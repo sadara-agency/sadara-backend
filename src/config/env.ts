@@ -1,0 +1,34 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+export const env = {
+  nodeEnv: process.env.NODE_ENV || 'development',
+  port: parseInt(process.env.PORT || '4000', 10),
+
+  db: {
+    host: process.env.POSTGRES_HOST || 'localhost',
+    port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+    name: process.env.POSTGRES_DB || 'SadaraDB',
+    user: process.env.POSTGRES_USER || 'admin',
+    password: process.env.POSTGRES_PASSWORD || 'admin1234',
+  },
+
+  jwt: {
+    secret: process.env.JWT_SECRET || 'sadara-dev-secret-change-in-production-min-32-chars',
+    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+  },
+
+  cors: {
+    origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+  },
+
+  bcrypt: {
+    saltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
+  },
+
+  pagination: {
+    defaultLimit: 20,
+    maxLimit: 100,
+  },
+} as const;
