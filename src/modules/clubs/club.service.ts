@@ -1,84 +1,86 @@
-import { query } from '../../config/database';
+import { Op, Sequelize, QueryTypes } from 'sequelize';
+import { Club } from './club.model';
+import { sequelize } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
 
+// ── List Clubs ──
 export async function listClubs(queryParams: any) {
   const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'name');
 
-  const conditions: string[] = [];
-  const values: any[] = [];
-  let idx = 1;
+  const where: any = {};
 
-  if (queryParams.type) { conditions.push(`type = $${idx++}`); values.push(queryParams.type); }
-  if (queryParams.country) { conditions.push(`country ILIKE $${idx++}`); values.push(`%${queryParams.country}%`); }
+  if (queryParams.type) where.type = queryParams.type;
+  if (queryParams.country) where.country = { [Op.iLike]: `%${queryParams.country}%` };
+
   if (search) {
-    conditions.push(`(name ILIKE $${idx} OR name_ar ILIKE $${idx} OR city ILIKE $${idx})`);
-    values.push(`%${search}%`); idx++;
+    where[Op.or] = [
+      { name: { [Op.iLike]: `%${search}%` } },
+      { nameAr: { [Op.iLike]: `%${search}%` } },
+      { city: { [Op.iLike]: `%${search}%` } },
+    ];
   }
 
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-  const allowedSorts: Record<string, string> = { name: 'name', created_at: 'created_at', city: 'city', country: 'country' };
-  const sortCol = allowedSorts[sort] || 'name';
+  const { count, rows } = await Club.findAndCountAll({
+    where,
+    attributes: {
+      include: [
+        [
+          Sequelize.literal(`(SELECT COUNT(*) FROM players p WHERE p.current_club_id = "Club".id)`),
+          'player_count',
+        ],
+        [
+          Sequelize.literal(`(SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = "Club".id AND ct.status = 'Active')`),
+          'active_contracts',
+        ],
+      ],
+    },
+    order: [[sort, order]],
+    limit,
+    offset,
+  });
 
-  const countResult = await query(`SELECT COUNT(*) FROM clubs ${whereClause}`, values);
-  const total = parseInt(countResult.rows[0].count, 10);
-
-  const dataValues = [...values, limit, offset];
-  const result = await query(
-    `SELECT c.*,
-       (SELECT COUNT(*) FROM players p WHERE p.current_club_id = c.id) AS player_count,
-       (SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = c.id AND ct.status = 'Active') AS active_contracts
-     FROM clubs c ${whereClause}
-     ORDER BY ${sortCol} ${order}
-     LIMIT $${idx++} OFFSET $${idx}`,
-    dataValues
-  );
-
-  return { data: result.rows, meta: buildMeta(total, page, limit) };
+  return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
+// ── Get Club by ID ──
 export async function getClubById(id: string) {
-  const result = await query(
-    `SELECT c.*, (SELECT COUNT(*) FROM players p WHERE p.current_club_id = c.id) AS player_count
-     FROM clubs c WHERE c.id = $1`, [id]
-  );
-  if (result.rows.length === 0) throw new AppError('Club not found', 404);
+  const club = await Club.findByPk(id, {
+    attributes: {
+      include: [
+        [
+          Sequelize.literal(`(SELECT COUNT(*) FROM players p WHERE p.current_club_id = "Club".id)`),
+          'player_count',
+        ],
+      ],
+    },
+  });
 
-  const contacts = await query(`SELECT * FROM contacts WHERE club_id = $1 ORDER BY is_primary DESC`, [id]);
-  return { ...result.rows[0], contacts: contacts.rows };
+  if (!club) throw new AppError('Club not found', 404);
+
+  const contacts = await sequelize.query(
+    `SELECT * FROM contacts WHERE club_id = :id ORDER BY is_primary DESC`,
+    { replacements: { id }, type: QueryTypes.SELECT }
+  );
+
+  return { ...club.get({ plain: true }), contacts };
 }
 
+// ── Create Club ──
 export async function createClub(input: any) {
-  const result = await query(
-    `INSERT INTO clubs (name, name_ar, type, country, city, league, logo_url, website, founded_year, stadium, stadium_capacity, primary_color, secondary_color, notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-    [input.name, input.nameAr, input.type, input.country, input.city, input.league, input.logoUrl, input.website,
-     input.foundedYear, input.stadium, input.stadiumCapacity, input.primaryColor, input.secondaryColor, input.notes]
-  );
-  return result.rows[0];
+  return await Club.create(input);
 }
 
+// ── Update Club ──
 export async function updateClub(id: string, input: any) {
-  const fields: string[] = [];
-  const values: any[] = [];
-  let idx = 1;
-  const map: Record<string, string> = {
-    name:'name', nameAr:'name_ar', type:'type', country:'country', city:'city', league:'league',
-    logoUrl:'logo_url', website:'website', foundedYear:'founded_year', stadium:'stadium',
-    stadiumCapacity:'stadium_capacity', primaryColor:'primary_color', secondaryColor:'secondary_color', notes:'notes',
-  };
-  for (const [key, val] of Object.entries(input)) {
-    if (val !== undefined && map[key]) { fields.push(`${map[key]} = $${idx++}`); values.push(val); }
-  }
-  if (fields.length === 0) throw new AppError('No fields to update');
-  values.push(id);
-  const result = await query(`UPDATE clubs SET ${fields.join(', ')} WHERE id = $${idx} RETURNING *`, values);
-  if (result.rows.length === 0) throw new AppError('Club not found', 404);
-  return result.rows[0];
+  const club = await Club.findByPk(id);
+  if (!club) throw new AppError('Club not found', 404);
+  return await club.update(input);
 }
 
+// ── Delete Club ──
 export async function deleteClub(id: string) {
-  const result = await query('DELETE FROM clubs WHERE id = $1 RETURNING id', [id]);
-  if (result.rows.length === 0) throw new AppError('Club not found', 404);
+  const deleted = await Club.destroy({ where: { id } });
+  if (!deleted) throw new AppError('Club not found', 404);
   return { id };
 }

@@ -4,6 +4,7 @@ import { Club } from '../clubs/club.model';
 import { User } from '../Users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
+import { sequelize } from '../../config/database'; 
 
 // ── List Players ──
 export async function listPlayers(queryParams: any) {
@@ -50,9 +51,9 @@ export async function getPlayerById(id: string) {
 
   // Use Promise.all with Model.count() for the sidebar counters
   const [activeContracts, activeInjuries, openTasks] = await Promise.all([
-    sequelize.model('Contract').count({ where: { playerId: id, status: 'Active' } }),
-    sequelize.model('Injury').count({ where: { playerId: id, status: 'UnderTreatment' } }),
-    sequelize.model('Task').count({ where: { playerId: id, status: 'Open' } }),
+    sequelize.models.Contract.count({ where: { playerId: id, status: 'Active' } }),
+    sequelize.models.Injury.count({ where: { playerId: id, status: 'UnderTreatment' } }),
+    sequelize.models.Task.count({ where: { playerId: id, status: 'Open' } }),
   ]);
 
   return {

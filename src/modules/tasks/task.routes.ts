@@ -1,6 +1,7 @@
 import { Router, Response } from 'express';
 import { z } from 'zod';
-import { query } from '../../config/database';
+import { QueryTypes } from 'sequelize';
+import { sequelize } from '../../config/database';
 import { AppError, asyncHandler } from '../../middleware/errorHandler';
 import { authenticate, authorize } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
@@ -52,42 +53,43 @@ router.get('/', validate(taskQuerySchema, 'query'), asyncHandler(async (req: Aut
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-  const countResult = await query(`SELECT COUNT(*) FROM tasks t ${where}`, values);
-  const total = parseInt(countResult.rows[0].count, 10);
+  const countResult: any[] = await sequelize.query(`SELECT COUNT(*) FROM tasks t ${where}`, { bind: values, type: QueryTypes.SELECT });
+  const total = parseInt(countResult[0].count, 10);
 
-  const result = await query(
+  const result = await sequelize.query(
     `SELECT t.*, p.first_name || ' ' || p.last_name AS player_name, u.full_name AS assigned_to_name
      FROM tasks t LEFT JOIN players p ON t.player_id = p.id LEFT JOIN users u ON t.assigned_to = u.id
      ${where}
      ORDER BY CASE t.priority WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
        t.due_date ASC NULLS LAST
      LIMIT $${idx++} OFFSET $${idx}`,
-    [...values, limit, offset]
+    { bind: [...values, limit, offset], type: QueryTypes.SELECT }
   );
 
-  sendPaginated(res, result.rows, buildMeta(total, page, limit));
+  sendPaginated(res, result, buildMeta(total, page, limit));
 }));
 
 // ── Get ──
 router.get('/:id', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const result = await query(
+  const result = await sequelize.query(
     `SELECT t.*, p.first_name || ' ' || p.last_name AS player_name, u.full_name AS assigned_to_name
      FROM tasks t LEFT JOIN players p ON t.player_id = p.id LEFT JOIN users u ON t.assigned_to = u.id
-     WHERE t.id = $1`, [req.params.id]
+     WHERE t.id = $1`,
+    { bind: [req.params.id], type: QueryTypes.SELECT }
   );
-  if (result.rows.length === 0) throw new AppError('Task not found', 404);
-  sendSuccess(res, result.rows[0]);
+  if (result.length === 0) throw new AppError('Task not found', 404);
+  sendSuccess(res, result[0]);
 }));
 
 // ── Create ──
 router.post('/', validate(createTaskSchema), asyncHandler(async (req: AuthRequest, res: Response) => {
   const d = req.body;
-  const result = await query(
+  const result = await sequelize.query(
     `INSERT INTO tasks (title, title_ar, description, type, priority, assigned_to, assigned_by, player_id, match_id, contract_id, due_date, notes)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
-    [d.title, d.titleAr, d.description, d.type, d.priority, d.assignedTo, req.user!.id, d.playerId, d.matchId, d.contractId, d.dueDate, d.notes]
+    { bind: [d.title, d.titleAr, d.description, d.type, d.priority, d.assignedTo, req.user!.id, d.playerId, d.matchId, d.contractId, d.dueDate, d.notes], type: QueryTypes.SELECT }
   );
-  sendCreated(res, result.rows[0]);
+  sendCreated(res, result[0]);
 }));
 
 // ── Update Status ──
@@ -96,18 +98,18 @@ router.patch('/:id/status', asyncHandler(async (req: AuthRequest, res: Response)
   if (!['Open', 'InProgress', 'Completed'].includes(status)) throw new AppError('Invalid status');
 
   const completedAt = status === 'Completed' ? 'NOW()' : 'NULL';
-  const result = await query(
+  const result = await sequelize.query(
     `UPDATE tasks SET status = $1, completed_at = ${completedAt} WHERE id = $2 RETURNING *`,
-    [status, req.params.id]
+    { bind: [status, req.params.id], type: QueryTypes.SELECT }
   );
-  if (result.rows.length === 0) throw new AppError('Task not found', 404);
-  sendSuccess(res, result.rows[0], 'Task status updated');
+  if (result.length === 0) throw new AppError('Task not found', 404);
+  sendSuccess(res, result[0], 'Task status updated');
 }));
 
 // ── Delete ──
 router.delete('/:id', authorize('Admin', 'Manager'), asyncHandler(async (req: AuthRequest, res: Response) => {
-  const result = await query('DELETE FROM tasks WHERE id = $1 RETURNING id', [req.params.id]);
-  if (result.rows.length === 0) throw new AppError('Task not found', 404);
+  const result = await sequelize.query('DELETE FROM tasks WHERE id = $1 RETURNING id', { bind: [req.params.id], type: QueryTypes.SELECT });
+  if (result.length === 0) throw new AppError('Task not found', 404);
   sendSuccess(res, { id: req.params.id }, 'Task deleted');
 }));
 
