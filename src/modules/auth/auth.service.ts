@@ -25,7 +25,7 @@ export async function register(input: RegisterInput) {
     passwordHash,
     fullName: input.fullName,
     fullNameAr: input.fullNameAr,
-    role: input.role as any ,
+    role: input.role as any,
   });
 
   return { user, token: generateToken(user) };
@@ -43,8 +43,12 @@ export async function login(input: LoginInput) {
 
   // Simple update logic
   await user.update({ lastLogin: new Date() });
+  const { passwordHash, ...userWithoutPassword } = user.get({ plain: true });
 
-  return { user, token: generateToken(user) };
+  return {
+    user: userWithoutPassword,
+    token: generateToken(user)
+  };
 }
 
 // ── Get Profile ──

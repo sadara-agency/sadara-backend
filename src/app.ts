@@ -39,12 +39,12 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ── API Routes ──
-app.use('/api/v1/auth',       authRoutes);
-app.use('/api/v1/players',    playerRoutes);
-app.use('/api/v1/clubs',      clubRoutes);
-app.use('/api/v1/contracts',  contractRoutes);
-app.use('/api/v1/tasks',      taskRoutes);
-app.use('/api/v1/dashboard',  dashboardRoutes);
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/players', playerRoutes);
+app.use('/api/v1/clubs', clubRoutes);
+app.use('/api/v1/contracts', contractRoutes);
+app.use('/api/v1/tasks', taskRoutes);
+app.use('/api/v1/dashboard', dashboardRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

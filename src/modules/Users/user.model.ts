@@ -17,15 +17,15 @@ interface UserAttributes {
 interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'lastLogin' | 'avatarUrl' | 'fullNameAr'> {}
 
 export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
-  public id!: string;
-  public email!: string;
-  public passwordHash!: string;
-  public fullName!: string;
-  public fullNameAr!: string | null;
-  public role!: string;
-  public avatarUrl!: string | null;
-  public isActive!: boolean;
-  public lastLogin!: Date | null;
+  declare id: string;
+  declare email: string;
+  declare passwordHash: string;
+  declare fullName: string;
+  declare fullNameAr: string | null;
+  declare role: string;
+  declare avatarUrl: string | null;
+  declare isActive: boolean;
+  declare lastLogin: Date | null;
 }
 
 User.init({
