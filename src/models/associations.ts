@@ -25,13 +25,11 @@ export function setupAssociations() {
   Task.belongsTo(Player, { as: 'player', foreignKey: 'playerId' });
   Task.belongsTo(User, { as: 'assignee', foreignKey: 'assignedTo' });
   Task.belongsTo(User, { as: 'assigner', foreignKey: 'assignedBy' });
+
+  // Contract associations
+  Contract.belongsTo(Player, { as: 'player', foreignKey: 'playerId' });
+  Contract.belongsTo(Club, { as: 'club', foreignKey: 'clubId' });
+  Contract.belongsTo(User, { as: 'creator', foreignKey: 'createdBy' });
+  Player.hasMany(Contract, { as: 'contracts', foreignKey: 'playerId' });
+  Club.hasMany(Contract, { as: 'contracts', foreignKey: 'clubId' });
 }
-
-// Contract associations
-// In your setupAssociations() file:
-Contract.belongsTo(Player, { as: 'player', foreignKey: 'playerId' });
-Contract.belongsTo(Club, { as: 'club', foreignKey: 'clubId' });
-Contract.belongsTo(User, { as: 'creator', foreignKey: 'createdBy' });
-
-Player.hasMany(Contract, { as: 'contracts', foreignKey: 'playerId' });
-Club.hasMany(Contract, { as: 'contracts', foreignKey: 'clubId' });

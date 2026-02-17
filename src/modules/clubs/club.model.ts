@@ -25,6 +25,7 @@ interface ClubAttributes {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   notes?: string | null;
+  isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -50,6 +51,7 @@ export class Club extends Model<ClubAttributes, ClubCreationAttributes> implemen
   declare primaryColor: string | null;
   declare secondaryColor: string | null;
   declare notes: string | null;
+  declare isActive: boolean;
 }
 
 Club.init({
@@ -108,6 +110,11 @@ Club.init({
   },
   notes: {
     type: DataTypes.TEXT,
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active',
   },
 }, {
   sequelize,

@@ -24,19 +24,19 @@ import { CreateClubInput, UpdateClubInput } from './club.schema';
 const CLUB_AGGREGATES = [
   [
     Sequelize.literal(`(SELECT COUNT(*) FROM players p WHERE p.current_club_id = "Club".id)`),
-    'playerCount',
+    'player_count',
   ],
   [
     Sequelize.literal(`(SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = "Club".id AND ct.status = 'Active')`),
-    'activeContracts',
+    'active_contracts',
   ],
   [
     Sequelize.literal(`(SELECT COALESCE(SUM(ct.base_salary), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`),
-    'totalContractValue',
+    'total_contract_value',
   ],
   [
     Sequelize.literal(`(SELECT COALESCE(SUM(ct.total_commission), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`),
-    'totalCommission',
+    'total_commission',
   ],
 ] as [ReturnType<typeof Sequelize.literal>, string][];
 
@@ -46,7 +46,7 @@ const CLUB_AGGREGATES = [
 export async function listClubs(queryParams: any) {
   const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'name');
 
-  const where: any = {};
+  const where: any = { isActive: true };
 
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.country) where.country = { [Op.iLike]: `%${queryParams.country}%` };
