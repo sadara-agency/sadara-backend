@@ -1,16 +1,17 @@
+
 import { QueryTypes } from 'sequelize';
 import { sequelize } from '../../config/database';
 
-// ── KPIs (main dashboard counters) ──
+/** Main KPI counters from the dashboard view. */
 export async function getKpis() {
   const result = await sequelize.query(
     'SELECT * FROM vw_dashboard_kpis',
-    { type: QueryTypes.SELECT }
+    { type: QueryTypes.SELECT },
   );
   return result[0] ?? {};
 }
 
-// ── Smart Alerts ──
+/** Smart alerts: expiring contracts, overdue payments, injury conflicts, referrals. */
 export async function getAlerts() {
   const [expiringContracts, overduePayments, injuryConflicts, openReferrals] =
     await Promise.all([
@@ -27,28 +28,26 @@ export async function getAlerts() {
         `SELECT r.*, p.first_name || ' ' || p.last_name AS player_name
          FROM referrals r
          JOIN players p ON r.player_id = p.id
-         WHERE r.status IN ('Open','InProgress')
+         WHERE r.status IN ('Open', 'InProgress')
          ORDER BY r.created_at DESC LIMIT 5`,
-        { type: QueryTypes.SELECT }
+        { type: QueryTypes.SELECT },
       ),
     ]);
 
   return { expiringContracts, overduePayments, injuryConflicts, openReferrals };
 }
 
-// ── Today's Overview ──
+/** Today's matches, due tasks, and due payments. Uses CURRENT_DATE to avoid timezone issues. */
 export async function getTodayOverview() {
-  const today = new Date().toISOString().split('T')[0];
-
   const [matches, tasks, payments] = await Promise.all([
     sequelize.query(
       `SELECT m.*, hc.name AS home_team, ac.name AS away_team
        FROM matches m
        LEFT JOIN clubs hc ON m.home_club_id = hc.id
        LEFT JOIN clubs ac ON m.away_club_id = ac.id
-       WHERE DATE(m.match_date) = $1
+       WHERE DATE(m.match_date) = CURRENT_DATE
        ORDER BY m.match_date`,
-      { bind: [today], type: QueryTypes.SELECT }
+      { type: QueryTypes.SELECT },
     ),
     sequelize.query(
       `SELECT t.*, p.first_name || ' ' || p.last_name AS player_name,
@@ -56,26 +55,26 @@ export async function getTodayOverview() {
        FROM tasks t
        LEFT JOIN players p ON t.player_id = p.id
        LEFT JOIN users u ON t.assigned_to = u.id
-       WHERE t.due_date = $1 AND t.status != 'Completed'
+       WHERE t.due_date = CURRENT_DATE AND t.status != 'Completed'
        ORDER BY CASE t.priority
          WHEN 'critical' THEN 0 WHEN 'high' THEN 1
          WHEN 'medium' THEN 2 ELSE 3 END`,
-      { bind: [today], type: QueryTypes.SELECT }
+      { type: QueryTypes.SELECT },
     ),
     sequelize.query(
       `SELECT py.*, p.first_name || ' ' || p.last_name AS player_name
        FROM payments py
        LEFT JOIN players p ON py.player_id = p.id
-       WHERE py.due_date = $1 AND py.status != 'Paid'
+       WHERE py.due_date = CURRENT_DATE AND py.status != 'Paid'
        ORDER BY py.amount DESC`,
-      { bind: [today], type: QueryTypes.SELECT }
+      { type: QueryTypes.SELECT },
     ),
   ]);
 
   return { matches, tasks, payments };
 }
 
-// ── Top Players (by market value) ──
+/** Top players ranked by market value with club, risk, and trend data. */
 export async function getTopPlayers(limit = 5) {
   return sequelize.query(
     `SELECT
@@ -101,47 +100,38 @@ export async function getTopPlayers(limit = 5) {
      WHERE p.status = 'active'
      ORDER BY p.market_value DESC NULLS LAST
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT }
+    { bind: [limit], type: QueryTypes.SELECT },
   );
 }
 
-// ── Contract Status Distribution (pie chart) ──
+/** Contract count grouped by status (for pie chart). */
 export async function getContractStatusDistribution() {
   return sequelize.query(
-    `SELECT
-       status,
-       COUNT(*)::INT AS count
+    `SELECT status, COUNT(*)::INT AS count
      FROM contracts
      GROUP BY status
      ORDER BY count DESC`,
-    { type: QueryTypes.SELECT }
+    { type: QueryTypes.SELECT },
   );
 }
 
-// ── Player Type Distribution (pro vs youth) ──
+/** Active player count grouped by type: Pro vs Youth. */
 export async function getPlayerDistribution() {
   return sequelize.query(
-    `SELECT
-       player_type,
-       COUNT(*)::INT AS count
+    `SELECT player_type, COUNT(*)::INT AS count
      FROM players
      WHERE status = 'active'
      GROUP BY player_type`,
-    { type: QueryTypes.SELECT }
+    { type: QueryTypes.SELECT },
   );
 }
 
-// ── Recent Offers ──
+/** Most recent offers with player and club names. */
 export async function getRecentOffers(limit = 5) {
   return sequelize.query(
     `SELECT
-       o.id,
-       o.offer_type,
-       o.status,
-       o.transfer_fee,
-       o.fee_currency,
-       o.deadline,
-       o.created_at,
+       o.id, o.offer_type, o.status, o.transfer_fee,
+       o.fee_currency, o.deadline, o.created_at,
        p.first_name || ' ' || p.last_name AS player_name,
        COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar,
        fc.name AS from_club,
@@ -152,44 +142,33 @@ export async function getRecentOffers(limit = 5) {
      LEFT JOIN clubs tc ON o.to_club_id = tc.id
      ORDER BY o.created_at DESC
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT }
+    { bind: [limit], type: QueryTypes.SELECT },
   );
 }
 
-// ── Upcoming Matches (with managed player count) ──
+/** Upcoming matches with managed player count per match. */
 export async function getUpcomingMatches(limit = 5) {
   return sequelize.query(
     `SELECT
-       m.id,
-       m.match_date,
-       m.venue,
-       m.competition,
-       m.status,
+       m.id, m.match_date, m.venue, m.competition, m.status,
        hc.name AS home_team,
        ac.name AS away_team,
-       (SELECT COUNT(*)
-        FROM match_players mp WHERE mp.match_id = m.id) AS managed_players
+       (SELECT COUNT(*) FROM match_players mp WHERE mp.match_id = m.id) AS managed_players
      FROM matches m
      LEFT JOIN clubs hc ON m.home_club_id = hc.id
      LEFT JOIN clubs ac ON m.away_club_id = ac.id
      WHERE m.status = 'upcoming' AND m.match_date >= NOW()
      ORDER BY m.match_date ASC
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT }
+    { bind: [limit], type: QueryTypes.SELECT },
   );
 }
 
-// ── Urgent Tasks ──
+/** Non-completed tasks sorted by priority (critical first). */
 export async function getUrgentTasks(limit = 5) {
   return sequelize.query(
     `SELECT
-       t.id,
-       t.title,
-       t.title_ar,
-       t.type,
-       t.priority,
-       t.status,
-       t.due_date,
+       t.id, t.title, t.title_ar, t.type, t.priority, t.status, t.due_date,
        p.first_name || ' ' || p.last_name AS player_name,
        u.full_name AS assigned_to_name
      FROM tasks t
@@ -201,11 +180,18 @@ export async function getUrgentTasks(limit = 5) {
        WHEN 'medium' THEN 2 ELSE 3 END,
        t.due_date ASC NULLS LAST
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT }
+    { bind: [limit], type: QueryTypes.SELECT },
   );
 }
 
-// ── Revenue & Commission (monthly for charts) ──
+/**
+ * Monthly revenue & commission for charts.
+ *
+ * FIX: The old code string-interpolated `months` directly into
+ * the SQL query (`INTERVAL '${months} months'`), which is a
+ * SQL injection vector. Now we use `make_interval(months => $1)`
+ * with a parameterized bind.
+ */
 export async function getRevenueChart(months = 12) {
   return sequelize.query(
     `SELECT
@@ -214,14 +200,14 @@ export async function getRevenueChart(months = 12) {
        SUM(CASE WHEN py.payment_type = 'Commission' THEN py.amount ELSE 0 END)::NUMERIC AS commission
      FROM payments py
      WHERE py.status = 'Paid'
-       AND py.paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '${months} months'
+       AND py.paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
      GROUP BY DATE_TRUNC('month', py.paid_date)
      ORDER BY month ASC`,
-    { type: QueryTypes.SELECT }
+    { bind: [months], type: QueryTypes.SELECT },
   );
 }
 
-// ── Performance Averages (radar chart) ──
+/** Average performance metrics across all active players (for radar chart). */
 export async function getPerformanceAverages() {
   return sequelize.query(
     `SELECT
@@ -234,44 +220,39 @@ export async function getPerformanceAverages() {
      FROM performances perf
      JOIN players p ON perf.player_id = p.id
      WHERE p.status = 'active'`,
-    { type: QueryTypes.SELECT }
+    { type: QueryTypes.SELECT },
   );
 }
 
-// ── Recent Activity (audit log) ──
+/** Recent audit log entries with user names. */
 export async function getRecentActivity(limit = 10) {
   return sequelize.query(
     `SELECT
-       al.id,
-       al.action,
-       al.entity,
-       al.entity_id,
-       al.detail,
-       al.logged_at,
-       al.user_id,
+       al.id, al.action, al.entity, al.entity_id,
+       al.detail, al.logged_at, al.user_id,
        u.full_name AS user_name
      FROM audit_logs al
      LEFT JOIN users u ON al.user_id = u.id
      ORDER BY al.logged_at DESC
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT }
+    { bind: [limit], type: QueryTypes.SELECT },
   );
 }
 
-// ── Quick Stats (gates, referrals, watchlist, completion) ──
+/** Quick counters: completed gates, active referrals, watchlist, task completion rate. */
 export async function getQuickStats() {
   const [gates, referrals, watchlist, taskCompletion] = await Promise.all([
     sequelize.query(
       `SELECT COUNT(*)::INT AS count FROM gates WHERE status = 'Completed'`,
-      { type: QueryTypes.SELECT }
+      { type: QueryTypes.SELECT },
     ),
     sequelize.query(
-      `SELECT COUNT(*)::INT AS count FROM referrals WHERE status IN ('Open','InProgress')`,
-      { type: QueryTypes.SELECT }
+      `SELECT COUNT(*)::INT AS count FROM referrals WHERE status IN ('Open', 'InProgress')`,
+      { type: QueryTypes.SELECT },
     ),
     sequelize.query(
       `SELECT COUNT(*)::INT AS count FROM watchlists WHERE status = 'Active'`,
-      { type: QueryTypes.SELECT }
+      { type: QueryTypes.SELECT },
     ),
     sequelize.query(
       `SELECT
@@ -281,7 +262,7 @@ export async function getQuickStats() {
            COUNT(*)::NUMERIC * 100
          ) END AS completion_rate
        FROM tasks`,
-      { type: QueryTypes.SELECT }
+      { type: QueryTypes.SELECT },
     ),
   ]);
 
@@ -293,21 +274,12 @@ export async function getQuickStats() {
   };
 }
 
-// ── Full Dashboard (aggregated single call) ──
+/** Full dashboard — fires all queries in parallel for initial page load. */
 export async function getFullDashboard() {
   const [
-    kpis,
-    alerts,
-    topPlayers,
-    contractStatus,
-    playerDistribution,
-    recentOffers,
-    upcomingMatches,
-    urgentTasks,
-    revenueChart,
-    performanceAvg,
-    recentActivity,
-    quickStats,
+    kpis, alerts, topPlayers, contractStatus, playerDistribution,
+    recentOffers, upcomingMatches, urgentTasks, revenueChart,
+    performanceAvg, recentActivity, quickStats,
   ] = await Promise.all([
     getKpis(),
     getAlerts(),
@@ -324,17 +296,8 @@ export async function getFullDashboard() {
   ]);
 
   return {
-    kpis,
-    alerts,
-    topPlayers,
-    contractStatus,
-    playerDistribution,
-    recentOffers,
-    upcomingMatches,
-    urgentTasks,
-    revenueChart,
-    performanceAvg,
-    recentActivity,
-    quickStats,
+    kpis, alerts, topPlayers, contractStatus, playerDistribution,
+    recentOffers, upcomingMatches, urgentTasks, revenueChart,
+    performanceAvg, recentActivity, quickStats,
   };
 }

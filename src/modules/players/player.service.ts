@@ -1,55 +1,63 @@
-import { Op, Sequelize } from 'sequelize';
+import { Op, Sequelize, fn, col } from 'sequelize';
 import { Player } from './player.model';
 import { Club } from '../clubs/club.model';
 import { User } from '../Users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { sequelize } from '../../config/database'; 
+import { sequelize } from '../../config/database';
 
-// ── List Players ──
-export async function listPlayers(queryParams: any) {
+import { ListPlayersQuery } from './utils/player.types';
+import { buildPlayerWhere } from './utils/player.filters';
+import { fetchEnrichmentMaps } from './utils/player.enrichment';
+import { toPlayerList } from './utils/player.serializer';
+
+// ────────────────────────────────────────────────────
+// List Players — enriched with contract/stats/injury data
+// ────────────────────────────────────────────────────
+export async function listPlayers(queryParams: ListPlayersQuery) {
   const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
 
-  const where: any = {};
-  
-  if (queryParams.status) where.status = queryParams.status;
-  if (queryParams.playerType) where.playerType = queryParams.playerType;
-  if (queryParams.clubId) where.currentClubId = queryParams.clubId;
-  
-  if (search) {
-    where[Op.or] = [
-      { firstName: { [Op.iLike]: `%${search}%` } },
-      { lastName: { [Op.iLike]: `%${search}%` } },
-      Sequelize.where(
-        Sequelize.fn('concat', Sequelize.col('first_name'), ' ', Sequelize.col('last_name')),
-        { [Op.iLike]: `%${search}%` }
-      )
-    ];
-  }
+  // 2. Build where clause (extracted to player.filters.ts)
+  const where = buildPlayerWhere(queryParams, search);
 
+  // 3. Query players with associations
   const { count, rows } = await Player.findAndCountAll({
     where,
     limit,
     offset,
     order: [[sort, order]],
     include: [
-      { model: Club, as: 'club', attributes: ['name', 'logoUrl'] },
-      { model: User, as: 'agent', attributes: ['fullName'] }
-    ]
+      { model: Club, as: 'club', attributes: ['id', 'name', 'nameAr', 'logoUrl', 'league'] },
+      { model: User, as: 'agent', attributes: ['id', 'fullName', 'fullNameAr'] },
+    ],
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  // 4. Early return for empty results
+  const playerIds = rows.map((p) => p.id);
+  if (playerIds.length === 0) {
+    return { data: [], meta: buildMeta(count, page, limit) };
+  }
+
+  // 5. Batch-fetch related data (extracted to player.enrichment.ts)
+  const maps = await fetchEnrichmentMaps(playerIds);
+
+  // 6. Serialize to DTOs (extracted to player.serializer.ts)
+  const plainPlayers = rows.map((p) => p.get({ plain: true }));
+  const data = toPlayerList(plainPlayers, maps);
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
-// ── Get Player by ID (With Aggregates) ──
+// ────────────────────────────────────────────────────────────
+// Get Player by ID (With Aggregates)
+// ────────────────────────────────────────────────────────────
 export async function getPlayerById(id: string) {
   const player = await Player.findByPk(id, {
-    include: ['club', 'agent', 'riskRadar']
+    include: ['club', 'agent', 'riskRadar'],
   });
 
   if (!player) throw new AppError('Player not found', 404);
 
-  // Use Promise.all with Model.count() for the sidebar counters
   const [activeContracts, activeInjuries, openTasks] = await Promise.all([
     sequelize.models.Contract.count({ where: { playerId: id, status: 'Active' } }),
     sequelize.models.Injury.count({ where: { playerId: id, status: 'UnderTreatment' } }),
@@ -58,11 +66,14 @@ export async function getPlayerById(id: string) {
 
   return {
     ...player.get({ plain: true }),
-    counts: { activeContracts, activeInjuries, openTasks }
+    counts: { activeContracts, activeInjuries, openTasks },
   };
 }
 
-// ── Create/Update/Delete (Simplified) ──
+
+// ────────────────────────────────────────────────────
+// Create / Update / Delete
+// ────────────────────────────────────────────────────
 export async function createPlayer(input: any, createdBy: string) {
   return await Player.create({ ...input, createdBy });
 }

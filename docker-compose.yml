@@ -16,7 +16,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-
+    networks:
+      - shared-db-net
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin_ui
@@ -29,6 +30,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-
+    networks:
+      - shared-db-net
 volumes:
   postgres_data:
+networks:
+  shared-db-net:
+    name: shared-db-net
+    driver: bridge
