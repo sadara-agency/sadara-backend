@@ -1,7 +1,14 @@
+// ─────────────────────────────────────────────────────────────
+// src/modules/clubs/club.model.ts
+// Sequelize model for the clubs table.
+//
+// FIXED: Changed `public` to `declare` on all properties
+// to avoid shadowing Sequelize ORM getters. This is the same
+// fix applied to Player and other models.
+// ─────────────────────────────────────────────────────────────
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
 
-// 1. Define all possible attributes in the Club model
 interface ClubAttributes {
   id: string;
   name: string;
@@ -18,36 +25,35 @@ interface ClubAttributes {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   notes?: string | null;
+  isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
-// 2. Define which attributes are optional during Club.create()
 interface ClubCreationAttributes extends Optional<
-  ClubAttributes, 
+  ClubAttributes,
   'id' | 'type' | 'createdAt' | 'updatedAt'
 > {}
 
-// 3. The Model Class
 export class Club extends Model<ClubAttributes, ClubCreationAttributes> implements ClubAttributes {
-  public id!: string;
-  public name!: string;
-  public nameAr!: string | null;
-  public type!: 'Club' | 'Sponsor';
-  public country!: string | null;
-  public city!: string | null;
-  public league!: string | null;
-  public logoUrl!: string | null;
-  public website!: string | null;
-  public foundedYear!: number | null;
-  public stadium!: string | null;
-  public stadiumCapacity!: number | null;
-  public primaryColor!: string | null;
-  public secondaryColor!: string | null;
-  public notes!: string | null;
+  declare id: string;
+  declare name: string;
+  declare nameAr: string | null;
+  declare type: 'Club' | 'Sponsor';
+  declare country: string | null;
+  declare city: string | null;
+  declare league: string | null;
+  declare logoUrl: string | null;
+  declare website: string | null;
+  declare foundedYear: number | null;
+  declare stadium: string | null;
+  declare stadiumCapacity: number | null;
+  declare primaryColor: string | null;
+  declare secondaryColor: string | null;
+  declare notes: string | null;
+  declare isActive: boolean;
 }
 
-// 4. Initialization
 Club.init({
   id: {
     type: DataTypes.UUID,
@@ -79,9 +85,6 @@ Club.init({
   logoUrl: {
     type: DataTypes.STRING,
     field: 'logo_url',
-    validate: {
-      isUrl: true,
-    },
   },
   website: {
     type: DataTypes.STRING,
@@ -107,6 +110,11 @@ Club.init({
   },
   notes: {
     type: DataTypes.TEXT,
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true,
+    field: 'is_active',
   },
 }, {
   sequelize,

@@ -42,5 +42,5 @@ User.init({
   sequelize,
   tableName: 'users',
   underscored: true,
-  timestamps: true, // Automatically adds created_at and updated_at
+  timestamps: true, 
 });

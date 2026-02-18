@@ -5,6 +5,7 @@ import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter } from './middleware/rateLimiter';
+import { setupAssociations } from './models/associations';
 
 // Route imports
 import authRoutes from './modules/auth/auth.routes';
@@ -13,6 +14,9 @@ import clubRoutes from './modules/clubs/club.routes';
 import contractRoutes from './modules/contracts/contract.routes';
 import taskRoutes from './modules/tasks/task.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
+import userRoutes from './modules/Users/user.routes';
+import offerRoutes from './modules/offers/offer.routes';
+import matchRoutes from './modules/matches/match.routes'
 
 const app = express();
 
@@ -38,6 +42,8 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+setupAssociations();
+
 // ── API Routes ──
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/players', playerRoutes);
@@ -45,6 +51,9 @@ app.use('/api/v1/clubs', clubRoutes);
 app.use('/api/v1/contracts', contractRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/offers', offerRoutes);
+app.use('/api/v1/matches', matchRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {
