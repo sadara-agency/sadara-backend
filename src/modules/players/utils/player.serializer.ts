@@ -1,15 +1,15 @@
 // ─────────────────────────────────────────────────────────────
 // src/modules/players/player.serializer.ts
 // Transforms raw Sequelize player rows + enrichment maps
-// into the final API response shape (EnrichedPlayerListItem).
+// into the final API response shape.
 //
-// Why a separate file?
-// - The old code had a 40-line .map() callback that mixed
-//   data access (contractMap.get) with business logic
-//   (deriveContractInfo) with DTO shaping (return { id, ... }).
-// - Now the service just calls `toPlayerListItem(player, maps)`
-//   and this file handles the rest.
-// - Easy to test: pass a plain player object + maps, assert shape.
+// FIX: Added flat convenience fields that the frontend expects:
+//   - name (full name string)
+//   - clubName (string, was returning club as nested object)
+//   - initials (Arabic or English initials)
+//   - age (computed from dateOfBirth)
+// The rich nested objects (club, agent) are ALSO kept for
+// detail pages that need them.
 // ─────────────────────────────────────────────────────────────
 import {
   RawContractRow,
@@ -25,11 +25,36 @@ export interface EnrichmentMaps {
 }
 
 /**
+ * Compute age from a date-of-birth string.
+ */
+function computeAge(dob: string | null): number {
+  if (!dob) return 0;
+  const birth = new Date(dob);
+  const now = new Date();
+  let age = now.getFullYear() - birth.getFullYear();
+  const monthDiff = now.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && now.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
+
+/**
+ * Generate 2-character initials from Arabic or English name.
+ */
+function getInitials(firstNameAr: string | null, lastNameAr: string | null, firstName: string, lastName: string): string {
+  if (firstNameAr && lastNameAr) {
+    return `${firstNameAr.charAt(0)}${lastNameAr.charAt(0)}`;
+  }
+  return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+}
+
+/**
  * Converts a single Sequelize player (plain object) into the
  * enriched list-item DTO that the API returns.
  */
 export function toPlayerListItem(
-  plainPlayer: any, // Sequelize .get({ plain: true }) result
+  plainPlayer: any,
   maps: EnrichmentMaps,
 ): EnrichedPlayerListItem {
   const p = plainPlayer;
@@ -52,6 +77,14 @@ export function toPlayerListItem(
     lastNameAr: p.lastNameAr,
     fullName: `${p.firstName} ${p.lastName}`,
     fullNameAr: p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null,
+
+    // ── Flat convenience fields for the frontend ──
+    name: p.firstNameAr && p.lastNameAr
+      ? `${p.firstNameAr} ${p.lastNameAr}`
+      : `${p.firstName} ${p.lastName}`,
+    initials: getInitials(p.firstNameAr, p.lastNameAr, p.firstName, p.lastName),
+    age: computeAge(p.dateOfBirth),
+
     dateOfBirth: p.dateOfBirth,
     nationality: p.nationality,
     playerType: p.playerType,
@@ -60,11 +93,19 @@ export function toPlayerListItem(
     email: p.email,
     phone: p.phone,
     photoUrl: p.photoUrl,
-    marketValue: p.marketValue,
+    marketValue: p.marketValue ? Number(p.marketValue) : 0,
     marketValueCurrency: p.marketValueCurrency,
     currentClubId: p.currentClubId,
-    club: p.club,
-    agent: p.agent,
+
+    // ── Club: nested object + flat string ──
+    club: p.club ? p.club.nameAr || p.club.name : null,
+    clubData: p.club,  // rich object for detail pages
+
+    // ── Agent: nested object + flat string ──
+    agent: p.agent ? p.agent.fullNameAr || p.agent.fullName : null,
+    agentData: p.agent,
+
+    // ── Enriched fields ──
     contractStatus,
     contractEnd,
     commissionRate,
@@ -76,7 +117,7 @@ export function toPlayerListItem(
     rating: avgRating ? parseFloat(avgRating.toFixed(1)) : 0,
     performance,
     createdAt: p.createdAt,
-  };
+  } as any;
 }
 
 /**

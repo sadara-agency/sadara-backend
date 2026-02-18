@@ -1,7 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // src/modules/players/player.utils.ts
-// Pure utility functions extracted from listPlayers.
-// Each function does ONE thing and is easy to unit-test.
+// Pure utility functions for the player module.
+//
+// FIX: deriveContractInfo now uses `contract.commissionPct`
+// instead of `contract.agencyCommissionPercent`.
 // ─────────────────────────────────────────────────────────────
 import {
   RawContractRow,
@@ -11,21 +13,10 @@ import {
   ContractStatusLabel,
 } from './player.types';
 
-// ─────────────────────────────────────────────────────
-// CONSTANTS
-// The "6-month" threshold was a magic number buried
-// inside the old map callback. Now it's named and
-// importable so tests can reference it too.
-// ─────────────────────────────────────────────────────
+// ── Constants ──
 export const CONTRACT_EXPIRY_WARNING_MONTHS = 6;
 
-// ─────────────────────────────────────────────────────
-// deriveContractInfo
-// ─────────────────────────────────────────────────────
-// Takes an optional raw contract row and returns a
-// normalized { contractStatus, contractEnd, commissionRate }
-// object. Previously this was 12 lines inside the .map().
-// ─────────────────────────────────────────────────────
+// ── deriveContractInfo ──
 export function deriveContractInfo(contract?: RawContractRow | null): DerivedContractInfo {
   if (!contract) {
     return { contractStatus: 'Expired', contractEnd: null, commissionRate: 0 };
@@ -49,24 +40,11 @@ export function deriveContractInfo(contract?: RawContractRow | null): DerivedCon
   return {
     contractStatus,
     contractEnd: contract.endDate,
-    commissionRate: contract.agencyCommissionPercent || 0,
+    commissionRate: Number(contract.commissionPct) || 0,  // FIX: was agencyCommissionPercent
   };
 }
 
-// ─────────────────────────────────────────────────────
-// calculatePerformance
-// ─────────────────────────────────────────────────────
-// Composite score 0-100 based on goals, assists, and
-// average rating relative to matches played.
-//
-// Formula breakdown:
-//   (goals/match * 30) + (assists/match * 20) + (avgRating * 5)
-//   clamped to [0, 100]
-//
-// Previously this was 6 lines inside the .map().
-// Now it's testable with simple inputs like:
-//   calculatePerformance({ matches: 10, goals: 5, assists: 3, avgRating: 7.2 })
-// ─────────────────────────────────────────────────────
+// ── calculatePerformance ──
 export interface PerformanceInput {
   matches: number;
   goals: number;
@@ -87,16 +65,7 @@ export function calculatePerformance(input: PerformanceInput): number {
   return Math.min(100, Math.max(0, Math.round(raw)));
 }
 
-// ─────────────────────────────────────────────────────
-// buildContractMap
-// ─────────────────────────────────────────────────────
-// From a flat array of raw contract rows, builds a Map
-// keyed by playerId → latest active contract (by endDate).
-//
-// Previously this was done inline with a forEach + manual
-// date comparison. Extracting it means we can test edge
-// cases like multiple active contracts per player.
-// ─────────────────────────────────────────────────────
+// ── buildContractMap ──
 export function buildContractMap(rows: RawContractRow[]): Map<string, RawContractRow> {
   const map = new Map<string, RawContractRow>();
 
@@ -110,12 +79,7 @@ export function buildContractMap(rows: RawContractRow[]): Map<string, RawContrac
   return map;
 }
 
-// ─────────────────────────────────────────────────────
-// buildInjuryMap
-// ─────────────────────────────────────────────────────
-// Converts the raw grouped injury-count rows into a
-// simple Map<playerId, number>.
-// ─────────────────────────────────────────────────────
+// ── buildInjuryMap ──
 export function buildInjuryMap(rows: RawInjuryCountRow[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const row of rows) {
@@ -124,12 +88,7 @@ export function buildInjuryMap(rows: RawInjuryCountRow[]): Map<string, number> {
   return map;
 }
 
-// ─────────────────────────────────────────────────────
-// buildStatsMap
-// ─────────────────────────────────────────────────────
-// Converts the raw grouped stats rows into a
-// Map<playerId, RawPlayerStatsRow>.
-// ─────────────────────────────────────────────────────
+// ── buildStatsMap ──
 export function buildStatsMap(rows: RawPlayerStatsRow[]): Map<string, RawPlayerStatsRow> {
   const map = new Map<string, RawPlayerStatsRow>();
   for (const row of rows) {

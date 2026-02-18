@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────
-// All TypeScript interfaces for the player module in one place.
-// Replaces every `any` that was scattered across the service.
+// src/modules/players/player.types.ts
+// All TypeScript interfaces for the player module.
 // ─────────────────────────────────────────────────────────────
 
-// ── Query params that the controller forwards from req.query ──
+// ── Query params from req.query ──
 export interface ListPlayersQuery {
   page?: number;
   limit?: number;
@@ -17,20 +17,22 @@ export interface ListPlayersQuery {
   nationality?: string;
 }
 
-// ── What the batch-fetched contract row looks like (raw: true) ──
+// ── Batch-fetched contract row (raw: true) ──
+// FIX: was `agencyCommissionPercent` which doesn't exist in DB.
+// The actual column is `commission_pct` → Sequelize camelCase: `commissionPct`
 export interface RawContractRow {
   playerId: string;
   endDate: string;
-  agencyCommissionPercent: number | null;
+  commissionPct: number | null;
 }
 
-// ── What the batch-fetched injury count row looks like (raw: true) ──
+// ── Batch-fetched injury count row (raw: true) ──
 export interface RawInjuryCountRow {
   playerId: string;
   count: string; // Sequelize COUNT returns string in raw mode
 }
 
-// ── What the batch-fetched stats row looks like (raw: true) ──
+// ── Batch-fetched stats row (raw: true) ──
 export interface RawPlayerStatsRow {
   playerId: string;
   matches: string;
@@ -40,7 +42,7 @@ export interface RawPlayerStatsRow {
   avgRating: string;
 }
 
-// ── Derived contract status after business-logic evaluation ──
+// ── Derived contract status ──
 export type ContractStatusLabel = 'Active' | 'Expiring Soon' | 'Expired';
 
 export interface DerivedContractInfo {
@@ -49,7 +51,7 @@ export interface DerivedContractInfo {
   commissionRate: number;
 }
 
-// ── The final shape of each player in the API response ──
+// ── Final shape of each player in the API response ──
 export interface EnrichedPlayerListItem {
   id: string;
   firstName: string;

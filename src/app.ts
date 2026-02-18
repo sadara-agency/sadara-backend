@@ -15,6 +15,8 @@ import contractRoutes from './modules/contracts/contract.routes';
 import taskRoutes from './modules/tasks/task.routes';
 import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import userRoutes from './modules/Users/user.routes';
+import offerRoutes from './modules/offers/offer.routes';
+import matchRoutes from './modules/matches/match.routes'
 
 const app = express();
 
@@ -50,6 +52,8 @@ app.use('/api/v1/contracts', contractRoutes);
 app.use('/api/v1/tasks', taskRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/offers', offerRoutes);
+app.use('/api/v1/matches', matchRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

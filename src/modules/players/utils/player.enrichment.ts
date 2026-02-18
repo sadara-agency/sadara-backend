@@ -1,15 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 // src/modules/players/player.enrichment.ts
-// Handles batch-fetching of related data (contracts, injuries,
-// match stats) for a given set of player IDs.
+// Batch-fetches contracts, injuries, and stats for player IDs.
 //
-// Why extracted?
-// - The old listPlayers had ~40 lines of Promise.all + map
-//   building mixed in with the main query logic.
-// - Now the service calls `fetchEnrichmentMaps(playerIds)`
-//   and gets back ready-to-use Maps.
-// - If you ever need enrichment in another endpoint (e.g.
-//   scouting shortlist), you can reuse this directly.
+// FIX: Changed 'agencyCommissionPercent' → 'commissionPct'
+// to match the actual contracts table column (commission_pct).
 // ─────────────────────────────────────────────────────────────
 import { Op, fn, col } from 'sequelize';
 import { sequelize } from '../../../config/database';
@@ -28,11 +22,6 @@ import { EnrichmentMaps } from './player.serializer';
 /**
  * Given an array of player IDs, fires 3 parallel queries and
  * returns lookup Maps for contracts, injuries, and match stats.
- *
- * Each query is guarded by a model-existence check so the
- * service doesn't crash if a migration hasn't run yet.
- * (Though ideally you'd remove those guards once the schema
- * is stable.)
  */
 export async function fetchEnrichmentMaps(playerIds: string[]): Promise<EnrichmentMaps> {
   const Contract = sequelize.models.Contract;
@@ -46,7 +35,7 @@ export async function fetchEnrichmentMaps(playerIds: string[]): Promise<Enrichme
     Contract
       ? Contract.findAll({
           where: { playerId: playerIdFilter, status: 'Active' },
-          attributes: ['playerId', 'endDate', 'agencyCommissionPercent'],
+          attributes: ['playerId', 'endDate', 'commissionPct'],  // FIX: was 'agencyCommissionPercent'
           raw: true,
         })
       : Promise.resolve([]),
