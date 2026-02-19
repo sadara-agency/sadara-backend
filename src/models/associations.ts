@@ -11,6 +11,13 @@ import { Task } from '../modules/tasks/task.model';
 import { Contract } from '../modules/contracts/contract.model';
 import { Offer } from '../modules/offers/offer.model';
 import { Match } from '../modules/matches/match.model';
+import { Gate, GateChecklist } from '../modules/gates/gate.model';
+import { Referral } from '../modules/referrals/referral.model';
+import { Watchlist, ScreeningCase, SelectionDecision } from '../modules/scouting/scouting.model';
+import { Invoice, Payment, LedgerEntry, Valuation } from '../modules/finance/finance.model';
+import { Document } from '../modules/documents/document.model';
+
+
 
 
 export function setupAssociations() {
@@ -51,5 +58,38 @@ export function setupAssociations() {
   Match.belongsTo(Club, { foreignKey: 'awayClubId', as: 'awayClub' });
   Club.hasMany(Match, { foreignKey: 'homeClubId', as: 'homeMatches' });
   Club.hasMany(Match, { foreignKey: 'awayClubId', as: 'awayMatches' });
+
+  Gate.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Player.hasMany(Gate, { foreignKey: 'playerId', as: 'gates' });
+  Gate.belongsTo(User, { foreignKey: 'approvedBy', as: 'approver' });
+
+
+  Gate.hasMany(GateChecklist, { foreignKey: 'gateId', as: 'checklist' });
+  GateChecklist.belongsTo(Gate, { foreignKey: 'gateId', as: 'gate' });
+
+  Referral.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Player.hasMany(Referral, { foreignKey: 'playerId', as: 'referrals' });
+  Referral.belongsTo(User, { foreignKey: 'assignedTo', as: 'assignee' });
+  Referral.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
+
+  Watchlist.belongsTo(User, { foreignKey: 'scoutedBy', as: 'scout' });
+  ScreeningCase.belongsTo(User, { foreignKey: 'packPreparedBy', as: 'preparer' });
+  ScreeningCase.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
+
+
+  Invoice.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Invoice.belongsTo(Club, { foreignKey: 'clubId', as: 'club' });
+  Invoice.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
+  Payment.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Payment.belongsTo(Invoice, { foreignKey: 'invoiceId', as: 'invoice' });
+  LedgerEntry.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Valuation.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Player.hasMany(Valuation, { foreignKey: 'playerId', as: 'valuations' });
+
+  Document.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Player.hasMany(Document, { foreignKey: 'playerId', as: 'documents' });
+  Document.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
+
+
 
 }

@@ -4,25 +4,36 @@ import { sendSuccess, sendCreated } from '../../shared/utils/apiResponse';
 import { logAudit, buildAuditContext } from '../../shared/utils/audit';
 import * as authService from './auth.service';
 
+// ── Public Register (no token returned, account inactive) ──
 export async function register(req: Request, res: Response) {
   const result = await authService.register(req.body);
 
   await logAudit('REGISTER', 'users', result.user.id, {
     userId: result.user.id,
-    userName: result.user.fullName,
-    userRole: result.user.role as any,
+    userName: result.user.fullName ?? result.user.fullNameAr,
+    userRole: 'Analyst',
     ip: req.ip,
   });
 
-  sendCreated(res, result, 'Registration successful');
+  sendCreated(res, { user: { id: result.user.id, email: result.user.email } }, 'Registration successful. Please check your email for verification.');
 }
 
+// ── Admin Invite (creates active user with assigned role) ──
+export async function invite(req: AuthRequest, res: Response) {
+  const result = await authService.invite(req.body);
+
+  await logAudit('INVITE', 'users', result.user.id, buildAuditContext(req.user!, req.ip), `Invited ${result.user.email} as ${result.user.role}`);
+
+  sendCreated(res, result, 'User invited successfully');
+}
+
+// ── Login ──
 export async function login(req: Request, res: Response) {
   const result = await authService.login(req.body);
 
   await logAudit('LOGIN', 'users', result.user.id, {
     userId: result.user.id,
-    userName: result.user.fullName,
+    userName: result.user.fullName ?? result.user.fullNameAr,
     userRole: result.user.role as any,
     ip: req.ip,
   });
@@ -30,6 +41,7 @@ export async function login(req: Request, res: Response) {
   sendSuccess(res, result, 'Login successful');
 }
 
+// ── Profile ──
 export async function getProfile(req: AuthRequest, res: Response) {
   const user = await authService.getProfile(req.user!.id);
   sendSuccess(res, user);

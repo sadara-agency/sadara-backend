@@ -17,6 +17,12 @@ import dashboardRoutes from './modules/dashboard/dashboard.routes';
 import userRoutes from './modules/Users/user.routes';
 import offerRoutes from './modules/offers/offer.routes';
 import matchRoutes from './modules/matches/match.routes'
+import gateRoutes from './modules/gates/gate.routes';
+import referralRoutes from './modules/referrals/referral.routes';
+import scoutingRoutes from './modules/scouting/scouting.routes';
+import financeRoutes from './modules/finance/finance.routes';
+import documentRoutes from './modules/documents/document.routes';
+import settingsRoutes from './modules/settings/settings.routes';
 
 const app = express();
 
@@ -54,6 +60,13 @@ app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/offers', offerRoutes);
 app.use('/api/v1/matches', matchRoutes);
+app.use('/api/v1/gates', gateRoutes);
+app.use('/api/v1/referrals', referralRoutes);
+app.use('/api/v1/scouting', scoutingRoutes);
+app.use('/api/v1/finance', financeRoutes);
+app.use('/api/v1/documents', documentRoutes);
+app.use('/api/v1/settings', settingsRoutes);
+
 
 // ── 404 ──
 app.use((_req, res) => {
