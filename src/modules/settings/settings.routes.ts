@@ -50,12 +50,25 @@ const SAFE_ATTRS = ['id', 'email', 'fullName', 'fullNameAr', 'role', 'avatarUrl'
 // ══════════════════════════════════════════
 
 router.get('/profile', asyncHandler(async (req: AuthRequest, res: Response) => {
-  const user = await User.findByPk(req.user!.id, {
+  let user = await User.findByPk(req.user!.id, {
     attributes: [...SAFE_ATTRS],
   });
-  if (!user) throw new AppError('User not found', 404);
 
-  // two_factor_enabled isn't in the User model definition, so fetch it separately
+  // If user was deleted/DB reseeded, return JWT payload as fallback
+  if (!user) {
+    sendSuccess(res, {
+      id: req.user!.id,
+      email: req.user!.email,
+      fullName: req.user!.fullName,
+      fullNameAr: null,
+      role: req.user!.role,
+      avatarUrl: null,
+      isActive: true,
+      twoFactorEnabled: false,
+    });
+    return;
+  }
+
   const [tfRow] = await sequelize.query(
     `SELECT two_factor_enabled FROM users WHERE id = $1`,
     { bind: [req.user!.id], type: QueryTypes.SELECT }
@@ -64,7 +77,6 @@ router.get('/profile', asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = { ...user.toJSON(), twoFactorEnabled: tfRow?.two_factor_enabled ?? false };
   sendSuccess(res, result);
 }));
-
 router.patch('/profile', validate(updateProfileSchema), asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await User.findByPk(req.user!.id);
   if (!user) throw new AppError('User not found', 404);
@@ -109,6 +121,7 @@ router.get('/team', authorize('Admin', 'Manager'), validate(teamQuerySchema, 'qu
   sendPaginated(res, rows, buildMeta(count, page, limit));
 }));
 
+// Admin-only route to update any user (e.g. for activating/deactivating accounts)
 router.patch('/team/:id', authorize('Admin'), validate(updateUserSchema), asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await User.findByPk(req.params.id);
   if (!user) throw new AppError('User not found', 404);
