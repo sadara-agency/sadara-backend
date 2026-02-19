@@ -3,8 +3,12 @@ import jwt from 'jsonwebtoken';
 import { User } from '../Users/user.model';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
-import { RegisterInput, LoginInput } from './auth.schema';
+import { RegisterInput, LoginInput, InviteInput } from './auth.schema';
 
+/** Default role for self-registered users (no admin privileges). */
+const DEFAULT_ROLE = 'Analyst';
+
+/** Generate JWT with user identity + role for frontend RBAC. */
 function generateToken(user: User): string {
   return jwt.sign(
     { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
@@ -13,7 +17,7 @@ function generateToken(user: User): string {
   );
 }
 
-// ── Register ──
+// ── Public Register (default role, no role selection) ──
 export async function register(input: RegisterInput) {
   const existing = await User.findOne({ where: { email: input.email } });
   if (existing) throw new AppError('Email already registered', 409);
@@ -25,10 +29,32 @@ export async function register(input: RegisterInput) {
     passwordHash,
     fullName: input.fullName,
     fullNameAr: input.fullNameAr,
-    role: input.role as any,
+    role: DEFAULT_ROLE,
+    isActive: false, // Inactive until admin approves or email is verified
   });
 
-  return { user, token: generateToken(user) };
+  const { passwordHash: _, ...safe } = user.get({ plain: true });
+  return { user: safe };
+}
+
+// ── Admin Invite (Admin assigns role) ──
+export async function invite(input: InviteInput) {
+  const existing = await User.findOne({ where: { email: input.email } });
+  if (existing) throw new AppError('Email already registered', 409);
+
+  const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
+
+  const user = await User.create({
+    email: input.email,
+    passwordHash,
+    fullName: input.fullName,
+    fullNameAr: input.fullNameAr,
+    role: input.role as any,
+    isActive: true, // Admin-invited users are active immediately
+  });
+
+  const { passwordHash: _, ...safe } = user.get({ plain: true });
+  return { user: safe };
 }
 
 // ── Login ──
@@ -39,15 +65,16 @@ export async function login(input: LoginInput) {
     throw new AppError('Invalid email or password', 401);
   }
 
-  if (!user.isActive) throw new AppError('Account is deactivated', 403);
+  if (!user.isActive) {
+    throw new AppError('Account is not yet activated. Please wait for admin approval or verify your email.', 403);
+  }
 
-  // Simple update logic
   await user.update({ lastLogin: new Date() });
   const { passwordHash, ...userWithoutPassword } = user.get({ plain: true });
 
   return {
     user: userWithoutPassword,
-    token: generateToken(user)
+    token: generateToken(user),
   };
 }
 
@@ -62,8 +89,6 @@ export async function getProfile(userId: string) {
 export async function updateProfile(userId: string, data: { fullName?: string; fullNameAr?: string; avatarUrl?: string }) {
   const user = await User.findByPk(userId);
   if (!user) throw new AppError('User not found', 404);
-
-  // Sequelize automatically ignores undefined fields! No more "idx++" loops.
   await user.update(data);
   return user;
 }
