@@ -8,6 +8,13 @@ async function bootstrap() {
   try {
     await testConnection();
 
+    console.log('DB CONFIG:', {
+      host: process.env.POSTGRES_HOST,
+      port: process.env.POSTGRES_PORT,
+      db: process.env.POSTGRES_DB,
+      user: process.env.POSTGRES_USER,
+    });
+
     app.listen(env.port, () => {
       const sadaraGradient = gradient(['#3C3CFA', '#E4E5F3', '#11132B']);
       const logo = `
