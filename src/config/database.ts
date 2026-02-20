@@ -32,18 +32,19 @@ const sequelizeOptions: Options = {
   dialect: 'postgres',
   logging: (msg) => console.log(`${chalk.gray('  [DB] ')} ${chalk.blue(msg)}`),
   pool: {
-    max: 5,        // Keep low — Supabase PgBouncer handles pooling
+    max: 5,
     min: 0,
     acquire: 30000,
     idle: 10000,
   },
   dialectOptions: {
     useUTC: true,
-    ssl: {
-      require: true,
-      rejectUnauthorized: false,
-    },
-    prepared_statements: false,  // Required for PgBouncer
+    ...(env.nodeEnv === 'production' && {
+      ssl: {
+        require: true,
+        rejectUnauthorized: false,
+      },
+    }),
   },
 };
 
