@@ -2,7 +2,27 @@ import { Sequelize, Options } from 'sequelize';
 import { env } from './env';
 import chalk from 'chalk';
 
-// 1. Configure Sequelize Connection
+// // 1. Configure Sequelize Connection
+// const sequelizeOptions: Options = {
+//   host: env.db.host,
+//   port: env.db.port,
+//   database: env.db.name,
+//   username: env.db.user,
+//   password: env.db.password,
+//   dialect: 'postgres',
+//   logging: (msg) => console.log(`${chalk.gray('  [DB] ')} ${chalk.blue(msg)}`),
+//   pool: {
+//     max: 20,
+//     min: 0,
+//     acquire: 30000,
+//     idle: 10000,
+//   },
+//   // Postgres specific: ensure dates are handled correctly
+//   dialectOptions: {
+//     useUTC: true,
+//   },
+// };
+
 const sequelizeOptions: Options = {
   host: env.db.host,
   port: env.db.port,
@@ -12,14 +32,18 @@ const sequelizeOptions: Options = {
   dialect: 'postgres',
   logging: (msg) => console.log(`${chalk.gray('  [DB] ')} ${chalk.blue(msg)}`),
   pool: {
-    max: 20,
+    max: 5,        // Keep low — Supabase PgBouncer handles pooling
     min: 0,
     acquire: 30000,
     idle: 10000,
   },
-  // Postgres specific: ensure dates are handled correctly
   dialectOptions: {
     useUTC: true,
+    ssl: {
+      require: true,
+      rejectUnauthorized: false,
+    },
+    prepared_statements: false,  // Required for PgBouncer
   },
 };
 
