@@ -59,6 +59,9 @@ export async function invite(input: InviteInput) {
 
 // ── Login ──
 export async function login(input: LoginInput) {
+
+
+
   const user = await User.findOne({ where: { email: input.email } });
 
   if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {

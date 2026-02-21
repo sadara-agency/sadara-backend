@@ -8,12 +8,6 @@ async function bootstrap() {
   try {
     await testConnection();
 
-    console.log('DB CONFIG:', {
-      host: process.env.POSTGRES_HOST,
-      port: process.env.POSTGRES_PORT,
-      db: process.env.POSTGRES_DB,
-      user: process.env.POSTGRES_USER,
-    });
 
     app.listen(env.port, () => {
       const sadaraGradient = gradient(['#3C3CFA', '#E4E5F3', '#11132B']);
@@ -40,9 +34,18 @@ async function bootstrap() {
         `  ${chalk.white.bold('🩺 HEALTH:')}       ${chalk.blue.underline(`http://localhost:${env.port}/api/health`)}`
       );
 
+      // Define a color theme based on the environment
+      const isProd = env.nodeEnv === 'production';
+      const envColor = isProd ? chalk.redBright.bold : chalk.cyanBright.bold;
+      const statusBullet = isProd ? '🔥' : '🛠️';
+
       console.log(
-        `  ${chalk.white.bold('🏗️  ENVIRONMENT:')}  ${chalk.magenta(env.nodeEnv.toUpperCase())}`
+        `  ${chalk.white.bold('🏗️  ENVIRONMENT:')}  ${envColor(env.nodeEnv.toUpperCase())} ${statusBullet}`
       );
+
+      if (isProd) {
+        console.log(chalk.red('  ⚠️  WARNING: RUNNING IN PRODUCTION MODE'));
+      }
 
       console.log(chalk.gray(`  ${'━'.repeat(54)}`));
       console.log(

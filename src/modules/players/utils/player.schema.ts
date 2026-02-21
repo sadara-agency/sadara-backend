@@ -21,6 +21,12 @@ export const createPlayerSchema = z.object({
   email: z.string().email().optional(),
   phone: z.string().optional(),
   notes: z.string().optional(),
+  speed: z.number().int().min(0).max(100).optional(),
+  passing: z.number().int().min(0).max(100).optional(),
+  shooting: z.number().int().min(0).max(100).optional(),
+  defense: z.number().int().min(0).max(100).optional(),
+  fitness: z.number().int().min(0).max(100).optional(),
+  tactical: z.number().int().min(0).max(100).optional(),
 });
 
 export const updatePlayerSchema = createPlayerSchema.partial();
