@@ -1,6 +1,6 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
- 
+
 
 // 1. Define all possible attributes in the Player model
 interface PlayerAttributes {
@@ -24,6 +24,12 @@ interface PlayerAttributes {
   marketValue?: number | null;
   marketValueCurrency: 'SAR' | 'USD' | 'EUR';
   status: 'active' | 'injured' | 'inactive';
+  speed?: number | null;
+  passing?: number | null;
+  shooting?: number | null;
+  defense?: number | null;
+  fitness?: number | null;
+  tactical?: number | null;
   email?: string | null;
   phone?: string | null;
   notes?: string | null;
@@ -35,9 +41,9 @@ interface PlayerAttributes {
 
 // 2. Define which attributes are optional during Player.create()
 interface PlayerCreationAttributes extends Optional<
-  PlayerAttributes, 
+  PlayerAttributes,
   'id' | 'playerType' | 'marketValueCurrency' | 'status' | 'createdAt' | 'updatedAt'
-> {}
+> { }
 
 // 3. The Model Class
 export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> implements PlayerAttributes {
@@ -61,6 +67,12 @@ export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> im
   public marketValue!: number | null;
   public marketValueCurrency!: 'SAR' | 'USD' | 'EUR';
   public status!: 'active' | 'injured' | 'inactive';
+  public speed!: number | null;
+  public passing!: number | null;
+  public shooting!: number | null;
+  public defense!: number | null;
+  public fitness!: number | null;
+  public tactical!: number | null;
   public email!: string | null;
   public phone!: string | null;
   public notes!: string | null;
@@ -113,6 +125,12 @@ Player.init({
   marketValue: { type: DataTypes.DECIMAL(15, 2) },
   marketValueCurrency: { type: DataTypes.ENUM('SAR', 'USD', 'EUR'), defaultValue: 'SAR' },
   status: { type: DataTypes.ENUM('active', 'injured', 'inactive'), defaultValue: 'active' },
+  speed: { type: DataTypes.INTEGER, defaultValue: 0 },
+  passing: { type: DataTypes.INTEGER, defaultValue: 0 },
+  shooting: { type: DataTypes.INTEGER, defaultValue: 0 },
+  defense: { type: DataTypes.INTEGER, defaultValue: 0 },
+  fitness: { type: DataTypes.INTEGER, defaultValue: 0 },
+  tactical: { type: DataTypes.INTEGER, defaultValue: 0 },
   email: { type: DataTypes.STRING, validate: { isEmail: true } },
   phone: { type: DataTypes.STRING },
   notes: { type: DataTypes.TEXT },

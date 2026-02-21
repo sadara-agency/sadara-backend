@@ -1,9 +1,20 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import path from 'path';
+dotenv.config(
+  {
+    path: path.resolve(process.cwd(), '.env.local'),
+  }
+);
+
+
+// Determine which file to load based on NODE_ENV
+const envFile = `.env.${process.env.NODE_ENV}`;
+dotenv.config({ path: path.resolve(process.cwd(), envFile) });
+
 
 export const env = {
   nodeEnv: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT || '4000', 10),
+  port: parseInt(process.env.PORT || '4444', 10),
 
   db: {
     host: process.env.POSTGRES_HOST || 'localhost',

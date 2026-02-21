@@ -1,0 +1,41 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.env = void 0;
+const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
+dotenv_1.default.config({
+    path: path_1.default.resolve(process.cwd(), '.env.local'),
+});
+// Determine which file to load based on NODE_ENV
+const envFile = `.env.${process.env.NODE_ENV}`;
+dotenv_1.default.config({ path: path_1.default.resolve(process.cwd(), envFile) });
+exports.env = {
+    nodeEnv: process.env.NODE_ENV || 'development',
+    port: parseInt(process.env.PORT || '4444', 10),
+    db: {
+        host: process.env.POSTGRES_HOST || 'localhost',
+        port: parseInt(process.env.POSTGRES_PORT || '5432', 10),
+        name: process.env.POSTGRES_DB || 'SadaraDB',
+        user: process.env.POSTGRES_USER || 'admin',
+        password: process.env.POSTGRES_PASSWORD || 'admin1234',
+    },
+    jwt: {
+        secret: process.env.JWT_SECRET || 'sadara-dev-secret-change-in-production-min-32-chars',
+        expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+        refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+    },
+    cors: {
+        origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
+    },
+    bcrypt: {
+        saltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
+    },
+    pagination: {
+        defaultLimit: 20,
+        maxLimit: 100,
+    },
+};
+//# sourceMappingURL=env.js.map

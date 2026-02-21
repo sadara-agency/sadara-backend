@@ -4,9 +4,9 @@
   "description": "Sadara Sports Player Management Platform — Backend API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "nodemon",
+    "dev": "cross-env NODE_ENV=development nodemon",
     "build": "tsc",
-    "start": "node dist/index.js",
+    "start:prod": "cross-env NODE_ENV=production node dist/index.js",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\""
   },
@@ -15,6 +15,7 @@
     "bcryptjs": "^2.4.3",
     "chalk": "^4.1.2",
     "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",
