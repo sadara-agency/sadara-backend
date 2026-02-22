@@ -1,11 +1,17 @@
 FROM node:20-slim
 
-# Install Chrome dependencies
+# Install Chrome dependencies + Arabic fonts
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
     fonts-noto-color-emoji \
     fonts-noto-cjk \
+    fonts-noto-core \
+    fonts-noto \
+    fonts-arabeyes \
+    fonts-hosny-amiri \
+    fonts-kacst \
+    fonts-kacst-one \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
     libcups2 \
