@@ -1,11 +1,7 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.schema.ts
-// Zod validation schemas for the Contract module.
-// ─────────────────────────────────────────────────────────────
 import { z } from 'zod';
 
 const CONTRACT_CATEGORIES = ['Club', 'Sponsorship'] as const;
-const CONTRACT_STATUSES = ['Active', 'Expiring Soon', 'Expired', 'Draft'] as const;
+const CONTRACT_STATUSES = ['Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing'] as const;
 const CURRENCIES = ['SAR', 'USD', 'EUR'] as const;
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -43,7 +39,26 @@ export const updateContractSchema = z.object({
   performanceBonus: z.number().min(0).optional(),
   commissionPct: z.number().min(0).max(100).optional(),
   documentUrl: z.string().url().nullable().optional(),
+  signedDocumentUrl: z.string().nullable().optional(),
+  signingMethod: z.enum(['digital', 'upload']).nullable().optional(),
   notes: z.string().nullable().optional(),
+});
+
+// ── Status Transition ──
+// Valid transitions: Draft→Review, Review→Signing, Review→Draft,
+//                    Signing→Active, Signing→Review
+export const transitionStatusSchema = z.object({
+  action: z.enum([
+    'submit_review',   // Draft → Review
+    'approve',         // Review → Signing
+    'reject_to_draft', // Review → Draft
+    'sign_digital',    // Signing → Active (digital signature)
+    'sign_upload',     // Signing → Active (upload signed scan)
+    'return_review',   // Signing → Review
+  ]),
+  signatureData: z.string().optional(),        // base64 signature image for digital
+  signedDocumentUrl: z.string().optional(),     // URL for uploaded signed PDF
+  notes: z.string().optional(),
 });
 
 // ── Query / List Contracts ──
@@ -62,4 +77,5 @@ export const contractQuerySchema = z.object({
 // ── Inferred types ──
 export type CreateContractInput = z.infer<typeof createContractSchema>;
 export type UpdateContractInput = z.infer<typeof updateContractSchema>;
+export type TransitionStatusInput = z.infer<typeof transitionStatusSchema>;
 export type ContractQuery = z.infer<typeof contractQuerySchema>;

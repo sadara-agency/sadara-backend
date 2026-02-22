@@ -8,6 +8,8 @@ import * as scoutingService from './scouting.service';
 // WATCHLIST
 // ══════════════════════════════════════════
 
+
+
 export async function listWatchlist(req: AuthRequest, res: Response) {
   const result = await scoutingService.listWatchlist(req.query);
   sendPaginated(res, result.data, result.meta);
@@ -74,6 +76,7 @@ export async function markPackReady(req: AuthRequest, res: Response) {
 // ══════════════════════════════════════════
 
 export async function createDecision(req: AuthRequest, res: Response) {
+  console.log('📦 Decision body:', JSON.stringify(req.body));
   const d = await scoutingService.createDecision(req.body, req.user!.id);
   await logAudit('CREATE', 'selection_decisions', d.id, buildAuditContext(req.user!, req.ip), `Decision: ${d.decision}`);
   sendCreated(res, d);

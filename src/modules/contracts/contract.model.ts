@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.model.ts
-// Sequelize model for the contracts table.
-// ─────────────────────────────────────────────────────────────
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
 
@@ -10,7 +6,7 @@ interface ContractAttributes {
   playerId: string;
   clubId: string;
   category: 'Club' | 'Sponsorship';
-  status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft';
+  status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft' | 'Review' | 'Signing';
   title: string | null;
   startDate: string;
   endDate: string;
@@ -23,6 +19,9 @@ interface ContractAttributes {
   totalCommission: number | null;
   commissionLocked: boolean;
   documentUrl: string | null;
+  signedDocumentUrl: string | null;
+  signedAt: Date | null;
+  signingMethod: 'digital' | 'upload' | null;
   notes: string | null;
   createdBy: string | null;
   createdAt?: Date;
@@ -32,7 +31,8 @@ interface ContractAttributes {
 interface ContractCreationAttributes extends Optional<
   ContractAttributes,
   'id' | 'status' | 'title' | 'salaryCurrency' | 'signingBonus' | 'performanceBonus' |
-  'commissionLocked' | 'documentUrl' | 'notes' | 'createdBy' | 'createdAt' | 'updatedAt' |
+  'commissionLocked' | 'documentUrl' | 'signedDocumentUrl' | 'signedAt' | 'signingMethod' |
+  'notes' | 'createdBy' | 'createdAt' | 'updatedAt' |
   'baseSalary' | 'releaseClause' | 'commissionPct' | 'totalCommission'
 > {}
 
@@ -41,7 +41,7 @@ export class Contract extends Model<ContractAttributes, ContractCreationAttribut
   declare playerId: string;
   declare clubId: string;
   declare category: 'Club' | 'Sponsorship';
-  declare status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft';
+  declare status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft' | 'Review' | 'Signing';
   declare title: string | null;
   declare startDate: string;
   declare endDate: string;
@@ -54,6 +54,9 @@ export class Contract extends Model<ContractAttributes, ContractCreationAttribut
   declare totalCommission: number | null;
   declare commissionLocked: boolean;
   declare documentUrl: string | null;
+  declare signedDocumentUrl: string | null;
+  declare signedAt: Date | null;
+  declare signingMethod: 'digital' | 'upload' | null;
   declare notes: string | null;
   declare createdBy: string | null;
 }
@@ -80,7 +83,7 @@ Contract.init({
     allowNull: false,
   },
   status: {
-    type: DataTypes.ENUM('Active', 'Expiring Soon', 'Expired', 'Draft'),
+    type: DataTypes.ENUM('Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing'),
     defaultValue: 'Draft',
   },
   title: {
@@ -135,6 +138,18 @@ Contract.init({
   documentUrl: {
     type: DataTypes.TEXT,
     field: 'document_url',
+  },
+  signedDocumentUrl: {
+    type: DataTypes.TEXT,
+    field: 'signed_document_url',
+  },
+  signedAt: {
+    type: DataTypes.DATE,
+    field: 'signed_at',
+  },
+  signingMethod: {
+    type: DataTypes.STRING(20),
+    field: 'signing_method',
   },
   notes: {
     type: DataTypes.TEXT,

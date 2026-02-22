@@ -16,10 +16,12 @@ export function validate(schema: ZodSchema, target: ValidationTarget = 'body') {
           field: e.path.join('.'),
           message: e.message,
         }));
+        console.log('❌ Zod errors:', JSON.stringify(errors));
+        console.log('❌ Payload:', JSON.stringify(req[target]));
         sendError(res, 'Validation failed', 422, JSON.stringify(errors));
-      } else {
-        next(err);
-      }
+    } else {
+      next(err);
     }
-  };
+  }
+};
 }
