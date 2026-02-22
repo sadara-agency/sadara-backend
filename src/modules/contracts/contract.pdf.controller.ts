@@ -1,141 +1,235 @@
+// ─────────────────────────────────────────────────────────────
+// src/modules/contracts/contract.pdf.controller.ts
+// GET /api/v1/contracts/:id/pdf
+//
+// Production-ready. No external fonts, no network requests,
+// no timeouts. Uses system fonts + domcontentloaded.
+// ─────────────────────────────────────────────────────────────
 import { Response } from 'express';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
 import path from 'path';
 import fs from 'fs';
+import puppeteer from 'puppeteer';
+import { PDFDocument } from 'pdf-lib';
 import { AuthRequest } from '../../shared/types';
 import { AppError } from '../../middleware/errorHandler';
 import * as contractService from './contract.service';
 
-const execFileAsync = promisify(execFile);
+const TMP = path.resolve(process.cwd(), 'tmp');
+if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
 
-const PYTHON = process.platform === 'win32' ? 'python' : 'python3';
-const SCRIPT_PATH = path.resolve(process.cwd(), 'src/modules/contracts/generate_contract_pdf.py');
-const TEMPLATE_PATH = path.resolve(process.cwd(), 'templates/contract_template.pdf');
-const OUTPUT_DIR = path.resolve(process.cwd(), 'tmp');
+// ─── Helpers ────────────────────────────────────────────────
 
-// Ensure tmp directory exists
-if (!fs.existsSync(OUTPUT_DIR)) {
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+function fmtDate(s: string): string {
+  if (!s) return '';
+  try {
+    const d = new Date(s);
+    return `${String(d.getDate()).padStart(2,'0')} / ${String(d.getMonth()+1).padStart(2,'0')} / ${d.getFullYear()}م`;
+  } catch { return s; }
 }
 
-/**
- * Build the JSON payload the Python script expects from a contract record.
- */
-function buildPdfData(contract: any): Record<string, unknown> {
-  const player = contract.player || {};
-  const club = contract.club || {};
+function calcDur(a: string, b: string): string {
+  try {
+    const s = new Date(a), e = new Date(b);
+    const m = (e.getFullYear()-s.getFullYear())*12 + e.getMonth()-s.getMonth();
+    if (m===24) return 'سنتان (24 شهرًا)';
+    if (m===12) return 'سنة واحدة (12 شهرًا)';
+    return m>0 ? `${m} شهرًا` : '';
+  } catch { return ''; }
+}
 
-  // Build Arabic name, fallback to English
-  const playerNameAr =
-    player.firstNameAr && player.lastNameAr
-      ? `${player.firstNameAr} ${player.lastNameAr}`
-      : null;
-  const playerNameEn =
-    player.firstName && player.lastName
-      ? `${player.firstName} ${player.lastName}`
-      : '';
-
+function getData(c: any) {
+  const p = c.player || {};
+  const ar = p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null;
+  const en = p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : '';
   return {
-    playerName: playerNameAr || playerNameEn || 'غير محدد',
-    playerNameEn,
-    nationality: player.nationality || '',
-    playerId: player.nationalId || player.idNumber || '',
-    playerPhone: player.phone || '',
-    clubName: club.nameAr || club.name || '',
-    title: contract.title || 'عقد تمثيل رياضي حصري',
-    startDate: contract.startDate
-      ? new Date(contract.startDate).toISOString().split('T')[0]
-      : '',
-    endDate: contract.endDate
-      ? new Date(contract.endDate).toISOString().split('T')[0]
-      : '',
-    baseSalary: Number(contract.baseSalary) || 0,
-    currency: contract.salaryCurrency || 'SAR',
-    commissionPct: Number(contract.commissionPct) || 10,
-    commissionValue: Number(contract.totalCommission) || 0,
-    signingBonus: Number(contract.signingBonus) || 0,
-    releaseClause: Number(contract.releaseClause) || 0,
-    performanceBonus: Number(contract.performanceBonus) || 0,
-    notes: contract.notes || '',
-    // Signature data (from digital signing)
-    signatureImage: contract.signingMethod === 'digital' ? (contract.signedDocumentUrl || '') : '',
-    signedDate: contract.signedAt
-      ? new Date(contract.signedAt).toISOString().split('T')[0]
-      : '',
+    pn: ar || en || 'غير محدد',
+    nat: p.nationality || '',
+    pid: p.nationalId || p.idNumber || '',
+    ph: p.phone || '',
+    sd: c.startDate ? new Date(c.startDate).toISOString().split('T')[0] : '',
+    ed: c.endDate ? new Date(c.endDate).toISOString().split('T')[0] : '',
+    cpct: Number(c.commissionPct) || 10,
+    sigImg: c.signingMethod === 'digital' ? (c.signedDocumentUrl || '') : '',
+    sigDt: c.signedAt ? new Date(c.signedAt).toISOString().split('T')[0] : '',
   };
 }
 
-/**
- * GET /api/v1/contracts/:id/pdf
- * Generates and streams a Sadara representation contract PDF.
- */
+// ─── CSS (system fonts only — zero network) ─────────────────
+
+const CSS = `*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#000;background:#fff;width:595px;height:842px;overflow:hidden;font-size:8.8pt;line-height:1.5}
+.pg{width:595px;height:842px;position:relative}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 35px 12px;border-bottom:2px solid #000}
+.hd-r{text-align:right}.lt{font-size:14pt;font-weight:700}.ls{font-size:7.5pt;font-weight:500;letter-spacing:1px}
+.hd-l{text-align:left;direction:ltr;font-size:7.5pt;line-height:1.5}.nn{font-weight:700}
+.ct{padding:10px 35px}.tt{text-align:center;font-size:22pt;font-weight:700;margin:12px 0 16px;letter-spacing:2px}
+.st{font-weight:700;font-size:9pt;background:#000;color:#fff;display:inline-block;padding:1px 8px;margin:6px 0 3px}
+.at{font-weight:700;font-size:9pt;text-decoration:underline;margin:8px 0 2px}
+p{margin-bottom:2px}
+.pts{display:flex;justify-content:space-between;gap:15px;margin-top:5px}
+.pr{flex:1;text-align:right;font-size:8.5pt;line-height:1.6}.pl{width:170px}
+.pl table{border-collapse:collapse;width:100%}.pl td{border:1px solid #000;padding:2px 6px;font-size:8pt}
+.vl{color:#3C3CFA;font-weight:600}
+.ni{display:flex;align-items:flex-start;gap:4px;font-size:8.5pt}
+.nc{min-width:14px;height:14px;border-radius:50%;background:#3C3CFA;color:#fff;font-size:6.5pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.db{display:flex;align-items:center;gap:6px;margin:3px 0}
+.dx{border:1px solid #000;padding:2px 10px;font-size:8.5pt;text-align:center;direction:ltr}
+.dl{font-weight:700;font-size:8.5pt;background:#3C3CFA;color:#fff;padding:2px 8px}
+.ss{display:flex;justify-content:space-between;margin-top:10px;gap:20px}.sb{flex:1;font-size:8.5pt}
+.sf{border-bottom:1px solid #000;display:inline-block;min-width:130px;height:14px}
+.gu{margin-top:8px;padding-top:4px;border-top:1px solid #ccc;font-size:8pt}
+.gt{border-collapse:collapse;width:170px;margin-top:3px}.gt td{border:1px solid #000;padding:2px 6px;font-size:8pt}`;
+
+const HD = `<div class="hd"><div class="hd-r"><div class="lt">شـركــة صـــدارة الـريـاضـيـة</div><div class="ls">SADARA SPORTS COMPANY</div></div><div class="hd-l"><div class="nn">N.N/ 7052143646</div><div>Prince Meshaal Ibn Abd AlAziz, Irqah, Riyadh 12534</div><div style="border-top:1px solid #000;margin-top:3px;padding-top:3px">P - +966533919155 &nbsp; W - www.sadarasport.sa<br>M - info@sadarasport.sa</div></div></div>`;
+
+// ─── Page Builders ──────────────────────────────────────────
+
+const wrap = (body: string) => `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${CSS}</style></head><body>${body}</body></html>`;
+
+function coverPage() {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;width:595px;height:842px;overflow:hidden}.c{width:595px;height:842px;background:#3C3CFA;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}.c h1{font-size:28pt;font-weight:700;letter-spacing:3px;margin-bottom:16px;direction:rtl}.c h2{font-size:15pt;font-weight:400;opacity:.9}.c .l{font-size:20pt;font-weight:700;margin-bottom:40px;direction:rtl}.c .s{font-size:10pt;opacity:.7;margin-top:30px}</style></head><body><div class="c"><div class="l">شـركـة صــدارة الـريـاضـيـة</div><h1>عقد تمثيل رياضي حصري</h1><h2>EXCLUSIVE SPORTS REPRESENTATION AGREEMENT</h2><div class="s">SADARA SPORTS COMPANY</div></div></body></html>`;
+}
+
+function backPage() {
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;width:595px;height:842px;overflow:hidden}.b{width:595px;height:842px;background:#3C3CFA;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}.b .l{font-size:24pt;font-weight:700;margin-bottom:20px;direction:rtl}.b .i{font-size:10pt;opacity:.8;text-align:center;line-height:2;direction:ltr}</style></head><body><div class="b"><div class="l">صـدارة</div><div class="i">SADARA SPORTS COMPANY<br>Prince Meshaal Ibn Abd AlAziz, Irqah, Riyadh 12534<br>+966 533 919 155 | info@sadarasport.sa<br>www.sadarasport.sa</div></div></body></html>`;
+}
+
+function pg2(d: any) {
+  const sd=fmtDate(d.sd), ed=fmtDate(d.ed), dur=calcDur(d.sd,d.ed);
+  return wrap(`<div class="pg">${HD}<div class="ct">
+<div class="tt">عـقـد تـمـثـيـل ريـاضـي حـصـري</div>
+<div class="st">التمهيــد</div>
+<p style="font-size:9pt">حيث إن شركة صدارة المواهب الرياضية المحدودة (الطرف الأول) تعمل في المجال الرياضي وفي أنشطة إدارة وتمثيل لاعبي كرة القدم والتفاوض بشأن عقودهم الرياضية والتجارية داخل المملكة العربية السعودية وخارجها، وفق الأنظمة واللوائح المعمول بها؛</p>
+<p style="font-size:9pt">وحيث إن الطرف الأول يمارس نشاطه من خلال وكيل معتمد ومرخّص من الاتحاد الدولي لكرة القدم (فيفا) يعمل تحت مظلة الشركة؛</p>
+<p style="font-size:9pt">وحيث إن الطرف الثاني (اللاعب) يرغب في الاستعانة بخدمات الطرف الأول لتمثيله تمثيلاً حصرياً؛</p>
+<p style="font-size:9pt">فقد اتفق الطرفين وهما بكامل أهليتهما الشرعية والنظامية على ما يلي، ويعدّ التمهيد جزءاً لا يتجزأ من العقد:</p>
+<div class="at">المادة (1): بيانات الأطراف</div>
+<div class="pts"><div class="pr"><strong>الطرف الأول/</strong> شركة صدارة المواهب الرياضية المحدودة<br><strong>المقر/</strong> السعودية، الرياض، حي عرقة، طريق الأمير مشعل ص.ب 12534<br><strong>الرقم الموحد/</strong>7052143646<br><strong>يمثلها/</strong> خالد بن علي الشهري<br><strong>جوال رقم/</strong> 0533919155<br><strong>البريد الإلكتروني</strong> khaled@sadarasport.sa</div>
+<div class="pl"><table><tr><td colspan="2" style="font-weight:700;text-align:center;background:#f5f5f5">الطرف الثاني: اللاعب</td></tr><tr><td class="vl">${d.pn}</td><td></td></tr><tr><td class="vl">${d.pid}</td><td>هوية رقم</td></tr><tr><td class="vl">${d.nat}</td><td>الجنسية</td></tr><tr><td class="vl">${d.ph}</td><td>جوال رقم</td></tr></table></div></div>
+<div class="at">المادة (2): نطاق التمثيل (موضوع العقد)</div>
+<p>يمنح اللاعب الشركة حق التمثيل الحصري الكامل داخل المملكة وخارجها في الآتي:</p>
+<div class="ni"><span class="nc">1</span><span>التفاوض مع الأندية بشأن توقيع أو تجديد أو فسخ أو إعارة أو تعديل أي عقد رياضي يخص اللاعب</span></div>
+<div class="ni"><span class="nc">2</span><span>التفاوض بشأن أي عقود تجارية أو رعائية أو دعائية تتعلق باللاعب، بعد موافقته</span></div>
+<div class="ni"><span class="nc">3</span><span>متابعة الإجراءات القانونية والإدارية المتعلقة بالعقود</span></div>
+<div class="ni"><span class="nc">4</span><span>توثيق العقود في الأنظمة الرسمية (TMS أو ما يستحدث)</span></div>
+<div class="ni"><span class="nc">5</span><span>يقر اللاعب بأن هذه الحصرية سارية طوال مدة العقد ولا يجوز له تفويض أي جهة أخرى في هذه الأعمال</span></div>
+<div class="at">المادة (3): وجود وكيل مرخّص</div>
+<p>يقر الطرف الأول بأن جميع أعمال التمثيل تُدار من خلال وكيل معتمد ومرخّص من فيفا:</p>
+<p style="text-align:center">الاسم: Ahmed Osman Hadoug<br>رقم رخصة فيفا FIFA AGENT LICENSE No (202411-8478)<br>جهة الترخيص: الاتحاد الدولي لكرة القدم - (FIFA)</p>
+<p>ويعمل الوكيل تحت مظلة شركة صدارة، وتبقى العلاقة التعاقدية بين اللاعب والشركة مباشرة</p>
+<div class="at">المادة (4): مدة العقد</div>
+<p>مدة هذا العقد ${dur} تبدأ من:</p>
+<div class="db"><span class="dl">من تاريخ</span><span class="dx">${sd}</span></div>
+<div class="db"><span class="dl" style="background:#000">إلى تاريخ:</span><span class="dx">${ed}</span></div>
+<div class="at">المادة (5): التزامات الطرف الأول (الشركة)</div>
+<div class="ni"><span class="nc">1</span><span>بذل العناية اللازمة للحصول على أفضل العروض الرياضية والتجارية</span></div>
+<div class="ni"><span class="nc">2</span><span>التفاوض نيابة عن اللاعب وفق الأنظمة واللوائح المعمول بها</span></div>
+<div class="ni"><span class="nc">3</span><span>مراجعة وصياغة العقود وتوضيح آثارها للاعب قبل توقيعها</span></div>
+<div class="ni"><span class="nc">4</span><span>عدم توقيع أي اتفاق نيابة عن اللاعب دون موافقته الخطية</span></div>
+<div class="ni"><span class="nc">5</span><span>إبلاغ اللاعب بأي عرض رسمي يصل للشركة فور استلامه</span></div>
+<div class="ni"><span class="nc">6</span><span>تمثيل اللاعب أمام الأندية والجهات المختصة</span></div>
+<div class="ni"><span class="nc">7</span><span>الحفاظ على سرية جميع البيانات والمعلومات</span></div>
+</div></div>`);
+}
+
+function pg3(d: any) {
+  const sd=fmtDate(d.sd);
+  const sig = d.sigImg ? `<img src="${d.sigImg}" style="height:40px;margin-top:3px" />` : '<span class="sf"></span>';
+  const sdt = d.sigDt ? `<span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${fmtDate(d.sigDt)}</span>` : '<span class="sf"></span>';
+  return wrap(`<div class="pg">${HD}<div class="ct">
+<div class="st">المادة (6): التزامات الطرف الثاني (اللاعب)</div>
+<div class="ni"><span class="nc">1</span><span>الالتزام بالحصرية وعدم التعامل أو التفاوض مع أي وسيط آخر</span></div>
+<div class="ni"><span class="nc">2</span><span>إبلاغ الشركة فوراً بأي عرض أو تواصل من أي نادٍ أو جهة تجارية</span></div>
+<div class="ni"><span class="nc">3</span><span>تقديم المعلومات الصحيحة المتعلقة بوضعه التعاقدي</span></div>
+<div class="ni"><span class="nc">4</span><span>التعاون مع الشركة فيما يخص المقابلات أو العروض</span></div>
+<div class="ni"><span class="nc">5</span><span>دفع العمولة المستحقة للطرف الأول في وقتها المحدد</span></div>
+<div class="st">المادة (7): العمولة</div>
+<p><strong>أولاً: العقود الرياضية</strong></p>
+<p>يستحق الطرف الأول عمولة بنسبة (${d.cpct}٪) من إجمالي قيمة العقد الرياضي</p>
+<p><strong>ثانياً: العقود التجارية والإعلانية</strong></p>
+<p><strong>السداد:</strong> تفويض النادي بالسداد مباشرة للشركة إن أمكن، أو يقوم اللاعب بالسداد خلال (14) يوماً من استلام المبالغ</p>
+<div class="st">المادة (8): السرية</div>
+<p>يلتزم الطرفان بسرية جميع البيانات والمعلومات والمراسلات ولا يجوز الإفصاح عنها إلا بما يتطلبه النظام أو الاتفاق</p>
+<div class="st">المادة (9): إنهاء العقد</div>
+<p>يجوز إنهاء العقد في الحالات التالية:</p>
+<div class="ni"><span class="nc">1</span><span>الإخلال الجوهري بأي بند وعدم معالجته خلال (30) يوماً</span></div>
+<div class="ni"><span class="nc">2</span><span>فقدان الشركة حق مزاولة النشاط دون تعيين وكيل مرخص بديل</span></div>
+<div class="ni"><span class="nc">3</span><span>صدور قرار رسمي يمنع اللاعب من ممارسة كرة القدم لأكثر من (6) أشهر</span></div>
+<p>ولا يؤثر الإنهاء على حقوق الشركة في العمولات المستحقة عن العقود التي تمت خلال مدة السريان</p>
+<div class="st">المادة (10): تسوية المنازعات</div>
+<div class="ni"><span class="nc">1</span><span>تُحل النزاعات ودياً أولاً خلال (30) يوماً</span></div>
+<div class="ni"><span class="nc">2</span><span>عند التعذر، تُحال إلى الجهة المختصة في الاتحاد السعودي لكرة القدم</span></div>
+<p>وفي حال النزاعات المتعلقة بلوائح فيفا يتم الرجوع إلى غرفة وكلاء فيفا أو محكمة CAS</p>
+<div class="st">المادة (11): أحكام عامة</div>
+<div class="ni"><span class="nc">1</span><span>أي تعديل يجب أن يكون مكتوباً وموقعاً من الطرفين</span></div>
+<div class="ni"><span class="nc">2</span><span>إذا أصبح أي بند غير قابل للتطبيق يتم استبداله بما يحقق الغرض دون إبطال العقد</span></div>
+<div class="ni"><span class="nc">3</span><span>يُحرّر العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها</span></div>
+<div class="ss">
+<div class="sb" style="text-align:right"><p style="font-size:9.5pt"><strong>التوقيعات</strong></p><p>الطرف الأول / شركة صدارة المواهب الرياضية</p><p>يمثلها/ خالد بن علي الشهري</p><p>الصفة/ المدير العام</p><p>من تاريخ: <span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${sd}</span></p><p style="margin-top:5px">التوقيع:_________________________</p><p style="direction:ltr;text-align:left;font-size:9pt">Ahmed Osman Hadoug</p></div>
+<div class="sb" style="text-align:right"><p>&nbsp;</p><p><strong>الطرف الثاني: اللاعب</strong></p><p style="color:#3C3CFA;font-weight:700">${d.pn}</p><p>التاريخ ${sdt}</p><p style="margin-top:5px">التوقيع ${sig}</p></div>
+</div>
+<div class="gu"><p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p><p style="font-size:8pt">أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p><table class="gt"><tr><td>الاسم</td><td style="min-width:90px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table></div>
+</div></div>`);
+}
+
+// ─── Render a single page ───────────────────────────────────
+
+async function render(page: any, html: string): Promise<Uint8Array> {
+  await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
+  await page.evaluate(() => new Promise(r => setTimeout(r, 200)));
+  return page.pdf({
+    width: '595px', height: '842px',
+    margin: { top: '0', bottom: '0', left: '0', right: '0' },
+    printBackground: true,
+  });
+}
+
+// ─── Main Endpoint ──────────────────────────────────────────
+
 export async function generatePdf(req: AuthRequest, res: Response) {
-  const { id } = req.params;
+  const contract = await contractService.getContractById(req.params.id);
+  if (!contract) throw new AppError('Contract not found', 404);
 
-  // 1. Fetch the contract with associations
-  const contract = await contractService.getContractById(id);
-  if (!contract) {
-    throw new AppError('Contract not found', 404);
-  }
-
-  // 2. Build PDF data payload
-  const pdfData = buildPdfData(contract);
-  const jsonStr = JSON.stringify(pdfData);
-
-  // 3. Generate unique output filename
-  const timestamp = Date.now();
-  const safeTitle = (pdfData.playerName as string).replace(/[^a-zA-Z0-9\u0600-\u06FF]/g, '_');
-  const outputFilename = `contract_${safeTitle}_${timestamp}.pdf`;
-  const outputPath = path.join(OUTPUT_DIR, outputFilename);
+  const d = getData(contract);
+  let browser: any = null;
 
   try {
-    // 4. Execute Python script
-    // Use env var to pass template path (avoids Arabic path encoding issues in args)
-    await execFileAsync(PYTHON, [SCRIPT_PATH, jsonStr, outputPath, TEMPLATE_PATH], {
-      timeout: 60000, // 60s timeout
-      maxBuffer: 10 * 1024 * 1024, // 10MB
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
-      cwd: process.cwd(),
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox','--disable-setuid-sandbox','--disable-dev-shm-usage','--disable-gpu','--font-render-hinting=none'],
     });
 
-    // 5. Verify file was created
-    if (!fs.existsSync(outputPath)) {
-      throw new AppError('PDF generation failed — output file not found', 500);
+    const page = await browser.newPage();
+
+    // Render 4 pages sequentially on same page instance (faster than parallel)
+    const buffers: Uint8Array[] = [];
+    for (const html of [coverPage(), pg2(d), pg3(d), backPage()]) {
+      buffers.push(await render(page, html));
     }
 
-    // 6. Stream PDF to client
-    const stat = fs.statSync(outputPath);
-    const downloadName = `عقد_تمثيل_${pdfData.playerName}.pdf`;
+    await page.close();
+    await browser.close();
+    browser = null;
 
+    // Merge
+    const merged = await PDFDocument.create();
+    for (const buf of buffers) {
+      const doc = await PDFDocument.load(buf);
+      const pages = await merged.copyPages(doc, doc.getPageIndices());
+      pages.forEach(p => merged.addPage(p));
+    }
+    const final = await merged.save();
+
+    // Send
+    const name = `contract_${d.pn}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Length', stat.size);
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
-    );
-
-    const stream = fs.createReadStream(outputPath);
-    stream.pipe(res);
-
-    // 7. Cleanup after streaming
-    stream.on('end', () => {
-      fs.unlink(outputPath, () => { }); // fire-and-forget cleanup
-    });
+    res.setHeader('Content-Length', final.length);
+    res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
+    res.end(Buffer.from(final));
 
   } catch (err: any) {
-    // Cleanup on error
-    if (fs.existsSync(outputPath)) {
-      fs.unlinkSync(outputPath);
-    }
-
-    if (err.stderr) {
-      console.error('PDF generation stderr:', err.stderr);
-    }
-
-    throw new AppError(
-      `PDF generation failed: ${err.message || 'Unknown error'}`,
-      500,
-    );
+    if (browser) try { await browser.close(); } catch {}
+    console.error('PDF error:', err.message);
+    throw new AppError(`PDF generation failed: ${err.message}`, 500);
   }
 }
