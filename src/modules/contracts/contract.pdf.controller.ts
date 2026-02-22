@@ -233,4 +233,4 @@ export async function generatePdf(req: AuthRequest, res: Response) {
     console.error('PDF error:', err.message);
     throw new AppError(`PDF generation failed: ${err.message}`, 500);
   }
-}
+}           
