@@ -1,7 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.controller.ts
-// Thin controller layer for Contract CRUD.
-// ─────────────────────────────────────────────────────────────
 import { Response } from 'express';
 import { AuthRequest } from '../../shared/types';
 import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';

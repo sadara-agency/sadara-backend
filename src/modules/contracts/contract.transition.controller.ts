@@ -1,103 +1,93 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.transition.controller.ts
-// POST /api/v1/contracts/:id/transition
-//
-// Handles contract status workflow:
-//   Draft → Review → Signing → Active
-// ─────────────────────────────────────────────────────────────
 import { Response } from 'express';
 import { AuthRequest } from '../../shared/types';
 import { sendSuccess } from '../../shared/utils/apiResponse';
 import { logAudit, buildAuditContext } from '../../shared/utils/audit';
 import { AppError } from '../../middleware/errorHandler';
 import { Contract } from './contract.model';
-import * as contractService from './contract.service';
 
-// Valid status transitions
-const TRANSITIONS: Record<string, { from: string[]; to: string }> = {
-    submit_review: { from: ['Draft'], to: 'Review' },
-    approve: { from: ['Review'], to: 'Signing' },
-    reject_to_draft: { from: ['Review'], to: 'Draft' },
-    sign_digital: { from: ['Signing'], to: 'Active' },
-    sign_upload: { from: ['Signing'], to: 'Active' },
-    return_review: { from: ['Signing'], to: 'Review' },
+// ── Allowed transitions map ──
+const TRANSITION_MAP: Record<string, Record<string, string>> = {
+  Draft: {
+    submit_review: 'Review',
+  },
+  Review: {
+    approve: 'Signing',
+    reject_to_draft: 'Draft',
+  },
+  Signing: {
+    sign_digital: 'Active',
+    sign_upload: 'Active',
+    return_review: 'Review',
+  },
 };
 
-const ACTION_LABELS: Record<string, string> = {
-    submit_review: 'ارسال للمراجعة',
-    approve: 'الموافقة وإرسال للتوقيع',
-    reject_to_draft: 'إرجاع للمسودة',
-    sign_digital: 'توقيع رقمي',
-    sign_upload: 'رفع عقد موقع',
-    return_review: 'إرجاع للمراجعة',
-};
+// ── Controller ──
 
-export async function transitionStatus(req: AuthRequest, res: Response) {
-    const { id } = req.params;
-    const { action, signatureData, signedDocumentUrl, notes } = req.body;
+export async function transitionContract(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { action, signatureData, signedDocumentUrl, notes } = req.body;
 
-    // 1. Get current contract
-    const contract = await Contract.findByPk(id);
-    if (!contract) {
-        throw new AppError('Contract not found', 404);
-    }
+  const contract = await Contract.findByPk(id);
+  if (!contract) throw new AppError('Contract not found', 404);
 
-    // 2. Validate transition
-    const transition = TRANSITIONS[action];
-    if (!transition) {
-        throw new AppError(`Invalid action: ${action}`, 400);
-    }
+  const currentStatus = contract.status;
+  const allowedActions = TRANSITION_MAP[currentStatus];
 
-    if (!transition.from.includes(contract.status)) {
-        throw new AppError(
-            `Cannot ${action} from status "${contract.status}". Expected: ${transition.from.join(' or ')}`,
-            422,
-        );
-    }
+  if (!allowedActions) {
+    throw new AppError(`Contract in status '${currentStatus}' cannot be transitioned`, 400);
+  }
 
-    // 3. Build update data
-    const updateData: Record<string, unknown> = {
-        status: transition.to,
-    };
-
-    if (notes) {
-        updateData.notes = notes;
-    }
-
-    // Handle signing actions
-    if (action === 'sign_digital') {
-        if (!signatureData) {
-            throw new AppError('Signature data is required for digital signing', 400);
-        }
-        updateData.signingMethod = 'digital';
-        updateData.signedAt = new Date();
-        // Store signature data as base64 in signedDocumentUrl for now
-        // In production, save to S3 and store URL
-        updateData.signedDocumentUrl = signatureData;
-    }
-
-    if (action === 'sign_upload') {
-        if (!signedDocumentUrl) {
-            throw new AppError('Signed document URL is required', 400);
-        }
-        updateData.signingMethod = 'upload';
-        updateData.signedAt = new Date();
-        updateData.signedDocumentUrl = signedDocumentUrl;
-    }
-
-    // 4. Apply update
-    await contract.update(updateData);
-
-    // 5. Audit log
-    await logAudit(
-        'UPDATE',
-        'contracts',
-        id,
-        buildAuditContext(req.user!, req.ip),
-        `Contract transition: ${contract.status} → ${transition.to} (${ACTION_LABELS[action] || action})`,
+  const nextStatus = allowedActions[action];
+  if (!nextStatus) {
+    throw new AppError(
+      `Action '${action}' is not valid for status '${currentStatus}'. Allowed: ${Object.keys(allowedActions).join(', ')}`,
+      400,
     );
+  }
 
-    // 6. Return enriched contract
-    const enriched = await contractService.getContractById(id);
-    sendSuccess(res, enriched, ACTION_LABELS[action] || 'Status updated');
+  // Build update payload
+  const updatePayload: Record<string, unknown> = {
+    status: nextStatus,
+  };
+
+  // Handle signing actions
+  if (action === 'sign_digital') {
+    if (!signatureData) {
+      throw new AppError('signatureData is required for digital signing', 400);
+    }
+    updatePayload.signedDocumentUrl = signatureData; // base64 image
+    updatePayload.signedAt = new Date();
+    updatePayload.signingMethod = 'digital';
+  }
+
+  if (action === 'sign_upload') {
+    if (!signedDocumentUrl) {
+      throw new AppError('signedDocumentUrl is required for upload signing', 400);
+    }
+    updatePayload.signedDocumentUrl = signedDocumentUrl;
+    updatePayload.signedAt = new Date();
+    updatePayload.signingMethod = 'upload';
+  }
+
+  // Add notes if provided
+  if (notes) {
+    const existing = contract.notes || '';
+    const timestamp = new Date().toISOString().split('T')[0];
+    updatePayload.notes = existing
+      ? `${existing}\n[${timestamp}] ${action}: ${notes}`
+      : `[${timestamp}] ${action}: ${notes}`;
+  }
+
+  await contract.update(updatePayload);
+
+  // Audit log
+  await logAudit(
+    'UPDATE',
+    'contracts',
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Contract transitioned: ${currentStatus} → ${nextStatus} (action: ${action})`,
+  );
+
+  sendSuccess(res, contract, `Contract transitioned to ${nextStatus}`);
 }

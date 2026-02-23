@@ -1,14 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.service.ts
-// Business logic for Contract CRUD.
-//
-// Replaces all raw SQL from the old contract.routes.ts with
-// Sequelize ORM queries. Key behaviors preserved:
-//   - Player name + club name via eager loading
-//   - days_remaining computed as a virtual field
-//   - totalCommission auto-calculated on create
-//   - Milestones fetched for getById (raw SQL until model exists)
-// ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, QueryTypes, literal } from 'sequelize';
 import { Contract } from './contract.model';
 import { Player } from '../players/player.model';

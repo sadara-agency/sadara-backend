@@ -1,9 +1,3 @@
-// src/models/associations.ts
-// This file sets up all Sequelize associations between models.
-// It should be imported once in the main app initialization
-// after all models have been defined, to ensure associations
-// are registered before any queries are made.
-
 import { Player } from '../modules/players/player.model';
 import { Club } from '../modules/clubs/club.model';
 import { User } from '../modules/Users/user.model';
@@ -16,6 +10,7 @@ import { Referral } from '../modules/referrals/referral.model';
 import { Watchlist, ScreeningCase, SelectionDecision } from '../modules/scouting/scouting.model';
 import { Invoice, Payment, LedgerEntry, Valuation } from '../modules/finance/finance.model';
 import { Document } from '../modules/documents/document.model';
+import { Clearance } from '../modules/clearances/clearance.model';
 
 
 
@@ -89,6 +84,10 @@ export function setupAssociations() {
   Document.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
   Player.hasMany(Document, { foreignKey: 'playerId', as: 'documents' });
   Document.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
+
+  Clearance.belongsTo(Contract, { foreignKey: 'contractId', as: 'contract' });
+  Clearance.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+  Clearance.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
 
 

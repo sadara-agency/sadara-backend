@@ -1,11 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/tasks/task.model.ts
-// Sequelize model for the tasks table.
-//
-// The old task.routes.ts used raw SQL queries because this
-// model didn't exist. Now we get type safety, associations,
-// and can use Sequelize's query builder consistently.
-// ─────────────────────────────────────────────────────────────
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
 
