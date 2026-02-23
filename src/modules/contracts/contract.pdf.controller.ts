@@ -1,10 +1,3 @@
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.pdf.controller.ts
-// GET /api/v1/contracts/:id/pdf
-//
-// Production-ready. No external fonts, no network requests,
-// no timeouts. Uses system fonts + domcontentloaded.
-// ─────────────────────────────────────────────────────────────
 import { Response } from 'express';
 import path from 'path';
 import fs from 'fs';
@@ -13,6 +6,11 @@ import { PDFDocument } from 'pdf-lib';
 import { AuthRequest } from '../../shared/types';
 import { AppError } from '../../middleware/errorHandler';
 import * as contractService from './contract.service';
+
+// ── Asset paths (brand template pages) ──
+const ASSETS_DIR = path.resolve(process.cwd(), 'src', 'assets', 'pdf');
+const COVER_PDF = path.join(ASSETS_DIR, 'cover_page.pdf');
+const BACK_PDF  = path.join(ASSETS_DIR, 'back_page.pdf');
 
 const TMP = path.resolve(process.cwd(), 'tmp');
 if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
@@ -82,17 +80,9 @@ p{margin-bottom:2px}
 
 const HD = `<div class="hd"><div class="hd-r"><div class="lt">شـركــة صـــدارة الـريـاضـيـة</div><div class="ls">SADARA SPORTS COMPANY</div></div><div class="hd-l"><div class="nn">N.N/ 7052143646</div><div>Prince Meshaal Ibn Abd AlAziz, Irqah, Riyadh 12534</div><div style="border-top:1px solid #000;margin-top:3px;padding-top:3px">P - +966533919155 &nbsp; W - www.sadarasport.sa<br>M - info@sadarasport.sa</div></div></div>`;
 
-// ─── Page Builders ──────────────────────────────────────────
+// ─── Page Builders (pages 2 & 3 only — cover/back from assets) ──
 
 const wrap = (body: string) => `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${CSS}</style></head><body>${body}</body></html>`;
-
-function coverPage() {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;width:595px;height:842px;overflow:hidden}.c{width:595px;height:842px;background:#3C3CFA;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}.c h1{font-size:28pt;font-weight:700;letter-spacing:3px;margin-bottom:16px;direction:rtl}.c h2{font-size:15pt;font-weight:400;opacity:.9}.c .l{font-size:20pt;font-weight:700;margin-bottom:40px;direction:rtl}.c .s{font-size:10pt;opacity:.7;margin-top:30px}</style></head><body><div class="c"><div class="l">شـركـة صــدارة الـريـاضـيـة</div><h1>عقد تمثيل رياضي حصري</h1><h2>EXCLUSIVE SPORTS REPRESENTATION AGREEMENT</h2><div class="s">SADARA SPORTS COMPANY</div></div></body></html>`;
-}
-
-function backPage() {
-  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;width:595px;height:842px;overflow:hidden}.b{width:595px;height:842px;background:#3C3CFA;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff}.b .l{font-size:24pt;font-weight:700;margin-bottom:20px;direction:rtl}.b .i{font-size:10pt;opacity:.8;text-align:center;line-height:2;direction:ltr}</style></head><body><div class="b"><div class="l">صـدارة</div><div class="i">SADARA SPORTS COMPANY<br>Prince Meshaal Ibn Abd AlAziz, Irqah, Riyadh 12534<br>+966 533 919 155 | info@sadarasport.sa<br>www.sadarasport.sa</div></div></body></html>`;
-}
 
 function pg2(d: any) {
   const sd=fmtDate(d.sd), ed=fmtDate(d.ed), dur=calcDur(d.sd,d.ed);
@@ -172,9 +162,9 @@ function pg3(d: any) {
 </div></div>`);
 }
 
-// ─── Render a single page ───────────────────────────────────
+// ─── Render a single HTML page to PDF buffer ────────────────
 
-async function render(page: any, html: string): Promise<Uint8Array> {
+async function renderHtmlPage(page: any, html: string): Promise<Uint8Array> {
   await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 10000 });
   await page.evaluate(() => new Promise(r => setTimeout(r, 200)));
   return page.pdf({
@@ -190,10 +180,23 @@ export async function generatePdf(req: AuthRequest, res: Response) {
   const contract = await contractService.getContractById(req.params.id);
   if (!contract) throw new AppError('Contract not found', 404);
 
+  // Validate brand assets exist
+  if (!fs.existsSync(COVER_PDF)) {
+    throw new AppError(`Brand asset not found: ${COVER_PDF}. Place cover_page.pdf in src/assets/pdf/`, 500);
+  }
+  if (!fs.existsSync(BACK_PDF)) {
+    throw new AppError(`Brand asset not found: ${BACK_PDF}. Place back_page.pdf in src/assets/pdf/`, 500);
+  }
+
   const d = getData(contract);
   let browser: any = null;
 
   try {
+    // ── 1. Load brand cover & back pages ──
+    const coverBytes = fs.readFileSync(COVER_PDF);
+    const backBytes  = fs.readFileSync(BACK_PDF);
+
+    // ── 2. Render content pages 2 & 3 with Puppeteer ──
     browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -201,28 +204,39 @@ export async function generatePdf(req: AuthRequest, res: Response) {
     });
 
     const page = await browser.newPage();
-
-    // Render 4 pages sequentially on same page instance (faster than parallel)
-    const buffers: Uint8Array[] = [];
-    for (const html of [coverPage(), pg2(d), pg3(d), backPage()]) {
-      buffers.push(await render(page, html));
+    const contentBuffers: Uint8Array[] = [];
+    for (const html of [pg2(d), pg3(d)]) {
+      contentBuffers.push(await renderHtmlPage(page, html));
     }
 
     await page.close();
     await browser.close();
     browser = null;
 
-    // Merge
+    // ── 3. Merge: Cover + Page2 + Page3 + Back ──
     const merged = await PDFDocument.create();
-    for (const buf of buffers) {
+
+    // Cover (page 1) — from brand template
+    const coverDoc = await PDFDocument.load(coverBytes);
+    const [coverPage] = await merged.copyPages(coverDoc, [0]);
+    merged.addPage(coverPage);
+
+    // Content pages (2 & 3) — from Puppeteer
+    for (const buf of contentBuffers) {
       const doc = await PDFDocument.load(buf);
       const pages = await merged.copyPages(doc, doc.getPageIndices());
       pages.forEach(p => merged.addPage(p));
     }
-    const final = await merged.save();
 
-    // Send
-    const name = `contract_${d.pn}.pdf`;
+    // Back (page 4) — from brand template
+    const backDoc = await PDFDocument.load(backBytes);
+    const [backPage] = await merged.copyPages(backDoc, [0]);
+    merged.addPage(backPage);
+
+    // ── 4. Finalize & send ──
+    const final = await merged.save();
+    const name = `عقد_تمثيل_${d.pn}.pdf`;
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', final.length);
     res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(name)}`);
@@ -230,7 +244,7 @@ export async function generatePdf(req: AuthRequest, res: Response) {
 
   } catch (err: any) {
     if (browser) try { await browser.close(); } catch {}
-    console.error('PDF error:', err.message);
+    console.error('PDF generation error:', err.message);
     throw new AppError(`PDF generation failed: ${err.message}`, 500);
   }
-}           
+}

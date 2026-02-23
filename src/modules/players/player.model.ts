@@ -20,7 +20,7 @@ interface PlayerAttributes {
   weightKg?: number | null;
   jerseyNumber?: number | null;
   currentClubId?: string | null;
-  agentId?: string | null; // From your previous logic (u.full_name AS agent_name)
+  agentId?: string | null;  
   marketValue?: number | null;
   marketValueCurrency: 'SAR' | 'USD' | 'EUR';
   status: 'active' | 'injured' | 'inactive';
