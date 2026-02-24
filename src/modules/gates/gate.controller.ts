@@ -41,6 +41,29 @@ export async function create(req: AuthRequest, res: Response) {
   sendCreated(res, gate);
 }
 
+// ── Initialize Gate (create + seed default checklist) ──
+
+export async function initialize(req: AuthRequest, res: Response) {
+  const gate = await gateService.initializeGate(
+    req.body.playerId,
+    req.body.gateNumber,
+    {
+      autoStart: req.body.autoStart ?? false,
+      notes: req.body.notes,
+    }
+  );
+
+  await logAudit(
+    'CREATE',
+    'gates',
+    (gate as any).id,
+    buildAuditContext(req.user!, req.ip),
+    `Initialized Gate ${req.body.gateNumber} for player ${req.body.playerId} with default checklist`
+  );
+
+  sendCreated(res, gate);
+}
+
 // ── Advance Gate (start / complete) ──
 
 export async function advance(req: AuthRequest, res: Response) {

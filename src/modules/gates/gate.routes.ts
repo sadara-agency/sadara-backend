@@ -6,6 +6,7 @@ import {
     createGateSchema,
     updateGateSchema,
     advanceGateSchema,
+    initializeGateSchema,
     createChecklistItemSchema,
     toggleChecklistItemSchema,
     gateQuerySchema,
@@ -17,9 +18,12 @@ router.use(authenticate);
 
 // ── Gates CRUD ──
 router.get('/', validate(gateQuerySchema, 'query'), asyncHandler(gateController.list));
-router.get('/:id', asyncHandler(gateController.getById));
+
+// Static paths MUST come before /:id to avoid Express matching "initialize" or "player" as an :id param
+router.post('/initialize', authorize('Admin', 'Manager'), validate(initializeGateSchema), asyncHandler(gateController.initialize));
 router.get('/player/:playerId', asyncHandler(gateController.getPlayerGates));
 
+router.get('/:id', asyncHandler(gateController.getById));
 router.post('/', authorize('Admin', 'Manager'), validate(createGateSchema), asyncHandler(gateController.create));
 router.patch('/:id', authorize('Admin', 'Manager'), validate(updateGateSchema), asyncHandler(gateController.update));
 router.patch('/:id/advance', authorize('Admin', 'Manager'), validate(advanceGateSchema), asyncHandler(gateController.advance));
