@@ -42,9 +42,9 @@ export async function update(req: AuthRequest, res: Response) {
     await logAudit(
         'UPDATE',
         'referrals',
-        referral.id,
+        referral!.id,
         buildAuditContext(req.user!, req.ip),
-        `Updated referral ${referral.id}`
+        `Updated referral ${referral!.id}`
     );
 
     sendSuccess(res, referral, 'Referral updated');
@@ -58,12 +58,12 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     await logAudit(
         'UPDATE',
         'referrals',
-        referral.id,
+        referral!.id,
         buildAuditContext(req.user!, req.ip),
-        `Referral status changed to ${referral.status}`
+        `Referral status changed to ${referral!.status}`
     );
 
-    sendSuccess(res, referral, `Status updated to ${referral.status}`);
+    sendSuccess(res, referral, `Status updated to ${referral!.status}`);
 }
 
 // ── Delete ──

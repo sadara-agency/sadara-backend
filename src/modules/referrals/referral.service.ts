@@ -16,20 +16,35 @@ function referralIncludes() {
   ];
 }
 
+/** Re-fetch a referral with full includes (player, assignee, creator). */
+async function refetchWithIncludes(id: string) {
+  return Referral.findByPk(id, { include: referralIncludes() });
+}
+
 // ── Access Control: Mental referrals are restricted ──
 
 function applyAccessFilter(where: any, userId: string, userRole: string) {
-  // Admin can see everything
   if (userRole === 'Admin') return;
 
-  // Non-admins cannot see restricted referrals unless they're in restrictedTo
-  where[Op.or] = [
-    ...(where[Op.or] || []),
+  // Build access conditions — user can see: unrestricted OR assigned/created by them OR in restrictedTo list
+  const accessConditions = [
     { isRestricted: false },
     { restrictedTo: { [Op.contains]: [userId] } },
     { assignedTo: userId },
     { createdBy: userId },
   ];
+
+  // If there's already an Op.or from search, wrap both in an Op.and
+  if (where[Op.or]) {
+    const searchConditions = where[Op.or];
+    delete where[Op.or];
+    where[Op.and] = [
+      { [Op.or]: searchConditions },
+      { [Op.or]: accessConditions },
+    ];
+  } else {
+    where[Op.or] = accessConditions;
+  }
 }
 
 // ── List Referrals ──
@@ -74,7 +89,6 @@ export async function getReferralById(id: string, userId: string, userRole: stri
   const referral = await Referral.findByPk(id, { include: referralIncludes() });
   if (!referral) throw new AppError('Referral not found', 404);
 
-  // Access check for restricted referrals
   if (referral.isRestricted && userRole !== 'Admin') {
     const allowed = referral.restrictedTo || [];
     if (!allowed.includes(userId) && referral.assignedTo !== userId && referral.createdBy !== userId) {
@@ -107,7 +121,7 @@ export async function createReferral(input: any, userId: string) {
     assignedAt: input.assignedTo ? new Date() : null,
   });
 
-  return await Referral.findByPk(referral.id, { include: referralIncludes() });
+  return refetchWithIncludes(referral.id);
 }
 
 // ── Update Referral ──
@@ -124,7 +138,8 @@ export async function updateReferral(id: string, input: any, userId: string, use
     input.assignedAt = new Date();
   }
 
-  return await referral.update(input);
+  await referral.update(input);
+  return refetchWithIncludes(id);
 }
 
 // ── Update Status ──
@@ -143,7 +158,8 @@ export async function updateReferralStatus(id: string, input: any, userId: strin
     updateData.resolvedAt = new Date();
   }
 
-  return await referral.update(updateData);
+  await referral.update(updateData);
+  return refetchWithIncludes(id);
 }
 
 // ── Delete Referral ──

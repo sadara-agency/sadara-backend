@@ -23,6 +23,15 @@ export const advanceGateSchema = z.object({
   notes: z.string().optional(),
 });
 
+// ── Initialize Gate (create + seed default checklist) ──
+
+export const initializeGateSchema = z.object({
+  playerId: z.string().uuid('Invalid player ID'),
+  gateNumber: z.enum(['0', '1', '2', '3']),
+  autoStart: z.boolean().default(false),
+  notes: z.string().optional(),
+});
+
 // ── Checklist Item ──
 
 export const createChecklistItemSchema = z.object({
@@ -57,6 +66,7 @@ export const gateQuerySchema = z.object({
 export type CreateGateInput = z.infer<typeof createGateSchema>;
 export type UpdateGateInput = z.infer<typeof updateGateSchema>;
 export type AdvanceGateInput = z.infer<typeof advanceGateSchema>;
+export type InitializeGateInput = z.infer<typeof initializeGateSchema>;
 export type CreateChecklistItemInput = z.infer<typeof createChecklistItemSchema>;
 export type ToggleChecklistItemInput = z.infer<typeof toggleChecklistItemSchema>;
 export type GateQuery = z.infer<typeof gateQuerySchema>;
