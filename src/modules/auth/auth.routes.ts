@@ -9,6 +9,8 @@ import {
   inviteSchema,
   updateProfileSchema,
   changePasswordSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema,
 } from './auth.schema';
 import * as authController from './auth.controller';
 
@@ -17,6 +19,8 @@ const router = Router();
 // ── Public ──
 router.post('/register', authLimiter, validate(registerSchema), asyncHandler(authController.register));
 router.post('/login', authLimiter, validate(loginSchema), asyncHandler(authController.login));
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), asyncHandler(authController.forgotPassword));
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), asyncHandler(authController.resetPassword));
 
 // ── Protected ──
 router.get('/me', authenticate, asyncHandler(authController.getProfile));
