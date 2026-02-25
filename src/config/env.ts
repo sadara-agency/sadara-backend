@@ -38,6 +38,19 @@ export const env = {
     saltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
   },
 
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    user: process.env.SMTP_USER || '',
+    password: process.env.SMTP_PASSWORD || '',
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@sadara.com',
+    secure: process.env.SMTP_SECURE === 'true', // true for port 465, false for 587
+  },
+
+  frontend: {
+    url: process.env.FRONTEND_URL || 'http://localhost:3000',
+  },
+
   pagination: {
     defaultLimit: 20,
     maxLimit: 100,

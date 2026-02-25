@@ -43,6 +43,26 @@ const updateUserSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+const notificationPrefsSchema = z.object({
+  contracts: z.boolean().optional(),
+  offers: z.boolean().optional(),
+  matches: z.boolean().optional(),
+  tasks: z.boolean().optional(),
+  email: z.boolean().optional(),
+  push: z.boolean().optional(),
+  sms: z.boolean().optional(),
+});
+
+const DEFAULT_NOTIFICATION_PREFS = {
+  contracts: true,
+  offers: true,
+  matches: true,
+  tasks: true,
+  email: true,
+  push: false,
+  sms: false,
+};
+
 const SAFE_ATTRS = ['id', 'email', 'fullName', 'fullNameAr', 'role', 'avatarUrl', 'isActive', 'lastLogin', 'createdAt'] as const;
 
 // ══════════════════════════════════════════
@@ -77,6 +97,7 @@ router.get('/profile', asyncHandler(async (req: AuthRequest, res: Response) => {
   const result = { ...user.toJSON(), twoFactorEnabled: tfRow?.two_factor_enabled ?? false };
   sendSuccess(res, result);
 }));
+
 router.patch('/profile', validate(updateProfileSchema), asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await User.findByPk(req.user!.id);
   if (!user) throw new AppError('User not found', 404);
@@ -96,6 +117,36 @@ router.post('/change-password', validate(changePasswordSchema), asyncHandler(asy
   await user.update({ passwordHash: hash } as any);
   await logAudit('UPDATE', 'users', user.id, buildAuditContext(req.user!, req.ip), 'Password changed');
   sendSuccess(res, null, 'Password changed successfully');
+}));
+
+// ══════════════════════════════════════════
+// NOTIFICATION PREFERENCES
+// ══════════════════════════════════════════
+
+router.get('/notifications', asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await User.findByPk(req.user!.id, {
+    attributes: ['id', 'notificationPreferences'],
+  });
+
+  sendSuccess(res, user?.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFS);
+}));
+
+router.patch('/notifications', validate(notificationPrefsSchema), asyncHandler(async (req: AuthRequest, res: Response) => {
+  const user = await User.findByPk(req.user!.id);
+  if (!user) throw new AppError('User not found', 404);
+
+  const currentPrefs = user.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFS;
+  const updatedPrefs = { ...currentPrefs, ...req.body };
+
+  await user.update({ notificationPreferences: updatedPrefs });
+
+  await logAudit(
+    'UPDATE', 'users', user.id,
+    buildAuditContext(req.user!, req.ip),
+    'Notification preferences updated',
+  );
+
+  sendSuccess(res, updatedPrefs, 'Notification preferences updated');
 }));
 
 // ══════════════════════════════════════════
@@ -121,7 +172,6 @@ router.get('/team', authorize('Admin', 'Manager'), validate(teamQuerySchema, 'qu
   sendPaginated(res, rows, buildMeta(count, page, limit));
 }));
 
-// Admin-only route to update any user (e.g. for activating/deactivating accounts)
 router.patch('/team/:id', authorize('Admin'), validate(updateUserSchema), asyncHandler(async (req: AuthRequest, res: Response) => {
   const user = await User.findByPk(req.params.id);
   if (!user) throw new AppError('User not found', 404);

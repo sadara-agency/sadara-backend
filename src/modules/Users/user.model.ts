@@ -1,6 +1,26 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
 
+interface NotificationPreferences {
+  contracts: boolean;
+  offers: boolean;
+  matches: boolean;
+  tasks: boolean;
+  email: boolean;
+  push: boolean;
+  sms: boolean;
+}
+
+const DEFAULT_NOTIFICATION_PREFS: NotificationPreferences = {
+  contracts: true,
+  offers: true,
+  matches: true,
+  tasks: true,
+  email: true,
+  push: false,
+  sms: false,
+};
+
 interface UserAttributes {
   id: string;
   email: string;
@@ -11,10 +31,12 @@ interface UserAttributes {
   avatarUrl: string | null;
   isActive: boolean;
   lastLogin: Date | null;
+  notificationPreferences: NotificationPreferences;
+  resetToken: string | null;
+  resetTokenExpiry: Date | null;
 }
 
-// Some attributes are optional on creation (ID is usually auto-generated)
-interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'lastLogin' | 'avatarUrl' | 'fullNameAr'> {}
+interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'lastLogin' | 'avatarUrl' | 'fullNameAr' | 'notificationPreferences'> { }
 
 export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   declare id: string;
@@ -26,6 +48,9 @@ export class User extends Model<UserAttributes, UserCreationAttributes> implemen
   declare avatarUrl: string | null;
   declare isActive: boolean;
   declare lastLogin: Date | null;
+  declare notificationPreferences: NotificationPreferences;
+  declare resetToken: string | null;
+  declare resetTokenExpiry: Date | null;
 }
 
 User.init({
@@ -38,9 +63,29 @@ User.init({
   avatarUrl: { type: DataTypes.STRING, field: 'avatar_url' },
   isActive: { type: DataTypes.BOOLEAN, field: 'is_active', defaultValue: true },
   lastLogin: { type: DataTypes.DATE, field: 'last_login' },
-}, {
-  sequelize,
-  tableName: 'users',
-  underscored: true,
-  timestamps: true, 
-});
+  notificationPreferences: {
+    type: DataTypes.JSONB,
+    field: 'notification_preferences',
+    allowNull: false,
+    defaultValue: DEFAULT_NOTIFICATION_PREFS,
+  },
+  resetToken: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    defaultValue: null,
+    field: 'reset_token',
+  },
+  resetTokenExpiry: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+    field: 'reset_token_expiry',
+  },
+
+},
+  {
+    sequelize,
+    tableName: 'users',
+    underscored: true,
+    timestamps: true,
+  });

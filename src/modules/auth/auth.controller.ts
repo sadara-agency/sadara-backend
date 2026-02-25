@@ -62,3 +62,15 @@ export async function changePassword(req: AuthRequest, res: Response) {
   await logAudit('UPDATE', 'users', req.user!.id, buildAuditContext(req.user!, req.ip), 'Password changed');
   sendSuccess(res, result);
 }
+
+// ── Forgot Password (public — request reset link) ──
+export async function forgotPassword(req: Request, res: Response) {
+  const result = await authService.forgotPassword(req.body.email);
+  sendSuccess(res, result);
+}
+
+// ── Reset Password (public — set new password with token) ──
+export async function resetPassword(req: Request, res: Response) {
+  const result = await authService.resetPassword(req.body.token, req.body.newPassword);
+  sendSuccess(res, result);
+}
