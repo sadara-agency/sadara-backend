@@ -4,8 +4,9 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
-import { apiLimiter } from './middleware/rateLimiter';
+import { apiLimiter, authLimiter } from './middleware/rateLimiter';
 import { setupAssociations } from './models/associations';
+import { isRedisConnected } from './config/redis';
 
 // Route imports
 import authRoutes from './modules/auth/auth.routes';
@@ -34,7 +35,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 
 if (env.nodeEnv === 'production') {
-  app.use('/api/', apiLimiter);
+  app.use('/api/v1/auth', authLimiter);
 }
 
 // ── Health Check ──
@@ -45,6 +46,7 @@ app.get('/api/health', (_req, res) => {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
     environment: env.nodeEnv,
+    redis: isRedisConnected() ? 'connected' : 'disconnected',
   });
 });
 

@@ -3,10 +3,12 @@ import { env } from './config/env';
 import { testConnection } from './config/database';
 import chalk from 'chalk';
 import gradient from 'gradient-string';
+import { initRedis, closeRedis } from './config/redis';
 
 async function bootstrap() {
   try {
     await testConnection();
+    await initRedis();
 
 
     app.listen(env.port, () => {
@@ -59,5 +61,12 @@ async function bootstrap() {
     process.exit(1);
   }
 }
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('🛑 Shutting down...');
+  await closeRedis();
+  process.exit(0);
+});
 
 bootstrap();
