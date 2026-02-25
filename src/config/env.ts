@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 dotenv.config(
   {
-    path: path.resolve(process.cwd(), '.env.local'),
+    path: path.resolve(process.cwd(), '.env.development.local'),
   }
 );
 
@@ -40,7 +40,7 @@ export const env = {
 
   // ── NEW: Redis ──
   redis: {
-    url: process.env.REDIS_URL || '', // empty = disabled
+    url: process.env.REDIS_URL , 
   },
 
   smtp: {
