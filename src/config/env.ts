@@ -38,6 +38,11 @@ export const env = {
     saltRounds: parseInt(process.env.BCRYPT_SALT_ROUNDS || '12', 10),
   },
 
+  // ── NEW: Redis ──
+  redis: {
+    url: process.env.REDIS_URL || '', // empty = disabled
+  },
+
   smtp: {
     host: process.env.SMTP_HOST || '',
     port: parseInt(process.env.SMTP_PORT || '587', 10),
