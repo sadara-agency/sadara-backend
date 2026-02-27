@@ -37,3 +37,26 @@ yarn-error.log*
 next-env.d.ts
 
 /tmp
+
+
+# Environment files (NEVER commit these)
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+
+# Keep .env.example as the template
+!.env.example
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+
+# IDE
+.vscode/
+.idea/
