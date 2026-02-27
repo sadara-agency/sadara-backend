@@ -1,4 +1,4 @@
-import { Op, Sequelize, QueryTypes, literal } from 'sequelize';
+import { Op, Sequelize, QueryTypes, fn, col, where as seqWhere } from 'sequelize';
 import { Contract } from './contract.model';
 import { Player } from '../players/player.model';
 import { Club } from '../clubs/club.model';
@@ -54,9 +54,13 @@ export async function listContracts(queryParams: any) {
     const pattern = `%${search}%`;
     where[Op.or] = [
       { title: { [Op.iLike]: pattern } },
-      // Search by player name via literal (since it's in a joined table)
-      literal(`"player"."first_name" ILIKE '${pattern.replace(/'/g, "''")}'`),
-      literal(`"player"."last_name" ILIKE '${pattern.replace(/'/g, "''")}'`),
+      // Safe: Sequelize.where + fn generate parameterized SQL
+      seqWhere(fn('lower', col('player.first_name')), {
+        [Op.like]: pattern.toLowerCase(),
+      }),
+      seqWhere(fn('lower', col('player.last_name')), {
+        [Op.like]: pattern.toLowerCase(),
+      }),
     ];
   }
 
@@ -66,7 +70,7 @@ export async function listContracts(queryParams: any) {
     limit,
     offset,
     order: [[sort, order]],
-    distinct: true, // Needed when including associations to get correct count
+    distinct: true,
   });
 
   const data = rows.map(enrichContract);
@@ -85,7 +89,7 @@ export async function getContractById(id: string) {
 
   const enriched = enrichContract(contract);
 
-  // Fetch milestones via raw SQL (until Milestone model is created)
+  // Fetch milestones via parameterized raw SQL
   const milestones = await sequelize.query(
     `SELECT ms.*
      FROM milestones ms
@@ -102,7 +106,6 @@ export async function getContractById(id: string) {
 // Create Contract
 // ────────────────────────────────────────────────────────────
 export async function createContract(input: CreateContractInput, createdBy: string) {
-  // Auto-calculate total commission
   const totalCommission =
     input.commissionPct && input.baseSalary
       ? (input.baseSalary * input.commissionPct) / 100
@@ -125,7 +128,6 @@ export async function createContract(input: CreateContractInput, createdBy: stri
     createdBy,
   });
 
-  // Re-fetch with associations
   return getContractById(contract.id);
 }
 
@@ -136,7 +138,6 @@ export async function updateContract(id: string, input: UpdateContractInput) {
   const contract = await Contract.findByPk(id);
   if (!contract) throw new AppError('Contract not found', 404);
 
-  // If commission % or salary changed, recalculate total
   const newPct = input.commissionPct ?? contract.commissionPct;
   const newSalary = input.baseSalary ?? contract.baseSalary;
   const updateData: any = { ...input };

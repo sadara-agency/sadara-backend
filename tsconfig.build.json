@@ -4,17 +4,15 @@
     "module": "commonjs",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": ".",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "sourceMap": true,
-    "noEmit": true,
     "ignoreDeprecations": "5.0",
     "baseUrl": "./src",
-    "types": ["jest", "node"],
     "paths": {
       "@config/*": ["config/*"],
       "@middleware/*": ["middleware/*"],
@@ -22,12 +20,6 @@
       "@shared/*": ["shared/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    "tests/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }
