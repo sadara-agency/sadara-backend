@@ -91,10 +91,11 @@ export const env = {
     refreshExpiresIn: validated.JWT_REFRESH_EXPIRES_IN,
   },
 
-  cors: {
-    origin: validated.CORS_ORIGIN,
-  },
-
+cors: {
+  origin: validated.CORS_ORIGIN.includes(',')
+    ? validated.CORS_ORIGIN.split(',').map(o => o.trim())
+    : validated.CORS_ORIGIN,
+},
   bcrypt: {
     saltRounds: validated.BCRYPT_SALT_ROUNDS,
   },
