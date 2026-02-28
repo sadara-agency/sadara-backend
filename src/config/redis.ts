@@ -9,7 +9,6 @@ let redisClient: RedisClientType | null = null;
 let isConnected = false;
 
 export async function initRedis(): Promise<RedisClientType | null> {
-    console.log('🔍 REDIS_URL:', env.redis.url ? `${env.redis.url.substring(0, 20)}...` : '(empty)');
     if (!env.redis.url) {
         console.warn('⚠️  REDIS_URL not configured — caching disabled, using in-memory fallback');
         return null;

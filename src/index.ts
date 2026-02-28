@@ -4,11 +4,13 @@ import { testConnection } from './config/database';
 import chalk from 'chalk';
 import gradient from 'gradient-string';
 import { initRedis, closeRedis } from './config/redis';
+import { seedDatabase } from './database/seed';
 
 async function bootstrap() {
   try {
     await testConnection();
     await initRedis();
+    await seedDatabase();
 
 
     app.listen(env.port, () => {
