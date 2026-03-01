@@ -24,6 +24,10 @@ import scoutingRoutes from './modules/scouting/scouting.routes';
 import financeRoutes from './modules/finance/finance.routes';
 import documentRoutes from './modules/documents/document.routes';
 import settingsRoutes from './modules/settings/settings.routes';
+import injuryRoutes from './modules/injuries/injury.routes';
+import trainingRoutes from './modules/training/training.routes';
+import saffRoutes from './modules/saff/saff.routes';
+
 
 const app = express();
 
@@ -68,7 +72,9 @@ app.use('/api/v1/scouting', scoutingRoutes);
 app.use('/api/v1/finance', financeRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/settings', settingsRoutes);
-
+app.use('/api/v1/injuries', injuryRoutes);
+app.use('/api/v1/training', trainingRoutes);
+app.use('/api/v1/saff', saffRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

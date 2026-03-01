@@ -1,5 +1,3 @@
-
-
 import bcrypt from 'bcryptjs';
 import { sequelize } from '../config/database';
 import { env } from '../config/env';
@@ -18,6 +16,8 @@ import { Player } from '../modules/players/player.model';
 import { Contract } from '../modules/contracts/contract.model';
 import { Offer } from '../modules/offers/offer.model';
 import { Match } from '../modules/matches/match.model';
+import { MatchPlayer } from '../modules/matches/matchPlayer.model';
+import { PlayerMatchStats } from '../modules/matches/playerMatchStats.model';
 import { Task } from '../modules/tasks/task.model';
 import { Gate, GateChecklist } from '../modules/gates/gate.model';
 import { Referral } from '../modules/referrals/referral.model';
@@ -76,6 +76,12 @@ const IDS = {
     watchlists: Array.from({ length: 3 }, (_, i) =>
         `wl000001-0000-0000-0000-${String(i + 1).padStart(12, '0')}`
     ),
+    matchPlayers: Array.from({ length: 15 }, (_, i) =>
+        `mp000001-0000-0000-0000-${String(i + 1).padStart(12, '0')}`
+    ),
+    matchStats: Array.from({ length: 15 }, (_, i) =>
+        `ms000001-0000-0000-0000-${String(i + 1).padStart(12, '0')}`
+    ),
 };
 
 // ══════════════════════════════════════════
@@ -113,22 +119,74 @@ async function createMissingTables() {
     );
   `);
 
+    // Create availability enum if not exists
+    await sequelize.query(`
+    DO $$ BEGIN
+      CREATE TYPE match_player_availability AS ENUM ('starter', 'bench', 'injured', 'suspended', 'not_called');
+    EXCEPTION
+      WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+
+    // Drop old match_players if it has old schema (started BOOLEAN column)
+    const oldCheck = await sequelize.query(
+        `SELECT column_name FROM information_schema.columns 
+         WHERE table_name = 'match_players' AND column_name = 'started'`,
+        { type: QueryTypes.SELECT }
+    );
+    if (oldCheck.length > 0) {
+        await sequelize.query('DROP TABLE IF EXISTS match_players CASCADE');
+        logger.info('   ↻ Dropped old match_players table (migrating to new schema)');
+    }
+
+    // New match_players table with availability enum
     await sequelize.query(`
     CREATE TABLE IF NOT EXISTS match_players (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
       player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-      minutes_played INT DEFAULT 0,
-      goals INT DEFAULT 0,
-      assists INT DEFAULT 0,
-      rating NUMERIC(3,1),
-      yellow_cards INT DEFAULT 0,
-      red_cards INT DEFAULT 0,
-      started BOOLEAN DEFAULT true
+      availability match_player_availability NOT NULL DEFAULT 'starter',
+      position_in_match VARCHAR(50),
+      minutes_played INT,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT uq_match_player UNIQUE (match_id, player_id)
     );
   `);
 
-    logger.info('✅ Missing tables ensured (performances, risk_radars, match_players)');
+    // player_match_stats table (detailed per-match performance)
+    await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS player_match_stats (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      minutes_played INT,
+      goals INT DEFAULT 0,
+      assists INT DEFAULT 0,
+      shots_total INT,
+      shots_on_target INT,
+      passes_total INT,
+      passes_completed INT,
+      tackles_total INT,
+      interceptions INT,
+      duels_won INT,
+      duels_total INT,
+      dribbles_completed INT,
+      dribbles_attempted INT,
+      fouls_committed INT,
+      fouls_drawn INT,
+      yellow_cards INT DEFAULT 0,
+      red_cards INT DEFAULT 0,
+      rating NUMERIC(3,1),
+      position_in_match VARCHAR(50),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW(),
+      CONSTRAINT uq_player_match_stats UNIQUE (player_id, match_id)
+    );
+  `);
+
+    logger.info('✅ Missing tables ensured (performances, risk_radars, match_players, player_match_stats)');
 }
 
 async function createViews() {
@@ -177,16 +235,17 @@ async function createViews() {
     CREATE OR REPLACE VIEW vw_injury_match_conflicts AS
     SELECT
       p.first_name || ' ' || p.last_name AS player_name,
-      'Injury' AS injury_type,
+      mp.availability AS status_in_match,
       m.id AS match_id,
       hc.name AS home_team,
-      ac.name AS away_team
-    FROM players p
-    JOIN match_players mp ON mp.player_id = p.id
+      ac.name AS away_team,
+      m.match_date
+    FROM match_players mp
+    JOIN players p ON mp.player_id = p.id
     JOIN matches m ON mp.match_id = m.id
     LEFT JOIN clubs hc ON m.home_club_id = hc.id
     LEFT JOIN clubs ac ON m.away_club_id = ac.id
-    WHERE p.status = 'injured'
+    WHERE mp.availability = 'injured'
       AND m.status = 'upcoming';
   `);
 
@@ -601,7 +660,7 @@ async function seedScouting() {
 }
 
 async function seedPerformances() {
-    // Seed performances for completed matches
+    // Seed performances for completed matches (legacy performances table)
     const completedMatchIds = [IDS.matches[3], IDS.matches[4], IDS.matches[5]];
     const playerIds = IDS.players.slice(0, 10);
 
@@ -631,30 +690,100 @@ async function seedPerformances() {
         );
     }
 
-    // Match players
-    for (const matchId of completedMatchIds) {
-        for (let i = 0; i < 3; i++) {
-            const pid = playerIds[i];
-            await sequelize.query(
-                `INSERT INTO match_players (match_id, player_id, minutes_played, goals, assists, rating, started)
-         VALUES (:match_id, :player_id, :minutes, :goals, :assists, :rating, true)
-         ON CONFLICT DO NOTHING`,
-                {
-                    replacements: {
-                        match_id: matchId,
-                        player_id: pid,
-                        minutes: 60 + Math.floor(Math.random() * 30),
-                        goals: Math.random() > 0.7 ? 1 : 0,
-                        assists: Math.random() > 0.6 ? 1 : 0,
-                        rating: (6 + Math.random() * 3).toFixed(1),
-                    },
-                    type: QueryTypes.INSERT,
-                }
-            );
+    logger.info('✅ Performances seeded');
+}
+
+async function seedMatchPlayers() {
+    // ── Match Players: Assign players to completed + upcoming matches ──
+    const availabilities: Array<'starter' | 'bench' | 'injured' | 'suspended' | 'not_called'> =
+        ['starter', 'starter', 'starter', 'starter', 'bench', 'bench', 'injured'];
+
+    const matchPlayerRecords: any[] = [];
+    let mpIdx = 0;
+
+    // Completed matches — Al Hilal vs Al Ahli (match 3), Al Nassr vs Al Shabab (match 4), Al Ittihad vs Al Taawoun (match 5)
+    const matchPlayerAssignments = [
+        // Match 3 (Al Hilal vs Al Ahli): Hilal players + Ahli players
+        { matchId: IDS.matches[3], players: [IDS.players[0], IDS.players[1], IDS.players[4], IDS.players[7], IDS.players[9], IDS.players[2], IDS.players[3]] },
+        // Match 4 (Al Nassr vs Al Shabab): Nassr + Shabab players
+        { matchId: IDS.matches[4], players: [IDS.players[8], IDS.players[6], IDS.players[13]] },
+        // Match 5 (Al Ittihad vs Al Taawoun): Ittihad players
+        { matchId: IDS.matches[5], players: [IDS.players[5]] },
+        // Upcoming match 0 (Al Hilal vs Al Nassr): Both sides
+        { matchId: IDS.matches[0], players: [IDS.players[0], IDS.players[1], IDS.players[4], IDS.players[9], IDS.players[8]] },
+        // Upcoming match 1 (Al Ahli vs Al Ittihad)
+        { matchId: IDS.matches[1], players: [IDS.players[2], IDS.players[3], IDS.players[5]] },
+    ];
+
+    for (const assignment of matchPlayerAssignments) {
+        for (let i = 0; i < assignment.players.length; i++) {
+            const avail = availabilities[i % availabilities.length];
+            matchPlayerRecords.push({
+                id: IDS.matchPlayers[mpIdx++],
+                matchId: assignment.matchId,
+                playerId: assignment.players[i],
+                availability: avail,
+                positionInMatch: null,
+                minutesPlayed: avail === 'starter' ? 60 + Math.floor(Math.random() * 30) : (avail === 'bench' ? Math.floor(Math.random() * 30) : null),
+                notes: avail === 'injured' ? 'Hamstring strain' : null,
+            });
         }
     }
 
-    logger.info('✅ Performances & match_players seeded');
+    await MatchPlayer.bulkCreate(matchPlayerRecords, { ignoreDuplicates: true });
+    logger.info(`✅ Match players seeded (${matchPlayerRecords.length} assignments)`);
+}
+
+async function seedMatchStats() {
+    // ── Player Match Stats: Detailed stats for completed matches only ──
+    const completedMatchIds = [IDS.matches[3], IDS.matches[4], IDS.matches[5]];
+    const statsRecords: any[] = [];
+    let msIdx = 0;
+
+    // Get the match player assignments for completed matches
+    const completedPlayers = [
+        // Match 3: Hilal + Ahli starters
+        { matchId: IDS.matches[3], players: [IDS.players[0], IDS.players[1], IDS.players[4], IDS.players[9], IDS.players[2], IDS.players[3]] },
+        // Match 4: Nassr + Shabab
+        { matchId: IDS.matches[4], players: [IDS.players[8], IDS.players[6]] },
+        // Match 5: Ittihad
+        { matchId: IDS.matches[5], players: [IDS.players[5]] },
+    ];
+
+    for (const group of completedPlayers) {
+        for (const pid of group.players) {
+            const isScorer = Math.random() > 0.65;
+            const mins = 60 + Math.floor(Math.random() * 30);
+
+            statsRecords.push({
+                id: IDS.matchStats[msIdx++],
+                playerId: pid,
+                matchId: group.matchId,
+                minutesPlayed: mins,
+                goals: isScorer ? Math.floor(Math.random() * 2) + 1 : 0,
+                assists: Math.random() > 0.55 ? 1 : 0,
+                shotsTotal: Math.floor(Math.random() * 5) + 1,
+                shotsOnTarget: Math.floor(Math.random() * 3),
+                passesTotal: 20 + Math.floor(Math.random() * 40),
+                passesCompleted: 15 + Math.floor(Math.random() * 30),
+                tacklesTotal: Math.floor(Math.random() * 5),
+                interceptions: Math.floor(Math.random() * 4),
+                duelsWon: Math.floor(Math.random() * 6),
+                duelsTotal: 3 + Math.floor(Math.random() * 8),
+                dribblesCompleted: Math.floor(Math.random() * 4),
+                dribblesAttempted: 1 + Math.floor(Math.random() * 5),
+                foulsCommitted: Math.floor(Math.random() * 3),
+                foulsDrawn: Math.floor(Math.random() * 3),
+                yellowCards: Math.random() > 0.8 ? 1 : 0,
+                redCards: 0,
+                rating: Number((6 + Math.random() * 3).toFixed(1)),
+                positionInMatch: null,
+            });
+        }
+    }
+
+    await PlayerMatchStats.bulkCreate(statsRecords, { ignoreDuplicates: true });
+    logger.info(`✅ Player match stats seeded (${statsRecords.length} stat rows)`);
 }
 
 // ══════════════════════════════════════════
@@ -697,6 +826,8 @@ export async function seedDatabase(): Promise<void> {
         await seedReferrals();
         await seedScouting();
         await seedPerformances();
+        await seedMatchPlayers();
+        await seedMatchStats();
 
         // Create views AFTER data exists
         await createViews();

@@ -5,6 +5,7 @@ import { User } from '../Users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
 import { sequelize } from '../../config/database';
+import { ExternalProviderMapping } from './externalProvider.model';
 
 // ── Computed attribute fragments (reusable) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -57,15 +58,15 @@ const COMPUTED_ATTRIBUTES: [any, string][] = [
     'matches',
   ],
   [
-    literal(`(SELECT COALESCE(SUM(mp.goals), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
+    literal(`(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`),
     'goals',
   ],
   [
-    literal(`(SELECT COALESCE(SUM(mp.assists), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
+    literal(`(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`),
     'assists',
   ],
   [
-    literal(`(SELECT ROUND(AVG(mp.rating), 1) FROM match_players mp WHERE mp.player_id = "Player".id AND mp.rating IS NOT NULL)`),
+    literal(`(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`),
     'rating',
   ],
   [
@@ -184,3 +185,41 @@ export async function deletePlayer(id: string) {
   if (!deleted) throw new AppError('Player not found', 404);
   return { id };
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Add to: src/modules/players/player.service.ts (append these functions)
+// ═══════════════════════════════════════════════════════════════
+
+
+export async function getPlayerProviders(playerId: string) {
+  return ExternalProviderMapping.findAll({
+    where: { playerId },
+    order: [['providerName', 'ASC']],
+  });
+}
+
+export async function upsertPlayerProvider(playerId: string, input: {
+  providerName: string; externalPlayerId: string;
+  externalTeamId?: string; apiBaseUrl?: string; notes?: string;
+}) {
+  const [mapping] = await ExternalProviderMapping.upsert({
+    playerId,
+    providerName: input.providerName as any,
+    externalPlayerId: input.externalPlayerId,
+    externalTeamId: input.externalTeamId || null,
+    apiBaseUrl: input.apiBaseUrl || null,
+    notes: input.notes || null,
+  } as any);
+  return mapping;
+}
+
+export async function removePlayerProvider(playerId: string, providerName: string) {
+  const mapping = await ExternalProviderMapping.findOne({
+    where: { playerId, providerName },
+  });
+  if (!mapping) throw new Error('Provider mapping not found');
+  await mapping.destroy();
+  return { playerId, providerName };
+}
+
+ 

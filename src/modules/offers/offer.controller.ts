@@ -88,3 +88,11 @@ export async function remove(req: AuthRequest, res: Response) {
 
   sendSuccess(res, result, 'Offer deleted');
 }
+
+
+export async function convertToContract(req: AuthRequest, res: Response) {
+  const result = await offerService.convertOfferToContract(req.params.id, req.user!.id);
+  await logAudit('CREATE', 'contracts', result.contract.id, buildAuditContext(req.user!, req.ip),
+    `Converted offer ${req.params.id} to contract ${result.contract.id}`);
+  sendCreated(res, result, 'Offer converted to contract');
+}

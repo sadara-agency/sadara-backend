@@ -47,6 +47,10 @@ export class Match extends Model<MatchAttributes, MatchCreationAttributes> imple
   declare createdAt: Date;
   declare updatedAt: Date;
 
+  // Associations (populated via include)
+  declare matchPlayers?: any[];
+  declare stats?: any[];
+
   // Virtual: formatted score
   get score(): string | null {
     if (this.homeScore == null || this.awayScore == null) return null;

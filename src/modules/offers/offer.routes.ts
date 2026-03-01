@@ -23,4 +23,8 @@ router.patch('/:id/status', authorize('Admin', 'Manager'), validate(updateOfferS
 // ── Delete ──
 router.delete('/:id', authorize('Admin'), asyncHandler(offerController.remove));
 
+
+router.post('/:id/convert', authorize('Admin', 'Manager'), asyncHandler(offerController.convertToContract));
+
+
 export default router;

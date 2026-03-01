@@ -19,4 +19,9 @@ router.post('/', authorize('Admin', 'Manager'), validate(createPlayerSchema), as
 router.patch('/:id', authorize('Admin', 'Manager'), validate(updatePlayerSchema), asyncHandler(playerController.update));
 router.delete('/:id', authorize('Admin'), asyncHandler(playerController.remove));
 
+router.get('/:id/providers', asyncHandler(playerController.getProviders));
+router.put('/:id/providers', asyncHandler(playerController.upsertProvider));
+router.delete('/:id/providers/:provider', asyncHandler(playerController.removeProvider));
+
+
 export default router;

@@ -5,6 +5,8 @@ import { Club } from '../clubs/club.model';
 import { User } from '../Users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
+import { Contract } from '../contracts/contract.model';
+
 
 // ── List Offers ──
 
@@ -148,3 +150,52 @@ export async function deleteOffer(id: string) {
   await offer.destroy();
   return { id };
 }
+
+// ── Convert Offer to Contract ──
+export async function convertOfferToContract(offerId: string, createdBy: string) {
+  const offer = await Offer.findByPk(offerId, {
+    include: [
+      { model: Player, as: 'player', attributes: ['id', 'firstName', 'lastName', 'currentClubId'] },
+    ],
+  });
+
+  if (!offer) throw new AppError('Offer not found', 404);
+  if (offer.status !== 'Closed') {
+    throw new AppError('Only closed offers can be converted to contracts', 400);
+  }
+
+  // Check if already converted
+  const plain = offer.get({ plain: true }) as any;
+  if (plain.convertedContractId) {
+    throw new AppError('This offer has already been converted to a contract', 400);
+  }
+
+  // Build contract dates
+  const today = new Date();
+  const endDate = new Date(today);
+  endDate.setFullYear(endDate.getFullYear() + (offer.contractYears || 1));
+
+  const contract = await Contract.create({
+    playerId: offer.playerId,
+    clubId: offer.toClubId || offer.fromClubId,
+    contractType: 'Professional',
+    status: 'Active',
+    startDate: today.toISOString().split('T')[0],
+    endDate: endDate.toISOString().split('T')[0],
+    baseSalary: offer.salaryOffered || 0,
+    salaryCurrency: offer.feeCurrency || 'SAR',
+    signingBonus: offer.transferFee || 0,
+    commissionPct: offer.agentFee ? Number(offer.agentFee) : 10,
+    notes: `Auto-created from offer #${offerId}`,
+    createdBy,
+  } as any);
+
+  // Link offer to contract
+  await offer.update({
+    convertedContractId: contract.id,
+    convertedAt: new Date(),
+  } as any);
+
+  return { offer: await Offer.findByPk(offerId), contract };
+}
+
