@@ -44,6 +44,8 @@ const router = (0, express_1.Router)();
 // ── Public ──
 router.post('/register', rateLimiter_1.authLimiter, (0, validate_1.validate)(auth_schema_1.registerSchema), (0, errorHandler_1.asyncHandler)(authController.register));
 router.post('/login', rateLimiter_1.authLimiter, (0, validate_1.validate)(auth_schema_1.loginSchema), (0, errorHandler_1.asyncHandler)(authController.login));
+router.post('/forgot-password', rateLimiter_1.authLimiter, (0, validate_1.validate)(auth_schema_1.forgotPasswordSchema), (0, errorHandler_1.asyncHandler)(authController.forgotPassword));
+router.post('/reset-password', rateLimiter_1.authLimiter, (0, validate_1.validate)(auth_schema_1.resetPasswordSchema), (0, errorHandler_1.asyncHandler)(authController.resetPassword));
 // ── Protected ──
 router.get('/me', auth_1.authenticate, (0, errorHandler_1.asyncHandler)(authController.getProfile));
 router.patch('/me', auth_1.authenticate, (0, validate_1.validate)(auth_schema_1.updateProfileSchema), (0, errorHandler_1.asyncHandler)(authController.updateProfile));

@@ -34,9 +34,15 @@ interface UserAttributes {
   notificationPreferences: NotificationPreferences;
   resetToken: string | null;
   resetTokenExpiry: Date | null;
+  playerId: string | null;
+  inviteToken: string | null;
+  inviteTokenExpiry: Date | null;
 }
 
-interface UserCreationAttributes extends Optional<UserAttributes, 'id' | 'isActive' | 'lastLogin' | 'avatarUrl' | 'fullNameAr' | 'notificationPreferences'> { }
+interface UserCreationAttributes extends Optional<UserAttributes,
+  'id' | 'isActive' | 'lastLogin' | 'avatarUrl' | 'fullNameAr' | 'notificationPreferences' |
+  'resetToken' | 'resetTokenExpiry' | 'playerId' | 'inviteToken' | 'inviteTokenExpiry'
+> { }
 
 export class User extends Model<UserAttributes, UserCreationAttributes> implements UserAttributes {
   declare id: string;
@@ -51,6 +57,9 @@ export class User extends Model<UserAttributes, UserCreationAttributes> implemen
   declare notificationPreferences: NotificationPreferences;
   declare resetToken: string | null;
   declare resetTokenExpiry: Date | null;
+  declare playerId: string | null;
+  declare inviteToken: string | null;
+  declare inviteTokenExpiry: Date | null;
 }
 
 User.init({
@@ -81,11 +90,27 @@ User.init({
     defaultValue: null,
     field: 'reset_token_expiry',
   },
-
-},
-  {
-    sequelize,
-    tableName: 'users',
-    underscored: true,
-    timestamps: true,
-  });
+  playerId: {
+    type: DataTypes.UUID,
+    allowNull: true,
+    defaultValue: null,
+    field: 'player_id',
+  },
+  inviteToken: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    defaultValue: null,
+    field: 'invite_token',
+  },
+  inviteTokenExpiry: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    defaultValue: null,
+    field: 'invite_token_expiry',
+  },
+}, {
+  sequelize,
+  tableName: 'users',
+  underscored: true,
+  timestamps: true,
+});

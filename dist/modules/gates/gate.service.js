@@ -1,9 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.GATE_CHECKLIST_TEMPLATES = void 0;
 exports.listGates = listGates;
 exports.getGateById = getGateById;
 exports.getPlayerGates = getPlayerGates;
 exports.createGate = createGate;
+exports.initializeGate = initializeGate;
 exports.advanceGate = advanceGate;
 exports.updateGate = updateGate;
 exports.deleteGate = deleteGate;
@@ -19,6 +21,44 @@ const errorHandler_1 = require("../../middleware/errorHandler");
 const PLAYER_ATTRS = ['id', 'firstName', 'lastName', 'photoUrl', 'position'];
 const USER_ATTRS = ['id', 'fullName'];
 const CHECKLIST_ORDER = [['sortOrder', 'ASC'], ['createdAt', 'ASC']];
+// ══════════════════════════════════════════
+// DEFAULT CHECKLIST TEMPLATES
+// ══════════════════════════════════════════
+/**
+ * Default checklist items auto-seeded when a gate is initialized.
+ * Adjust items as needed for your agency's workflow.
+ */
+exports.GATE_CHECKLIST_TEMPLATES = {
+    '0': [
+        { item: 'Collect player identification documents (ID / Passport)', isMandatory: true, sortOrder: 0 },
+        { item: 'Obtain signed representation agreement', isMandatory: true, sortOrder: 1 },
+        { item: 'Complete medical examination & fitness assessment', isMandatory: true, sortOrder: 2 },
+        { item: 'Verify player registration with federation', isMandatory: true, sortOrder: 3 },
+        { item: 'Upload player photo & profile data', isMandatory: false, sortOrder: 4 },
+        { item: 'Guardian consent form (if youth player)', isMandatory: false, sortOrder: 5 },
+    ],
+    '1': [
+        { item: 'Complete initial performance assessment', isMandatory: true, sortOrder: 0 },
+        { item: 'Create Individual Development Plan (IDP)', isMandatory: true, sortOrder: 1 },
+        { item: 'Set short-term performance goals', isMandatory: true, sortOrder: 2 },
+        { item: 'Assign development coach / mentor', isMandatory: false, sortOrder: 3 },
+        { item: 'Record baseline statistics', isMandatory: false, sortOrder: 4 },
+    ],
+    '2': [
+        { item: 'Mid-season performance review', isMandatory: true, sortOrder: 0 },
+        { item: 'Update market valuation', isMandatory: true, sortOrder: 1 },
+        { item: 'Review IDP progress & adjust goals', isMandatory: true, sortOrder: 2 },
+        { item: 'Collect performance data & match statistics', isMandatory: false, sortOrder: 3 },
+        { item: 'Stakeholder feedback report', isMandatory: false, sortOrder: 4 },
+    ],
+    '3': [
+        { item: 'End-of-season comprehensive review', isMandatory: true, sortOrder: 0 },
+        { item: 'Contract renewal recommendation', isMandatory: true, sortOrder: 1 },
+        { item: 'Final market valuation update', isMandatory: true, sortOrder: 2 },
+        { item: 'Transfer window strategy assessment', isMandatory: false, sortOrder: 3 },
+        { item: 'Player satisfaction interview', isMandatory: false, sortOrder: 4 },
+    ],
+};
 // ── Helpers ──
 function gateIncludes() {
     return [
@@ -127,6 +167,36 @@ async function createGate(input) {
         }
     }
     return await gate_model_1.Gate.create(input);
+}
+// ── Initialize Gate (create + seed default checklist) ──
+/**
+ * Creates a gate for a player and seeds it with default checklist items.
+ * Used by: admin manual creation UI and auto-trigger from scouting approval.
+ */
+async function initializeGate(playerId, gateNumber, options = {}) {
+    // Reuse createGate for all validation (duplicate check, ordering)
+    const gate = await createGate({
+        playerId,
+        gateNumber,
+        status: options.autoStart ? 'InProgress' : 'Pending',
+        notes: options.notes,
+    });
+    // If auto-started, record startedAt
+    if (options.autoStart) {
+        await gate.update({ startedAt: new Date() });
+    }
+    // Seed default checklist items from template
+    const template = exports.GATE_CHECKLIST_TEMPLATES[gateNumber] || [];
+    if (template.length > 0) {
+        await gate_model_1.GateChecklist.bulkCreate(template.map((item) => ({
+            gateId: gate.id,
+            item: item.item,
+            isMandatory: item.isMandatory,
+            sortOrder: item.sortOrder,
+        })));
+    }
+    // Return full gate with checklist included
+    return getGateById(gate.id);
 }
 // ── Advance Gate (start / complete) ──
 async function advanceGate(id, action, userId, notes) {

@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.changePasswordSchema = exports.updateProfileSchema = exports.inviteSchema = exports.loginSchema = exports.registerSchema = void 0;
+exports.resetPasswordSchema = exports.forgotPasswordSchema = exports.changePasswordSchema = exports.updateProfileSchema = exports.inviteSchema = exports.loginSchema = exports.registerSchema = void 0;
 const zod_1 = require("zod");
 // ── Public Registration (no role selection) ──
 exports.registerSchema = zod_1.z.object({
@@ -32,5 +32,14 @@ exports.updateProfileSchema = zod_1.z.object({
 exports.changePasswordSchema = zod_1.z.object({
     currentPassword: zod_1.z.string().min(1, 'Current password is required'),
     newPassword: zod_1.z.string().min(8, 'New password must be at least 8 characters'),
+});
+// ── Forgot Password (request reset link) ──
+exports.forgotPasswordSchema = zod_1.z.object({
+    email: zod_1.z.string().email('Invalid email address'),
+});
+// ── Reset Password (set new password with token) ──
+exports.resetPasswordSchema = zod_1.z.object({
+    token: zod_1.z.string().min(1, 'Reset token is required'),
+    newPassword: zod_1.z.string().min(8, 'Password must be at least 8 characters'),
 });
 //# sourceMappingURL=auth.schema.js.map

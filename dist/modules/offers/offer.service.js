@@ -7,6 +7,7 @@ exports.createOffer = createOffer;
 exports.updateOffer = updateOffer;
 exports.updateOfferStatus = updateOfferStatus;
 exports.deleteOffer = deleteOffer;
+exports.convertOfferToContract = convertOfferToContract;
 const sequelize_1 = require("sequelize");
 const offer_model_1 = require("./offer.model");
 const player_model_1 = require("../players/player.model");
@@ -14,6 +15,7 @@ const club_model_1 = require("../clubs/club.model");
 const user_model_1 = require("../Users/user.model");
 const errorHandler_1 = require("../../middleware/errorHandler");
 const pagination_1 = require("../../shared/utils/pagination");
+const contract_model_1 = require("../contracts/contract.model");
 // ── List Offers ──
 async function listOffers(queryParams) {
     const { limit, offset, page, sort, order, search } = (0, pagination_1.parsePagination)(queryParams, 'createdAt');
@@ -138,5 +140,47 @@ async function deleteOffer(id) {
     }
     await offer.destroy();
     return { id };
+}
+// ── Convert Offer to Contract ──
+async function convertOfferToContract(offerId, createdBy) {
+    const offer = await offer_model_1.Offer.findByPk(offerId, {
+        include: [
+            { model: player_model_1.Player, as: 'player', attributes: ['id', 'firstName', 'lastName', 'currentClubId'] },
+        ],
+    });
+    if (!offer)
+        throw new errorHandler_1.AppError('Offer not found', 404);
+    if (offer.status !== 'Closed') {
+        throw new errorHandler_1.AppError('Only closed offers can be converted to contracts', 400);
+    }
+    // Check if already converted
+    const plain = offer.get({ plain: true });
+    if (plain.convertedContractId) {
+        throw new errorHandler_1.AppError('This offer has already been converted to a contract', 400);
+    }
+    // Build contract dates
+    const today = new Date();
+    const endDate = new Date(today);
+    endDate.setFullYear(endDate.getFullYear() + (offer.contractYears || 1));
+    const contract = await contract_model_1.Contract.create({
+        playerId: offer.playerId,
+        clubId: offer.toClubId || offer.fromClubId,
+        contractType: 'Professional',
+        status: 'Active',
+        startDate: today.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        baseSalary: offer.salaryOffered || 0,
+        salaryCurrency: offer.feeCurrency || 'SAR',
+        signingBonus: offer.transferFee || 0,
+        commissionPct: offer.agentFee ? Number(offer.agentFee) : 10,
+        notes: `Auto-created from offer #${offerId}`,
+        createdBy,
+    });
+    // Link offer to contract
+    await offer.update({
+        convertedContractId: contract.id,
+        convertedAt: new Date(),
+    });
+    return { offer: await offer_model_1.Offer.findByPk(offerId), contract };
 }
 //# sourceMappingURL=offer.service.js.map

@@ -4,6 +4,8 @@ import { Player } from '../players/player.model';
 import { User } from '../Users/user.model';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
+import { notifyByRole, notifyUser } from '../notifications/notification.service';
+import { logger } from '../../config/logger';
 
 const PLAYER_ATTRS = ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'photoUrl', 'position'] as const;
 const USER_ATTRS = ['id', 'fullName', 'fullNameAr'] as const;
@@ -16,17 +18,15 @@ function referralIncludes() {
   ];
 }
 
-/** Re-fetch a referral with full includes (player, assignee, creator). */
 async function refetchWithIncludes(id: string) {
   return Referral.findByPk(id, { include: referralIncludes() });
 }
 
-// ── Access Control: Mental referrals are restricted ──
+// ── Access Control ──
 
 function applyAccessFilter(where: any, userId: string, userRole: string) {
   if (userRole === 'Admin') return;
 
-  // Build access conditions — user can see: unrestricted OR assigned/created by them OR in restrictedTo list
   const accessConditions = [
     { isRestricted: false },
     { restrictedTo: { [Op.contains]: [userId] } },
@@ -34,7 +34,6 @@ function applyAccessFilter(where: any, userId: string, userRole: string) {
     { createdBy: userId },
   ];
 
-  // If there's already an Op.or from search, wrap both in an Op.and
   if (where[Op.or]) {
     const searchConditions = where[Op.or];
     delete where[Op.or];
@@ -47,7 +46,7 @@ function applyAccessFilter(where: any, userId: string, userRole: string) {
   }
 }
 
-// ── List Referrals ──
+// ── List ──
 
 export async function listReferrals(queryParams: any, userId: string, userRole: string) {
   const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
@@ -83,7 +82,7 @@ export async function listReferrals(queryParams: any, userId: string, userRole: 
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-// ── Get Referral by ID ──
+// ── Get by ID ──
 
 export async function getReferralById(id: string, userId: string, userRole: string) {
   const referral = await Referral.findByPk(id, { include: referralIncludes() });
@@ -99,7 +98,7 @@ export async function getReferralById(id: string, userId: string, userRole: stri
   return referral;
 }
 
-// ── Create Referral ──
+// ── Create ──
 
 export async function createReferral(input: any, userId: string) {
   const player = await Player.findByPk(input.playerId);
@@ -121,10 +120,44 @@ export async function createReferral(input: any, userId: string) {
     assignedAt: input.assignedTo ? new Date() : null,
   });
 
+  // ── Push notification (non-blocking) ──
+  const playerName = `${player.firstName} ${player.lastName}`.trim();
+  const playerNameAr = (player as any).firstNameAr
+    ? `${(player as any).firstNameAr} ${(player as any).lastNameAr || ''}`.trim()
+    : playerName;
+
+  const typeLabel = input.referralType || 'General';
+
+  // Notify managers
+  notifyByRole(['Admin', 'Manager'], {
+    type: 'referral',
+    title: `New ${typeLabel} referral: ${playerName}`,
+    titleAr: `إحالة ${typeLabel} جديدة: ${playerNameAr}`,
+    body: input.triggerDesc || `${typeLabel} referral created for ${playerName}`,
+    link: `/dashboard/referrals/${referral.id}`,
+    sourceType: 'referral',
+    sourceId: referral.id,
+    priority: input.priority === 'Critical' ? 'critical' : input.priority === 'High' ? 'high' : 'normal',
+  }).catch(err => logger.error('Failed to send referral notification', err));
+
+  // Notify assignee directly
+  if (input.assignedTo) {
+    notifyUser(input.assignedTo, {
+      type: 'referral',
+      title: `Referral assigned to you: ${playerName}`,
+      titleAr: `إحالة مسندة إليك: ${playerNameAr}`,
+      body: input.triggerDesc || `${typeLabel} referral for ${playerName}`,
+      link: `/dashboard/referrals/${referral.id}`,
+      sourceType: 'referral',
+      sourceId: referral.id,
+      priority: input.priority === 'Critical' ? 'critical' : 'normal',
+    }).catch(err => logger.error('Failed to send assignee notification', err));
+  }
+
   return refetchWithIncludes(referral.id);
 }
 
-// ── Update Referral ──
+// ── Update ──
 
 export async function updateReferral(id: string, input: any, userId: string, userRole: string) {
   const referral = await getReferralById(id, userId, userRole);
@@ -136,6 +169,20 @@ export async function updateReferral(id: string, input: any, userId: string, use
   // Track assignment change
   if (input.assignedTo && input.assignedTo !== referral.assignedTo) {
     input.assignedAt = new Date();
+
+    // Notify new assignee
+    const player = referral.get('player') as any;
+    const playerName = player ? `${player.firstName} ${player.lastName}`.trim() : '';
+
+    notifyUser(input.assignedTo, {
+      type: 'referral',
+      title: `Referral reassigned to you: ${playerName}`,
+      titleAr: `إحالة أعيد إسنادها إليك: ${playerName}`,
+      link: `/dashboard/referrals/${id}`,
+      sourceType: 'referral',
+      sourceId: id,
+      priority: 'normal',
+    }).catch(err => logger.error('Failed to send reassignment notification', err));
   }
 
   await referral.update(input);
@@ -158,11 +205,28 @@ export async function updateReferralStatus(id: string, input: any, userId: strin
     updateData.resolvedAt = new Date();
   }
 
+  // Notify on escalation
+  if (input.status === 'Escalated') {
+    const player = referral.get('player') as any;
+    const playerName = player ? `${player.firstName} ${player.lastName}`.trim() : '';
+
+    notifyByRole(['Admin'], {
+      type: 'referral',
+      title: `Referral ESCALATED: ${playerName}`,
+      titleAr: `إحالة مصعّدة: ${playerName}`,
+      body: input.notes || `Referral ${id} escalated`,
+      link: `/dashboard/referrals/${id}`,
+      sourceType: 'referral',
+      sourceId: id,
+      priority: 'critical',
+    }).catch(err => logger.error('Failed to send escalation notification', err));
+  }
+
   await referral.update(updateData);
   return refetchWithIncludes(id);
 }
 
-// ── Delete Referral ──
+// ── Delete ──
 
 export async function deleteReferral(id: string, userId: string, userRole: string) {
   const referral = await getReferralById(id, userId, userRole);

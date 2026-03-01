@@ -24,6 +24,13 @@ import scoutingRoutes from './modules/scouting/scouting.routes';
 import financeRoutes from './modules/finance/finance.routes';
 import documentRoutes from './modules/documents/document.routes';
 import settingsRoutes from './modules/settings/settings.routes';
+import injuryRoutes from './modules/injuries/injury.routes';
+import trainingRoutes from './modules/training/training.routes';
+import saffRoutes from './modules/saff/saff.routes';
+import notificationRoutes from './modules/notifications/notification.routes';
+import cronRoutes from './cron/cron.routes';
+import portalRoutes from './modules/portal/portal.routes';
+
 
 const app = express();
 
@@ -34,8 +41,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 
+// Rate limiting
+app.use('/api/v1', apiLimiter);
 if (env.nodeEnv === 'production') {
-  app.use('/api/v1/auth', authLimiter);
+  app.use('/api/v1/auth', authLimiter); // Stricter limit for auth
 }
 
 // ── Health Check ──
@@ -68,7 +77,15 @@ app.use('/api/v1/scouting', scoutingRoutes);
 app.use('/api/v1/finance', financeRoutes);
 app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/settings', settingsRoutes);
-
+app.use('/api/v1/injuries', injuryRoutes);
+app.use('/api/v1/training', trainingRoutes);
+app.use('/api/v1/saff', saffRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+// Cron test routes — development only
+if (env.nodeEnv !== 'production') {
+  app.use('/api/v1/cron', cronRoutes);
+}
+app.use('/api/v1/portal', portalRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

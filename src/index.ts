@@ -1,10 +1,12 @@
 import app from './app';
 import { env } from './config/env';
-import { testConnection } from './config/database';
+import { testConnection, sequelize } from './config/database';
 import chalk from 'chalk';
 import gradient from 'gradient-string';
 import { initRedis, closeRedis } from './config/redis';
 import { seedDatabase } from './database/seed';
+import { startSaffScheduler } from './modules/saff/saff.scheduler';
+import { startCronJobs } from './cron/scheduler';
 
 async function bootstrap() {
   try {
@@ -12,6 +14,9 @@ async function bootstrap() {
     await initRedis();
     await seedDatabase();
 
+    // Start background jobs after DB/Redis are ready
+    startSaffScheduler();
+    startCronJobs();
 
     app.listen(env.port, () => {
       const sadaraGradient = gradient(['#3C3CFA', '#E4E5F3', '#11132B']);
@@ -65,10 +70,14 @@ async function bootstrap() {
 }
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
+async function shutdown() {
   console.log('🛑 Shutting down...');
   await closeRedis();
+  await sequelize.close();
   process.exit(0);
-});
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 bootstrap();

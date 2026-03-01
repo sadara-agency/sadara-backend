@@ -1,8 +1,6 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
 
-
-// 1. Define all possible attributes in the Player model
 interface PlayerAttributes {
   id: string;
   firstName: string;
@@ -12,7 +10,8 @@ interface PlayerAttributes {
   dateOfBirth: string;
   nationality?: string | null;
   secondaryNationality?: string | null;
-  playerType: 'Pro' | 'Youth';
+  playerType: 'Pro' | 'Youth' | 'Amateur';
+  contractType: 'Professional' | 'Amateur' | 'Youth';
   position?: string | null;
   secondaryPosition?: string | null;
   preferredFoot?: 'Left' | 'Right' | 'Both' | null;
@@ -20,7 +19,9 @@ interface PlayerAttributes {
   weightKg?: number | null;
   jerseyNumber?: number | null;
   currentClubId?: string | null;
-  agentId?: string | null;  
+  agentId?: string | null;
+  coachId?: string | null;
+  analystId?: string | null;
   marketValue?: number | null;
   marketValueCurrency: 'SAR' | 'USD' | 'EUR';
   status: 'active' | 'injured' | 'inactive';
@@ -32,6 +33,9 @@ interface PlayerAttributes {
   tactical?: number | null;
   email?: string | null;
   phone?: string | null;
+  guardianName?: string | null;
+  guardianPhone?: string | null;
+  guardianRelation?: string | null;
   notes?: string | null;
   photoUrl?: string | null;
   createdBy: string;
@@ -39,13 +43,11 @@ interface PlayerAttributes {
   updatedAt?: Date;
 }
 
-// 2. Define which attributes are optional during Player.create()
 interface PlayerCreationAttributes extends Optional<
   PlayerAttributes,
-  'id' | 'playerType' | 'marketValueCurrency' | 'status' | 'createdAt' | 'updatedAt'
-> { }
+  'id' | 'playerType' | 'contractType' | 'marketValueCurrency' | 'status' | 'createdAt' | 'updatedAt'
+> {}
 
-// 3. The Model Class
 export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> implements PlayerAttributes {
   public id!: string;
   public firstName!: string;
@@ -55,7 +57,8 @@ export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> im
   public dateOfBirth!: string;
   public nationality!: string | null;
   public secondaryNationality!: string | null;
-  public playerType!: 'Pro' | 'Youth';
+  public playerType!: 'Pro' | 'Youth' | 'Amateur';
+  public contractType!: 'Professional' | 'Amateur' | 'Youth';
   public position!: string | null;
   public secondaryPosition!: string | null;
   public preferredFoot!: 'Left' | 'Right' | 'Both' | null;
@@ -64,6 +67,8 @@ export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> im
   public jerseyNumber!: number | null;
   public currentClubId!: string | null;
   public agentId!: string | null;
+  public coachId!: string | null;
+  public analystId!: string | null;
   public marketValue!: number | null;
   public marketValueCurrency!: 'SAR' | 'USD' | 'EUR';
   public status!: 'active' | 'injured' | 'inactive';
@@ -75,35 +80,32 @@ export class Player extends Model<PlayerAttributes, PlayerCreationAttributes> im
   public tactical!: number | null;
   public email!: string | null;
   public phone!: string | null;
+  public guardianName!: string | null;
+  public guardianPhone!: string | null;
+  public guardianRelation!: string | null;
   public notes!: string | null;
   public photoUrl!: string | null;
   public createdBy!: string;
 
-  // Virtual Getter: Full Name (English)
   get fullName(): string {
     return `${this.firstName} ${this.lastName}`;
   }
 
-  // Virtual Getter: Full Name (Arabic)
   get fullNameAr(): string | null {
     if (!this.firstNameAr || !this.lastNameAr) return null;
     return `${this.firstNameAr} ${this.lastNameAr}`;
   }
 
-  // Virtual Getter: Age Calculation
   get age(): number {
     const today = new Date();
     const birthDate = new Date(this.dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
     const m = today.getMonth() - birthDate.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-      age--;
-    }
+    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
     return age;
   }
 }
 
-// 4. Initialization
 Player.init({
   id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
   firstName: { type: DataTypes.STRING, allowNull: false },
@@ -113,7 +115,8 @@ Player.init({
   dateOfBirth: { type: DataTypes.DATEONLY, allowNull: false },
   nationality: { type: DataTypes.STRING },
   secondaryNationality: { type: DataTypes.STRING },
-  playerType: { type: DataTypes.ENUM('Pro', 'Youth'), defaultValue: 'Pro' },
+  playerType: { type: DataTypes.ENUM('Pro', 'Youth', 'Amateur'), defaultValue: 'Pro' },
+  contractType: { type: DataTypes.STRING(20), defaultValue: 'Professional', field: 'contract_type' },
   position: { type: DataTypes.STRING },
   secondaryPosition: { type: DataTypes.STRING },
   preferredFoot: { type: DataTypes.ENUM('Left', 'Right', 'Both') },
@@ -122,6 +125,8 @@ Player.init({
   jerseyNumber: { type: DataTypes.INTEGER },
   currentClubId: { type: DataTypes.UUID },
   agentId: { type: DataTypes.UUID, field: 'agent_id' },
+  coachId: { type: DataTypes.UUID, field: 'coach_id' },
+  analystId: { type: DataTypes.UUID, field: 'analyst_id' },
   marketValue: { type: DataTypes.DECIMAL(15, 2) },
   marketValueCurrency: { type: DataTypes.ENUM('SAR', 'USD', 'EUR'), defaultValue: 'SAR' },
   status: { type: DataTypes.ENUM('active', 'injured', 'inactive'), defaultValue: 'active' },
@@ -133,6 +138,9 @@ Player.init({
   tactical: { type: DataTypes.INTEGER, defaultValue: 0 },
   email: { type: DataTypes.STRING, validate: { isEmail: true } },
   phone: { type: DataTypes.STRING },
+  guardianName: { type: DataTypes.STRING, field: 'guardian_name' },
+  guardianPhone: { type: DataTypes.STRING(50), field: 'guardian_phone' },
+  guardianRelation: { type: DataTypes.STRING(50), field: 'guardian_relation' },
   notes: { type: DataTypes.TEXT },
   photoUrl: { type: DataTypes.STRING },
   createdBy: { type: DataTypes.UUID, allowNull: false },

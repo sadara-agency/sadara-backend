@@ -63,6 +63,8 @@ describe('Auth Service', () => {
 
     it('should throw 401 for invalid email', async () => {
       mockFindOne.mockResolvedValue(null);
+      const { sequelize } = await import('../../../src/config/database');
+      (sequelize.query as jest.Mock).mockResolvedValue([]);
 
       await expect(
         authService.login({ email: 'nobody@sadara.com', password: 'wrong' }),

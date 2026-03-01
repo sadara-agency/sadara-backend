@@ -4,6 +4,7 @@ exports.AppError = void 0;
 exports.errorHandler = errorHandler;
 exports.asyncHandler = asyncHandler;
 const env_1 = require("../config/env");
+const logger_1 = require("../config/logger");
 class AppError extends Error {
     statusCode;
     isOperational;
@@ -15,19 +16,37 @@ class AppError extends Error {
     }
 }
 exports.AppError = AppError;
-function errorHandler(err, _req, res, _next) {
+function errorHandler(err, req, res, _next) {
     if (err instanceof AppError) {
+        // Operational errors — expected, log at warn level
+        logger_1.logger.warn('Operational error', {
+            status: err.statusCode,
+            message: err.message,
+            path: req.path,
+            method: req.method,
+        });
         res.status(err.statusCode).json({
             success: false,
             message: err.message,
         });
         return;
     }
-    console.error('❌ Unexpected error:', err);
+    // Unexpected errors — log full stack at error level
+    logger_1.logger.error('Unexpected error', {
+        message: err.message,
+        stack: err.stack,
+        path: req.path,
+        method: req.method,
+        body: env_1.env.nodeEnv === 'development' ? req.body : undefined,
+    });
     res.status(500).json({
         success: false,
         message: 'Internal server error',
-        ...(env_1.env.nodeEnv === 'development' && { error: err.message, stack: err.stack }),
+        // Only expose details in development
+        ...(env_1.env.nodeEnv === 'development' && {
+            error: err.message,
+            stack: err.stack,
+        }),
     });
 }
 // Catch async errors automatically

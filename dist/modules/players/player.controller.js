@@ -38,11 +38,14 @@ exports.getById = getById;
 exports.create = create;
 exports.update = update;
 exports.remove = remove;
+exports.getProviders = getProviders;
+exports.upsertProvider = upsertProvider;
+exports.removeProvider = removeProvider;
 const apiResponse_1 = require("../../shared/utils/apiResponse");
 const audit_1 = require("../../shared/utils/audit");
+const cache_1 = require("../../shared/utils/cache");
 const playerService = __importStar(require("./player.service"));
 async function list(req, res) {
-    // queryParams are handled inside the service with Sequelize Operators (Op)
     const result = await playerService.listPlayers(req.query);
     (0, apiResponse_1.sendPaginated)(res, result.data, result.meta);
 }
@@ -51,24 +54,33 @@ async function getById(req, res) {
     (0, apiResponse_1.sendSuccess)(res, player);
 }
 async function create(req, res) {
-    // req.user!.id is passed as createdBy
     const player = await playerService.createPlayer(req.body, req.user.id);
-    // Using the new Sequelize property names for the audit log
     await (0, audit_1.logAudit)('CREATE', 'players', player.id, (0, audit_1.buildAuditContext)(req.user, req.ip), `Created player: ${player.firstName} ${player.lastName}`);
+    await (0, cache_1.invalidateMultiple)([cache_1.CachePrefix.PLAYERS, cache_1.CachePrefix.DASHBOARD]);
     (0, apiResponse_1.sendCreated)(res, player);
 }
 async function update(req, res) {
     const player = await playerService.updatePlayer(req.params.id, req.body);
     await (0, audit_1.logAudit)('UPDATE', 'players', player.id, (0, audit_1.buildAuditContext)(req.user, req.ip), `Updated player: ${player.firstName} ${player.lastName}`);
+    await (0, cache_1.invalidateMultiple)([cache_1.CachePrefix.PLAYERS, cache_1.CachePrefix.PLAYER, cache_1.CachePrefix.DASHBOARD]);
     (0, apiResponse_1.sendSuccess)(res, player, 'Player updated');
 }
 async function remove(req, res) {
     const result = await playerService.deletePlayer(req.params.id);
     await (0, audit_1.logAudit)('DELETE', 'players', result.id, (0, audit_1.buildAuditContext)(req.user, req.ip), 'Player deleted');
+    await (0, cache_1.invalidateMultiple)([cache_1.CachePrefix.PLAYERS, cache_1.CachePrefix.PLAYER, cache_1.CachePrefix.CONTRACTS, cache_1.CachePrefix.DASHBOARD]);
     (0, apiResponse_1.sendSuccess)(res, result, 'Player deleted');
 }
-// export async function getStats(req: AuthRequest, res: Response) {
-//   const stats = await playerService.getPlayerStats(req.params.id);
-//   sendSuccess(res, stats);
-// }
+async function getProviders(req, res) {
+    const providers = await playerService.getPlayerProviders(req.params.id);
+    (0, apiResponse_1.sendSuccess)(res, providers);
+}
+async function upsertProvider(req, res) {
+    const mapping = await playerService.upsertPlayerProvider(req.params.id, req.body);
+    (0, apiResponse_1.sendSuccess)(res, mapping, 'Provider mapping saved');
+}
+async function removeProvider(req, res) {
+    const result = await playerService.removePlayerProvider(req.params.id, req.params.provider);
+    (0, apiResponse_1.sendSuccess)(res, result, 'Provider mapping removed');
+}
 //# sourceMappingURL=player.controller.js.map

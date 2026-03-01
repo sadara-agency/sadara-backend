@@ -11,7 +11,7 @@ export async function register(req: Request, res: Response) {
   await logAudit('REGISTER', 'users', result.user.id, {
     userId: result.user.id,
     userName: result.user.fullName ?? result.user.fullNameAr,
-    userRole: 'Analyst',
+    userRole: result.user.role as any,
     ip: req.ip,
   });
 

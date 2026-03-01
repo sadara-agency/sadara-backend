@@ -33,29 +33,28 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.routes.ts
-// RESTful routes for Contract CRUD.
-//
-// Replaces the old monolithic file. Same endpoints preserved,
-// plus a new PATCH /:id for updating contracts (the old code
-// only had create and delete — no update endpoint).
-// ─────────────────────────────────────────────────────────────
 const express_1 = require("express");
 const errorHandler_1 = require("../../middleware/errorHandler");
 const auth_1 = require("../../middleware/auth");
 const validate_1 = require("../../middleware/validate");
+const cache_middleware_1 = require("../../middleware/cache.middleware");
+const cache_1 = require("../../shared/utils/cache");
 const contract_schema_1 = require("./contract.schema");
 const contractController = __importStar(require("./contract.controller"));
+const contract_transition_controller_1 = require("./contract.transition.controller");
+const contract_pdf_controller_1 = require("./contract.pdf.controller");
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticate);
-// ── Read ──
-router.get('/', (0, validate_1.validate)(contract_schema_1.contractQuerySchema, 'query'), (0, errorHandler_1.asyncHandler)(contractController.list));
-router.get('/:id', (0, errorHandler_1.asyncHandler)(contractController.getById));
-// ── Write (Admin / Manager) ──
+// ── Read (cached) ──
+router.get('/', (0, validate_1.validate)(contract_schema_1.contractQuerySchema, 'query'), (0, cache_middleware_1.cacheRoute)('contracts', cache_1.CacheTTL.MEDIUM), (0, errorHandler_1.asyncHandler)(contractController.list));
+// ── Write ──
 router.post('/', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(contract_schema_1.createContractSchema), (0, errorHandler_1.asyncHandler)(contractController.create));
+// ── Sub-resource routes MUST come before /:id ──
+router.get('/:id/pdf', (0, errorHandler_1.asyncHandler)(contract_pdf_controller_1.generatePdf)); // No cache — dynamic PDF
+router.post('/:id/transition', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(contract_schema_1.transitionStatusSchema), (0, errorHandler_1.asyncHandler)(contract_transition_controller_1.transitionContract));
+// ── Single resource ──
+router.get('/:id', (0, cache_middleware_1.cacheRoute)('contracts', cache_1.CacheTTL.MEDIUM), (0, errorHandler_1.asyncHandler)(contractController.getById));
 router.patch('/:id', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(contract_schema_1.updateContractSchema), (0, errorHandler_1.asyncHandler)(contractController.update));
-// ── Delete (Admin only) ──
 router.delete('/:id', (0, auth_1.authorize)('Admin'), (0, errorHandler_1.asyncHandler)(contractController.remove));
 exports.default = router;
 //# sourceMappingURL=contract.routes.js.map

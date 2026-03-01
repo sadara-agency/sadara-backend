@@ -11,6 +11,7 @@ const env_1 = require("./config/env");
 const errorHandler_1 = require("./middleware/errorHandler");
 const rateLimiter_1 = require("./middleware/rateLimiter");
 const associations_1 = require("./models/associations");
+const redis_1 = require("./config/redis");
 // Route imports
 const auth_routes_1 = __importDefault(require("./modules/auth/auth.routes"));
 const player_routes_1 = __importDefault(require("./modules/players/player.routes"));
@@ -27,6 +28,12 @@ const scouting_routes_1 = __importDefault(require("./modules/scouting/scouting.r
 const finance_routes_1 = __importDefault(require("./modules/finance/finance.routes"));
 const document_routes_1 = __importDefault(require("./modules/documents/document.routes"));
 const settings_routes_1 = __importDefault(require("./modules/settings/settings.routes"));
+const injury_routes_1 = __importDefault(require("./modules/injuries/injury.routes"));
+const training_routes_1 = __importDefault(require("./modules/training/training.routes"));
+const saff_routes_1 = __importDefault(require("./modules/saff/saff.routes"));
+const notification_routes_1 = __importDefault(require("./modules/notifications/notification.routes"));
+const cron_routes_1 = __importDefault(require("./cron/cron.routes"));
+const portal_routes_1 = __importDefault(require("./modules/portal/portal.routes"));
 const app = (0, express_1.default)();
 // ── Global Middleware ──
 app.use((0, helmet_1.default)());
@@ -35,7 +42,7 @@ app.use(express_1.default.json({ limit: '10mb' }));
 app.use(express_1.default.urlencoded({ extended: true }));
 app.use((0, morgan_1.default)(env_1.env.nodeEnv === 'production' ? 'combined' : 'dev'));
 if (env_1.env.nodeEnv === 'production') {
-    app.use('/api/', rateLimiter_1.apiLimiter);
+    app.use('/api/v1/auth', rateLimiter_1.authLimiter);
 }
 // ── Health Check ──
 app.get('/api/health', (_req, res) => {
@@ -45,6 +52,7 @@ app.get('/api/health', (_req, res) => {
         version: '1.0.0',
         timestamp: new Date().toISOString(),
         environment: env_1.env.nodeEnv,
+        redis: (0, redis_1.isRedisConnected)() ? 'connected' : 'disconnected',
     });
 });
 (0, associations_1.setupAssociations)();
@@ -64,6 +72,12 @@ app.use('/api/v1/scouting', scouting_routes_1.default);
 app.use('/api/v1/finance', finance_routes_1.default);
 app.use('/api/v1/documents', document_routes_1.default);
 app.use('/api/v1/settings', settings_routes_1.default);
+app.use('/api/v1/injuries', injury_routes_1.default);
+app.use('/api/v1/training', training_routes_1.default);
+app.use('/api/v1/saff', saff_routes_1.default);
+app.use('/api/v1/notifications', notification_routes_1.default);
+app.use('/api/v1/cron', cron_routes_1.default);
+app.use('/api/v1/portal', portal_routes_1.default);
 // ── 404 ──
 app.use((_req, res) => {
     res.status(404).json({ success: false, message: 'Route not found' });

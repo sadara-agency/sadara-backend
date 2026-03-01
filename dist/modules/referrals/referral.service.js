@@ -12,6 +12,8 @@ const player_model_1 = require("../players/player.model");
 const user_model_1 = require("../Users/user.model");
 const errorHandler_1 = require("../../middleware/errorHandler");
 const pagination_1 = require("../../shared/utils/pagination");
+const notification_service_1 = require("../notifications/notification.service");
+const logger_1 = require("../../config/logger");
 const PLAYER_ATTRS = ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'photoUrl', 'position'];
 const USER_ATTRS = ['id', 'fullName', 'fullNameAr'];
 function referralIncludes() {
@@ -21,21 +23,32 @@ function referralIncludes() {
         { model: user_model_1.User, as: 'creator', attributes: [...USER_ATTRS] },
     ];
 }
-// ── Access Control: Mental referrals are restricted ──
+async function refetchWithIncludes(id) {
+    return referral_model_1.Referral.findByPk(id, { include: referralIncludes() });
+}
+// ── Access Control ──
 function applyAccessFilter(where, userId, userRole) {
-    // Admin can see everything
     if (userRole === 'Admin')
         return;
-    // Non-admins cannot see restricted referrals unless they're in restrictedTo
-    where[sequelize_1.Op.or] = [
-        ...(where[sequelize_1.Op.or] || []),
+    const accessConditions = [
         { isRestricted: false },
         { restrictedTo: { [sequelize_1.Op.contains]: [userId] } },
         { assignedTo: userId },
         { createdBy: userId },
     ];
+    if (where[sequelize_1.Op.or]) {
+        const searchConditions = where[sequelize_1.Op.or];
+        delete where[sequelize_1.Op.or];
+        where[sequelize_1.Op.and] = [
+            { [sequelize_1.Op.or]: searchConditions },
+            { [sequelize_1.Op.or]: accessConditions },
+        ];
+    }
+    else {
+        where[sequelize_1.Op.or] = accessConditions;
+    }
 }
-// ── List Referrals ──
+// ── List ──
 async function listReferrals(queryParams, userId, userRole) {
     const { limit, offset, page, sort, order, search } = (0, pagination_1.parsePagination)(queryParams, 'createdAt');
     const where = {};
@@ -69,12 +82,11 @@ async function listReferrals(queryParams, userId, userRole) {
     });
     return { data: rows, meta: (0, pagination_1.buildMeta)(count, page, limit) };
 }
-// ── Get Referral by ID ──
+// ── Get by ID ──
 async function getReferralById(id, userId, userRole) {
     const referral = await referral_model_1.Referral.findByPk(id, { include: referralIncludes() });
     if (!referral)
         throw new errorHandler_1.AppError('Referral not found', 404);
-    // Access check for restricted referrals
     if (referral.isRestricted && userRole !== 'Admin') {
         const allowed = referral.restrictedTo || [];
         if (!allowed.includes(userId) && referral.assignedTo !== userId && referral.createdBy !== userId) {
@@ -83,7 +95,7 @@ async function getReferralById(id, userId, userRole) {
     }
     return referral;
 }
-// ── Create Referral ──
+// ── Create ──
 async function createReferral(input, userId) {
     const player = await player_model_1.Player.findByPk(input.playerId);
     if (!player)
@@ -102,9 +114,39 @@ async function createReferral(input, userId) {
         createdBy: userId,
         assignedAt: input.assignedTo ? new Date() : null,
     });
-    return await referral_model_1.Referral.findByPk(referral.id, { include: referralIncludes() });
+    // ── Push notification (non-blocking) ──
+    const playerName = `${player.firstName} ${player.lastName}`.trim();
+    const playerNameAr = player.firstNameAr
+        ? `${player.firstNameAr} ${player.lastNameAr || ''}`.trim()
+        : playerName;
+    const typeLabel = input.referralType || 'General';
+    // Notify managers
+    (0, notification_service_1.notifyByRole)(['Admin', 'Manager'], {
+        type: 'referral',
+        title: `New ${typeLabel} referral: ${playerName}`,
+        titleAr: `إحالة ${typeLabel} جديدة: ${playerNameAr}`,
+        body: input.triggerDesc || `${typeLabel} referral created for ${playerName}`,
+        link: `/dashboard/referrals/${referral.id}`,
+        sourceType: 'referral',
+        sourceId: referral.id,
+        priority: input.priority === 'Critical' ? 'critical' : input.priority === 'High' ? 'high' : 'normal',
+    }).catch(err => logger_1.logger.error('Failed to send referral notification', err));
+    // Notify assignee directly
+    if (input.assignedTo) {
+        (0, notification_service_1.notifyUser)(input.assignedTo, {
+            type: 'referral',
+            title: `Referral assigned to you: ${playerName}`,
+            titleAr: `إحالة مسندة إليك: ${playerNameAr}`,
+            body: input.triggerDesc || `${typeLabel} referral for ${playerName}`,
+            link: `/dashboard/referrals/${referral.id}`,
+            sourceType: 'referral',
+            sourceId: referral.id,
+            priority: input.priority === 'Critical' ? 'critical' : 'normal',
+        }).catch(err => logger_1.logger.error('Failed to send assignee notification', err));
+    }
+    return refetchWithIncludes(referral.id);
 }
-// ── Update Referral ──
+// ── Update ──
 async function updateReferral(id, input, userId, userRole) {
     const referral = await getReferralById(id, userId, userRole);
     if (referral.status === 'Resolved') {
@@ -113,8 +155,21 @@ async function updateReferral(id, input, userId, userRole) {
     // Track assignment change
     if (input.assignedTo && input.assignedTo !== referral.assignedTo) {
         input.assignedAt = new Date();
+        // Notify new assignee
+        const player = referral.get('player');
+        const playerName = player ? `${player.firstName} ${player.lastName}`.trim() : '';
+        (0, notification_service_1.notifyUser)(input.assignedTo, {
+            type: 'referral',
+            title: `Referral reassigned to you: ${playerName}`,
+            titleAr: `إحالة أعيد إسنادها إليك: ${playerName}`,
+            link: `/dashboard/referrals/${id}`,
+            sourceType: 'referral',
+            sourceId: id,
+            priority: 'normal',
+        }).catch(err => logger_1.logger.error('Failed to send reassignment notification', err));
     }
-    return await referral.update(input);
+    await referral.update(input);
+    return refetchWithIncludes(id);
 }
 // ── Update Status ──
 async function updateReferralStatus(id, input, userId, userRole) {
@@ -129,9 +184,25 @@ async function updateReferralStatus(id, input, userId, userRole) {
     if (input.status === 'Resolved') {
         updateData.resolvedAt = new Date();
     }
-    return await referral.update(updateData);
+    // Notify on escalation
+    if (input.status === 'Escalated') {
+        const player = referral.get('player');
+        const playerName = player ? `${player.firstName} ${player.lastName}`.trim() : '';
+        (0, notification_service_1.notifyByRole)(['Admin'], {
+            type: 'referral',
+            title: `Referral ESCALATED: ${playerName}`,
+            titleAr: `إحالة مصعّدة: ${playerName}`,
+            body: input.notes || `Referral ${id} escalated`,
+            link: `/dashboard/referrals/${id}`,
+            sourceType: 'referral',
+            sourceId: id,
+            priority: 'critical',
+        }).catch(err => logger_1.logger.error('Failed to send escalation notification', err));
+    }
+    await referral.update(updateData);
+    return refetchWithIncludes(id);
 }
-// ── Delete Referral ──
+// ── Delete ──
 async function deleteReferral(id, userId, userRole) {
     const referral = await getReferralById(id, userId, userRole);
     if (referral.status === 'Resolved') {

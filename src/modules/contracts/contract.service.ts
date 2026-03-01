@@ -106,6 +106,11 @@ export async function getContractById(id: string) {
 // Create Contract
 // ────────────────────────────────────────────────────────────
 export async function createContract(input: CreateContractInput, createdBy: string) {
+  // Validate: if commissionPct is provided, baseSalary should also be provided for proper calculation
+  if (input.commissionPct && !input.baseSalary) {
+    throw new AppError('Base salary is required when setting commission percentage', 400);
+  }
+
   const totalCommission =
     input.commissionPct && input.baseSalary
       ? (input.baseSalary * input.commissionPct) / 100

@@ -39,6 +39,8 @@ exports.login = login;
 exports.getProfile = getProfile;
 exports.updateProfile = updateProfile;
 exports.changePassword = changePassword;
+exports.forgotPassword = forgotPassword;
+exports.resetPassword = resetPassword;
 const apiResponse_1 = require("../../shared/utils/apiResponse");
 const audit_1 = require("../../shared/utils/audit");
 const authService = __importStar(require("./auth.service"));
@@ -83,6 +85,16 @@ async function updateProfile(req, res) {
 async function changePassword(req, res) {
     const result = await authService.changePassword(req.user.id, req.body.currentPassword, req.body.newPassword);
     await (0, audit_1.logAudit)('UPDATE', 'users', req.user.id, (0, audit_1.buildAuditContext)(req.user, req.ip), 'Password changed');
+    (0, apiResponse_1.sendSuccess)(res, result);
+}
+// ── Forgot Password (public — request reset link) ──
+async function forgotPassword(req, res) {
+    const result = await authService.forgotPassword(req.body.email);
+    (0, apiResponse_1.sendSuccess)(res, result);
+}
+// ── Reset Password (public — set new password with token) ──
+async function resetPassword(req, res) {
+    const result = await authService.resetPassword(req.body.token, req.body.newPassword);
     (0, apiResponse_1.sendSuccess)(res, result);
 }
 //# sourceMappingURL=auth.controller.js.map

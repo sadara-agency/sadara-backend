@@ -106,6 +106,7 @@ async function markPackReady(req, res) {
 // SELECTION DECISIONS
 // ══════════════════════════════════════════
 async function createDecision(req, res) {
+    console.log('📦 Decision body:', JSON.stringify(req.body));
     const d = await scoutingService.createDecision(req.body, req.user.id);
     await (0, audit_1.logAudit)('CREATE', 'selection_decisions', d.id, (0, audit_1.buildAuditContext)(req.user, req.ip), `Decision: ${d.decision}`);
     (0, apiResponse_1.sendCreated)(res, d);

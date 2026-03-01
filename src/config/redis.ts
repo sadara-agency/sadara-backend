@@ -15,19 +15,23 @@ export async function initRedis(): Promise<RedisClientType | null> {
     }
 
     try {
-        redisClient = createClient({
-            url: env.redis.url,
-            socket: {
-                connectTimeout: 5000,
-                reconnectStrategy: (retries) => {
-                    if (retries > 10) {
-                        console.error('❌ Redis max reconnection attempts reached');
-                        return new Error('Redis max retries');
-                    }
-                    return Math.min(retries * 200, 3000);
-                },
-            },
-        });
+        // Determine if TLS is needed based on URL scheme
+        const isTLS = env.redis.url.startsWith('rediss://');
+
+     redisClient = createClient({
+    url: env.redis.url,
+    socket: {
+        connectTimeout: 5000,
+        ...(isTLS ? { tls: true as const } : {}),
+        reconnectStrategy: (retries) => {
+            if (retries > 10) {
+                console.error('❌ Redis max reconnection attempts reached');
+                return new Error('Redis max retries');
+            }
+            return Math.min(retries * 200, 3000);
+        },
+    },
+});
 
         redisClient.on('connect', () => {
             console.log('🔄 Redis connecting...');

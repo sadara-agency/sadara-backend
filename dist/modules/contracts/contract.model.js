@@ -1,10 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Contract = void 0;
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.model.ts
-// Sequelize model for the contracts table.
-// ─────────────────────────────────────────────────────────────
 const sequelize_1 = require("sequelize");
 const database_1 = require("../../config/database");
 class Contract extends sequelize_1.Model {
@@ -28,15 +24,20 @@ Contract.init({
     },
     category: {
         type: sequelize_1.DataTypes.ENUM('Club', 'Sponsorship'),
-        defaultValue: 'Club',
         allowNull: false,
+        defaultValue: 'Club',
+    },
+    contractType: {
+        type: sequelize_1.DataTypes.ENUM('Representation', 'CareerManagement', 'Transfer', 'Loan', 'Renewal', 'Sponsorship', 'ImageRights', 'MedicalAuth'),
+        defaultValue: 'Representation',
+        field: 'contract_type',
     },
     status: {
-        type: sequelize_1.DataTypes.ENUM('Active', 'Expiring Soon', 'Expired', 'Draft'),
+        type: sequelize_1.DataTypes.ENUM('Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing', 'Terminated'),
         defaultValue: 'Draft',
     },
     title: {
-        type: sequelize_1.DataTypes.STRING,
+        type: sequelize_1.DataTypes.STRING(255),
     },
     startDate: {
         type: sequelize_1.DataTypes.DATEONLY,
@@ -84,9 +85,50 @@ Contract.init({
         defaultValue: false,
         field: 'commission_locked',
     },
+    // Representation
+    exclusivity: {
+        type: sequelize_1.DataTypes.ENUM('Exclusive', 'NonExclusive'),
+        defaultValue: 'Exclusive',
+    },
+    representationScope: {
+        type: sequelize_1.DataTypes.ENUM('Local', 'International', 'Both'),
+        defaultValue: 'Both',
+        field: 'representation_scope',
+    },
+    agentName: {
+        type: sequelize_1.DataTypes.STRING(255),
+        field: 'agent_name',
+    },
+    agentLicense: {
+        type: sequelize_1.DataTypes.STRING(100),
+        field: 'agent_license',
+    },
+    // Documents & Signing
     documentUrl: {
         type: sequelize_1.DataTypes.TEXT,
         field: 'document_url',
+    },
+    signedDocumentUrl: {
+        type: sequelize_1.DataTypes.TEXT,
+        field: 'signed_document_url',
+    },
+    signedAt: {
+        type: sequelize_1.DataTypes.DATE,
+        field: 'signed_at',
+    },
+    signingMethod: {
+        type: sequelize_1.DataTypes.STRING(20),
+        field: 'signing_method',
+    },
+    // Alerts & Termination
+    expiryAlertSent: {
+        type: sequelize_1.DataTypes.BOOLEAN,
+        defaultValue: false,
+        field: 'expiry_alert_sent',
+    },
+    terminatedByClearanceId: {
+        type: sequelize_1.DataTypes.UUID,
+        field: 'terminated_by_clearance_id',
     },
     notes: {
         type: sequelize_1.DataTypes.TEXT,
