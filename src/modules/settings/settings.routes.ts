@@ -8,7 +8,7 @@ import { sendSuccess, sendPaginated } from '../../shared/utils/apiResponse';
 import { logAudit, buildAuditContext } from '../../shared/utils/audit';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
 import { z } from 'zod';
-import bcrypt from 'bcrypt';
+import bcrypt from 'bcryptjs';
 import { Op, QueryTypes } from 'sequelize';
 import { sequelize } from '../../config/database';
 
