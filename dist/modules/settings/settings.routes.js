@@ -40,6 +40,24 @@ const updateUserSchema = zod_1.z.object({
     role: zod_1.z.enum(['Admin', 'Manager', 'Analyst', 'Scout', 'Player']).optional(),
     isActive: zod_1.z.boolean().optional(),
 });
+const notificationPrefsSchema = zod_1.z.object({
+    contracts: zod_1.z.boolean().optional(),
+    offers: zod_1.z.boolean().optional(),
+    matches: zod_1.z.boolean().optional(),
+    tasks: zod_1.z.boolean().optional(),
+    email: zod_1.z.boolean().optional(),
+    push: zod_1.z.boolean().optional(),
+    sms: zod_1.z.boolean().optional(),
+});
+const DEFAULT_NOTIFICATION_PREFS = {
+    contracts: true,
+    offers: true,
+    matches: true,
+    tasks: true,
+    email: true,
+    push: false,
+    sms: false,
+};
 const SAFE_ATTRS = ['id', 'email', 'fullName', 'fullNameAr', 'role', 'avatarUrl', 'isActive', 'lastLogin', 'createdAt'];
 // ══════════════════════════════════════════
 // PROFILE (current user)
@@ -87,6 +105,25 @@ router.post('/change-password', (0, validate_1.validate)(changePasswordSchema), 
     (0, apiResponse_1.sendSuccess)(res, null, 'Password changed successfully');
 }));
 // ══════════════════════════════════════════
+// NOTIFICATION PREFERENCES
+// ══════════════════════════════════════════
+router.get('/notifications', (0, errorHandler_1.asyncHandler)(async (req, res) => {
+    const user = await user_model_1.User.findByPk(req.user.id, {
+        attributes: ['id', 'notificationPreferences'],
+    });
+    (0, apiResponse_1.sendSuccess)(res, user?.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFS);
+}));
+router.patch('/notifications', (0, validate_1.validate)(notificationPrefsSchema), (0, errorHandler_1.asyncHandler)(async (req, res) => {
+    const user = await user_model_1.User.findByPk(req.user.id);
+    if (!user)
+        throw new errorHandler_1.AppError('User not found', 404);
+    const currentPrefs = user.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFS;
+    const updatedPrefs = { ...currentPrefs, ...req.body };
+    await user.update({ notificationPreferences: updatedPrefs });
+    await (0, audit_1.logAudit)('UPDATE', 'users', user.id, (0, audit_1.buildAuditContext)(req.user, req.ip), 'Notification preferences updated');
+    (0, apiResponse_1.sendSuccess)(res, updatedPrefs, 'Notification preferences updated');
+}));
+// ══════════════════════════════════════════
 // TEAM (users list — Admin/Manager only)
 // ══════════════════════════════════════════
 router.get('/team', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(teamQuerySchema, 'query'), (0, errorHandler_1.asyncHandler)(async (req, res) => {
@@ -109,7 +146,6 @@ router.get('/team', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.va
     });
     (0, apiResponse_1.sendPaginated)(res, rows, (0, pagination_1.buildMeta)(count, page, limit));
 }));
-// Admin-only route to update any user (e.g. for activating/deactivating accounts)
 router.patch('/team/:id', (0, auth_1.authorize)('Admin'), (0, validate_1.validate)(updateUserSchema), (0, errorHandler_1.asyncHandler)(async (req, res) => {
     const user = await user_model_1.User.findByPk(req.params.id);
     if (!user)

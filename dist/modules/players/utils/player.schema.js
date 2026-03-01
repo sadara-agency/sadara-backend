@@ -3,8 +3,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.playerQuerySchema = exports.updatePlayerSchema = exports.createPlayerSchema = void 0;
 const zod_1 = require("zod");
 exports.createPlayerSchema = zod_1.z.object({
-    firstName: zod_1.z.string().min(1, 'First name is required'),
-    lastName: zod_1.z.string().min(1, 'Last name is required'),
+    firstName: zod_1.z.string()
+        .min(1, 'First name is required')
+        .regex(/^[\p{L}\p{M}\s'-]+$/u, 'Name contains invalid characters'),
+    lastName: zod_1.z.string()
+        .min(1, 'Last name is required')
+        .regex(/^[\p{L}\p{M}\s'-]+$/u, 'Name contains invalid characters'),
     firstNameAr: zod_1.z.string().optional(),
     lastNameAr: zod_1.z.string().optional(),
     dateOfBirth: zod_1.z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be YYYY-MM-DD'),
@@ -23,6 +27,12 @@ exports.createPlayerSchema = zod_1.z.object({
     email: zod_1.z.string().email().optional(),
     phone: zod_1.z.string().optional(),
     notes: zod_1.z.string().optional(),
+    speed: zod_1.z.number().int().min(0).max(100).optional(),
+    passing: zod_1.z.number().int().min(0).max(100).optional(),
+    shooting: zod_1.z.number().int().min(0).max(100).optional(),
+    defense: zod_1.z.number().int().min(0).max(100).optional(),
+    fitness: zod_1.z.number().int().min(0).max(100).optional(),
+    tactical: zod_1.z.number().int().min(0).max(100).optional(),
 });
 exports.updatePlayerSchema = exports.createPlayerSchema.partial();
 exports.playerQuerySchema = zod_1.z.object({

@@ -40,6 +40,7 @@ exports.create = create;
 exports.update = update;
 exports.updateStatus = updateStatus;
 exports.remove = remove;
+exports.convertToContract = convertToContract;
 const apiResponse_1 = require("../../shared/utils/apiResponse");
 const audit_1 = require("../../shared/utils/audit");
 const offerService = __importStar(require("./offer.service"));
@@ -81,5 +82,10 @@ async function remove(req, res) {
     const result = await offerService.deleteOffer(req.params.id);
     await (0, audit_1.logAudit)('DELETE', 'offers', result.id, (0, audit_1.buildAuditContext)(req.user, req.ip), 'Offer deleted');
     (0, apiResponse_1.sendSuccess)(res, result, 'Offer deleted');
+}
+async function convertToContract(req, res) {
+    const result = await offerService.convertOfferToContract(req.params.id, req.user.id);
+    await (0, audit_1.logAudit)('CREATE', 'contracts', result.contract.id, (0, audit_1.buildAuditContext)(req.user, req.ip), `Converted offer ${req.params.id} to contract ${result.contract.id}`);
+    (0, apiResponse_1.sendCreated)(res, result, 'Offer converted to contract');
 }
 //# sourceMappingURL=offer.controller.js.map

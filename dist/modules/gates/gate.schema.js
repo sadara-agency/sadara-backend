@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.gateQuerySchema = exports.toggleChecklistItemSchema = exports.createChecklistItemSchema = exports.advanceGateSchema = exports.updateGateSchema = exports.createGateSchema = void 0;
+exports.gateQuerySchema = exports.toggleChecklistItemSchema = exports.createChecklistItemSchema = exports.initializeGateSchema = exports.advanceGateSchema = exports.updateGateSchema = exports.createGateSchema = void 0;
 const zod_1 = require("zod");
 // ── Create Gate ──
 exports.createGateSchema = zod_1.z.object({
@@ -17,6 +17,13 @@ exports.updateGateSchema = zod_1.z.object({
 // ── Advance Gate (start / complete) ──
 exports.advanceGateSchema = zod_1.z.object({
     action: zod_1.z.enum(['start', 'complete']),
+    notes: zod_1.z.string().optional(),
+});
+// ── Initialize Gate (create + seed default checklist) ──
+exports.initializeGateSchema = zod_1.z.object({
+    playerId: zod_1.z.string().uuid('Invalid player ID'),
+    gateNumber: zod_1.z.enum(['0', '1', '2', '3']),
+    autoStart: zod_1.z.boolean().default(false),
     notes: zod_1.z.string().optional(),
 });
 // ── Checklist Item ──

@@ -1,8 +1,9 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { Op } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 import { User } from '../Users/user.model';
+import { sequelize } from '../../config/database';
 import { env } from '../../config/env';
 import { AppError } from '../../middleware/errorHandler';
 import { RegisterInput, LoginInput, InviteInput } from './auth.schema';
@@ -12,9 +13,9 @@ import { sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } fr
 const DEFAULT_ROLE = 'Analyst';
 
 /** Generate JWT with user identity + role for frontend RBAC. */
-function generateToken(user: User): string {
+function generateToken(payload: { id: string; email: string; fullName: string; role: string }): string {
   return jwt.sign(
-    { id: user.id, email: user.email, fullName: user.fullName, role: user.role },
+    payload,
     env.jwt.secret as jwt.Secret,
     { expiresIn: env.jwt.expiresIn as any }
   );
@@ -64,32 +65,143 @@ export async function invite(input: InviteInput) {
   return { user: safe };
 }
 
-// ── Login ──
+// ── Login (checks users table first, then player_accounts) ──
 export async function login(input: LoginInput) {
+  // ─── Attempt 1: Check the users table (Admin, Agent, Analyst, Scout, etc.) ───
   const user = await User.findOne({ where: { email: input.email } });
 
-  if (!user || !(await bcrypt.compare(input.password, user.passwordHash))) {
+  if (user) {
+    if (!(await bcrypt.compare(input.password, user.passwordHash))) {
+      throw new AppError('Invalid email or password', 401);
+    }
+
+    if (!user.isActive) {
+      throw new AppError('Account is not yet activated. Please wait for admin approval or verify your email.', 403);
+    }
+
+    await user.update({ lastLogin: new Date() });
+    const { passwordHash, ...userWithoutPassword } = user.get({ plain: true });
+
+    return {
+      user: userWithoutPassword,
+      token: generateToken({ id: user.id, email: user.email, fullName: user.fullName, role: user.role }),
+    };
+  }
+
+  // ─── Attempt 2: Check the player_accounts table ───
+  const playerAccounts = await sequelize.query<{
+    id: string;
+    player_id: string;
+    email: string;
+    password_hash: string;
+    status: string;
+    last_login: Date | null;
+  }>(
+    `SELECT id, player_id, email, password_hash, status, last_login
+     FROM player_accounts
+     WHERE email = :email
+     LIMIT 1`,
+    { replacements: { email: input.email }, type: QueryTypes.SELECT }
+  );
+
+  const playerAccount = playerAccounts[0];
+
+  if (!playerAccount) {
     throw new AppError('Invalid email or password', 401);
   }
 
-  if (!user.isActive) {
-    throw new AppError('Account is not yet activated. Please wait for admin approval or verify your email.', 403);
+  if (!(await bcrypt.compare(input.password, playerAccount.password_hash))) {
+    throw new AppError('Invalid email or password', 401);
   }
 
-  await user.update({ lastLogin: new Date() });
-  const { passwordHash, ...userWithoutPassword } = user.get({ plain: true });
+  if (playerAccount.status !== 'active') {
+    throw new AppError('Account is not yet activated. Please wait for admin approval.', 403);
+  }
+
+  // Fetch player profile for name/details
+  const players = await sequelize.query<{
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+    photo_url: string | null;
+  }>(
+    `SELECT first_name, last_name, first_name_ar, last_name_ar, photo_url
+     FROM players
+     WHERE id = :playerId
+     LIMIT 1`,
+    { replacements: { playerId: playerAccount.player_id }, type: QueryTypes.SELECT }
+  );
+
+  const player = players[0];
+  const fullName = player ? `${player.first_name} ${player.last_name}` : playerAccount.email;
+  const fullNameAr = player ? `${player.first_name_ar || ''} ${player.last_name_ar || ''}`.trim() : null;
+
+  // Update last_login
+  await sequelize.query(
+    `UPDATE player_accounts SET last_login = NOW() WHERE id = :id`,
+    { replacements: { id: playerAccount.id }, type: QueryTypes.UPDATE }
+  );
+
+  // Build a user-like response so frontend works seamlessly
+  const playerUser = {
+    id: playerAccount.id,
+    email: playerAccount.email,
+    fullName,
+    fullNameAr,
+    role: 'Player',
+    avatarUrl: player?.photo_url || null,
+    isActive: true,
+    lastLogin: new Date(),
+    playerId: playerAccount.player_id,
+  };
 
   return {
-    user: userWithoutPassword,
-    token: generateToken(user),
+    user: playerUser,
+    token: generateToken({
+      id: playerAccount.id,
+      email: playerAccount.email,
+      fullName,
+      role: 'Player',
+    }),
   };
 }
 
 // ── Get Profile ──
 export async function getProfile(userId: string) {
+  // Check users table first
   const user = await User.findByPk(userId);
-  if (!user) throw new AppError('User not found', 404);
-  return user;
+  if (user) return user;
+
+  // Fall back to player_accounts
+  const accounts = await sequelize.query<{
+    id: string;
+    player_id: string;
+    email: string;
+    status: string;
+  }>(
+    `SELECT pa.id, pa.player_id, pa.email, pa.status,
+            p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url
+     FROM player_accounts pa
+     LEFT JOIN players p ON pa.player_id = p.id
+     WHERE pa.id = :userId
+     LIMIT 1`,
+    { replacements: { userId }, type: QueryTypes.SELECT }
+  );
+
+  if (!accounts[0]) throw new AppError('User not found', 404);
+
+  const acc: any = accounts[0];
+  return {
+    id: acc.id,
+    email: acc.email,
+    fullName: `${acc.first_name} ${acc.last_name}`,
+    fullNameAr: `${acc.first_name_ar || ''} ${acc.last_name_ar || ''}`.trim() || null,
+    role: 'Player',
+    avatarUrl: acc.photo_url || null,
+    isActive: acc.status === 'active',
+    playerId: acc.player_id,
+  };
 }
 
 // ── Update Profile ──
@@ -102,19 +214,38 @@ export async function updateProfile(userId: string, data: { fullName?: string; f
 
 // ── Change Password (authenticated user) ──
 export async function changePassword(userId: string, currentPassword: string, newPassword: string) {
+  // Check users table first
   const user = await User.findByPk(userId);
-  if (!user) throw new AppError('User not found', 404);
 
-  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+  if (user) {
+    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new AppError('Current password is incorrect', 400);
+    }
+    const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
+    await user.update({ passwordHash: newHash });
+    sendPasswordChangedEmail(user.email, user.fullName || user.fullNameAr || '').catch(() => {});
+    return { message: 'Password changed successfully' };
+  }
+
+  // Fall back to player_accounts
+  const accounts = await sequelize.query<{ id: string; password_hash: string; email: string }>(
+    `SELECT id, password_hash, email FROM player_accounts WHERE id = :userId LIMIT 1`,
+    { replacements: { userId }, type: QueryTypes.SELECT }
+  );
+
+  if (!accounts[0]) throw new AppError('User not found', 404);
+
+  if (!(await bcrypt.compare(currentPassword, accounts[0].password_hash))) {
     throw new AppError('Current password is incorrect', 400);
   }
 
   const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
-  await user.update({ passwordHash: newHash });
+  await sequelize.query(
+    `UPDATE player_accounts SET password_hash = :hash WHERE id = :id`,
+    { replacements: { hash: newHash, id: userId }, type: QueryTypes.UPDATE }
+  );
 
-  // Send confirmation email (non-blocking)
-  sendPasswordChangedEmail(user.email, user.fullName || user.fullNameAr || '').catch(() => {});
-
+  sendPasswordChangedEmail(accounts[0].email, '').catch(() => {});
   return { message: 'Password changed successfully' };
 }
 

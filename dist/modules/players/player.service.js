@@ -5,6 +5,9 @@ exports.getPlayerById = getPlayerById;
 exports.createPlayer = createPlayer;
 exports.updatePlayer = updatePlayer;
 exports.deletePlayer = deletePlayer;
+exports.getPlayerProviders = getPlayerProviders;
+exports.upsertPlayerProvider = upsertPlayerProvider;
+exports.removePlayerProvider = removePlayerProvider;
 const sequelize_1 = require("sequelize");
 const player_model_1 = require("./player.model");
 const club_model_1 = require("../clubs/club.model");
@@ -12,6 +15,85 @@ const user_model_1 = require("../Users/user.model");
 const errorHandler_1 = require("../../middleware/errorHandler");
 const pagination_1 = require("../../shared/utils/pagination");
 const database_1 = require("../../config/database");
+const externalProvider_model_1 = require("./externalProvider.model");
+// ── Computed attribute fragments (reusable) ──
+const COMPUTED_ATTRIBUTES = [
+    [
+        (0, sequelize_1.literal)(`COALESCE(
+      NULLIF(CONCAT("Player".first_name_ar, ' ', "Player".last_name_ar), ' '),
+      CONCAT("Player".first_name, ' ', "Player".last_name)
+    )`),
+        'full_name_ar',
+    ],
+    [
+        (0, sequelize_1.literal)(`CONCAT("Player".first_name, ' ', "Player".last_name)`),
+        'full_name',
+    ],
+    [
+        (0, sequelize_1.literal)(`EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`),
+        'computed_age',
+    ],
+    [
+        (0, sequelize_1.literal)(`(
+      SELECT CASE
+        WHEN c.end_date IS NULL THEN 'Active'
+        WHEN c.end_date < CURRENT_DATE THEN 'Expired'
+        WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
+        ELSE 'Active'
+      END
+      FROM contracts c WHERE c.player_id = "Player".id
+      ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
+    )`),
+        'contract_status',
+    ],
+    [
+        (0, sequelize_1.literal)(`(
+      SELECT c.end_date::text FROM contracts c
+      WHERE c.player_id = "Player".id
+      ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
+    )`),
+        'contract_end',
+    ],
+    [
+        (0, sequelize_1.literal)(`(
+      SELECT c.commission_pct FROM contracts c
+      WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL
+      ORDER BY c.created_at DESC LIMIT 1
+    )`),
+        'commission_rate',
+    ],
+    [
+        (0, sequelize_1.literal)(`(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
+        'matches',
+    ],
+    [
+        (0, sequelize_1.literal)(`(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`),
+        'goals',
+    ],
+    [
+        (0, sequelize_1.literal)(`(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`),
+        'assists',
+    ],
+    [
+        (0, sequelize_1.literal)(`(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`),
+        'rating',
+    ],
+    [
+        (0, sequelize_1.literal)(`(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
+        'minutes_played',
+    ],
+    [
+        (0, sequelize_1.literal)(`(SELECT perf.average_rating FROM performances perf WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`),
+        'performance',
+    ],
+];
+async function getPlayerCounts(playerId) {
+    const [result] = await database_1.sequelize.query(`SELECT
+       COALESCE((SELECT COUNT(*)::int FROM contracts WHERE player_id = :id AND status = 'Active'), 0) AS "activeContracts",
+       COALESCE((SELECT COUNT(*)::int FROM injuries WHERE player_id = :id AND status = 'UnderTreatment'), 0) AS "activeInjuries",
+       COALESCE((SELECT COUNT(*)::int FROM tasks WHERE player_id = :id AND status = 'Open'), 0) AS "openTasks"`, { replacements: { id: playerId }, type: sequelize_1.QueryTypes.SELECT });
+    return result || { activeContracts: 0, activeInjuries: 0, openTasks: 0 };
+}
 // ── List Players (enriched with computed fields) ──
 async function listPlayers(queryParams) {
     const { limit, offset, page, sort, order, search } = (0, pagination_1.parsePagination)(queryParams, 'createdAt');
@@ -40,124 +122,7 @@ async function listPlayers(queryParams) {
         limit,
         offset,
         order: [[sort, order]],
-        attributes: {
-            include: [
-                // ── Full Arabic Name (computed) ──
-                [
-                    sequelize_1.Sequelize.literal(`COALESCE(
-            NULLIF(CONCAT("Player".first_name_ar, ' ', "Player".last_name_ar), ' '),
-            CONCAT("Player".first_name, ' ', "Player".last_name)
-          )`),
-                    'full_name_ar',
-                ],
-                // ── Full English Name ──
-                [
-                    sequelize_1.Sequelize.literal(`CONCAT("Player".first_name, ' ', "Player".last_name)`),
-                    'full_name',
-                ],
-                // ── Age (computed from date_of_birth) ──
-                [
-                    sequelize_1.Sequelize.literal(`EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`),
-                    'computed_age',
-                ],
-                // ── Contract Status (from most recent active contract) ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT
-              CASE
-                WHEN c.end_date IS NULL THEN 'Active'
-                WHEN c.end_date < CURRENT_DATE THEN 'Expired'
-                WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
-                ELSE 'Active'
-              END
-            FROM contracts c
-            WHERE c.player_id = "Player".id
-            ORDER BY c.end_date DESC NULLS FIRST
-            LIMIT 1
-          )`),
-                    'contract_status',
-                ],
-                // ── Contract End Date ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT c.end_date::text
-            FROM contracts c
-            WHERE c.player_id = "Player".id
-            ORDER BY c.end_date DESC NULLS FIRST
-            LIMIT 1
-          )`),
-                    'contract_end',
-                ],
-                // ── Commission Rate ──
-                // ── Commission Rate (from contracts.commission_pct) ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-    SELECT c.commission_pct
-    FROM contracts c
-    WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL
-    ORDER BY c.created_at DESC
-    LIMIT 1
-  )`),
-                    'commission_rate',
-                ],
-                // ── Total Matches Played ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT COUNT(*)::int
-            FROM match_players mp
-            WHERE mp.player_id = "Player".id
-          )`),
-                    'matches',
-                ],
-                // ── Total Goals ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT COALESCE(SUM(mp.goals), 0)::int
-            FROM match_players mp
-            WHERE mp.player_id = "Player".id
-          )`),
-                    'goals',
-                ],
-                // ── Total Assists ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT COALESCE(SUM(mp.assists), 0)::int
-            FROM match_players mp
-            WHERE mp.player_id = "Player".id
-          )`),
-                    'assists',
-                ],
-                // ── Average Rating ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT ROUND(AVG(mp.rating), 1)
-            FROM match_players mp
-            WHERE mp.player_id = "Player".id AND mp.rating IS NOT NULL
-          )`),
-                    'rating',
-                ],
-                // ── Minutes Played ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT COALESCE(SUM(mp.minutes_played), 0)::int
-            FROM match_players mp
-            WHERE mp.player_id = "Player".id
-          )`),
-                    'minutes_played',
-                ],
-                // ── Latest Performance Score ──
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT perf.average_rating
-            FROM performances perf
-            WHERE perf.player_id = "Player".id
-            ORDER BY perf.created_at DESC
-            LIMIT 1
-          )`),
-                    'performance',
-                ],
-            ],
-        },
+        attributes: { include: COMPUTED_ATTRIBUTES },
         include: [
             { model: club_model_1.Club, as: 'club', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
             { model: user_model_1.User, as: 'agent', attributes: ['id', 'fullName'] },
@@ -167,91 +132,27 @@ async function listPlayers(queryParams) {
 }
 // ── Get Player by ID (With Aggregates) ──
 async function getPlayerById(id) {
-    const player = await player_model_1.Player.findByPk(id, {
-        attributes: {
-            include: [
-                [
-                    sequelize_1.Sequelize.literal(`COALESCE(
-            NULLIF(CONCAT("Player".first_name_ar, ' ', "Player".last_name_ar), ' '),
-            CONCAT("Player".first_name, ' ', "Player".last_name)
-          )`),
-                    'full_name_ar',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`CONCAT("Player".first_name, ' ', "Player".last_name)`),
-                    'full_name',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`),
-                    'computed_age',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(
-            SELECT CASE
-              WHEN c.end_date IS NULL THEN 'Active'
-              WHEN c.end_date < CURRENT_DATE THEN 'Expired'
-              WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
-              ELSE 'Active'
-            END
-            FROM contracts c WHERE c.player_id = "Player".id
-            ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
-          )`),
-                    'contract_status',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT c.end_date::text FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`),
-                    'contract_end',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
-                    'matches',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT COALESCE(SUM(mp.goals), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
-                    'goals',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT COALESCE(SUM(mp.assists), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
-                    'assists',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT ROUND(AVG(mp.rating), 1) FROM match_players mp WHERE mp.player_id = "Player".id AND mp.rating IS NOT NULL)`),
-                    'rating',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
-                    'minutes_played',
-                ],
-                [
-                    sequelize_1.Sequelize.literal(`(SELECT perf.average_rating FROM performances perf  WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`),
-                    'performance',
-                ],
-            ],
-        },
-        include: ['club', 'agent'],
-    });
+    // Run main query + sidebar counts + performance history in parallel
+    const [player, counts, performanceHistory] = await Promise.all([
+        player_model_1.Player.findByPk(id, {
+            attributes: { include: COMPUTED_ATTRIBUTES },
+            include: ['club', 'agent'],
+        }),
+        getPlayerCounts(id),
+        database_1.sequelize.query(`SELECT
+         TO_CHAR(perf.created_at, 'YYYY-MM') as month,
+         ROUND(AVG(perf.average_rating), 1) as rating
+       FROM performances perf
+       WHERE perf.player_id = :id
+       GROUP BY TO_CHAR(perf.created_at, 'YYYY-MM')
+       ORDER BY month DESC
+       LIMIT 12`, { replacements: { id }, type: sequelize_1.QueryTypes.SELECT }).catch(() => []),
+    ]);
     if (!player)
         throw new errorHandler_1.AppError('Player not found', 404);
-    // Sidebar counters
-    const [activeContracts, activeInjuries, openTasks] = await Promise.all([
-        database_1.sequelize.models.Contract?.count({ where: { playerId: id, status: 'Active' } }).catch(() => 0),
-        database_1.sequelize.models.Injury?.count({ where: { playerId: id, status: 'UnderTreatment' } }).catch(() => 0),
-        database_1.sequelize.models.Task?.count({ where: { playerId: id, status: 'Open' } }).catch(() => 0),
-    ]);
-    // Performance history (monthly averages)
-    const performanceHistory = await database_1.sequelize.query(`
-    SELECT
-      TO_CHAR(perf.created_at, 'YYYY-MM') as month,
-      ROUND(AVG(perf.average_rating), 1) as rating
-    FROM performances perf
-    WHERE perf.player_id = :id
-    GROUP BY TO_CHAR(perf.created_at, 'YYYY-MM')
-    ORDER BY month DESC
-    LIMIT 12
-  `, { replacements: { id }, type: sequelize_1.QueryTypes.SELECT }).catch(() => []);
     return {
         ...player.get({ plain: true }),
-        counts: { activeContracts, activeInjuries, openTasks },
+        counts,
         performance_history: performanceHistory,
     };
 }
@@ -270,5 +171,34 @@ async function deletePlayer(id) {
     if (!deleted)
         throw new errorHandler_1.AppError('Player not found', 404);
     return { id };
+}
+// ═══════════════════════════════════════════════════════════════
+// Add to: src/modules/players/player.service.ts (append these functions)
+// ═══════════════════════════════════════════════════════════════
+async function getPlayerProviders(playerId) {
+    return externalProvider_model_1.ExternalProviderMapping.findAll({
+        where: { playerId },
+        order: [['providerName', 'ASC']],
+    });
+}
+async function upsertPlayerProvider(playerId, input) {
+    const [mapping] = await externalProvider_model_1.ExternalProviderMapping.upsert({
+        playerId,
+        providerName: input.providerName,
+        externalPlayerId: input.externalPlayerId,
+        externalTeamId: input.externalTeamId || null,
+        apiBaseUrl: input.apiBaseUrl || null,
+        notes: input.notes || null,
+    });
+    return mapping;
+}
+async function removePlayerProvider(playerId, providerName) {
+    const mapping = await externalProvider_model_1.ExternalProviderMapping.findOne({
+        where: { playerId, providerName },
+    });
+    if (!mapping)
+        throw new Error('Provider mapping not found');
+    await mapping.destroy();
+    return { playerId, providerName };
 }
 //# sourceMappingURL=player.service.js.map

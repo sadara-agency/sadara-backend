@@ -17,6 +17,7 @@ import { Injury, InjuryUpdate } from '../modules/injuries/injury.model';
 import { TrainingCourse, TrainingEnrollment } from '../modules/training/training.model';
 import { ExternalProviderMapping } from '../modules/players/externalProvider.model';
 import { SaffTournament, SaffFixture, SaffStanding, SaffTeamMap } from '@modules/saff/saff.model';
+import { Notification } from '../modules/notifications/notification.model';
 
 
 export function setupAssociations() {
@@ -34,6 +35,10 @@ export function setupAssociations() {
 
   // Player ↔ Analyst (User)
   Player.belongsTo(User, { as: 'analyst', foreignKey: 'analystId' });
+
+  // User ↔ Player (Portal link — one user per player)
+  User.belongsTo(Player, { as: 'playerProfile', foreignKey: 'playerId' });
+  Player.hasOne(User, { as: 'userAccount', foreignKey: 'playerId' });
 
   // Task associations
   Task.belongsTo(Player, { as: 'player', foreignKey: 'playerId' });
@@ -142,3 +147,7 @@ SaffStanding.belongsTo(SaffTournament, { foreignKey: 'tournamentId', as: 'tourna
 
 SaffTournament.hasMany(SaffFixture, { foreignKey: 'tournamentId', as: 'fixtures' });
 SaffFixture.belongsTo(SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
+
+
+User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });

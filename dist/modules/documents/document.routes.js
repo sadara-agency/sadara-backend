@@ -38,12 +38,28 @@ const errorHandler_1 = require("../../middleware/errorHandler");
 const auth_1 = require("../../middleware/auth");
 const validate_1 = require("../../middleware/validate");
 const document_schema_1 = require("./document.schema");
+const upload_1 = require("../../middleware/upload");
 const ctrl = __importStar(require("./document.controller"));
 const router = (0, express_1.Router)();
 router.use(auth_1.authenticate);
+// List & detail
 router.get('/', (0, validate_1.validate)(document_schema_1.documentQuerySchema, 'query'), (0, errorHandler_1.asyncHandler)(ctrl.list));
 router.get('/:id', (0, errorHandler_1.asyncHandler)(ctrl.getById));
+// Upload real file (multipart/form-data) — metadata in form fields
+router.post('/upload', (0, auth_1.authorize)('Admin', 'Manager', 'Analyst'), (req, res, next) => {
+    (0, upload_1.uploadSingle)(req, res, (err) => {
+        if (err) {
+            const msg = err.code === 'LIMIT_FILE_SIZE'
+                ? 'File too large. Maximum size is 25MB.'
+                : err.message || 'Upload failed';
+            return res.status(400).json({ success: false, message: msg });
+        }
+        next();
+    });
+}, (0, errorHandler_1.asyncHandler)(ctrl.upload));
+// Create via JSON (external URL, no file upload)
 router.post('/', (0, auth_1.authorize)('Admin', 'Manager', 'Analyst'), (0, validate_1.validate)(document_schema_1.createDocumentSchema), (0, errorHandler_1.asyncHandler)(ctrl.create));
+// Update & delete
 router.patch('/:id', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(document_schema_1.updateDocumentSchema), (0, errorHandler_1.asyncHandler)(ctrl.update));
 router.delete('/:id', (0, auth_1.authorize)('Admin'), (0, errorHandler_1.asyncHandler)(ctrl.remove));
 exports.default = router;

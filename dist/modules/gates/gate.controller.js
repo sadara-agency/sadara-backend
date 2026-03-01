@@ -37,6 +37,7 @@ exports.list = list;
 exports.getById = getById;
 exports.getPlayerGates = getPlayerGates;
 exports.create = create;
+exports.initialize = initialize;
 exports.advance = advance;
 exports.update = update;
 exports.remove = remove;
@@ -65,6 +66,15 @@ async function getPlayerGates(req, res) {
 async function create(req, res) {
     const gate = await gateService.createGate(req.body);
     await (0, audit_1.logAudit)('CREATE', 'gates', gate.id, (0, audit_1.buildAuditContext)(req.user, req.ip), `Created Gate ${gate.gateNumber} for player ${gate.playerId}`);
+    (0, apiResponse_1.sendCreated)(res, gate);
+}
+// ── Initialize Gate (create + seed default checklist) ──
+async function initialize(req, res) {
+    const gate = await gateService.initializeGate(req.body.playerId, req.body.gateNumber, {
+        autoStart: req.body.autoStart ?? false,
+        notes: req.body.notes,
+    });
+    await (0, audit_1.logAudit)('CREATE', 'gates', gate.id, (0, audit_1.buildAuditContext)(req.user, req.ip), `Initialized Gate ${req.body.gateNumber} for player ${req.body.playerId} with default checklist`);
     (0, apiResponse_1.sendCreated)(res, gate);
 }
 // ── Advance Gate (start / complete) ──

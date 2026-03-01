@@ -1,9 +1,4 @@
 "use strict";
-// src/models/associations.ts
-// This file sets up all Sequelize associations between models.
-// It should be imported once in the main app initialization
-// after all models have been defined, to ensure associations
-// are registered before any queries are made.
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.setupAssociations = setupAssociations;
 const player_model_1 = require("../modules/players/player.model");
@@ -13,11 +8,19 @@ const task_model_1 = require("../modules/tasks/task.model");
 const contract_model_1 = require("../modules/contracts/contract.model");
 const offer_model_1 = require("../modules/offers/offer.model");
 const match_model_1 = require("../modules/matches/match.model");
+const matchPlayer_model_1 = require("../modules/matches/matchPlayer.model");
+const playerMatchStats_model_1 = require("../modules/matches/playerMatchStats.model");
 const gate_model_1 = require("../modules/gates/gate.model");
 const referral_model_1 = require("../modules/referrals/referral.model");
 const scouting_model_1 = require("../modules/scouting/scouting.model");
 const finance_model_1 = require("../modules/finance/finance.model");
 const document_model_1 = require("../modules/documents/document.model");
+const clearance_model_1 = require("../modules/clearances/clearance.model");
+const injury_model_1 = require("../modules/injuries/injury.model");
+const training_model_1 = require("../modules/training/training.model");
+const externalProvider_model_1 = require("../modules/players/externalProvider.model");
+const saff_model_1 = require("@modules/saff/saff.model");
+const notification_model_1 = require("../modules/notifications/notification.model");
 function setupAssociations() {
     // Player ↔ Club
     player_model_1.Player.belongsTo(club_model_1.Club, { as: 'club', foreignKey: 'currentClubId' });
@@ -25,6 +28,13 @@ function setupAssociations() {
     // Player ↔ Agent (User)
     player_model_1.Player.belongsTo(user_model_1.User, { as: 'agent', foreignKey: 'agentId' });
     user_model_1.User.hasMany(player_model_1.Player, { as: 'players', foreignKey: 'agentId' });
+    // Player ↔ Coach (User)
+    player_model_1.Player.belongsTo(user_model_1.User, { as: 'coach', foreignKey: 'coachId' });
+    // Player ↔ Analyst (User)
+    player_model_1.Player.belongsTo(user_model_1.User, { as: 'analyst', foreignKey: 'analystId' });
+    // User ↔ Player (Portal link — one user per player)
+    user_model_1.User.belongsTo(player_model_1.Player, { as: 'playerProfile', foreignKey: 'playerId' });
+    player_model_1.Player.hasOne(user_model_1.User, { as: 'userAccount', foreignKey: 'playerId' });
     // Task associations
     task_model_1.Task.belongsTo(player_model_1.Player, { as: 'player', foreignKey: 'playerId' });
     task_model_1.Task.belongsTo(user_model_1.User, { as: 'assignee', foreignKey: 'assignedTo' });
@@ -43,22 +53,40 @@ function setupAssociations() {
     offer_model_1.Offer.belongsTo(club_model_1.Club, { foreignKey: 'toClubId', as: 'toClub' });
     // Offer → User (creator)
     offer_model_1.Offer.belongsTo(user_model_1.User, { foreignKey: 'createdBy', as: 'creator' });
+    // Match ↔ Club
     match_model_1.Match.belongsTo(club_model_1.Club, { foreignKey: 'homeClubId', as: 'homeClub' });
     match_model_1.Match.belongsTo(club_model_1.Club, { foreignKey: 'awayClubId', as: 'awayClub' });
     club_model_1.Club.hasMany(match_model_1.Match, { foreignKey: 'homeClubId', as: 'homeMatches' });
     club_model_1.Club.hasMany(match_model_1.Match, { foreignKey: 'awayClubId', as: 'awayMatches' });
+    // Match ↔ MatchPlayer ↔ Player
+    match_model_1.Match.hasMany(matchPlayer_model_1.MatchPlayer, { foreignKey: 'matchId', as: 'matchPlayers' });
+    matchPlayer_model_1.MatchPlayer.belongsTo(match_model_1.Match, { foreignKey: 'matchId', as: 'match' });
+    matchPlayer_model_1.MatchPlayer.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
+    player_model_1.Player.hasMany(matchPlayer_model_1.MatchPlayer, { foreignKey: 'playerId', as: 'matchAppearances' });
+    // Match ↔ PlayerMatchStats ↔ Player
+    match_model_1.Match.hasMany(playerMatchStats_model_1.PlayerMatchStats, { foreignKey: 'matchId', as: 'stats' });
+    playerMatchStats_model_1.PlayerMatchStats.belongsTo(match_model_1.Match, { foreignKey: 'matchId', as: 'match' });
+    playerMatchStats_model_1.PlayerMatchStats.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
+    player_model_1.Player.hasMany(playerMatchStats_model_1.PlayerMatchStats, { foreignKey: 'playerId', as: 'matchStats' });
+    // Task ↔ Match
+    task_model_1.Task.belongsTo(match_model_1.Match, { foreignKey: 'matchId', as: 'match' });
+    match_model_1.Match.hasMany(task_model_1.Task, { foreignKey: 'matchId', as: 'tasks' });
+    // Gate ↔ Player
     gate_model_1.Gate.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
     player_model_1.Player.hasMany(gate_model_1.Gate, { foreignKey: 'playerId', as: 'gates' });
     gate_model_1.Gate.belongsTo(user_model_1.User, { foreignKey: 'approvedBy', as: 'approver' });
     gate_model_1.Gate.hasMany(gate_model_1.GateChecklist, { foreignKey: 'gateId', as: 'checklist' });
     gate_model_1.GateChecklist.belongsTo(gate_model_1.Gate, { foreignKey: 'gateId', as: 'gate' });
+    // Referral
     referral_model_1.Referral.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
     player_model_1.Player.hasMany(referral_model_1.Referral, { foreignKey: 'playerId', as: 'referrals' });
     referral_model_1.Referral.belongsTo(user_model_1.User, { foreignKey: 'assignedTo', as: 'assignee' });
     referral_model_1.Referral.belongsTo(user_model_1.User, { foreignKey: 'createdBy', as: 'creator' });
+    // Scouting
     scouting_model_1.Watchlist.belongsTo(user_model_1.User, { foreignKey: 'scoutedBy', as: 'scout' });
     scouting_model_1.ScreeningCase.belongsTo(user_model_1.User, { foreignKey: 'packPreparedBy', as: 'preparer' });
     scouting_model_1.ScreeningCase.belongsTo(user_model_1.User, { foreignKey: 'createdBy', as: 'creator' });
+    // Finance
     finance_model_1.Invoice.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
     finance_model_1.Invoice.belongsTo(club_model_1.Club, { foreignKey: 'clubId', as: 'club' });
     finance_model_1.Invoice.belongsTo(user_model_1.User, { foreignKey: 'createdBy', as: 'creator' });
@@ -67,8 +95,33 @@ function setupAssociations() {
     finance_model_1.LedgerEntry.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
     finance_model_1.Valuation.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
     player_model_1.Player.hasMany(finance_model_1.Valuation, { foreignKey: 'playerId', as: 'valuations' });
+    // Document
     document_model_1.Document.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
     player_model_1.Player.hasMany(document_model_1.Document, { foreignKey: 'playerId', as: 'documents' });
     document_model_1.Document.belongsTo(user_model_1.User, { foreignKey: 'uploadedBy', as: 'uploader' });
+    // Clearance
+    clearance_model_1.Clearance.belongsTo(contract_model_1.Contract, { foreignKey: 'contractId', as: 'contract' });
+    clearance_model_1.Clearance.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
+    clearance_model_1.Clearance.belongsTo(user_model_1.User, { foreignKey: 'createdBy', as: 'creator' });
+    // ── Injuries (NO duplicates) ──
+    player_model_1.Player.hasMany(injury_model_1.Injury, { foreignKey: 'playerId', as: 'injuries' });
+    injury_model_1.Injury.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
+    injury_model_1.Injury.belongsTo(match_model_1.Match, { foreignKey: 'matchId', as: 'match' });
+    injury_model_1.Injury.hasMany(injury_model_1.InjuryUpdate, { foreignKey: 'injuryId', as: 'updates' });
+    injury_model_1.InjuryUpdate.belongsTo(injury_model_1.Injury, { foreignKey: 'injuryId', as: 'injury' });
+    // ── Training ──
+    training_model_1.TrainingCourse.hasMany(training_model_1.TrainingEnrollment, { foreignKey: 'courseId', as: 'enrollments' });
+    training_model_1.TrainingEnrollment.belongsTo(training_model_1.TrainingCourse, { foreignKey: 'courseId', as: 'course' });
+    training_model_1.TrainingEnrollment.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
+    player_model_1.Player.hasMany(training_model_1.TrainingEnrollment, { foreignKey: 'playerId', as: 'trainingEnrollments' });
+    // ── External Provider Mappings ──
+    player_model_1.Player.hasMany(externalProvider_model_1.ExternalProviderMapping, { foreignKey: 'playerId', as: 'externalProviders' });
+    externalProvider_model_1.ExternalProviderMapping.belongsTo(player_model_1.Player, { foreignKey: 'playerId', as: 'player' });
 }
+saff_model_1.SaffTournament.hasMany(saff_model_1.SaffStanding, { foreignKey: 'tournamentId', as: 'standings' });
+saff_model_1.SaffStanding.belongsTo(saff_model_1.SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
+saff_model_1.SaffTournament.hasMany(saff_model_1.SaffFixture, { foreignKey: 'tournamentId', as: 'fixtures' });
+saff_model_1.SaffFixture.belongsTo(saff_model_1.SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
+user_model_1.User.hasMany(notification_model_1.Notification, { foreignKey: 'userId', as: 'notifications' });
+notification_model_1.Notification.belongsTo(user_model_1.User, { foreignKey: 'userId', as: 'user' });
 //# sourceMappingURL=associations.js.map

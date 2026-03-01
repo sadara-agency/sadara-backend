@@ -52,5 +52,6 @@ router.patch('/:id', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.v
 router.patch('/:id/status', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(offer_schema_1.updateOfferStatusSchema), (0, errorHandler_1.asyncHandler)(offerController.updateStatus));
 // ── Delete ──
 router.delete('/:id', (0, auth_1.authorize)('Admin'), (0, errorHandler_1.asyncHandler)(offerController.remove));
+router.post('/:id/convert', (0, auth_1.authorize)('Admin', 'Manager'), (0, errorHandler_1.asyncHandler)(offerController.convertToContract));
 exports.default = router;
 //# sourceMappingURL=offer.routes.js.map

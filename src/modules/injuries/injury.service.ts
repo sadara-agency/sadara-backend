@@ -1,10 +1,11 @@
 import { Op } from 'sequelize';
 import { Injury, InjuryUpdate } from './injury.model';
 import { Player } from '../players/player.model';
-import { Task } from '../tasks/task.model';
 import { Match } from '../matches/match.model';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
+import { notifyByRole } from '../notifications/notification.service';
+import { logger } from '../../config/logger';
 import type { CreateInjuryInput, UpdateInjuryInput, AddInjuryUpdateInput } from './injury.schema';
 
 const PLAYER_ATTRS = ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'position', 'photoUrl'] as const;
@@ -87,29 +88,23 @@ export async function createInjury(input: CreateInjuryInput, createdBy: string) 
   // Update player status to injured
   await player.update({ status: 'injured' });
 
-  // Auto-create task for medical follow-up
+  // ── Push notification (non-blocking — won't crash the endpoint) ──
   const playerName = `${player.firstName} ${player.lastName}`.trim();
   const playerNameAr = (player as any).firstNameAr
     ? `${(player as any).firstNameAr} ${(player as any).lastNameAr || ''}`.trim()
     : playerName;
 
-  const dueDate = new Date();
-  dueDate.setDate(dueDate.getDate() + 1);
-
-  await Task.create({
-    title: `Medical follow-up: ${playerName} — ${input.injuryType}`,
-    titleAr: `متابعة طبية: ${playerNameAr} — ${input.injuryTypeAr || input.injuryType}`,
-    description: `${playerName} has been logged with ${input.severity || 'Moderate'} injury (${input.injuryType}) on ${input.injuryDate}. ${input.diagnosis || ''}`,
-    type: 'Health',
-    priority: input.severity === 'Critical' || input.severity === 'Severe' ? 'critical' : 'high',
-    status: 'Open',
-    playerId: input.playerId,
-    assignedBy: createdBy,
-    isAutoCreated: true,
-    // triggerRuleId: 'injury_logged',
-    dueDate: dueDate.toISOString().split('T')[0],
-    notes: `Injury ID: ${injury.id}`,
-  } as any);
+  notifyByRole(['Admin', 'Manager'], {
+    type: 'injury',
+    title: `New injury logged: ${playerName} — ${input.injuryType}`,
+    titleAr: `إصابة جديدة: ${playerNameAr} — ${input.injuryTypeAr || input.injuryType}`,
+    body: `${input.severity || 'Moderate'} injury on ${input.injuryDate}. ${input.diagnosis || ''}`.trim(),
+    bodyAr: `إصابة ${input.severity || 'Moderate'} بتاريخ ${input.injuryDate}`,
+    link: '/dashboard/injuries',
+    sourceType: 'injury',
+    sourceId: injury.id,
+    priority: input.severity === 'Critical' || input.severity === 'Severe' ? 'critical' : 'normal',
+  }).catch(err => logger.error('Failed to send injury notification', err));
 
   return getInjuryById(injury.id);
 }
@@ -154,7 +149,6 @@ export async function addInjuryUpdate(injuryId: string, input: AddInjuryUpdateIn
     updatedBy: userId,
   } as any);
 
-  // If status changed, update the injury too
   if (input.status && input.status !== injury.status) {
     await injury.update({ status: input.status });
 

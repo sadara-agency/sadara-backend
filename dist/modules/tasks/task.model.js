@@ -1,14 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Task = void 0;
-// ─────────────────────────────────────────────────────────────
-// src/modules/tasks/task.model.ts
-// Sequelize model for the tasks table.
-//
-// The old task.routes.ts used raw SQL queries because this
-// model didn't exist. Now we get type safety, associations,
-// and can use Sequelize's query builder consistently.
-// ─────────────────────────────────────────────────────────────
 const sequelize_1 = require("sequelize");
 const database_1 = require("../../config/database");
 class Task extends sequelize_1.Model {

@@ -43,8 +43,10 @@ const router = (0, express_1.Router)();
 router.use(auth_1.authenticate);
 // ── Gates CRUD ──
 router.get('/', (0, validate_1.validate)(gate_schema_1.gateQuerySchema, 'query'), (0, errorHandler_1.asyncHandler)(gateController.list));
-router.get('/:id', (0, errorHandler_1.asyncHandler)(gateController.getById));
+// Static paths MUST come before /:id to avoid Express matching "initialize" or "player" as an :id param
+router.post('/initialize', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(gate_schema_1.initializeGateSchema), (0, errorHandler_1.asyncHandler)(gateController.initialize));
 router.get('/player/:playerId', (0, errorHandler_1.asyncHandler)(gateController.getPlayerGates));
+router.get('/:id', (0, errorHandler_1.asyncHandler)(gateController.getById));
 router.post('/', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(gate_schema_1.createGateSchema), (0, errorHandler_1.asyncHandler)(gateController.create));
 router.patch('/:id', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(gate_schema_1.updateGateSchema), (0, errorHandler_1.asyncHandler)(gateController.update));
 router.patch('/:id/advance', (0, auth_1.authorize)('Admin', 'Manager'), (0, validate_1.validate)(gate_schema_1.advanceGateSchema), (0, errorHandler_1.asyncHandler)(gateController.advance));

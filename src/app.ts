@@ -27,6 +27,9 @@ import settingsRoutes from './modules/settings/settings.routes';
 import injuryRoutes from './modules/injuries/injury.routes';
 import trainingRoutes from './modules/training/training.routes';
 import saffRoutes from './modules/saff/saff.routes';
+import notificationRoutes from './modules/notifications/notification.routes';
+import cronRoutes from './cron/cron.routes';
+import portalRoutes from './modules/portal/portal.routes';
 
 
 const app = express();
@@ -75,6 +78,9 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/injuries', injuryRoutes);
 app.use('/api/v1/training', trainingRoutes);
 app.use('/api/v1/saff', saffRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
+app.use('/api/v1/cron', cronRoutes);
+app.use('/api/v1/portal', portalRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

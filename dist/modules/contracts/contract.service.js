@@ -5,17 +5,6 @@ exports.getContractById = getContractById;
 exports.createContract = createContract;
 exports.updateContract = updateContract;
 exports.deleteContract = deleteContract;
-// ─────────────────────────────────────────────────────────────
-// src/modules/contracts/contract.service.ts
-// Business logic for Contract CRUD.
-//
-// Replaces all raw SQL from the old contract.routes.ts with
-// Sequelize ORM queries. Key behaviors preserved:
-//   - Player name + club name via eager loading
-//   - days_remaining computed as a virtual field
-//   - totalCommission auto-calculated on create
-//   - Milestones fetched for getById (raw SQL until model exists)
-// ─────────────────────────────────────────────────────────────
 const sequelize_1 = require("sequelize");
 const contract_model_1 = require("./contract.model");
 const player_model_1 = require("../players/player.model");
@@ -69,9 +58,13 @@ async function listContracts(queryParams) {
         const pattern = `%${search}%`;
         where[sequelize_1.Op.or] = [
             { title: { [sequelize_1.Op.iLike]: pattern } },
-            // Search by player name via literal (since it's in a joined table)
-            (0, sequelize_1.literal)(`"player"."first_name" ILIKE '${pattern.replace(/'/g, "''")}'`),
-            (0, sequelize_1.literal)(`"player"."last_name" ILIKE '${pattern.replace(/'/g, "''")}'`),
+            // Safe: Sequelize.where + fn generate parameterized SQL
+            (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('player.first_name')), {
+                [sequelize_1.Op.like]: pattern.toLowerCase(),
+            }),
+            (0, sequelize_1.where)((0, sequelize_1.fn)('lower', (0, sequelize_1.col)('player.last_name')), {
+                [sequelize_1.Op.like]: pattern.toLowerCase(),
+            }),
         ];
     }
     const { count, rows } = await contract_model_1.Contract.findAndCountAll({
@@ -80,7 +73,7 @@ async function listContracts(queryParams) {
         limit,
         offset,
         order: [[sort, order]],
-        distinct: true, // Needed when including associations to get correct count
+        distinct: true,
     });
     const data = rows.map(enrichContract);
     return { data, meta: (0, pagination_1.buildMeta)(count, page, limit) };
@@ -95,7 +88,7 @@ async function getContractById(id) {
     if (!contract)
         throw new errorHandler_1.AppError('Contract not found', 404);
     const enriched = enrichContract(contract);
-    // Fetch milestones via raw SQL (until Milestone model is created)
+    // Fetch milestones via parameterized raw SQL
     const milestones = await database_1.sequelize.query(`SELECT ms.*
      FROM milestones ms
      JOIN commission_schedules cs ON ms.commission_schedule_id = cs.id
@@ -107,7 +100,6 @@ async function getContractById(id) {
 // Create Contract
 // ────────────────────────────────────────────────────────────
 async function createContract(input, createdBy) {
-    // Auto-calculate total commission
     const totalCommission = input.commissionPct && input.baseSalary
         ? (input.baseSalary * input.commissionPct) / 100
         : 0;
@@ -127,7 +119,6 @@ async function createContract(input, createdBy) {
         totalCommission,
         createdBy,
     });
-    // Re-fetch with associations
     return getContractById(contract.id);
 }
 // ────────────────────────────────────────────────────────────
@@ -137,7 +128,6 @@ async function updateContract(id, input) {
     const contract = await contract_model_1.Contract.findByPk(id);
     if (!contract)
         throw new errorHandler_1.AppError('Contract not found', 404);
-    // If commission % or salary changed, recalculate total
     const newPct = input.commissionPct ?? contract.commissionPct;
     const newSalary = input.baseSalary ?? contract.baseSalary;
     const updateData = { ...input };

@@ -6,6 +6,7 @@ import gradient from 'gradient-string';
 import { initRedis, closeRedis } from './config/redis';
 import { seedDatabase } from './database/seed';
 import { startSaffScheduler } from './modules/saff/saff.scheduler';
+import { startCronJobs } from './cron/scheduler';
 
 async function bootstrap() {
   try {
@@ -65,7 +66,9 @@ async function bootstrap() {
   }
 }
 
+// Start background jobs
 startSaffScheduler();
+startCronJobs();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

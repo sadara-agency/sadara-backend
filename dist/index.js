@@ -8,9 +8,15 @@ const env_1 = require("./config/env");
 const database_1 = require("./config/database");
 const chalk_1 = __importDefault(require("chalk"));
 const gradient_string_1 = __importDefault(require("gradient-string"));
+const redis_1 = require("./config/redis");
+const seed_1 = require("./database/seed");
+const saff_scheduler_1 = require("./modules/saff/saff.scheduler");
+const scheduler_1 = require("./cron/scheduler");
 async function bootstrap() {
     try {
         await (0, database_1.testConnection)();
+        await (0, redis_1.initRedis)();
+        await (0, seed_1.seedDatabase)();
         app_1.default.listen(env_1.env.port, () => {
             const sadaraGradient = (0, gradient_string_1.default)(['#3C3CFA', '#E4E5F3', '#11132B']);
             const logo = `
@@ -40,9 +46,18 @@ async function bootstrap() {
         });
     }
     catch (err) {
-        console.error('❌ Failed to start server:', err);
+        console.error('❌ Failed to start    server:', err);
         process.exit(1);
     }
 }
+// Start background jobs
+(0, saff_scheduler_1.startSaffScheduler)();
+(0, scheduler_1.startCronJobs)();
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('🛑 Shutting down...');
+    await (0, redis_1.closeRedis)();
+    process.exit(0);
+});
 bootstrap();
 //# sourceMappingURL=index.js.map
