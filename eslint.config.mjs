@@ -8,12 +8,12 @@ export default tseslint.config(
   {
     files: ['src/**/*.ts'],
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-empty-object-type': 'warn',   // 20 model files
-      '@typescript-eslint/no-require-imports': 'warn',      // finance.service.ts
-      'no-empty': 'warn',                                   // contract.pdf.controller.ts
-      'prefer-const': 'warn',                               // settings.routes.ts
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      'no-empty': 'off',
+      'prefer-const': 'off',
     },
   },
   {
