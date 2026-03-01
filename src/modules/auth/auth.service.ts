@@ -169,8 +169,10 @@ export async function login(input: LoginInput) {
 
 // ── Get Profile ──
 export async function getProfile(userId: string) {
-  // Check users table first
-  const user = await User.findByPk(userId);
+  // Check users table first (exclude sensitive fields)
+  const user = await User.findByPk(userId, {
+    attributes: { exclude: ['passwordHash', 'inviteToken', 'inviteTokenExpiry'] },
+  });
   if (user) return user;
 
   // Fall back to player_accounts
@@ -290,10 +292,6 @@ export async function forgotPassword(email: string) {
   console.log(`   Email:      ${email}`);
   console.log(`   Email sent: ${emailSent ? '✅ Yes' : '❌ No (logged only)'}`);
   console.log(`   Expiry:     ${expiry.toISOString()}`);
-  if (!emailSent) {
-    console.log(`   Token:      ${rawToken}`);
-    console.log(`   URL:        ${resetUrl}`);
-  }
   console.log('═══════════════════════════════════════════════');
 
   // In dev mode, return the token in the response for testing

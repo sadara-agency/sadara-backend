@@ -80,5 +80,7 @@ export async function seedDatabase(): Promise<void> {
     } catch (err) {
         console.error('❌ Seed failed:', (err as Error).message);
         console.error((err as Error).stack);
+        // Re-throw error to prevent server from starting with incomplete data
+        throw err;
     }
 }

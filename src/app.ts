@@ -41,8 +41,10 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 
+// Rate limiting
+app.use('/api/v1', apiLimiter);
 if (env.nodeEnv === 'production') {
-  app.use('/api/v1/auth', authLimiter);
+  app.use('/api/v1/auth', authLimiter); // Stricter limit for auth
 }
 
 // ── Health Check ──
@@ -79,7 +81,10 @@ app.use('/api/v1/injuries', injuryRoutes);
 app.use('/api/v1/training', trainingRoutes);
 app.use('/api/v1/saff', saffRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
-app.use('/api/v1/cron', cronRoutes);
+// Cron test routes — development only
+if (env.nodeEnv !== 'production') {
+  app.use('/api/v1/cron', cronRoutes);
+}
 app.use('/api/v1/portal', portalRoutes);
 
 // ── 404 ──

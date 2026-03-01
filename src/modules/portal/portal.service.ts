@@ -2,6 +2,7 @@ import { Op, QueryTypes } from 'sequelize';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { sequelize } from '../../config/database';
+import { env } from '../../config/env';
 import { Player } from '../players/player.model';
 import { Club } from '../clubs/club.model';
 import { User } from '../Users/user.model';
@@ -215,9 +216,13 @@ export async function generatePlayerInvite(playerId: string, generatedBy: string
   const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   // Create a placeholder user with invite token
+  // Hash a random placeholder password that will never match (prevents login until registration)
+  const placeholderPassword = crypto.randomBytes(32).toString('hex');
+  const passwordHash = await bcrypt.hash(placeholderPassword, env.bcrypt.saltRounds);
+
   const user = await User.create({
     email: player.email,
-    passwordHash: '', // Will be set during registration
+    passwordHash, // Impossible to guess placeholder hash until user completes registration
     fullName: `${player.firstName} ${player.lastName}`,
     fullNameAr: player.firstNameAr && player.lastNameAr
       ? `${player.firstNameAr} ${player.lastNameAr}` : undefined,
@@ -228,7 +233,7 @@ export async function generatePlayerInvite(playerId: string, generatedBy: string
     playerId: player.id,
   } as any);
 
-  const inviteLink = `${process.env.FRONTEND_URL || 'https://platform.sadarasport.sa'}/player/register?token=${token}`;
+  const inviteLink = `${env.frontend.url}/player/register?token=${token}`;
 
   return {
     inviteLink,

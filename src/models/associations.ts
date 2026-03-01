@@ -119,7 +119,9 @@ export function setupAssociations() {
   Document.belongsTo(User, { foreignKey: 'uploadedBy', as: 'uploader' });
 
   // Clearance
+  Contract.hasMany(Clearance, { foreignKey: 'contractId', as: 'clearances' });
   Clearance.belongsTo(Contract, { foreignKey: 'contractId', as: 'contract' });
+  Player.hasMany(Clearance, { foreignKey: 'playerId', as: 'clearances' });
   Clearance.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
   Clearance.belongsTo(User, { foreignKey: 'createdBy', as: 'creator' });
 
@@ -139,15 +141,15 @@ export function setupAssociations() {
   // ── External Provider Mappings ──
   Player.hasMany(ExternalProviderMapping, { foreignKey: 'playerId', as: 'externalProviders' });
   ExternalProviderMapping.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
+
+  // SAFF associations
+  SaffTournament.hasMany(SaffStanding, { foreignKey: 'tournamentId', as: 'standings' });
+  SaffStanding.belongsTo(SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
+
+  SaffTournament.hasMany(SaffFixture, { foreignKey: 'tournamentId', as: 'fixtures' });
+  SaffFixture.belongsTo(SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
+
+  // Notification associations
+  User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
+  Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 }
-
-
-SaffTournament.hasMany(SaffStanding, { foreignKey: 'tournamentId', as: 'standings' });
-SaffStanding.belongsTo(SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
-
-SaffTournament.hasMany(SaffFixture, { foreignKey: 'tournamentId', as: 'fixtures' });
-SaffFixture.belongsTo(SaffTournament, { foreignKey: 'tournamentId', as: 'tournament' });
-
-
-User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
-Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });

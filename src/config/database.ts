@@ -27,7 +27,7 @@ const sequelizeOptions: Options = {
     ...(env.nodeEnv === 'production' && {
       ssl: {
         require: true,
-        rejectUnauthorized: false,
+        rejectUnauthorized: true,
       },
     }),
   },

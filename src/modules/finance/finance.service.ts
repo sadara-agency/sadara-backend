@@ -1,4 +1,5 @@
 import { Op, QueryTypes } from 'sequelize';
+import { randomUUID } from 'crypto';
 import { sequelize } from '../../config/database';
 import { Invoice, Payment, LedgerEntry, Valuation, type PaymentStatus } from './finance.model';
 import { Player } from '../players/player.model';
@@ -138,7 +139,7 @@ export async function createLedgerEntry(input: any, userId: string) {
 
 // ── Create a balanced double-entry pair ──
 export async function createLedgerPair(debitAccount: string, creditAccount: string, amount: number, description: string, refType: string, refId: string, playerId: string | null, userId: string) {
-  const txId = require('crypto').randomUUID();
+  const txId = randomUUID();
   const base = { transactionId: txId, amount, currency: 'SAR', description, referenceType: refType, referenceId: refId, playerId, createdBy: userId };
   await LedgerEntry.bulkCreate([
     { ...base, side: 'Debit' as const, account: debitAccount },
