@@ -141,6 +141,20 @@ function scrapeStandings($: cheerio.CheerioAPI): ScrapedStanding[] {
 
     if (!hasPts || !hasP) return;
 
+    // Find column indices from headers
+    const colIdx = {
+      pts: headers.findIndex(h => h === 'Pts' || h === 'نقاط'),
+      p: headers.findIndex(h => h === 'P' || h === 'لعب'),
+      w: headers.findIndex(h => h === 'W' || h === 'فوز'),
+      d: headers.findIndex(h => h === 'D' || h === 'تعادل'),
+      l: headers.findIndex(h => h === 'L' || h === 'خسارة'),
+      gf: headers.findIndex(h => h === 'GF' || h === 'له'),
+      ga: headers.findIndex(h => h === 'GA' || h === 'عليه'),
+      gd: headers.findIndex(h => h === '+/-' || h === 'الفارق' || h === 'فرق'),
+    };
+
+    let rowNum = 0;
+
     $(table).find('tbody tr').each((_, row) => {
       const cells = $(row).find('td');
       if (cells.length < 8) return;
@@ -151,33 +165,53 @@ function scrapeStandings($: cheerio.CheerioAPI): ScrapedStanding[] {
 
       const saffTeamId = extractTeamId(teamLink.attr('href'));
       const teamNameEn = teamLink.text().trim();
+      if (!saffTeamId || !teamNameEn) return;
 
-      // Parse numeric cells — the order is: [checkbox?], pos, [logo?], name, P, W, D, L, GF, GA, GD, Pts
-      const nums: number[] = [];
-      cells.each((_, cell) => {
-        const text = $(cell).text().trim();
-        const num = parseInt(text, 10);
-        if (!isNaN(num) && text === String(num)) {
-          nums.push(num);
-        }
-      });
+      rowNum++;
 
-      // We expect: position, played, won, drawn, lost, gf, ga, gd(signed), pts
-      if (nums.length >= 9) {
-        const [pos, played, won, drawn, lost, gf, ga] = nums;
-        const gd = nums[nums.length - 2]; // goal difference (may be negative)
-        const pts = nums[nums.length - 1]; // points is always last
+      // Helper: parse a cell's text as integer (handles +46, -7, etc.)
+      const cellInt = (idx: number): number => {
+        if (idx < 0 || idx >= cells.length) return 0;
+        const text = $(cells[idx]).text().trim().replace(/\+/, '');
+        const n = parseInt(text, 10);
+        return isNaN(n) ? 0 : n;
+      };
 
+      // Try to get position from first cell, fall back to row number
+      const firstCellText = $(cells[0]).text().trim().replace(/[^\d]/g, '');
+      const position = parseInt(firstCellText, 10) || rowNum;
+
+      // Parse stats by column index (most reliable method)
+      const played = cellInt(colIdx.p);
+      const won = cellInt(colIdx.w);
+      const drawn = cellInt(colIdx.d);
+      const lost = cellInt(colIdx.l);
+      const goalsFor = cellInt(colIdx.gf);
+      const goalsAgainst = cellInt(colIdx.ga);
+      const points = cellInt(colIdx.pts);
+
+      // Goal difference: parse from column if available, otherwise compute
+      let goalDifference = 0;
+      if (colIdx.gd >= 0) {
+        const gdText = $(cells[colIdx.gd]).text().trim();
+        goalDifference = parseInt(gdText.replace(/\+/, ''), 10);
+        if (isNaN(goalDifference)) goalDifference = goalsFor - goalsAgainst;
+      } else {
+        goalDifference = goalsFor - goalsAgainst;
+      }
+
+      // Validate: at least played > 0 or points > 0 to avoid junk rows
+      if (played > 0 || points > 0) {
         standings.push({
-          position: pos,
+          position,
           saffTeamId,
           teamNameEn,
-          teamNameAr: '', // Will be filled from Arabic page or team map
+          teamNameAr: '',
           played, won, drawn, lost,
-          goalsFor: gf,
-          goalsAgainst: ga,
-          goalDifference: gf - ga,
-          points: pts,
+          goalsFor,
+          goalsAgainst,
+          goalDifference,
+          points,
         });
       }
     });

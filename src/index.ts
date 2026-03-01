@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import gradient from 'gradient-string';
 import { initRedis, closeRedis } from './config/redis';
 import { seedDatabase } from './database/seed';
+import { startSaffScheduler } from './modules/saff/saff.scheduler';
 
 async function bootstrap() {
   try {
@@ -63,6 +64,8 @@ async function bootstrap() {
     process.exit(1);
   }
 }
+
+startSaffScheduler();
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
