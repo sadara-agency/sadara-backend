@@ -32,7 +32,7 @@ export const updateClubSchema = createClubSchema.partial();
 // ── Query / List Clubs ──
 export const clubQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(200).default(20),
   sort: z.string().default('name'),
   order: z.enum(['asc', 'desc']).default('asc'),
   search: z.string().optional(),
