@@ -40,7 +40,22 @@ export const clubQuerySchema = z.object({
   country: z.string().optional(),
 });
 
+// ── Create Contact ──
+export const createContactSchema = z.object({
+  name: z.string().min(1, 'Contact name is required'),
+  name_ar: z.string().optional(),
+  role: z.string().min(1, 'Contact role is required'),
+  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  phone: z.string().optional(),
+  is_primary: z.boolean().default(false),
+});
+
+// ── Update Contact (partial) ──
+export const updateContactSchema = createContactSchema.partial();
+
 // ── Inferred types for service layer ──
 export type CreateClubInput = z.infer<typeof createClubSchema>;
 export type UpdateClubInput = z.infer<typeof updateClubSchema>;
 export type ClubQuery = z.infer<typeof clubQuerySchema>;
+export type CreateContactInput = z.infer<typeof createContactSchema>;
+export type UpdateContactInput = z.infer<typeof updateContactSchema>;
