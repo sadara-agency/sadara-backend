@@ -5,5 +5,16 @@ import * as auditService from './audit.service';
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await auditService.listAuditLogs(req.query);
-  sendPaginated(res, result.data, result.meta);
+
+  const mapped = result.data.map((log) => ({
+    id: log.id,
+    action: log.action,
+    entity: log.entity,
+    entityType: log.entity,
+    performedBy: log.userName || 'System',
+    performedAt: log.loggedAt?.toISOString?.() || new Date().toISOString(),
+    details: log.detail || '',
+  }));
+
+  sendPaginated(res, mapped, result.meta);
 }
