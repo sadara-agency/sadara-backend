@@ -16,7 +16,7 @@ import { Club } from './club.model';
 import { sequelize } from '../../config/database';
 import { AppError } from '../../middleware/errorHandler';
 import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { CreateClubInput, UpdateClubInput } from './club.schema';
+import { CreateClubInput, UpdateClubInput, CreateContactInput, UpdateContactInput } from './club.schema';
 
 // ── Shared computed attributes (subqueries) ──
 // These are appended to every Club query so the frontend
@@ -166,4 +166,83 @@ export async function deleteClub(id: string) {
   const deleted = await Club.destroy({ where: { id } });
   if (!deleted) throw new AppError('Club not found', 404);
   return { id };
+}
+
+// ────────────────────────────────────────────────────────────
+// Update Club Logo URL
+// ────────────────────────────────────────────────────────────
+export async function updateClubLogo(id: string, logoUrl: string) {
+  const club = await Club.findByPk(id);
+  if (!club) throw new AppError('Club not found', 404);
+  return await club.update({ logoUrl });
+}
+
+// ────────────────────────────────────────────────────────────
+// Create Contact (raw SQL — no Sequelize model yet)
+// ────────────────────────────────────────────────────────────
+export async function createContact(clubId: string, input: CreateContactInput) {
+  const club = await Club.findByPk(clubId);
+  if (!club) throw new AppError('Club not found', 404);
+
+  const results = await sequelize.query(
+    `INSERT INTO contacts (id, name, name_ar, role, email, phone, is_primary, club_id, created_at, updated_at)
+     VALUES (gen_random_uuid(), :name, :name_ar, :role, :email, :phone, :is_primary, :club_id, NOW(), NOW())
+     RETURNING id, name, name_ar, role, email, phone, is_primary`,
+    {
+      replacements: {
+        name: input.name,
+        name_ar: input.name_ar || null,
+        role: input.role,
+        email: input.email || null,
+        phone: input.phone || null,
+        is_primary: input.is_primary ?? false,
+        club_id: clubId,
+      },
+      type: QueryTypes.SELECT,
+    },
+  );
+  return (results as any[])[0];
+}
+
+// ────────────────────────────────────────────────────────────
+// Update Contact (raw SQL)
+// ────────────────────────────────────────────────────────────
+export async function updateContact(contactId: string, clubId: string, input: UpdateContactInput) {
+  const fields: string[] = [];
+  const replacements: Record<string, any> = { contactId, clubId };
+
+  if (input.name !== undefined) { fields.push('name = :name'); replacements.name = input.name; }
+  if (input.name_ar !== undefined) { fields.push('name_ar = :name_ar'); replacements.name_ar = input.name_ar; }
+  if (input.role !== undefined) { fields.push('role = :role'); replacements.role = input.role; }
+  if (input.email !== undefined) { fields.push('email = :email'); replacements.email = input.email || null; }
+  if (input.phone !== undefined) { fields.push('phone = :phone'); replacements.phone = input.phone || null; }
+  if (input.is_primary !== undefined) { fields.push('is_primary = :is_primary'); replacements.is_primary = input.is_primary; }
+
+  if (fields.length === 0) throw new AppError('No fields to update', 400);
+  fields.push('updated_at = NOW()');
+
+  const [, metadata] = await sequelize.query(
+    `UPDATE contacts SET ${fields.join(', ')} WHERE id = :contactId AND club_id = :clubId`,
+    { replacements },
+  );
+
+  if ((metadata as any)?.rowCount === 0) throw new AppError('Contact not found', 404);
+
+  const updated = await sequelize.query(
+    `SELECT id, name, name_ar, role, email, phone, is_primary FROM contacts WHERE id = :contactId`,
+    { replacements: { contactId }, type: QueryTypes.SELECT },
+  );
+  return (updated as any[])[0];
+}
+
+// ────────────────────────────────────────────────────────────
+// Delete Contact (raw SQL)
+// ────────────────────────────────────────────────────────────
+export async function deleteContact(contactId: string, clubId: string) {
+  const [, metadata] = await sequelize.query(
+    `DELETE FROM contacts WHERE id = :contactId AND club_id = :clubId`,
+    { replacements: { contactId, clubId } },
+  );
+  if ((metadata as any)?.rowCount === 0) throw new AppError('Contact not found', 404);
+  return { id: contactId };
 }
