@@ -79,11 +79,25 @@ export async function createMissingTables() {
             fouls_committed INT, fouls_drawn INT,
             yellow_cards INT DEFAULT 0, red_cards INT DEFAULT 0,
             rating NUMERIC(3,1), position_in_match VARCHAR(50),
+            key_passes INT, saves INT, clean_sheet BOOLEAN,
+            goals_conceded INT, penalties_saved INT,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW(),
             CONSTRAINT uq_player_match_stats UNIQUE (player_id, match_id)
         );
     `);
+
+    // Add new columns to player_match_stats if they don't exist (for existing DBs)
+    const newCols = ['key_passes', 'saves', 'clean_sheet', 'goals_conceded', 'penalties_saved'];
+    for (const col of newCols) {
+        const colType = col === 'clean_sheet' ? 'BOOLEAN' : 'INT';
+        await sequelize.query(
+            `DO $$ BEGIN
+                ALTER TABLE player_match_stats ADD COLUMN ${col} ${colType};
+            EXCEPTION WHEN duplicate_column THEN NULL;
+            END $$;`
+        );
+    }
 
     console.log('✅ Missing tables ensured');
 }

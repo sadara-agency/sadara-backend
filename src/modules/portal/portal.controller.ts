@@ -32,6 +32,34 @@ export async function getMyDevelopment(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+// ── My Stats ──
+
+export async function getMyStats(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyStats(req.user!.id);
+  sendSuccess(res, data);
+}
+
+// ── My Contracts ──
+
+export async function getMyContracts(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyContracts(req.user!.id);
+  sendSuccess(res, data);
+}
+
+// ── Sign My Contract (Player digital/upload sign) ──
+
+export async function signMyContract(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { action, signatureData, signedDocumentUrl } = req.body;
+  const contract = await portalService.signMyContract(
+    req.user!.id, id, action, signatureData, signedDocumentUrl,
+  );
+  await logAudit('UPDATE', 'contracts', id, buildAuditContext(req.user!, req.ip),
+    `Player signed contract via portal (method: ${action})`,
+  );
+  sendSuccess(res, contract, 'Contract signed successfully');
+}
+
 // ── Generate Invite Link (Admin/Manager only) ──
 
 export async function generateInvite(req: AuthRequest, res: Response) {

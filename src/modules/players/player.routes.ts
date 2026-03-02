@@ -4,6 +4,7 @@ import { authenticate, authorize } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { cacheRoute } from '../../middleware/cache.middleware';
 import { CacheTTL } from '../../shared/utils/cache';
+import { uploadSingle } from '../../middleware/upload';
 import { createPlayerSchema, updatePlayerSchema, playerQuerySchema } from './utils/player.schema';
 import * as playerController from './player.controller';
 
@@ -18,6 +19,7 @@ router.get('/:id', cacheRoute('player', CacheTTL.MEDIUM), asyncHandler(playerCon
 router.post('/', authorize('Admin', 'Manager'), validate(createPlayerSchema), asyncHandler(playerController.create));
 router.patch('/:id', authorize('Admin', 'Manager'), validate(updatePlayerSchema), asyncHandler(playerController.update));
 router.delete('/:id', authorize('Admin'), asyncHandler(playerController.remove));
+router.post('/:id/photo', authorize('Admin', 'Manager'), uploadSingle, asyncHandler(playerController.uploadPhoto));
 
 router.get('/:id/providers', asyncHandler(playerController.getProviders));
 router.put('/:id/providers', asyncHandler(playerController.upsertProvider));

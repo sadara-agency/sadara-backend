@@ -18,6 +18,12 @@ const generateInviteSchema = z.object({
   playerId: z.string().uuid('Invalid player ID format'),
 });
 
+const signContractSchema = z.object({
+  action: z.enum(['sign_digital', 'sign_upload']),
+  signatureData: z.string().optional(),
+  signedDocumentUrl: z.string().optional(),
+});
+
 // ── Public route: complete registration via invite token ──
 router.post('/register', validate(completeRegistrationSchema), asyncHandler(portalController.completeRegistration));
 
@@ -28,7 +34,10 @@ router.use(authenticate);
 router.get('/me', authorize('Player'), asyncHandler(portalController.getMyProfile));
 router.get('/schedule', authorize('Player'), asyncHandler(portalController.getMySchedule));
 router.get('/documents', authorize('Player'), asyncHandler(portalController.getMyDocuments));
+router.get('/contracts', authorize('Player'), asyncHandler(portalController.getMyContracts));
+router.post('/contracts/:id/sign', authorize('Player'), validate(signContractSchema), asyncHandler(portalController.signMyContract));
 router.get('/development', authorize('Player'), asyncHandler(portalController.getMyDevelopment));
+router.get('/stats', authorize('Player'), asyncHandler(portalController.getMyStats));
 
 // ── Admin/Manager routes: generate invite links ──
 router.post('/invite', authorize('Admin', 'Manager'), validate(generateInviteSchema), asyncHandler(portalController.generateInvite));
