@@ -88,6 +88,7 @@ export async function getTopPlayers(limit = 5) {
        p.market_value,
        p.photo_url,
        c.name AS club_name,
+       c.logo_url AS club_logo_url,
        rr.overall_risk,
        (SELECT AVG(perf.average_rating)
         FROM performances perf WHERE perf.player_id = p.id) AS avg_rating,

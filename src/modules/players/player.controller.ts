@@ -3,6 +3,7 @@ import { AuthRequest } from '../../shared/types';
 import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
 import { logAudit, buildAuditContext } from '../../shared/utils/audit';
 import { invalidateMultiple, CachePrefix } from '../../shared/utils/cache';
+import { AppError } from '../../middleware/errorHandler';
 import * as playerService from './player.service';
 
 export async function list(req: AuthRequest, res: Response) {
@@ -36,6 +37,19 @@ export async function remove(req: AuthRequest, res: Response) {
   await logAudit('DELETE', 'players', result.id, buildAuditContext(req.user!, req.ip), 'Player deleted');
   await invalidateMultiple([CachePrefix.PLAYERS, CachePrefix.PLAYER, CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
   sendSuccess(res, result, 'Player deleted');
+}
+
+export async function uploadPhoto(req: AuthRequest, res: Response) {
+  if (!req.file) throw new AppError('No file uploaded', 400);
+
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const photoUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
+
+  const player = await playerService.updatePlayer(req.params.id, { photoUrl });
+  await logAudit('UPDATE', 'players', player.id, buildAuditContext(req.user!, req.ip),
+    'Updated player photo');
+  await invalidateMultiple([CachePrefix.PLAYERS, CachePrefix.PLAYER, CachePrefix.DASHBOARD]);
+  sendSuccess(res, { photoUrl }, 'Photo uploaded');
 }
 
 export async function getProviders(req: AuthRequest, res: Response) {

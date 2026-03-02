@@ -26,6 +26,11 @@ export interface PlayerMatchStatsAttributes {
   redCards?: number | null;
   rating?: number | null;
   positionInMatch?: string | null;
+  keyPasses?: number | null;
+  saves?: number | null;
+  cleanSheet?: boolean | null;
+  goalsConceded?: number | null;
+  penaltiesSaved?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -61,6 +66,11 @@ export class PlayerMatchStats extends Model<PlayerMatchStatsAttributes, PlayerMa
   declare redCards: number | null;
   declare rating: number | null;
   declare positionInMatch: string | null;
+  declare keyPasses: number | null;
+  declare saves: number | null;
+  declare cleanSheet: boolean | null;
+  declare goalsConceded: number | null;
+  declare penaltiesSaved: number | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -106,6 +116,11 @@ PlayerMatchStats.init({
   redCards: { type: DataTypes.INTEGER, field: 'red_cards', defaultValue: 0 },
   rating: { type: DataTypes.DECIMAL(3, 1) },
   positionInMatch: { type: DataTypes.STRING(50), field: 'position_in_match' },
+  keyPasses: { type: DataTypes.INTEGER, field: 'key_passes' },
+  saves: { type: DataTypes.INTEGER },
+  cleanSheet: { type: DataTypes.BOOLEAN, field: 'clean_sheet' },
+  goalsConceded: { type: DataTypes.INTEGER, field: 'goals_conceded' },
+  penaltiesSaved: { type: DataTypes.INTEGER, field: 'penalties_saved' },
 }, {
   sequelize,
   tableName: 'player_match_stats',

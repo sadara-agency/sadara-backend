@@ -35,6 +35,9 @@ export async function seedDatabase(): Promise<void> {
     }
 
     try {
+        // Ensure schema migrations run on every startup (e.g. new columns)
+        await createMissingTables();
+
         // Check if already seeded
         const existingAdmin = await User.findOne({ where: { email: 'admin@sadara.com' } });
         if (existingAdmin) {
@@ -44,11 +47,8 @@ export async function seedDatabase(): Promise<void> {
 
         console.log('🌱 Seeding development database...');
 
-        // Sync models → create tables
+        // Sync models → create tables (first-time only)
         await sequelize.sync({ alter: false });
-
-        // Create non-Sequelize tables
-        await createMissingTables();
 
         // Seed in FK order
         await seedUsers();

@@ -1,4 +1,5 @@
 import express from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -46,6 +47,9 @@ app.use('/api/v1', apiLimiter);
 if (env.nodeEnv === 'production') {
   app.use('/api/v1/auth', authLimiter); // Stricter limit for auth
 }
+
+// ── Serve uploaded files ──
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // ── Health Check ──
 app.get('/api/health', (_req, res) => {
