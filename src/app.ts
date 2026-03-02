@@ -31,6 +31,7 @@ import saffRoutes from './modules/saff/saff.routes';
 import notificationRoutes from './modules/notifications/notification.routes';
 import cronRoutes from './cron/cron.routes';
 import portalRoutes from './modules/portal/portal.routes';
+import auditRoutes from './modules/audit/audit.routes';
 
 
 const app = express();
@@ -90,6 +91,7 @@ if (env.nodeEnv !== 'production') {
   app.use('/api/v1/cron', cronRoutes);
 }
 app.use('/api/v1/portal', portalRoutes);
+app.use('/api/v1/audit', auditRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {
