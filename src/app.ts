@@ -38,6 +38,11 @@ import splRoutes from './modules/spl/spl.routes';
 
 const app = express();
 
+// Trust reverse proxy (Railway, Heroku, etc.) — required for rate limiting & real IPs
+if (env.nodeEnv === 'production') {
+  app.set('trust proxy', 1);
+}
+
 // ── Global Middleware ──
 app.use(helmet());
 app.use(cors({

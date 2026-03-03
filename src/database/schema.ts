@@ -107,6 +107,20 @@ export async function createMissingTables() {
         END $$;`
     );
 
+    // Add spl_team_id and espn_team_id to clubs if missing (for existing DBs)
+    await sequelize.query(
+        `DO $$ BEGIN
+            ALTER TABLE clubs ADD COLUMN spl_team_id INTEGER;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`
+    );
+    await sequelize.query(
+        `DO $$ BEGIN
+            ALTER TABLE clubs ADD COLUMN espn_team_id INTEGER;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`
+    );
+
     // ── Performance indexes on frequently queried foreign keys ──
     const indexes = [
         'CREATE INDEX IF NOT EXISTS idx_contracts_player_id ON contracts(player_id)',
