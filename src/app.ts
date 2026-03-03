@@ -40,7 +40,29 @@ const app = express();
 
 // ── Global Middleware ──
 app.use(helmet());
-app.use(cors({ origin: env.cors.origin, credentials: true }));
+app.use(cors({
+  origin(origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    // Check exact matches from env (comma-separated CORS_ORIGIN)
+    const allowed = Array.isArray(env.cors.origin) ? env.cors.origin : [env.cors.origin];
+    if (allowed.includes(origin)) return callback(null, true);
+
+    // Allow any Vercel preview/production URL for this project
+    if (/^https:\/\/sadara-frontend[\w-]*\.vercel\.app$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow localhost in development
+    if (env.nodeEnv !== 'production' && /^http:\/\/localhost:\d+$/.test(origin)) {
+      return callback(null, true);
+    }
+
+    callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
