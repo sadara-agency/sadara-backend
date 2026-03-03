@@ -68,7 +68,7 @@ export async function listTasks(queryParams: any) {
   // Unless the user explicitly requests a different sort
   const isDefaultSort = sort === 'createdAt' && order === 'DESC';
   const orderClause = isDefaultSort
-    ? [[PRIORITY_ORDER, 'ASC'], [literal('"Task"."due_date" ASC NULLS LAST'), '']]
+    ? [[PRIORITY_ORDER, 'ASC'], [literal('"Task"."due_date" ASC NULLS LAST')]]
     : [[sort, order]];
 
   const { count, rows } = await Task.findAndCountAll({

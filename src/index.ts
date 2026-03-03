@@ -5,6 +5,7 @@ import chalk from 'chalk';
 import gradient from 'gradient-string';
 import { initRedis, closeRedis } from './config/redis';
 import { seedDatabase } from './database/seed';
+import { createMissingTables } from './database/schema';
 import { startSaffScheduler } from './modules/saff/saff.scheduler';
 import { startCronJobs } from './cron/scheduler';
 
@@ -12,6 +13,10 @@ async function bootstrap() {
   try {
     await testConnection();
     await initRedis();
+
+    // Schema migrations run in ALL environments (adds missing columns/tables)
+    await createMissingTables();
+
     await seedDatabase();
 
     // Start background jobs after DB/Redis are ready
