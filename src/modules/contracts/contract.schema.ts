@@ -5,7 +5,7 @@ const CONTRACT_TYPES = [
   'Representation', 'CareerManagement', 'Transfer', 'Loan',
   'Renewal', 'Sponsorship', 'ImageRights', 'MedicalAuth',
 ] as const;
-const CONTRACT_STATUSES = ['Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing', 'Terminated'] as const;
+const CONTRACT_STATUSES = ['Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing', 'AwaitingPlayer', 'Terminated'] as const;
 const EXCLUSIVITY_TYPES = ['Exclusive', 'NonExclusive'] as const;
 const REPRESENTATION_SCOPES = ['Local', 'International', 'Both'] as const;
 const CURRENCIES = ['SAR', 'USD', 'EUR'] as const;
@@ -26,7 +26,6 @@ export const createContractSchema = z.object({
   releaseClause: z.number().positive().optional(),
   performanceBonus: z.number().min(0).default(0),
   commissionPct: z.number().min(0).max(100, 'Commission must be 0-100%').optional(),
-  // Representation fields
   exclusivity: z.enum(EXCLUSIVITY_TYPES).default('Exclusive'),
   representationScope: z.enum(REPRESENTATION_SCOPES).default('Both'),
   agentName: z.string().optional(),
@@ -59,19 +58,28 @@ export const updateContractSchema = z.object({
   notes: z.string().nullable().optional(),
 });
 
-// ── Transition Status (Draft→Review→Signing→Active) ──
+// ── Transition Status ──
+// Agent actions: agent_sign_digital, agent_sign_upload
+// Admin actions: submit_review, approve, reject_to_draft, return_review
 export const transitionStatusSchema = z.object({
   action: z.enum([
-    'submit_review',   // Draft → Review
-    'approve',         // Review → Signing
-    'reject_to_draft', // Review → Draft
-    'sign_digital',    // Signing → Active
-    'sign_upload',     // Signing → Active
-    'return_review',   // Signing → Review
+    'submit_review',      // Draft → Review
+    'approve',            // Review → Signing
+    'reject_to_draft',    // Review → Draft
+    'agent_sign_digital', // Signing → AwaitingPlayer (agent signs digitally)
+    'agent_sign_upload',  // Signing → AwaitingPlayer (agent uploads signed doc)
+    'return_review',      // Signing|AwaitingPlayer → Review
   ]),
   signatureData: z.string().optional(),
   signedDocumentUrl: z.string().optional(),
   notes: z.string().optional(),
+});
+
+// ── Terminate Contract (NEW) ──
+export const terminateContractSchema = z.object({
+  reason: z.string().min(1, 'Termination reason is required').max(1000),
+  terminationDate: z.string().regex(DATE_REGEX, 'Date must be YYYY-MM-DD').optional(),
+  clearanceId: z.string().uuid().optional(),
 });
 
 // ── Query / List Contracts ──
@@ -92,3 +100,4 @@ export const contractQuerySchema = z.object({
 export type CreateContractInput = z.infer<typeof createContractSchema>;
 export type UpdateContractInput = z.infer<typeof updateContractSchema>;
 export type ContractQuery = z.infer<typeof contractQuerySchema>;
+export type TerminateContractInput = z.infer<typeof terminateContractSchema>;

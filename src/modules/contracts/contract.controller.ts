@@ -60,3 +60,22 @@ export async function remove(req: AuthRequest, res: Response) {
 
   sendSuccess(res, result, 'Contract deleted');
 }
+
+// ── Terminate Contract (NEW) ──
+export async function terminate(req: AuthRequest, res: Response) {
+  const contract = await contractService.terminateContract(
+    req.params.id,
+    req.body,
+    req.user!.id,
+  );
+
+  await logAudit(
+    'UPDATE',
+    'contracts',
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    `Contract terminated: ${contract.title || 'Untitled'} — Reason: ${req.body.reason}`,
+  );
+
+  sendSuccess(res, contract, 'Contract terminated');
+}

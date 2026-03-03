@@ -9,6 +9,7 @@ import {
   updateContractSchema,
   contractQuerySchema,
   transitionStatusSchema,
+  terminateContractSchema,
 } from './contract.schema';
 import * as contractController from './contract.controller';
 import { transitionContract } from './contract.transition.controller';
@@ -24,8 +25,9 @@ router.get('/', validate(contractQuerySchema, 'query'), cacheRoute('contracts', 
 router.post('/', authorize('Admin', 'Manager'), validate(createContractSchema), asyncHandler(contractController.create));
 
 // ── Sub-resource routes MUST come before /:id ──
-router.get('/:id/pdf', asyncHandler(generatePdf));  // No cache — dynamic PDF
+router.get('/:id/pdf', asyncHandler(generatePdf));
 router.post('/:id/transition', authorize('Admin', 'Manager'), validate(transitionStatusSchema), asyncHandler(transitionContract));
+router.post('/:id/terminate', authorize('Admin', 'Manager'), validate(terminateContractSchema), asyncHandler(contractController.terminate));
 
 // ── Single resource ──
 router.get('/:id', cacheRoute('contracts', CacheTTL.MEDIUM), asyncHandler(contractController.getById));

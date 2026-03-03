@@ -13,7 +13,7 @@ import { sendPasswordResetEmail, sendPasswordChangedEmail, sendWelcomeEmail } fr
 const DEFAULT_ROLE = 'Analyst';
 
 /** Generate JWT with user identity + role for frontend RBAC. */
-function generateToken(payload: { id: string; email: string; fullName: string; role: string }): string {
+function generateToken(payload: { id: string; email: string; fullName: string; role: string; playerId?: string | null }): string {
   return jwt.sign(
     payload,
     env.jwt.secret as jwt.Secret,
@@ -156,13 +156,14 @@ export async function login(input: LoginInput) {
     playerId: playerAccount.player_id,
   };
 
-  return {
+return {
     user: playerUser,
     token: generateToken({
       id: playerAccount.id,
       email: playerAccount.email,
       fullName,
       role: 'Player',
+      playerId: playerAccount.player_id,    
     }),
   };
 }

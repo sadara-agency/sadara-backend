@@ -1,8 +1,6 @@
-// ═══════════════════════════════════════════════════════════════
-// src/modules/training/training.schema.ts
-// ═══════════════════════════════════════════════════════════════
-
 import { z } from 'zod';
+
+// ── Course CRUD ──
 
 export const createCourseSchema = z.object({
   title: z.string().min(1),
@@ -20,6 +18,8 @@ export const updateCourseSchema = createCourseSchema.partial().extend({
   isActive: z.boolean().optional(),
 });
 
+// ── Enrollment ──
+
 export const enrollPlayersSchema = z.object({
   playerIds: z.array(z.string().uuid()).min(1, 'Select at least one player'),
 });
@@ -30,6 +30,24 @@ export const updateEnrollmentSchema = z.object({
   notes: z.string().optional(),
 });
 
+// ── NEW: Activity tracking (player self-service) ──
+
+export const trackActivitySchema = z.object({
+  action: z.enum(['Clicked', 'VideoStarted', 'VideoCompleted', 'Downloaded', 'Viewed']),
+  metadata: z.record(z.unknown()).optional(),
+});
+
+// ── NEW: Player self-service progress update ──
+
+export const selfUpdateProgressSchema = z.object({
+  progressPct: z.number().int().min(0).max(100).optional(),
+  notes: z.string().optional(),
+});
+
+// ── Inferred types ──
+
 export type CreateCourseInput = z.infer<typeof createCourseSchema>;
 export type UpdateCourseInput = z.infer<typeof updateCourseSchema>;
 export type UpdateEnrollmentInput = z.infer<typeof updateEnrollmentSchema>;
+export type TrackActivityInput = z.infer<typeof trackActivitySchema>;
+export type SelfUpdateProgressInput = z.infer<typeof selfUpdateProgressSchema>;

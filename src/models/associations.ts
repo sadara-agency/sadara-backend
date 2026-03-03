@@ -14,7 +14,7 @@ import { Invoice, Payment, LedgerEntry, Valuation } from '../modules/finance/fin
 import { Document } from '../modules/documents/document.model';
 import { Clearance } from '../modules/clearances/clearance.model';
 import { Injury, InjuryUpdate } from '../modules/injuries/injury.model';
-import { TrainingCourse, TrainingEnrollment } from '../modules/training/training.model';
+import { TrainingActivity, TrainingCourse, TrainingEnrollment } from '../modules/training/training.model';
 import { ExternalProviderMapping } from '../modules/players/externalProvider.model';
 import { SaffTournament, SaffFixture, SaffStanding, SaffTeamMap } from '../modules/saff/saff.model';
 import { Notification } from '../modules/notifications/notification.model';
@@ -152,4 +152,10 @@ export function setupAssociations() {
   // Notification associations
   User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' });
   Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+// ── Training Activity (NEW) ──
+  TrainingEnrollment.hasMany(TrainingActivity, { foreignKey: 'enrollmentId', as: 'activities' });
+  TrainingActivity.belongsTo(TrainingEnrollment, { foreignKey: 'enrollmentId', as: 'enrollment' });
+  TrainingActivity.belongsTo(TrainingCourse, { foreignKey: 'courseId', as: 'course' });
+  TrainingActivity.belongsTo(Player, { foreignKey: 'playerId', as: 'player' });
 }

@@ -418,8 +418,12 @@ export async function signMyContract(
     throw new AppError('You are not authorized to sign this contract', 403);
   }
 
-  if (contract.status !== 'Signing') {
-    throw new AppError('This contract is not in signing status', 400);
+  // ── FIX: Player signs when status is 'AwaitingPlayer' ──
+  if (contract.status !== 'AwaitingPlayer') {
+    throw new AppError(
+      'This contract is not awaiting your signature. Current status: ' + contract.status,
+      400,
+    );
   }
 
   const updatePayload: Record<string, unknown> = {
