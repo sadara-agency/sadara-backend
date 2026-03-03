@@ -1,3 +1,12 @@
+// ─────────────────────────────────────────────────────────────
+// src/modules/contracts/contract.transition.controller.ts
+//
+// FIXED from contract audit:
+//  1. agent_sign_digital / agent_sign_upload → AwaitingPlayer (not Active)
+//  2. Added AwaitingPlayer step with return_review action
+//  3. Agent signatures stored in agentSignatureData/agentSignedAt/agentSigningMethod
+//  4. Player signatures stay in signedDocumentUrl/signedAt/signingMethod
+// ─────────────────────────────────────────────────────────────
 import { Response } from 'express';
 import { AuthRequest } from '../../shared/types';
 import { sendSuccess } from '../../shared/utils/apiResponse';
@@ -5,7 +14,7 @@ import { logAudit, buildAuditContext } from '../../shared/utils/audit';
 import { AppError } from '../../middleware/errorHandler';
 import { Contract } from './contract.model';
 
-// ── Allowed transitions map ──
+// ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {
   Draft: {
     submit_review: 'Review',
@@ -15,10 +24,14 @@ const TRANSITION_MAP: Record<string, Record<string, string>> = {
     reject_to_draft: 'Draft',
   },
   Signing: {
-    sign_digital: 'Active',
-    sign_upload: 'Active',
+    agent_sign_digital: 'AwaitingPlayer',   // Agent signs → awaiting player
+    agent_sign_upload: 'AwaitingPlayer',     // Agent uploads → awaiting player
     return_review: 'Review',
   },
+  AwaitingPlayer: {
+    return_review: 'Review',                 // Admin can pull back
+  },
+  // Note: AwaitingPlayer → Active happens via player portal (portal.service.ts)
 };
 
 // ── Controller ──
@@ -50,23 +63,24 @@ export async function transitionContract(req: AuthRequest, res: Response) {
     status: nextStatus,
   };
 
-  // Handle signing actions
-  if (action === 'sign_digital') {
+  // ── Agent digital signature → stored in agent fields ──
+  if (action === 'agent_sign_digital') {
     if (!signatureData) {
       throw new AppError('signatureData is required for digital signing', 400);
     }
-    updatePayload.signedDocumentUrl = signatureData; // base64 image
-    updatePayload.signedAt = new Date();
-    updatePayload.signingMethod = 'digital';
+    updatePayload.agentSignatureData = signatureData;   // base64 image
+    updatePayload.agentSignedAt = new Date();
+    updatePayload.agentSigningMethod = 'digital';
   }
 
-  if (action === 'sign_upload') {
+  // ── Agent upload signature → stored in agent fields ──
+  if (action === 'agent_sign_upload') {
     if (!signedDocumentUrl) {
       throw new AppError('signedDocumentUrl is required for upload signing', 400);
     }
-    updatePayload.signedDocumentUrl = signedDocumentUrl;
-    updatePayload.signedAt = new Date();
-    updatePayload.signingMethod = 'upload';
+    updatePayload.agentSignatureData = signedDocumentUrl;
+    updatePayload.agentSignedAt = new Date();
+    updatePayload.agentSigningMethod = 'upload';
   }
 
   // Add notes if provided

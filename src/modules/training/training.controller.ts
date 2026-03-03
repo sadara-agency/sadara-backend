@@ -1,8 +1,16 @@
+// ═══════════════════════════════════════════════════════════════
+// src/modules/training/training.controller.ts
+// ═══════════════════════════════════════════════════════════════
+
 import { Response } from 'express';
 import { AuthRequest } from '../../shared/types';
 import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
 import { logAudit, buildAuditContext } from '../../shared/utils/audit';
 import * as svc from './training.service';
+
+// ══════════════════════════════════════════
+// COURSES (Admin)
+// ══════════════════════════════════════════
 
 export async function listCourses(req: AuthRequest, res: Response) {
   const result = await svc.listCourses(req.query);
@@ -31,6 +39,10 @@ export async function deleteCourse(req: AuthRequest, res: Response) {
   sendSuccess(res, result, 'Course deleted');
 }
 
+// ══════════════════════════════════════════
+// ENROLLMENTS (Admin)
+// ══════════════════════════════════════════
+
 export async function enrollPlayers(req: AuthRequest, res: Response) {
   const course = await svc.enrollPlayers(req.params.id, req.body.playerIds, req.user!.id);
   await logAudit('UPDATE', 'training', req.params.id, buildAuditContext(req.user!, req.ip),
@@ -51,4 +63,65 @@ export async function removeEnrollment(req: AuthRequest, res: Response) {
 export async function playerEnrollments(req: AuthRequest, res: Response) {
   const enrollments = await svc.getPlayerEnrollments(req.params.playerId);
   sendSuccess(res, enrollments);
+}
+
+// ══════════════════════════════════════════
+// ADMIN: Completion Matrix
+// ══════════════════════════════════════════
+
+export async function completionMatrix(req: AuthRequest, res: Response) {
+  const data = await svc.getCompletionMatrix(req.query);
+  sendSuccess(res, data);
+}
+
+// ══════════════════════════════════════════
+// PLAYER SELF-SERVICE (Portal)
+// ══════════════════════════════════════════
+
+export async function myEnrollments(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, [], 'Player account not linked');
+    return;
+  }
+  const enrollments = await svc.getMyEnrollments(playerId);
+  sendSuccess(res, enrollments);
+}
+
+export async function trackMyActivity(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    res.status(403).json({ success: false, message: 'Player account not linked' });
+    return;
+  }
+
+  const result = await svc.trackActivity(
+    req.params.enrollmentId,
+    playerId,
+    req.body,
+  );
+
+  await logAudit(
+    'UPDATE', 'training', req.params.enrollmentId,
+    buildAuditContext(req.user!, req.ip),
+    `Player tracked: ${req.body.action} on enrollment ${req.params.enrollmentId}`,
+  );
+
+  sendSuccess(res, result, 'Activity tracked');
+}
+
+export async function updateMyProgress(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    res.status(403).json({ success: false, message: 'Player account not linked' });
+    return;
+  }
+
+  const enrollment = await svc.selfUpdateProgress(
+    req.params.enrollmentId,
+    playerId,
+    req.body,
+  );
+
+  sendSuccess(res, enrollment, 'Progress updated');
 }

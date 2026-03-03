@@ -190,7 +190,7 @@ describe('Contract Service', () => {
   // ════════════════════════════════════════════════════════
   describe('deleteContract', () => {
     it('should delete existing contract', async () => {
-      const contract = mockModelInstance(mockContract());
+      const contract = mockModelInstance(mockContract({ status: 'Draft' }));
       mockFindByPk.mockResolvedValue(contract);
 
       const result = await contractService.deleteContract('contract-001');

@@ -105,3 +105,48 @@ TrainingEnrollment.init({
   assignedBy: { type: DataTypes.UUID, field: 'assigned_by' },
 }, { sequelize, tableName: 'training_enrollments', underscored: true, timestamps: true });
 
+// ═══════════════════════════════════════════════════════════════
+// ADD TO: src/modules/training/training.model.ts
+// Append after TrainingEnrollment.init(…) block
+// ═══════════════════════════════════════════════════════════════
+
+// ── Activity Log (content interaction tracking) ──
+
+export type ActivityAction = 'Clicked' | 'VideoStarted' | 'VideoCompleted' | 'Downloaded' | 'Viewed';
+
+interface ActivityAttributes {
+  id: string;
+  enrollmentId: string;
+  playerId: string;
+  courseId: string;
+  action: ActivityAction;
+  metadata?: Record<string, unknown> | null;
+  createdAt?: Date;
+}
+
+interface ActivityCreation extends Optional<ActivityAttributes, 'id' | 'createdAt'> {}
+
+export class TrainingActivity extends Model<ActivityAttributes, ActivityCreation> implements ActivityAttributes {
+  declare id: string;
+  declare enrollmentId: string;
+  declare playerId: string;
+  declare courseId: string;
+  declare action: ActivityAction;
+  declare metadata: Record<string, unknown> | null;
+}
+
+TrainingActivity.init({
+  id:           { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  enrollmentId: { type: DataTypes.UUID, allowNull: false, field: 'enrollment_id' },
+  playerId:     { type: DataTypes.UUID, allowNull: false, field: 'player_id' },
+  courseId:     { type: DataTypes.UUID, allowNull: false, field: 'course_id' },
+  action:       { type: DataTypes.ENUM('Clicked', 'VideoStarted', 'VideoCompleted', 'Downloaded', 'Viewed'), allowNull: false },
+  metadata:     { type: DataTypes.JSONB },
+}, {
+  sequelize,
+  tableName: 'training_activities',
+  underscored: true,
+  timestamps: true,
+  updatedAt: false,          // append-only log — no updates
+});
+

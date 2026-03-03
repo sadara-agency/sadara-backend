@@ -7,7 +7,7 @@ interface ContractAttributes {
   clubId: string;
   category: 'Club' | 'Sponsorship';
   contractType: 'Representation' | 'CareerManagement' | 'Transfer' | 'Loan' | 'Renewal' | 'Sponsorship' | 'ImageRights' | 'MedicalAuth';
-  status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft' | 'Review' | 'Signing' | 'Terminated';
+  status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft' | 'Review' | 'Signing' | 'AwaitingPlayer' | 'Terminated';
   title: string | null;
   startDate: string;
   endDate: string;
@@ -24,11 +24,15 @@ interface ContractAttributes {
   representationScope: 'Local' | 'International' | 'Both';
   agentName: string | null;
   agentLicense: string | null;
-  // Documents & Signing
+  // Documents & Signing (player side)
   documentUrl: string | null;
   signedDocumentUrl: string | null;
   signedAt: Date | null;
   signingMethod: string | null;
+  // Agent-side signing (two-sided workflow)
+  agentSignatureData: string | null;
+  agentSignedAt: Date | null;
+  agentSigningMethod: string | null;
   // Alerts & Termination
   expiryAlertSent: boolean;
   terminatedByClearanceId: string | null;
@@ -46,9 +50,10 @@ interface ContractCreationAttributes extends Optional<
   'commissionPct' | 'totalCommission' | 'commissionLocked' |
   'exclusivity' | 'representationScope' | 'agentName' | 'agentLicense' |
   'documentUrl' | 'signedDocumentUrl' | 'signedAt' | 'signingMethod' |
+  'agentSignatureData' | 'agentSignedAt' | 'agentSigningMethod' |
   'expiryAlertSent' | 'terminatedByClearanceId' |
   'notes' | 'createdBy' | 'createdAt' | 'updatedAt'
-> {}
+> { }
 
 export class Contract extends Model<ContractAttributes, ContractCreationAttributes> implements ContractAttributes {
   declare id: string;
@@ -56,7 +61,7 @@ export class Contract extends Model<ContractAttributes, ContractCreationAttribut
   declare clubId: string;
   declare category: 'Club' | 'Sponsorship';
   declare contractType: 'Representation' | 'CareerManagement' | 'Transfer' | 'Loan' | 'Renewal' | 'Sponsorship' | 'ImageRights' | 'MedicalAuth';
-  declare status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft' | 'Review' | 'Signing' | 'Terminated';
+  declare status: 'Active' | 'Expiring Soon' | 'Expired' | 'Draft' | 'Review' | 'Signing' | 'AwaitingPlayer' | 'Terminated';
   declare title: string | null;
   declare startDate: string;
   declare endDate: string;
@@ -76,6 +81,9 @@ export class Contract extends Model<ContractAttributes, ContractCreationAttribut
   declare signedDocumentUrl: string | null;
   declare signedAt: Date | null;
   declare signingMethod: string | null;
+  declare agentSignatureData: string | null;
+  declare agentSignedAt: Date | null;
+  declare agentSigningMethod: string | null;
   declare expiryAlertSent: boolean;
   declare terminatedByClearanceId: string | null;
   declare notes: string | null;
@@ -114,7 +122,7 @@ Contract.init({
     field: 'contract_type',
   },
   status: {
-    type: DataTypes.ENUM('Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing', 'Terminated'),
+    type: DataTypes.ENUM('Active', 'Expiring Soon', 'Expired', 'Draft', 'Review', 'Signing', 'AwaitingPlayer', 'Terminated'),
     defaultValue: 'Draft',
   },
   title: {
@@ -184,7 +192,7 @@ Contract.init({
     type: DataTypes.STRING(100),
     field: 'agent_license',
   },
-  // Documents & Signing
+  // Documents & Signing (player side)
   documentUrl: {
     type: DataTypes.TEXT,
     field: 'document_url',
@@ -200,6 +208,19 @@ Contract.init({
   signingMethod: {
     type: DataTypes.STRING(20),
     field: 'signing_method',
+  },
+  // Agent-side signing (two-sided workflow)
+  agentSignatureData: {
+    type: DataTypes.TEXT,
+    field: 'agent_signature_data',
+  },
+  agentSignedAt: {
+    type: DataTypes.DATE,
+    field: 'agent_signed_at',
+  },
+  agentSigningMethod: {
+    type: DataTypes.STRING(20),
+    field: 'agent_signing_method',
   },
   // Alerts & Termination
   expiryAlertSent: {

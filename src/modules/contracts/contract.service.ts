@@ -54,7 +54,6 @@ export async function listContracts(queryParams: any) {
     const pattern = `%${search}%`;
     where[Op.or] = [
       { title: { [Op.iLike]: pattern } },
-      // Safe: Sequelize.where + fn generate parameterized SQL
       seqWhere(fn('lower', col('player.first_name')), {
         [Op.like]: pattern.toLowerCase(),
       }),
@@ -89,7 +88,6 @@ export async function getContractById(id: string) {
 
   const enriched = enrichContract(contract);
 
-  // Fetch milestones via parameterized raw SQL
   const milestones = await sequelize.query(
     `SELECT ms.*
      FROM milestones ms
@@ -106,11 +104,6 @@ export async function getContractById(id: string) {
 // Create Contract
 // ────────────────────────────────────────────────────────────
 export async function createContract(input: CreateContractInput, createdBy: string) {
-  // Validate: if commissionPct is provided, baseSalary should also be provided for proper calculation
-  if (input.commissionPct && !input.baseSalary) {
-    throw new AppError('Base salary is required when setting commission percentage', 400);
-  }
-
   const totalCommission =
     input.commissionPct && input.baseSalary
       ? (input.baseSalary * input.commissionPct) / 100
@@ -120,6 +113,7 @@ export async function createContract(input: CreateContractInput, createdBy: stri
     playerId: input.playerId,
     clubId: input.clubId,
     category: input.category,
+    contractType: (input as any).contractType, // Pass contractType if provided
     title: input.title,
     startDate: input.startDate,
     endDate: input.endDate,
@@ -130,6 +124,11 @@ export async function createContract(input: CreateContractInput, createdBy: stri
     performanceBonus: input.performanceBonus,
     commissionPct: input.commissionPct,
     totalCommission,
+    exclusivity: input.exclusivity,
+    representationScope: input.representationScope,
+    agentName: input.agentName,
+    agentLicense: input.agentLicense,
+    notes: input.notes,
     createdBy,
   });
 
@@ -163,6 +162,65 @@ export async function deleteContract(id: string) {
   const contract = await Contract.findByPk(id);
   if (!contract) throw new AppError('Contract not found', 404);
 
+  // Prevent deletion of active/signed contracts
+  if (['Active', 'Expiring Soon'].includes(contract.status)) {
+    throw new AppError(
+      'Cannot delete an active contract. Use termination instead.',
+      400,
+    );
+  }
+
   await contract.destroy();
   return { id };
+}
+
+// ────────────────────────────────────────────────────────────
+// Terminate Contract (NEW)
+// ────────────────────────────────────────────────────────────
+export interface TerminateContractInput {
+  reason: string;
+  terminationDate?: string;   // defaults to today
+  clearanceId?: string;       // optional reference to a clearance record
+}
+
+export async function terminateContract(
+  id: string,
+  input: TerminateContractInput,
+  terminatedBy: string,
+) {
+  const contract = await Contract.findByPk(id);
+  if (!contract) throw new AppError('Contract not found', 404);
+
+  // Only active/expiring contracts can be terminated
+  const terminatable = ['Active', 'Expiring Soon', 'AwaitingPlayer', 'Signing'];
+  if (!terminatable.includes(contract.status)) {
+    throw new AppError(
+      `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(', ')} contracts can be terminated.`,
+      400,
+    );
+  }
+
+  const termDate = input.terminationDate || new Date().toISOString().split('T')[0];
+
+  // Append termination note with reason
+  const existing = contract.notes || '';
+  const timestamp = new Date().toISOString().split('T')[0];
+  const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
+
+  const updatePayload: Record<string, unknown> = {
+    status: 'Terminated',
+    notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
+    endDate: termDate, // Override end date to termination date
+  };
+
+  if (input.clearanceId) {
+    updatePayload.terminatedByClearanceId = input.clearanceId;
+  }
+
+  // Lock commission so it can't be recalculated after termination
+  updatePayload.commissionLocked = true;
+
+  await contract.update(updatePayload);
+
+  return getContractById(id);
 }
