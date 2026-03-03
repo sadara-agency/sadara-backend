@@ -90,14 +90,20 @@ export async function getTopPlayers(limit = 5) {
        c.name AS club_name,
        c.logo_url AS club_logo_url,
        rr.overall_risk,
-       (SELECT AVG(perf.average_rating)
-        FROM performances perf WHERE perf.player_id = p.id) AS avg_rating,
-       (SELECT v.trend FROM valuations v
-        WHERE v.player_id = p.id
-        ORDER BY v.valued_at DESC LIMIT 1) AS value_trend
+       perf_agg.avg_rating,
+       val_latest.trend AS value_trend
      FROM players p
      LEFT JOIN clubs c ON p.current_club_id = c.id
      LEFT JOIN risk_radars rr ON rr.player_id = p.id
+     LEFT JOIN LATERAL (
+       SELECT ROUND(AVG(perf.average_rating), 1) AS avg_rating
+       FROM performances perf WHERE perf.player_id = p.id
+     ) perf_agg ON true
+     LEFT JOIN LATERAL (
+       SELECT v.trend FROM valuations v
+       WHERE v.player_id = p.id
+       ORDER BY v.valued_at DESC LIMIT 1
+     ) val_latest ON true
      WHERE p.status = 'active'
      ORDER BY p.market_value DESC NULLS LAST
      LIMIT $1`,
@@ -242,46 +248,59 @@ export async function getRecentActivity(limit = 10) {
 
 /** Quick counters: completed gates, active referrals, watchlist, task completion rate. */
 export async function getQuickStats() {
-  const [gates, referrals, watchlist, taskCompletion] = await Promise.all([
-    sequelize.query(
-      `SELECT COUNT(*)::INT AS count FROM gates WHERE status = 'Completed'`,
-      { type: QueryTypes.SELECT },
-    ),
-    sequelize.query(
-      `SELECT COUNT(*)::INT AS count FROM referrals WHERE status IN ('Open', 'InProgress')`,
-      { type: QueryTypes.SELECT },
-    ),
-    sequelize.query(
-      `SELECT COUNT(*)::INT AS count FROM watchlists WHERE status = 'Active'`,
-      { type: QueryTypes.SELECT },
-    ),
-    sequelize.query(
-      `SELECT
-         CASE WHEN COUNT(*) = 0 THEN 0
-         ELSE ROUND(
-           COUNT(*) FILTER (WHERE status = 'Completed')::NUMERIC /
-           COUNT(*)::NUMERIC * 100
-         ) END AS completion_rate
-       FROM tasks`,
-      { type: QueryTypes.SELECT },
-    ),
-  ]);
+  // Single query instead of 4 parallel queries — all are simple COUNTs
+  const [result] = await sequelize.query<{
+    completed_gates: number;
+    active_referrals: number;
+    watchlist_count: number;
+    completion_rate: number;
+  }>(
+    `SELECT
+       (SELECT COUNT(*)::INT FROM gates WHERE status = 'Completed') AS completed_gates,
+       (SELECT COUNT(*)::INT FROM referrals WHERE status IN ('Open', 'InProgress')) AS active_referrals,
+       (SELECT COUNT(*)::INT FROM watchlists WHERE status = 'Active') AS watchlist_count,
+       (SELECT CASE WHEN COUNT(*) = 0 THEN 0
+         ELSE ROUND(COUNT(*) FILTER (WHERE status = 'Completed')::NUMERIC / COUNT(*)::NUMERIC * 100)
+       END FROM tasks) AS completion_rate`,
+    { type: QueryTypes.SELECT },
+  );
 
   return {
-    completedGates: (gates[0] as any)?.count ?? 0,
-    activeReferrals: (referrals[0] as any)?.count ?? 0,
-    watchlistCount: (watchlist[0] as any)?.count ?? 0,
-    taskCompletionRate: (taskCompletion[0] as any)?.completion_rate ?? 0,
+    completedGates: result?.completed_gates ?? 0,
+    activeReferrals: result?.active_referrals ?? 0,
+    watchlistCount: result?.watchlist_count ?? 0,
+    taskCompletionRate: result?.completion_rate ?? 0,
   };
 }
 
-/** Full dashboard — fires all queries in parallel for initial page load. */
+/**
+ * Full dashboard — fires all queries in parallel for initial page load.
+ * Uses Promise.allSettled so a single failing query doesn't crash the entire dashboard.
+ * Failed sections return safe defaults and the dashboard renders partially.
+ */
 export async function getFullDashboard() {
-  const [
-    kpis, alerts, topPlayers, contractStatus, playerDistribution,
-    recentOffers, upcomingMatches, urgentTasks, revenueChart,
-    performanceAvg, recentActivity, quickStats,
-  ] = await Promise.all([
+  const labels = [
+    'kpis', 'alerts', 'topPlayers', 'contractStatus', 'playerDistribution',
+    'recentOffers', 'upcomingMatches', 'urgentTasks', 'revenueChart',
+    'performanceAvg', 'recentActivity', 'quickStats',
+  ] as const;
+
+  const defaults: Record<string, any> = {
+    kpis: {},
+    alerts: { expiringContracts: [], overduePayments: [], injuryConflicts: [], openReferrals: [] },
+    topPlayers: [],
+    contractStatus: [],
+    playerDistribution: [],
+    recentOffers: [],
+    upcomingMatches: [],
+    urgentTasks: [],
+    revenueChart: [],
+    performanceAvg: [{}],
+    recentActivity: [],
+    quickStats: { completedGates: 0, activeReferrals: 0, watchlistCount: 0, taskCompletionRate: 0 },
+  };
+
+  const results = await Promise.allSettled([
     getKpis(),
     getAlerts(),
     getTopPlayers(),
@@ -296,9 +315,16 @@ export async function getFullDashboard() {
     getQuickStats(),
   ]);
 
-  return {
-    kpis, alerts, topPlayers, contractStatus, playerDistribution,
-    recentOffers, upcomingMatches, urgentTasks, revenueChart,
-    performanceAvg, recentActivity, quickStats,
-  };
+  const dashboard: Record<string, any> = {};
+  results.forEach((result, i) => {
+    const key = labels[i];
+    if (result.status === 'fulfilled') {
+      dashboard[key] = result.value;
+    } else {
+      console.error(`[Dashboard] ${key} query failed:`, result.reason?.message || result.reason);
+      dashboard[key] = defaults[key];
+    }
+  });
+
+  return dashboard;
 }

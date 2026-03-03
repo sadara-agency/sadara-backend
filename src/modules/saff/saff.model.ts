@@ -222,6 +222,7 @@ interface SaffTeamMapAttributes {
   teamNameEn: string;
   teamNameAr: string;
   city?: string | null;
+  logoUrl?: string | null;
   clubId?: string | null;     // Mapped Sadara Club UUID
   createdAt?: Date;
   updatedAt?: Date;
@@ -236,6 +237,7 @@ export class SaffTeamMap extends Model<SaffTeamMapAttributes, SaffTeamMapCreatio
   declare teamNameEn: string;
   declare teamNameAr: string;
   declare city: string | null;
+  declare logoUrl: string | null;
   declare clubId: string | null;
 }
 
@@ -246,6 +248,7 @@ SaffTeamMap.init({
   teamNameEn: { type: DataTypes.STRING, allowNull: false, field: 'team_name_en' },
   teamNameAr: { type: DataTypes.STRING, allowNull: false, field: 'team_name_ar' },
   city: { type: DataTypes.STRING },
+  logoUrl: { type: DataTypes.STRING(500), field: 'logo_url' },
   clubId: { type: DataTypes.UUID, field: 'club_id', references: { model: 'clubs', key: 'id' } },
 }, {
   sequelize, tableName: 'saff_team_maps', underscored: true, timestamps: true,

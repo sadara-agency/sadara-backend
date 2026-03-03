@@ -44,7 +44,11 @@ export function cacheRoute(
         ? `:u${(req as AuthRequest).user!.id}`
         : '';
 
-      cacheKey = `${prefix}${userSegment}:${req.path}:${queryString || 'default'}`;
+      const roleSegment = (req as AuthRequest).user
+        ? `:r${(req as AuthRequest).user!.role}`
+        : '';
+
+      cacheKey = `${prefix}${userSegment}${roleSegment}:${req.path}:${queryString || 'default'}`;
     }
 
     // Try to get from cache
@@ -53,7 +57,6 @@ export function cacheRoute(
 
       if (cached) {
         res.setHeader('X-Cache', 'HIT');
-        res.setHeader('X-Cache-Key', cacheKey);
         res.status(cached.statusCode).json(cached.body);
         return;
       }

@@ -38,7 +38,7 @@ export const updatePlayerSchema = createPlayerSchema.partial();
 export const playerQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.string().default('created_at'),
+  sort: z.enum(['created_at', 'updated_at', 'first_name', 'last_name', 'date_of_birth', 'position', 'nationality', 'jersey_number', 'market_value']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
   status: z.enum(['active', 'injured', 'inactive']).optional(),

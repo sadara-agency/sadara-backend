@@ -99,7 +99,45 @@ export async function createMissingTables() {
         );
     }
 
-    console.log('✅ Missing tables ensured');
+    // Add logo_url column to saff_team_maps if missing (for existing DBs)
+    await sequelize.query(
+        `DO $$ BEGIN
+            ALTER TABLE saff_team_maps ADD COLUMN logo_url VARCHAR(500);
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`
+    );
+
+    // ── Performance indexes on frequently queried foreign keys ──
+    const indexes = [
+        'CREATE INDEX IF NOT EXISTS idx_contracts_player_id ON contracts(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_contracts_club_id ON contracts(club_id)',
+        'CREATE INDEX IF NOT EXISTS idx_contracts_end_date ON contracts(end_date)',
+        'CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status)',
+        'CREATE INDEX IF NOT EXISTS idx_players_current_club_id ON players(current_club_id)',
+        'CREATE INDEX IF NOT EXISTS idx_players_status ON players(status)',
+        'CREATE INDEX IF NOT EXISTS idx_offers_player_id ON offers(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(status)',
+        'CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to)',
+        'CREATE INDEX IF NOT EXISTS idx_tasks_player_id ON tasks(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)',
+        'CREATE INDEX IF NOT EXISTS idx_matches_match_date ON matches(match_date)',
+        'CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status)',
+        'CREATE INDEX IF NOT EXISTS idx_injuries_player_id ON injuries(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_payments_player_id ON payments(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)',
+        'CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date)',
+        'CREATE INDEX IF NOT EXISTS idx_invoices_player_id ON invoices(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_documents_player_id ON documents(player_id)',
+        'CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)',
+        'CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read)',
+        'CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id)',
+    ];
+
+    for (const sql of indexes) {
+        try { await sequelize.query(sql); } catch { /* table may not exist yet */ }
+    }
+
+    console.log('✅ Missing tables & indexes ensured');
 }
 
 export async function createViews() {

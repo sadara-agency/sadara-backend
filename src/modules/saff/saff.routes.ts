@@ -39,6 +39,9 @@ router.post('/team-maps', authorize('Admin', 'Manager'), validate(mapTeamSchema)
 // ── Import to Sadara ──
 router.post('/import', authorize('Admin'), validate(importRequestSchema), asyncHandler(saffController.importToSadara));
 
+// ── Fetch Team Logos ──
+router.post('/fetch-logos', authorize('Admin', 'Manager'), asyncHandler(saffController.fetchTeamLogos));
+
 // ── Stats ──
 router.get('/stats', asyncHandler(saffController.getStats));
 

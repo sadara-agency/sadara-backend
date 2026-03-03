@@ -1,0 +1,65 @@
+// ─────────────────────────────────────────────────────────────
+// src/modules/spl/spl.controller.ts
+// ─────────────────────────────────────────────────────────────
+
+import { Response } from 'express';
+import { sendSuccess } from '../../shared/utils/apiResponse';
+import { logAudit, buildAuditContext } from '../../shared/utils/audit';
+import { AuthRequest } from '../../shared/types';
+import * as splSync from './spl.sync';
+import { seedClubExternalIds, getSyncState, updateSyncState } from './spl.service';
+import { SPL_CLUB_REGISTRY } from './spl.registry';
+
+export async function syncPlayer(req: AuthRequest, res: Response) {
+  const { splPlayerId, slug } = req.body;
+  const result = await splSync.syncPlayer(splPlayerId, slug);
+  await logAudit('CREATE', 'players', result.sadaraPlayerId || null, buildAuditContext(req.user!, req.ip),
+    `SPL sync player #${splPlayerId}: ${result.action} — ${result.playerName}`);
+  sendSuccess(res, result, `Player ${result.action}: ${result.playerName}`);
+}
+
+export async function syncTeam(req: AuthRequest, res: Response) {
+  const { splTeamId } = req.body;
+  const summary = await splSync.syncTeam(splTeamId);
+  await logAudit('CREATE', 'players', null, buildAuditContext(req.user!, req.ip),
+    `SPL team sync #${splTeamId}: ${summary.created}c ${summary.updated}u`);
+  sendSuccess(res, summary, `Synced ${summary.total} players from team ${splTeamId}`);
+}
+
+export async function syncAll(req: AuthRequest, res: Response) {
+  const state = getSyncState();
+  if (state.isRunning) {
+    sendSuccess(res, state, 'Sync already running');
+    return;
+  }
+
+  updateSyncState({ isRunning: true, lastRun: new Date() });
+  res.json({ success: true, message: 'Full SPL sync started in background.' });
+
+  splSync.syncAllTeams((name, i, total) => {
+    console.log(`[SPL] Syncing ${name} (${i + 1}/${total})...`);
+  }).then(result => {
+    updateSyncState({ isRunning: false, lastResult: result });
+    console.log(`[SPL] ✓ Complete: ${result.totalPlayers} players, ${result.teams} teams`);
+  }).catch(err => {
+    updateSyncState({ isRunning: false });
+    console.error(`[SPL] ✗ Failed: ${err.message}`);
+  });
+
+  await logAudit('CREATE', 'players', null, buildAuditContext(req.user!, req.ip), 'SPL full sync triggered (background)');
+}
+
+export async function seedClubIds(req: AuthRequest, res: Response) {
+  const result = await seedClubExternalIds();
+  await logAudit('UPDATE', 'clubs', null, buildAuditContext(req.user!, req.ip),
+    `Seeded SPL/ESPN IDs for ${result.updated} clubs`);
+  sendSuccess(res, result, `Updated ${result.updated} clubs`);
+}
+
+export async function getRegistry(_req: AuthRequest, res: Response) {
+  sendSuccess(res, { clubs: SPL_CLUB_REGISTRY, total: SPL_CLUB_REGISTRY.length });
+}
+
+export async function getStatus(_req: AuthRequest, res: Response) {
+  sendSuccess(res, getSyncState());
+}

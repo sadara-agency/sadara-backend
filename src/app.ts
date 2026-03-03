@@ -3,11 +3,12 @@ import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import fs from 'fs';
 import { env } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { apiLimiter, authLimiter } from './middleware/rateLimiter';
+import { authenticate } from './middleware/auth';
 import { setupAssociations } from './models/associations';
-import { isRedisConnected } from './config/redis';
 
 // Route imports
 import authRoutes from './modules/auth/auth.routes';
@@ -32,25 +33,32 @@ import notificationRoutes from './modules/notifications/notification.routes';
 import cronRoutes from './cron/cron.routes';
 import portalRoutes from './modules/portal/portal.routes';
 import auditRoutes from './modules/audit/audit.routes';
+import splRoutes from './modules/spl/spl.routes';
 
 
 const app = express();
 
 // ── Global Middleware ──
 app.use(helmet());
-app.use(cors({ origin: true, credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use(cors({ origin: env.cors.origin, credentials: true }));
+app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
 
 // Rate limiting
 app.use('/api/v1', apiLimiter);
-if (env.nodeEnv === 'production') {
-  app.use('/api/v1/auth', authLimiter); // Stricter limit for auth
-}
+app.use('/api/v1/auth', authLimiter);
 
-// ── Serve uploaded files ──
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+// ── Serve uploaded files (authenticated, path-traversal safe) ──
+const UPLOADS_ROOT = path.resolve(process.cwd(), 'uploads', 'documents');
+app.get('/uploads/documents/:filename', authenticate, (req, res) => {
+  const filename = path.basename(req.params.filename); // strip any traversal
+  const filePath = path.join(UPLOADS_ROOT, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: 'File not found' });
+  }
+  res.sendFile(filePath);
+});
 
 // ── Health Check ──
 app.get('/api/health', (_req, res) => {
@@ -59,8 +67,6 @@ app.get('/api/health', (_req, res) => {
     service: 'sadara-api',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
-    environment: env.nodeEnv,
-    redis: isRedisConnected() ? 'connected' : 'disconnected',
   });
 });
 
@@ -92,6 +98,7 @@ if (env.nodeEnv !== 'production') {
 }
 app.use('/api/v1/portal', portalRoutes);
 app.use('/api/v1/audit', auditRoutes);
+app.use('/api/v1/spl', splRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

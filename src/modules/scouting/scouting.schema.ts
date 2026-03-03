@@ -29,7 +29,7 @@ export const updateWatchlistStatusSchema = z.object({
 export const watchlistQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.string().default('created_at'),
+  sort: z.enum(['created_at', 'updated_at', 'prospect_name', 'priority', 'status']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
   status: z.enum(['Active', 'Shortlisted', 'Archived', 'Rejected']).optional(),

@@ -468,6 +468,8 @@ export async function generatePlayerInvite(playerId: string, generatedBy: string
   const placeholderPassword = crypto.randomBytes(32).toString('hex');
   const passwordHash = await bcrypt.hash(placeholderPassword, env.bcrypt.saltRounds);
 
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
   await User.create({
     email: player.email,
     passwordHash,
@@ -476,7 +478,7 @@ export async function generatePlayerInvite(playerId: string, generatedBy: string
       ? `${player.firstNameAr} ${player.lastNameAr}` : undefined,
     role: 'Player',
     isActive: false,
-    inviteToken: token,
+    inviteToken: hashedToken,
     inviteTokenExpiry: expiry,
     playerId: player.id,
   } as any);
@@ -497,16 +499,18 @@ export async function generatePlayerInvite(playerId: string, generatedBy: string
 // ══════════════════════════════════════════
 
 export async function completePlayerRegistration(token: string, password: string) {
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
   const user = await User.findOne({
     where: {
-      inviteToken: token,
+      inviteToken: hashedToken,
       inviteTokenExpiry: { [Op.gt]: new Date() },
     } as any,
   });
 
   if (!user) throw new AppError('Invalid or expired invite link', 400);
 
-  const hashedPassword = await bcrypt.hash(password, 12);
+  const hashedPassword = await bcrypt.hash(password, env.bcrypt.saltRounds);
 
   await (user as any).update({
     passwordHash: hashedPassword,

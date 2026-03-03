@@ -39,7 +39,7 @@ export const updateInvoiceStatusSchema = z.object({
 export const invoiceQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
-    sort: z.string().default('created_at'),
+    sort: z.enum(['created_at', 'updated_at', 'due_date', 'amount', 'total_amount', 'status']).default('created_at'),
     order: z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
     status: z.enum(paymentStatuses).optional(),
@@ -71,7 +71,7 @@ export const updatePaymentStatusSchema = z.object({
 export const paymentQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
-    sort: z.string().default('due_date'),
+    sort: z.enum(['due_date', 'created_at', 'updated_at', 'amount', 'status', 'payment_type']).default('due_date'),
     order: z.enum(['asc', 'desc']).default('asc'),
     status: z.enum(paymentStatuses).optional(),
     paymentType: z.enum(paymentTypes).optional(),
@@ -95,7 +95,7 @@ export const createLedgerEntrySchema = z.object({
 export const ledgerQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
-    sort: z.string().default('posted_at'),
+    sort: z.enum(['posted_at', 'created_at', 'amount', 'side', 'account']).default('posted_at'),
     order: z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
     side: z.enum(ledgerSides).optional(),
@@ -119,7 +119,7 @@ export const createValuationSchema = z.object({
 export const valuationQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
-    sort: z.string().default('valued_at'),
+    sort: z.enum(['valued_at', 'created_at', 'value', 'trend']).default('valued_at'),
     order: z.enum(['asc', 'desc']).default('desc'),
     playerId: z.string().uuid().optional(),
 });

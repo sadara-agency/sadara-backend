@@ -5,7 +5,12 @@
 import { DataTypes, Model, Optional } from 'sequelize';
 import { sequelize } from '../../config/database';
 
-export type ProviderName = 'Wyscout' | 'InStat' | 'StatsBomb' | 'APIFootball' | 'Sportmonks' | 'Other';
+export type ProviderName =
+  | 'Wyscout' | 'InStat' | 'StatsBomb' | 'APIFootball' | 'Sportmonks'
+  | 'SPL' | 'PulseLive' | 'ESPN'
+  | 'Other';
+
+
 
 interface EPMAttributes {
   id: string;
@@ -21,7 +26,7 @@ interface EPMAttributes {
   updatedAt?: Date;
 }
 
-interface EPMCreation extends Optional<EPMAttributes, 'id' | 'isActive' | 'createdAt' | 'updatedAt'> {}
+interface EPMCreation extends Optional<EPMAttributes, 'id' | 'isActive' | 'createdAt' | 'updatedAt'> { }
 
 export class ExternalProviderMapping extends Model<EPMAttributes, EPMCreation> implements EPMAttributes {
   declare id: string;

@@ -1,5 +1,6 @@
 import { AuditLog } from '../../modules/audit/AuditLog.model';
 import { AuditContext } from '../types';
+import { logger } from '../../config/logger';
 
 export async function logAudit(
   action: string,
@@ -23,7 +24,7 @@ export async function logAudit(
       ipAddress: context.ip || null,
     });
   } catch (err) {
-    console.error('Audit log error:', err);
+    logger.error('Audit log write failed', { action, entity, entityId, userId: context.userId, error: (err as Error).message });
   }
 }
 

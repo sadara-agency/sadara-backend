@@ -41,7 +41,7 @@ export const updateMatchStatusSchema = z.object({
 export const matchQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.string().default('match_date'),
+  sort: z.enum(['match_date', 'created_at', 'updated_at', 'status', 'competition']).default('match_date'),
   order: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
   status: z.enum(['upcoming', 'live', 'completed', 'cancelled']).optional(),

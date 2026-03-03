@@ -28,12 +28,14 @@ interface ClubAttributes {
   isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  splTeamId?: number | null;
+  espnTeamId?: number | null;
 }
 
 interface ClubCreationAttributes extends Optional<
   ClubAttributes,
   'id' | 'type' | 'createdAt' | 'updatedAt'
-> {}
+> { }
 
 export class Club extends Model<ClubAttributes, ClubCreationAttributes> implements ClubAttributes {
   declare id: string;
@@ -52,6 +54,8 @@ export class Club extends Model<ClubAttributes, ClubCreationAttributes> implemen
   declare secondaryColor: string | null;
   declare notes: string | null;
   declare isActive: boolean;
+  declare splTeamId: number | null;
+  declare espnTeamId: number | null;
 }
 
 Club.init({
@@ -110,6 +114,14 @@ Club.init({
   },
   notes: {
     type: DataTypes.TEXT,
+  },
+  splTeamId: {
+    type: DataTypes.INTEGER,
+    field: 'spl_team_id',
+  },
+  espnTeamId: {
+    type: DataTypes.INTEGER,
+    field: 'espn_team_id',
   },
   isActive: {
     type: DataTypes.BOOLEAN,

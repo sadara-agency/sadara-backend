@@ -2,7 +2,8 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import * as iconv from 'iconv-lite';
 
-const BASE_URL = 'https://www.saff.com.sa/en';
+const BASE_URL_EN = 'https://www.saff.com.sa/en';
+const BASE_URL_AR = 'https://www.saff.com.sa/ar';
 const REQUEST_DELAY = 1500; // ms between requests to be respectful
 
 // ── Types ──
@@ -27,8 +28,10 @@ export interface ScrapedFixture {
   time: string;       // HH:MM
   saffHomeTeamId: number;
   homeTeamNameEn: string;
+  homeTeamNameAr: string;
   saffAwayTeamId: number;
   awayTeamNameEn: string;
+  awayTeamNameAr: string;
   homeScore: number | null;
   awayScore: number | null;
   stadium: string;
@@ -38,6 +41,8 @@ export interface ScrapedFixture {
 export interface ScrapedTeam {
   saffTeamId: number;
   teamNameEn: string;
+  teamNameAr: string;
+  logoUrl?: string;
 }
 
 export interface ScrapeResult {
@@ -77,14 +82,14 @@ function parseScore(scoreStr: string): [number | null, number | null] {
 
 // ── Fetch page with proper encoding ──
 
-async function fetchPage(url: string): Promise<cheerio.CheerioAPI> {
+async function fetchPage(url: string, lang: 'en' | 'ar' = 'en'): Promise<cheerio.CheerioAPI> {
   const response = await axios.get(url, {
     responseType: 'arraybuffer',
     timeout: 15000,
     headers: {
       'User-Agent': 'Sadara-Sports-Platform/1.0 (data-integration)',
       'Accept': 'text/html',
-      'Accept-Language': 'en',
+      'Accept-Language': lang,
     },
   });
 
@@ -109,12 +114,57 @@ export async function scrapeChampionship(
   saffId: number,
   season: string
 ): Promise<ScrapeResult> {
-  const url = `${BASE_URL}/championship.php?id=${saffId}`;
-  const $ = await fetchPage(url);
+  const urlEn = `${BASE_URL_EN}/championship.php?id=${saffId}`;
+  const urlAr = `${BASE_URL_AR}/championship.php?id=${saffId}`;
 
-  const standings = scrapeStandings($);
-  const fixtures = scrapeFixtures($);
-  const teams = extractTeams($);
+  // Fetch both EN and AR pages in parallel for bilingual data
+  const [$en, $ar] = await Promise.all([
+    fetchPage(urlEn, 'en'),
+    fetchPage(urlAr, 'ar'),
+  ]);
+
+  // Scrape English data (primary)
+  const standingsEn = scrapeStandings($en);
+  const fixturesEn = scrapeFixtures($en);
+  const teamsEn = extractTeams($en);
+
+  // Scrape Arabic data for name merging
+  const standingsAr = scrapeStandings($ar);
+  const fixturesAr = scrapeFixtures($ar);
+  const teamsAr = extractTeams($ar);
+
+  // Build Arabic name lookup by saffTeamId
+  // Note: "teamNameEn" from the AR page actually contains the Arabic text
+  const arNameMap = new Map<number, string>();
+  standingsAr.forEach(s => arNameMap.set(s.saffTeamId, s.teamNameEn));
+  teamsAr.forEach(t => arNameMap.set(t.saffTeamId, t.teamNameEn));
+
+  // Merge Arabic names into English standings
+  const standings = standingsEn.map(s => ({
+    ...s,
+    teamNameAr: arNameMap.get(s.saffTeamId) || '',
+  }));
+
+  // Merge Arabic names into fixtures
+  const arFixtureMap = new Map<string, { home: string; away: string }>();
+  fixturesAr.forEach(f => {
+    arFixtureMap.set(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`, {
+      home: f.homeTeamNameEn,
+      away: f.awayTeamNameEn,
+    });
+  });
+
+  const fixtures = fixturesEn.map(f => ({
+    ...f,
+    homeTeamNameAr: arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)?.home || arNameMap.get(f.saffHomeTeamId) || '',
+    awayTeamNameAr: arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)?.away || arNameMap.get(f.saffAwayTeamId) || '',
+  }));
+
+  // Merge Arabic names into teams
+  const teams = teamsEn.map(t => ({
+    ...t,
+    teamNameAr: arNameMap.get(t.saffTeamId) || '',
+  }));
 
   return {
     tournamentId: saffId,
@@ -294,8 +344,10 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
             time,
             saffHomeTeamId: homeId,
             homeTeamNameEn: homeName,
+            homeTeamNameAr: '',  // filled by merge in scrapeChampionship
             saffAwayTeamId: awayId,
             awayTeamNameEn: awayName,
+            awayTeamNameAr: '',  // filled by merge in scrapeChampionship
             homeScore,
             awayScore,
             stadium,
@@ -333,7 +385,66 @@ function extractTeams($: cheerio.CheerioAPI): ScrapedTeam[] {
   return Array.from(teamMap.entries()).map(([saffTeamId, teamNameEn]) => ({
     saffTeamId,
     teamNameEn,
+    teamNameAr: '',  // filled by merge in scrapeChampionship
   }));
+}
+
+
+// ══════════════════════════════════════════
+// SCRAPE TEAM LOGO
+// ══════════════════════════════════════════
+
+export async function scrapeTeamLogo(saffTeamId: number): Promise<string | null> {
+  try {
+    const url = `${BASE_URL_EN}/team.php?id=${saffTeamId}`;
+    const $ = await fetchPage(url, 'en');
+
+    // Look for team logo image - check common patterns on SAFF team pages
+    let logoImg = $('img[src*="logo"]').first();
+    if (!logoImg.length) logoImg = $('img[src*="team"]').first();
+    if (!logoImg.length) logoImg = $('.team-logo img, .team-header img, .club-logo img, .team-img img').first();
+    // Fallback: first large image in the profile/header area
+    if (!logoImg.length) logoImg = $('img[width]').filter((_, el) => {
+      const w = parseInt($(el).attr('width') || '0', 10);
+      return w >= 50 && w <= 200;
+    }).first();
+
+    let src = logoImg.attr('src');
+    if (!src) return null;
+
+    // Make absolute URL
+    if (!src.startsWith('http')) {
+      src = `https://www.saff.com.sa${src.startsWith('/') ? '' : '/'}${src}`;
+    }
+    return src;
+  } catch {
+    return null;
+  }
+}
+
+// ── Batch scrape logos for multiple teams ──
+
+export async function scrapeTeamLogos(
+  saffTeamIds: number[],
+): Promise<Map<number, string>> {
+  const logos = new Map<number, string>();
+
+  for (let i = 0; i < saffTeamIds.length; i++) {
+    const id = saffTeamIds[i];
+    try {
+      const logo = await scrapeTeamLogo(id);
+      if (logo) logos.set(id, logo);
+    } catch {
+      // Skip failed logos silently
+    }
+
+    // Respectful delay
+    if (i < saffTeamIds.length - 1) {
+      await delay(REQUEST_DELAY);
+    }
+  }
+
+  return logos;
 }
 
 

@@ -7,7 +7,7 @@ import { parsePagination, buildMeta } from '../../shared/utils/pagination';
 import { sequelize } from '../../config/database';
 import { ExternalProviderMapping } from './externalProvider.model';
 
-// ── Computed attribute fragments (reusable) ──
+// ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
   [
     literal(`COALESCE(
@@ -24,60 +24,81 @@ const COMPUTED_ATTRIBUTES: [any, string][] = [
     literal(`EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`),
     'computed_age',
   ],
-  [
-    literal(`(
-      SELECT CASE
-        WHEN c.end_date IS NULL THEN 'Active'
-        WHEN c.end_date < CURRENT_DATE THEN 'Expired'
-        WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
-        ELSE 'Active'
-      END
-      FROM contracts c WHERE c.player_id = "Player".id
-      ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
-    )`),
-    'contract_status',
-  ],
-  [
-    literal(`(
-      SELECT c.end_date::text FROM contracts c
-      WHERE c.player_id = "Player".id
-      ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
-    )`),
-    'contract_end',
-  ],
-  [
-    literal(`(
-      SELECT c.commission_pct FROM contracts c
-      WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL
-      ORDER BY c.created_at DESC LIMIT 1
-    )`),
-    'commission_rate',
-  ],
-  [
-    literal(`(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
-    'matches',
-  ],
-  [
-    literal(`(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`),
-    'goals',
-  ],
-  [
-    literal(`(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`),
-    'assists',
-  ],
-  [
-    literal(`(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`),
-    'rating',
-  ],
-  [
-    literal(`(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`),
-    'minutes_played',
-  ],
-  [
-    literal(`(SELECT perf.average_rating FROM performances perf WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`),
-    'performance',
-  ],
 ];
+
+// ── Heavy computed attributes (correlated subqueries — only for single player detail) ──
+const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
+  ...COMPUTED_ATTRIBUTES,
+  [literal(`(SELECT CASE WHEN c.end_date IS NULL THEN 'Active' WHEN c.end_date < CURRENT_DATE THEN 'Expired' WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon' ELSE 'Active' END FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`), 'contract_status'],
+  [literal(`(SELECT c.end_date::text FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`), 'contract_end'],
+  [literal(`(SELECT c.commission_pct FROM contracts c WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL ORDER BY c.created_at DESC LIMIT 1)`), 'commission_rate'],
+  [literal(`(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`), 'matches'],
+  [literal(`(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`), 'goals'],
+  [literal(`(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`), 'assists'],
+  [literal(`(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`), 'rating'],
+  [literal(`(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`), 'minutes_played'],
+  [literal(`(SELECT perf.average_rating FROM performances perf WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`), 'performance'],
+];
+
+/**
+ * Batch-load stats for a set of player IDs in ONE query using LATERAL joins.
+ * Replaces 9 correlated subqueries × N rows with 1 aggregated query.
+ */
+async function batchLoadPlayerStats(playerIds: string[]): Promise<Map<string, Record<string, any>>> {
+  if (playerIds.length === 0) return new Map();
+
+  const rows = await sequelize.query<Record<string, any>>(
+    `SELECT
+       p.id AS player_id,
+       -- Latest contract info (1 lateral instead of 3 subqueries)
+       lc.contract_status, lc.contract_end, lc.commission_rate,
+       -- Match participation (1 lateral instead of 2 subqueries)
+       COALESCE(mp_agg.matches, 0) AS matches,
+       COALESCE(mp_agg.minutes_played, 0) AS minutes_played,
+       -- Match stats (1 lateral instead of 3 subqueries)
+       COALESCE(pms_agg.goals, 0) AS goals,
+       COALESCE(pms_agg.assists, 0) AS assists,
+       pms_agg.rating,
+       -- Latest performance
+       perf_latest.performance
+     FROM players p
+     LEFT JOIN LATERAL (
+       SELECT
+         CASE
+           WHEN c.end_date IS NULL THEN 'Active'
+           WHEN c.end_date < CURRENT_DATE THEN 'Expired'
+           WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
+           ELSE 'Active'
+         END AS contract_status,
+         c.end_date::text AS contract_end,
+         c.commission_pct AS commission_rate
+       FROM contracts c WHERE c.player_id = p.id
+       ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
+     ) lc ON true
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS matches,
+              COALESCE(SUM(mp.minutes_played), 0)::int AS minutes_played
+       FROM match_players mp WHERE mp.player_id = p.id
+     ) mp_agg ON true
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(SUM(pms.goals), 0)::int AS goals,
+              COALESCE(SUM(pms.assists), 0)::int AS assists,
+              ROUND(AVG(pms.rating) FILTER (WHERE pms.rating IS NOT NULL), 1) AS rating
+       FROM player_match_stats pms WHERE pms.player_id = p.id
+     ) pms_agg ON true
+     LEFT JOIN LATERAL (
+       SELECT perf.average_rating AS performance
+       FROM performances perf WHERE perf.player_id = p.id
+       ORDER BY perf.created_at DESC LIMIT 1
+     ) perf_latest ON true
+     WHERE p.id IN (:ids)`,
+    { replacements: { ids: playerIds }, type: QueryTypes.SELECT },
+  );
+
+  const map = new Map<string, Record<string, any>>();
+  for (const row of rows) map.set(row.player_id, row);
+  return map;
+}
 
 // ── Player sidebar counts (single query instead of 3 separate COUNT queries) ──
 interface PlayerCounts {
@@ -99,6 +120,9 @@ async function getPlayerCounts(playerId: string): Promise<PlayerCounts> {
 }
 
 // ── List Players (enriched with computed fields) ──
+// Step 1: Fetch base player data with lightweight attributes (no heavy subqueries)
+// Step 2: Batch-load stats for all returned player IDs in a single query
+// Step 3: Merge stats into player objects
 export async function listPlayers(queryParams: any) {
   const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
 
@@ -123,6 +147,7 @@ export async function listPlayers(queryParams: any) {
     ];
   }
 
+  // Step 1: Base query with only lightweight computed attributes (name, age)
   const { count, rows } = await Player.findAndCountAll({
     where,
     limit,
@@ -135,7 +160,29 @@ export async function listPlayers(queryParams: any) {
     ],
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  // Step 2: Batch-load stats for all player IDs in a single query
+  const playerIds = rows.map(r => r.id);
+  const statsMap = await batchLoadPlayerStats(playerIds);
+
+  // Step 3: Merge stats into each player's plain object
+  const data = rows.map(row => {
+    const plain = row.get({ plain: true });
+    const stats = statsMap.get(row.id) || {};
+    return {
+      ...plain,
+      contract_status: stats.contract_status ?? null,
+      contract_end: stats.contract_end ?? null,
+      commission_rate: stats.commission_rate ?? null,
+      matches: stats.matches ?? 0,
+      minutes_played: stats.minutes_played ?? 0,
+      goals: stats.goals ?? 0,
+      assists: stats.assists ?? 0,
+      rating: stats.rating ?? null,
+      performance: stats.performance ?? null,
+    };
+  });
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 // ── Get Player by ID (With Aggregates) ──
@@ -143,7 +190,7 @@ export async function getPlayerById(id: string) {
   // Run main query + sidebar counts + performance history in parallel
   const [player, counts, performanceHistory] = await Promise.all([
     Player.findByPk(id, {
-      attributes: { include: COMPUTED_ATTRIBUTES },
+      attributes: { include: DETAIL_COMPUTED_ATTRIBUTES },
       include: ['club', 'agent'],
     }),
     getPlayerCounts(id),
@@ -181,6 +228,15 @@ export async function updatePlayer(id: string, input: any) {
 }
 
 export async function deletePlayer(id: string) {
+  const [deps] = await sequelize.query<{ active_contracts: number }>(
+    `SELECT COUNT(*)::int AS active_contracts FROM contracts WHERE player_id = :id AND status = 'Active'`,
+    { replacements: { id }, type: QueryTypes.SELECT },
+  );
+
+  if (deps && deps.active_contracts > 0) {
+    throw new AppError('Cannot delete player with active contracts. Terminate or transfer contracts first.', 400);
+  }
+
   const deleted = await Player.destroy({ where: { id } });
   if (!deleted) throw new AppError('Player not found', 404);
   return { id };
