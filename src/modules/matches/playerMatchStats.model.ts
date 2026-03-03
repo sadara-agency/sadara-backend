@@ -1,5 +1,5 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../../config/database';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../../config/database";
 
 // ── Attribute Interfaces ──
 
@@ -37,13 +37,15 @@ export interface PlayerMatchStatsAttributes {
 
 interface PlayerMatchStatsCreationAttributes extends Optional<
   PlayerMatchStatsAttributes,
-  'id' | 'createdAt' | 'updatedAt'
+  "id" | "createdAt" | "updatedAt"
 > {}
 
 // ── Model Class ──
 
-export class PlayerMatchStats extends Model<PlayerMatchStatsAttributes, PlayerMatchStatsCreationAttributes>
-  implements PlayerMatchStatsAttributes {
+export class PlayerMatchStats
+  extends Model<PlayerMatchStatsAttributes, PlayerMatchStatsCreationAttributes>
+  implements PlayerMatchStatsAttributes
+{
   declare id: string;
   declare playerId: string;
   declare matchId: string;
@@ -77,58 +79,65 @@ export class PlayerMatchStats extends Model<PlayerMatchStatsAttributes, PlayerMa
 
 // ── Initialization ──
 
-PlayerMatchStats.init({
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
+PlayerMatchStats.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    playerId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "player_id",
+      references: { model: "players", key: "id" },
+      onDelete: "CASCADE",
+    },
+    matchId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "match_id",
+      references: { model: "matches", key: "id" },
+      onDelete: "CASCADE",
+    },
+    minutesPlayed: { type: DataTypes.INTEGER, field: "minutes_played" },
+    goals: { type: DataTypes.INTEGER, defaultValue: 0 },
+    assists: { type: DataTypes.INTEGER, defaultValue: 0 },
+    shotsTotal: { type: DataTypes.INTEGER, field: "shots_total" },
+    shotsOnTarget: { type: DataTypes.INTEGER, field: "shots_on_target" },
+    passesTotal: { type: DataTypes.INTEGER, field: "passes_total" },
+    passesCompleted: { type: DataTypes.INTEGER, field: "passes_completed" },
+    tacklesTotal: { type: DataTypes.INTEGER, field: "tackles_total" },
+    interceptions: { type: DataTypes.INTEGER },
+    duelsWon: { type: DataTypes.INTEGER, field: "duels_won" },
+    duelsTotal: { type: DataTypes.INTEGER, field: "duels_total" },
+    dribblesCompleted: { type: DataTypes.INTEGER, field: "dribbles_completed" },
+    dribblesAttempted: { type: DataTypes.INTEGER, field: "dribbles_attempted" },
+    foulsCommitted: { type: DataTypes.INTEGER, field: "fouls_committed" },
+    foulsDrawn: { type: DataTypes.INTEGER, field: "fouls_drawn" },
+    yellowCards: {
+      type: DataTypes.INTEGER,
+      field: "yellow_cards",
+      defaultValue: 0,
+    },
+    redCards: { type: DataTypes.INTEGER, field: "red_cards", defaultValue: 0 },
+    rating: { type: DataTypes.DECIMAL(3, 1) },
+    positionInMatch: { type: DataTypes.STRING(50), field: "position_in_match" },
+    keyPasses: { type: DataTypes.INTEGER, field: "key_passes" },
+    saves: { type: DataTypes.INTEGER },
+    cleanSheet: { type: DataTypes.BOOLEAN, field: "clean_sheet" },
+    goalsConceded: { type: DataTypes.INTEGER, field: "goals_conceded" },
+    penaltiesSaved: { type: DataTypes.INTEGER, field: "penalties_saved" },
   },
-  playerId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    field: 'player_id',
-    references: { model: 'players', key: 'id' },
-    onDelete: 'CASCADE',
+  {
+    sequelize,
+    tableName: "player_match_stats",
+    underscored: true,
+    timestamps: true,
+    indexes: [
+      { unique: true, fields: ["player_id", "match_id"] }, // one stat row per player per match
+      { fields: ["player_id"] },
+      { fields: ["match_id"] },
+    ],
   },
-  matchId: {
-    type: DataTypes.UUID,
-    allowNull: false,
-    field: 'match_id',
-    references: { model: 'matches', key: 'id' },
-    onDelete: 'CASCADE',
-  },
-  minutesPlayed: { type: DataTypes.INTEGER, field: 'minutes_played' },
-  goals: { type: DataTypes.INTEGER, defaultValue: 0 },
-  assists: { type: DataTypes.INTEGER, defaultValue: 0 },
-  shotsTotal: { type: DataTypes.INTEGER, field: 'shots_total' },
-  shotsOnTarget: { type: DataTypes.INTEGER, field: 'shots_on_target' },
-  passesTotal: { type: DataTypes.INTEGER, field: 'passes_total' },
-  passesCompleted: { type: DataTypes.INTEGER, field: 'passes_completed' },
-  tacklesTotal: { type: DataTypes.INTEGER, field: 'tackles_total' },
-  interceptions: { type: DataTypes.INTEGER },
-  duelsWon: { type: DataTypes.INTEGER, field: 'duels_won' },
-  duelsTotal: { type: DataTypes.INTEGER, field: 'duels_total' },
-  dribblesCompleted: { type: DataTypes.INTEGER, field: 'dribbles_completed' },
-  dribblesAttempted: { type: DataTypes.INTEGER, field: 'dribbles_attempted' },
-  foulsCommitted: { type: DataTypes.INTEGER, field: 'fouls_committed' },
-  foulsDrawn: { type: DataTypes.INTEGER, field: 'fouls_drawn' },
-  yellowCards: { type: DataTypes.INTEGER, field: 'yellow_cards', defaultValue: 0 },
-  redCards: { type: DataTypes.INTEGER, field: 'red_cards', defaultValue: 0 },
-  rating: { type: DataTypes.DECIMAL(3, 1) },
-  positionInMatch: { type: DataTypes.STRING(50), field: 'position_in_match' },
-  keyPasses: { type: DataTypes.INTEGER, field: 'key_passes' },
-  saves: { type: DataTypes.INTEGER },
-  cleanSheet: { type: DataTypes.BOOLEAN, field: 'clean_sheet' },
-  goalsConceded: { type: DataTypes.INTEGER, field: 'goals_conceded' },
-  penaltiesSaved: { type: DataTypes.INTEGER, field: 'penalties_saved' },
-}, {
-  sequelize,
-  tableName: 'player_match_stats',
-  underscored: true,
-  timestamps: true,
-  indexes: [
-    { unique: true, fields: ['player_id', 'match_id'] },  // one stat row per player per match
-    { fields: ['player_id'] },
-    { fields: ['match_id'] },
-  ],
-});
+);

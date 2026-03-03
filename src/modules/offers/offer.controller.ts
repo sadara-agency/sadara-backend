@@ -1,8 +1,12 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import * as offerService from './offer.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import * as offerService from "./offer.service";
 
 // ── List Offers ──
 
@@ -31,11 +35,11 @@ export async function create(req: AuthRequest, res: Response) {
   const offer = await offerService.createOffer(req.body, req.user!.id);
 
   await logAudit(
-    'CREATE',
-    'offers',
+    "CREATE",
+    "offers",
     offer.id,
     buildAuditContext(req.user!, req.ip),
-    `Created ${offer.offerType} offer for player ${offer.playerId}`
+    `Created ${offer.offerType} offer for player ${offer.playerId}`,
   );
 
   sendCreated(res, offer);
@@ -47,14 +51,14 @@ export async function update(req: AuthRequest, res: Response) {
   const offer = await offerService.updateOffer(req.params.id, req.body);
 
   await logAudit(
-    'UPDATE',
-    'offers',
+    "UPDATE",
+    "offers",
     offer.id,
     buildAuditContext(req.user!, req.ip),
-    `Updated offer ${offer.id}`
+    `Updated offer ${offer.id}`,
   );
 
-  sendSuccess(res, offer, 'Offer updated');
+  sendSuccess(res, offer, "Offer updated");
 }
 
 // ── Update Offer Status ──
@@ -63,11 +67,11 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   const offer = await offerService.updateOfferStatus(req.params.id, req.body);
 
   await logAudit(
-    'UPDATE',
-    'offers',
+    "UPDATE",
+    "offers",
     offer.id,
     buildAuditContext(req.user!, req.ip),
-    `Offer status changed to ${offer.status}`
+    `Offer status changed to ${offer.status}`,
   );
 
   sendSuccess(res, offer, `Offer status updated to ${offer.status}`);
@@ -79,20 +83,27 @@ export async function remove(req: AuthRequest, res: Response) {
   const result = await offerService.deleteOffer(req.params.id);
 
   await logAudit(
-    'DELETE',
-    'offers',
+    "DELETE",
+    "offers",
     result.id,
     buildAuditContext(req.user!, req.ip),
-    'Offer deleted'
+    "Offer deleted",
   );
 
-  sendSuccess(res, result, 'Offer deleted');
+  sendSuccess(res, result, "Offer deleted");
 }
 
-
 export async function convertToContract(req: AuthRequest, res: Response) {
-  const result = await offerService.convertOfferToContract(req.params.id, req.user!.id);
-  await logAudit('CREATE', 'contracts', result.contract.id, buildAuditContext(req.user!, req.ip),
-    `Converted offer ${req.params.id} to contract ${result.contract.id}`);
-  sendCreated(res, result, 'Offer converted to contract');
+  const result = await offerService.convertOfferToContract(
+    req.params.id,
+    req.user!.id,
+  );
+  await logAudit(
+    "CREATE",
+    "contracts",
+    result.contract.id,
+    buildAuditContext(req.user!, req.ip),
+    `Converted offer ${req.params.id} to contract ${result.contract.id}`,
+  );
+  sendCreated(res, result, "Offer converted to contract");
 }

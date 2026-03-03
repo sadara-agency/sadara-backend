@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ── Watchlist ──
 
@@ -12,7 +12,7 @@ export const createWatchlistSchema = z.object({
   currentLeague: z.string().max(255).optional(),
   source: z.string().max(255).optional(),
   videoClips: z.number().int().min(0).default(0),
-  priority: z.enum(['High', 'Medium', 'Low']).default('Medium'),
+  priority: z.enum(["High", "Medium", "Low"]).default("Medium"),
   technicalRating: z.number().int().min(1).max(10).optional(),
   physicalRating: z.number().int().min(1).max(10).optional(),
   mentalRating: z.number().int().min(1).max(10).optional(),
@@ -23,17 +23,19 @@ export const createWatchlistSchema = z.object({
 export const updateWatchlistSchema = createWatchlistSchema.partial();
 
 export const updateWatchlistStatusSchema = z.object({
-  status: z.enum(['Active', 'Shortlisted', 'Archived', 'Rejected']),
+  status: z.enum(["Active", "Shortlisted", "Archived", "Rejected"]),
 });
 
 export const watchlistQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.enum(['created_at', 'updated_at', 'prospect_name', 'priority', 'status']).default('created_at'),
-  order: z.enum(['asc', 'desc']).default('desc'),
+  sort: z
+    .enum(["created_at", "updated_at", "prospect_name", "priority", "status"])
+    .default("created_at"),
+  order: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
-  status: z.enum(['Active', 'Shortlisted', 'Archived', 'Rejected']).optional(),
-  priority: z.enum(['High', 'Medium', 'Low']).optional(),
+  status: z.enum(["Active", "Shortlisted", "Archived", "Rejected"]).optional(),
+  priority: z.enum(["High", "Medium", "Low"]).optional(),
   position: z.string().optional(),
   nationality: z.string().optional(),
 });
@@ -46,7 +48,7 @@ export const createScreeningSchema = z.object({
 });
 
 export const updateScreeningSchema = z.object({
-  identityCheck: z.enum(['Verified', 'Pending', 'Failed']).optional(),
+  identityCheck: z.enum(["Verified", "Pending", "Failed"]).optional(),
   passportVerified: z.boolean().optional(),
   ageVerified: z.boolean().optional(),
   fitAssessment: z.string().optional(),
@@ -65,17 +67,21 @@ export const markPackReadySchema = z.object({
 export const createDecisionSchema = z.object({
   screeningCaseId: z.string().uuid(),
   committeeName: z.string().min(1).max(255),
-  decision: z.enum(['Approved', 'Rejected', 'Deferred']),
-  decisionScope: z.enum(['Full', 'Transfer-Only']).default('Full'),
+  decision: z.enum(["Approved", "Rejected", "Deferred"]),
+  decisionScope: z.enum(["Full", "Transfer-Only"]).default("Full"),
   decisionDate: z.string().optional(),
   votesFor: z.number().int().min(0).default(0),
   votesAgainst: z.number().int().min(0).default(0),
   votesAbstain: z.number().int().min(0).default(0),
-  voteDetails: z.array(z.object({
-    member: z.string(),
-    vote: z.enum(['Approve', 'Reject', 'Abstain']),
-    comment: z.string().optional(),
-  })).optional(),
+  voteDetails: z
+    .array(
+      z.object({
+        member: z.string(),
+        vote: z.enum(["Approve", "Reject", "Abstain"]),
+        comment: z.string().optional(),
+      }),
+    )
+    .optional(),
   rationale: z.string().optional(),
   conditions: z.string().optional(),
   dissentingOpinion: z.string().optional(),

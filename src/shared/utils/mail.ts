@@ -1,14 +1,13 @@
-
-import nodemailer from 'nodemailer';
-import { env } from '../../config/env';
+import nodemailer from "nodemailer";
+import { env } from "../../config/env";
 
 function escapeHtml(str: string): string {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -22,7 +21,7 @@ function getTransporter(): nodemailer.Transporter | null {
 
   // If SMTP is not configured, return null (will fall back to console)
   if (!env.smtp.host || !env.smtp.user) {
-    console.warn('⚠️  SMTP not configured — emails will be logged to console');
+    console.warn("⚠️  SMTP not configured — emails will be logged to console");
     return null;
   }
 
@@ -45,10 +44,11 @@ function getTransporter(): nodemailer.Transporter | null {
   });
 
   // Verify connection on first use
-  _transporter.verify()
-    .then(() => console.log('✅ SMTP connection verified'))
+  _transporter
+    .verify()
+    .then(() => console.log("✅ SMTP connection verified"))
     .catch((err) => {
-      console.error('❌ SMTP connection failed:', err.message);
+      console.error("❌ SMTP connection failed:", err.message);
       _transporter = null;
     });
 
@@ -71,12 +71,12 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
 
   if (!transporter) {
     // Fallback: log to console in dev mode
-    console.log('═══════════════════════════════════════════════');
-    console.log('📧 EMAIL (SMTP not configured — logged to console)');
+    console.log("═══════════════════════════════════════════════");
+    console.log("📧 EMAIL (SMTP not configured — logged to console)");
     console.log(`   To:      ${options.to}`);
     console.log(`   Subject: ${options.subject}`);
     if (options.text) console.log(`   Body:    ${options.text}`);
-    console.log('═══════════════════════════════════════════════');
+    console.log("═══════════════════════════════════════════════");
     return false;
   }
 
@@ -89,7 +89,9 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
       text: options.text,
     });
 
-    console.log(`✅ Email sent to ${options.to} — messageId: ${info.messageId}`);
+    console.log(
+      `✅ Email sent to ${options.to} — messageId: ${info.messageId}`,
+    );
     return true;
   } catch (err: any) {
     console.error(`❌ Failed to send email to ${options.to}:`, err.message);
@@ -185,7 +187,7 @@ export async function sendPasswordResetEmail(
       إعادة تعيين كلمة المرور
     </h1>
     <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
-      مرحباً ${escapeHtml(userName || '')}، تم طلب إعادة تعيين كلمة المرور لحسابك في صدارة.
+      مرحباً ${escapeHtml(userName || "")}، تم طلب إعادة تعيين كلمة المرور لحسابك في صدارة.
     </p>
 
     <!-- Button -->
@@ -215,7 +217,7 @@ export async function sendPasswordResetEmail(
 
   return sendMail({
     to,
-    subject: '🔑 إعادة تعيين كلمة المرور — صدارة',
+    subject: "🔑 إعادة تعيين كلمة المرور — صدارة",
     html: wrapInTemplate(content),
     text: `مرحباً ${userName}، تم طلب إعادة تعيين كلمة المرور. اضغط على هذا الرابط: ${resetUrl} — صالح لمدة ساعة واحدة.`,
   });
@@ -251,7 +253,7 @@ export async function sendWelcomeEmail(
 
   return sendMail({
     to,
-    subject: '👋 مرحباً بك في صدارة — Sadara',
+    subject: "👋 مرحباً بك في صدارة — Sadara",
     html: wrapInTemplate(content),
     text: `مرحباً ${userName}، تم تسجيل حسابك في صدارة بنجاح. سيقوم المسؤول بتفعيل حسابك قريباً.`,
   });
@@ -289,7 +291,7 @@ export async function sendPasswordChangedEmail(
 
   return sendMail({
     to,
-    subject: '✅ تم تغيير كلمة المرور — صدارة',
+    subject: "✅ تم تغيير كلمة المرور — صدارة",
     html: wrapInTemplate(content),
     text: `مرحباً ${userName}، تم تغيير كلمة المرور بنجاح. إذا لم تقم بهذا التغيير، تواصل مع المسؤول فوراً.`,
   });

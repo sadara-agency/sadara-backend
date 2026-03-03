@@ -1,29 +1,43 @@
-import { Op, Sequelize, QueryTypes, fn, col, where as seqWhere } from 'sequelize';
-import { Contract } from './contract.model';
-import { Player } from '../players/player.model';
-import { Club } from '../clubs/club.model';
-import { User } from '../Users/user.model';
-import { sequelize } from '../../config/database';
-import { AppError } from '../../middleware/errorHandler';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { CreateContractInput, UpdateContractInput } from './contract.schema';
+import {
+  Op,
+  Sequelize,
+  QueryTypes,
+  fn,
+  col,
+  where as seqWhere,
+} from "sequelize";
+import { Contract } from "./contract.model";
+import { Player } from "../players/player.model";
+import { Club } from "../clubs/club.model";
+import { User } from "../Users/user.model";
+import { sequelize } from "../../config/database";
+import { AppError } from "../../middleware/errorHandler";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { CreateContractInput, UpdateContractInput } from "./contract.schema";
 
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
   {
     model: Player,
-    as: 'player',
-    attributes: ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'photoUrl'],
+    as: "player",
+    attributes: [
+      "id",
+      "firstName",
+      "lastName",
+      "firstNameAr",
+      "lastNameAr",
+      "photoUrl",
+    ],
   },
   {
     model: Club,
-    as: 'club',
-    attributes: ['id', 'name', 'nameAr', 'logoUrl'],
+    as: "club",
+    attributes: ["id", "name", "nameAr", "logoUrl"],
   },
   {
     model: User,
-    as: 'creator',
-    attributes: ['id', 'fullName', 'fullNameAr'],
+    as: "creator",
+    attributes: ["id", "fullName", "fullNameAr"],
   },
 ];
 
@@ -41,12 +55,17 @@ function enrichContract(contract: any) {
 // List Contracts
 // ────────────────────────────────────────────────────────────
 export async function listContracts(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "createdAt",
+  );
 
   const where: any = {};
 
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.category) where.category = queryParams.category;
+  if (queryParams.playerContractType)
+    where.playerContractType = queryParams.playerContractType;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   if (queryParams.clubId) where.clubId = queryParams.clubId;
 
@@ -54,10 +73,10 @@ export async function listContracts(queryParams: any) {
     const pattern = `%${search}%`;
     where[Op.or] = [
       { title: { [Op.iLike]: pattern } },
-      seqWhere(fn('lower', col('player.first_name')), {
+      seqWhere(fn("lower", col("player.first_name")), {
         [Op.like]: pattern.toLowerCase(),
       }),
-      seqWhere(fn('lower', col('player.last_name')), {
+      seqWhere(fn("lower", col("player.last_name")), {
         [Op.like]: pattern.toLowerCase(),
       }),
     ];
@@ -84,7 +103,7 @@ export async function getContractById(id: string) {
     include: CONTRACT_INCLUDES,
   });
 
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   const enriched = enrichContract(contract);
 
@@ -103,17 +122,30 @@ export async function getContractById(id: string) {
 // ────────────────────────────────────────────────────────────
 // Create Contract
 // ────────────────────────────────────────────────────────────
-export async function createContract(input: CreateContractInput, createdBy: string) {
+export async function createContract(
+  input: CreateContractInput,
+  createdBy: string,
+) {
   const totalCommission =
     input.commissionPct && input.baseSalary
       ? (input.baseSalary * input.commissionPct) / 100
       : 0;
 
+  // Auto-fill playerContractType from player profile if not provided
+  let playerContractType = (input as any).playerContractType || null;
+  if (!playerContractType) {
+    const player = await Player.findByPk(input.playerId, {
+      attributes: ["contractType"],
+    });
+    if (player) playerContractType = (player as any).contractType || null;
+  }
+
   const contract = await Contract.create({
     playerId: input.playerId,
     clubId: input.clubId,
     category: input.category,
-    contractType: (input as any).contractType, // Pass contractType if provided
+    contractType: (input as any).contractType,
+    playerContractType,
     title: input.title,
     startDate: input.startDate,
     endDate: input.endDate,
@@ -140,7 +172,7 @@ export async function createContract(input: CreateContractInput, createdBy: stri
 // ────────────────────────────────────────────────────────────
 export async function updateContract(id: string, input: UpdateContractInput) {
   const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   const newPct = input.commissionPct ?? contract.commissionPct;
   const newSalary = input.baseSalary ?? contract.baseSalary;
@@ -148,7 +180,9 @@ export async function updateContract(id: string, input: UpdateContractInput) {
 
   if (input.commissionPct !== undefined || input.baseSalary !== undefined) {
     updateData.totalCommission =
-      newPct && newSalary ? (Number(newSalary) * Number(newPct)) / 100 : contract.totalCommission;
+      newPct && newSalary
+        ? (Number(newSalary) * Number(newPct)) / 100
+        : contract.totalCommission;
   }
 
   await contract.update(updateData);
@@ -160,12 +194,12 @@ export async function updateContract(id: string, input: UpdateContractInput) {
 // ────────────────────────────────────────────────────────────
 export async function deleteContract(id: string) {
   const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   // Prevent deletion of active/signed contracts
-  if (['Active', 'Expiring Soon'].includes(contract.status)) {
+  if (["Active", "Expiring Soon"].includes(contract.status)) {
     throw new AppError(
-      'Cannot delete an active contract. Use termination instead.',
+      "Cannot delete an active contract. Use termination instead.",
       400,
     );
   }
@@ -179,8 +213,8 @@ export async function deleteContract(id: string) {
 // ────────────────────────────────────────────────────────────
 export interface TerminateContractInput {
   reason: string;
-  terminationDate?: string;   // defaults to today
-  clearanceId?: string;       // optional reference to a clearance record
+  terminationDate?: string; // defaults to today
+  clearanceId?: string; // optional reference to a clearance record
 }
 
 export async function terminateContract(
@@ -189,26 +223,27 @@ export async function terminateContract(
   terminatedBy: string,
 ) {
   const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   // Only active/expiring contracts can be terminated
-  const terminatable = ['Active', 'Expiring Soon', 'AwaitingPlayer', 'Signing'];
+  const terminatable = ["Active", "Expiring Soon", "AwaitingPlayer", "Signing"];
   if (!terminatable.includes(contract.status)) {
     throw new AppError(
-      `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(', ')} contracts can be terminated.`,
+      `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(", ")} contracts can be terminated.`,
       400,
     );
   }
 
-  const termDate = input.terminationDate || new Date().toISOString().split('T')[0];
+  const termDate =
+    input.terminationDate || new Date().toISOString().split("T")[0];
 
   // Append termination note with reason
-  const existing = contract.notes || '';
-  const timestamp = new Date().toISOString().split('T')[0];
+  const existing = contract.notes || "";
+  const timestamp = new Date().toISOString().split("T")[0];
   const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
 
   const updatePayload: Record<string, unknown> = {
-    status: 'Terminated',
+    status: "Terminated",
     notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
     endDate: termDate, // Override end date to termination date
   };

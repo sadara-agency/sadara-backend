@@ -1,13 +1,11 @@
-
-import { QueryTypes } from 'sequelize';
-import { sequelize } from '../../config/database';
+import { QueryTypes } from "sequelize";
+import { sequelize } from "../../config/database";
 
 /** Main KPI counters from the dashboard view. */
 export async function getKpis() {
-  const result = await sequelize.query(
-    'SELECT * FROM vw_dashboard_kpis',
-    { type: QueryTypes.SELECT },
-  );
+  const result = await sequelize.query("SELECT * FROM vw_dashboard_kpis", {
+    type: QueryTypes.SELECT,
+  });
   return result[0] ?? {};
 }
 
@@ -15,13 +13,13 @@ export async function getKpis() {
 export async function getAlerts() {
   const [expiringContracts, overduePayments, injuryConflicts, openReferrals] =
     await Promise.all([
-      sequelize.query('SELECT * FROM vw_expiring_contracts LIMIT 5', {
+      sequelize.query("SELECT * FROM vw_expiring_contracts LIMIT 5", {
         type: QueryTypes.SELECT,
       }),
-      sequelize.query('SELECT * FROM vw_overdue_payments LIMIT 5', {
+      sequelize.query("SELECT * FROM vw_overdue_payments LIMIT 5", {
         type: QueryTypes.SELECT,
       }),
-      sequelize.query('SELECT * FROM vw_injury_match_conflicts LIMIT 5', {
+      sequelize.query("SELECT * FROM vw_injury_match_conflicts LIMIT 5", {
         type: QueryTypes.SELECT,
       }),
       sequelize.query(
@@ -280,14 +278,28 @@ export async function getQuickStats() {
  */
 export async function getFullDashboard() {
   const labels = [
-    'kpis', 'alerts', 'topPlayers', 'contractStatus', 'playerDistribution',
-    'recentOffers', 'upcomingMatches', 'urgentTasks', 'revenueChart',
-    'performanceAvg', 'recentActivity', 'quickStats',
+    "kpis",
+    "alerts",
+    "topPlayers",
+    "contractStatus",
+    "playerDistribution",
+    "recentOffers",
+    "upcomingMatches",
+    "urgentTasks",
+    "revenueChart",
+    "performanceAvg",
+    "recentActivity",
+    "quickStats",
   ] as const;
 
   const defaults: Record<string, any> = {
     kpis: {},
-    alerts: { expiringContracts: [], overduePayments: [], injuryConflicts: [], openReferrals: [] },
+    alerts: {
+      expiringContracts: [],
+      overduePayments: [],
+      injuryConflicts: [],
+      openReferrals: [],
+    },
     topPlayers: [],
     contractStatus: [],
     playerDistribution: [],
@@ -297,7 +309,12 @@ export async function getFullDashboard() {
     revenueChart: [],
     performanceAvg: [{}],
     recentActivity: [],
-    quickStats: { completedGates: 0, activeReferrals: 0, watchlistCount: 0, taskCompletionRate: 0 },
+    quickStats: {
+      completedGates: 0,
+      activeReferrals: 0,
+      watchlistCount: 0,
+      taskCompletionRate: 0,
+    },
   };
 
   const results = await Promise.allSettled([
@@ -318,10 +335,13 @@ export async function getFullDashboard() {
   const dashboard: Record<string, any> = {};
   results.forEach((result, i) => {
     const key = labels[i];
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       dashboard[key] = result.value;
     } else {
-      console.error(`[Dashboard] ${key} query failed:`, result.reason?.message || result.reason);
+      console.error(
+        `[Dashboard] ${key} query failed:`,
+        result.reason?.message || result.reason,
+      );
       dashboard[key] = defaults[key];
     }
   });

@@ -6,14 +6,14 @@
 // to avoid shadowing Sequelize ORM getters. This is the same
 // fix applied to Player and other models.
 // ─────────────────────────────────────────────────────────────
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../../config/database';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../../config/database";
 
 interface ClubAttributes {
   id: string;
   name: string;
   nameAr?: string | null;
-  type: 'Club' | 'Sponsor';
+  type: "Club" | "Sponsor";
   country?: string | null;
   city?: string | null;
   league?: string | null;
@@ -34,14 +34,17 @@ interface ClubAttributes {
 
 interface ClubCreationAttributes extends Optional<
   ClubAttributes,
-  'id' | 'type' | 'createdAt' | 'updatedAt'
-> { }
+  "id" | "type" | "createdAt" | "updatedAt"
+> {}
 
-export class Club extends Model<ClubAttributes, ClubCreationAttributes> implements ClubAttributes {
+export class Club
+  extends Model<ClubAttributes, ClubCreationAttributes>
+  implements ClubAttributes
+{
   declare id: string;
   declare name: string;
   declare nameAr: string | null;
-  declare type: 'Club' | 'Sponsor';
+  declare type: "Club" | "Sponsor";
   declare country: string | null;
   declare city: string | null;
   declare league: string | null;
@@ -58,79 +61,82 @@ export class Club extends Model<ClubAttributes, ClubCreationAttributes> implemen
   declare espnTeamId: number | null;
 }
 
-Club.init({
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
+Club.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    name: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    nameAr: {
+      type: DataTypes.STRING,
+      field: "name_ar",
+    },
+    type: {
+      type: DataTypes.ENUM("Club", "Sponsor"),
+      defaultValue: "Club",
+      allowNull: false,
+    },
+    country: {
+      type: DataTypes.STRING,
+    },
+    city: {
+      type: DataTypes.STRING,
+    },
+    league: {
+      type: DataTypes.STRING,
+    },
+    logoUrl: {
+      type: DataTypes.STRING,
+      field: "logo_url",
+    },
+    website: {
+      type: DataTypes.STRING,
+    },
+    foundedYear: {
+      type: DataTypes.INTEGER,
+      field: "founded_year",
+    },
+    stadium: {
+      type: DataTypes.STRING,
+    },
+    stadiumCapacity: {
+      type: DataTypes.INTEGER,
+      field: "stadium_capacity",
+    },
+    primaryColor: {
+      type: DataTypes.STRING,
+      field: "primary_color",
+    },
+    secondaryColor: {
+      type: DataTypes.STRING,
+      field: "secondary_color",
+    },
+    notes: {
+      type: DataTypes.TEXT,
+    },
+    splTeamId: {
+      type: DataTypes.INTEGER,
+      field: "spl_team_id",
+    },
+    espnTeamId: {
+      type: DataTypes.INTEGER,
+      field: "espn_team_id",
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+      field: "is_active",
+    },
   },
-  name: {
-    type: DataTypes.STRING,
-    allowNull: false,
+  {
+    sequelize,
+    tableName: "clubs",
+    underscored: true,
+    timestamps: true,
   },
-  nameAr: {
-    type: DataTypes.STRING,
-    field: 'name_ar',
-  },
-  type: {
-    type: DataTypes.ENUM('Club', 'Sponsor'),
-    defaultValue: 'Club',
-    allowNull: false,
-  },
-  country: {
-    type: DataTypes.STRING,
-  },
-  city: {
-    type: DataTypes.STRING,
-  },
-  league: {
-    type: DataTypes.STRING,
-  },
-  logoUrl: {
-    type: DataTypes.STRING,
-    field: 'logo_url',
-  },
-  website: {
-    type: DataTypes.STRING,
-  },
-  foundedYear: {
-    type: DataTypes.INTEGER,
-    field: 'founded_year',
-  },
-  stadium: {
-    type: DataTypes.STRING,
-  },
-  stadiumCapacity: {
-    type: DataTypes.INTEGER,
-    field: 'stadium_capacity',
-  },
-  primaryColor: {
-    type: DataTypes.STRING,
-    field: 'primary_color',
-  },
-  secondaryColor: {
-    type: DataTypes.STRING,
-    field: 'secondary_color',
-  },
-  notes: {
-    type: DataTypes.TEXT,
-  },
-  splTeamId: {
-    type: DataTypes.INTEGER,
-    field: 'spl_team_id',
-  },
-  espnTeamId: {
-    type: DataTypes.INTEGER,
-    field: 'espn_team_id',
-  },
-  isActive: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-    field: 'is_active',
-  },
-}, {
-  sequelize,
-  tableName: 'clubs',
-  underscored: true,
-  timestamps: true,
-});
+);

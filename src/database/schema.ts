@@ -2,11 +2,11 @@
 // src/database/seed/schema.ts
 // Creates tables & views not managed by Sequelize models.
 // ─────────────────────────────────────────────────────────────
-import { sequelize } from './../config/database';
-import { QueryTypes } from 'sequelize';
+import { sequelize } from "./../config/database";
+import { QueryTypes } from "sequelize";
 
 export async function createMissingTables() {
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE TABLE IF NOT EXISTS performances (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -20,7 +20,7 @@ export async function createMissingTables() {
         );
     `);
 
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE TABLE IF NOT EXISTS risk_radars (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -32,25 +32,27 @@ export async function createMissingTables() {
         );
     `);
 
-    await sequelize.query(`
+  await sequelize.query(`
         DO $$ BEGIN
             CREATE TYPE match_player_availability AS ENUM ('starter','bench','injured','suspended','not_called');
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;
     `);
 
-    // Migrate old match_players schema if needed
-    const oldCheck = await sequelize.query(
-        `SELECT column_name FROM information_schema.columns 
+  // Migrate old match_players schema if needed
+  const oldCheck = await sequelize.query(
+    `SELECT column_name FROM information_schema.columns 
          WHERE table_name = 'match_players' AND column_name = 'started'`,
-        { type: QueryTypes.SELECT }
+    { type: QueryTypes.SELECT },
+  );
+  if (oldCheck.length > 0) {
+    await sequelize.query("DROP TABLE IF EXISTS match_players CASCADE");
+    console.log(
+      "   ↻ Dropped old match_players table (migrating to new schema)",
     );
-    if (oldCheck.length > 0) {
-        await sequelize.query('DROP TABLE IF EXISTS match_players CASCADE');
-        console.log('   ↻ Dropped old match_players table (migrating to new schema)');
-    }
+  }
 
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE TABLE IF NOT EXISTS match_players (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
@@ -64,7 +66,7 @@ export async function createMissingTables() {
         );
     `);
 
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE TABLE IF NOT EXISTS player_match_stats (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -87,75 +89,126 @@ export async function createMissingTables() {
         );
     `);
 
-    // Add new columns to player_match_stats if they don't exist (for existing DBs)
-    const newCols = ['key_passes', 'saves', 'clean_sheet', 'goals_conceded', 'penalties_saved'];
-    for (const col of newCols) {
-        const colType = col === 'clean_sheet' ? 'BOOLEAN' : 'INT';
-        await sequelize.query(
-            `DO $$ BEGIN
+  // Add new columns to player_match_stats if they don't exist (for existing DBs)
+  const newCols = [
+    "key_passes",
+    "saves",
+    "clean_sheet",
+    "goals_conceded",
+    "penalties_saved",
+  ];
+  for (const col of newCols) {
+    const colType = col === "clean_sheet" ? "BOOLEAN" : "INT";
+    await sequelize.query(
+      `DO $$ BEGIN
                 ALTER TABLE player_match_stats ADD COLUMN ${col} ${colType};
             EXCEPTION WHEN duplicate_column THEN NULL;
-            END $$;`
-        );
-    }
+            END $$;`,
+    );
+  }
 
-    // Add logo_url column to saff_team_maps if missing (for existing DBs)
-    await sequelize.query(
-        `DO $$ BEGIN
+  // Add player_contract_type to contracts if missing (PRD requirement)
+  await sequelize.query(
+    `DO $$ BEGIN
+            CREATE TYPE player_contract_type_enum AS ENUM ('Professional','Amateur','Youth');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;`,
+  );
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE contracts ADD COLUMN player_contract_type player_contract_type_enum;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+
+  // Add account lockout columns to users if missing (security requirement)
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE users ADD COLUMN failed_login_attempts INT DEFAULT 0;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE users ADD COLUMN locked_until TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+
+  // Add logo_url column to saff_team_maps if missing (for existing DBs)
+  await sequelize.query(
+    `DO $$ BEGIN
             ALTER TABLE saff_team_maps ADD COLUMN logo_url VARCHAR(500);
         EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;`
-    );
+        END $$;`,
+  );
 
-    // Add spl_team_id and espn_team_id to clubs if missing (for existing DBs)
-    await sequelize.query(
-        `DO $$ BEGIN
+  // Add spl_team_id and espn_team_id to clubs if missing (for existing DBs)
+  await sequelize.query(
+    `DO $$ BEGIN
             ALTER TABLE clubs ADD COLUMN spl_team_id INTEGER;
         EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;`
-    );
-    await sequelize.query(
-        `DO $$ BEGIN
+        END $$;`,
+  );
+  await sequelize.query(
+    `DO $$ BEGIN
             ALTER TABLE clubs ADD COLUMN espn_team_id INTEGER;
         EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;`
-    );
+        END $$;`,
+  );
 
-    // ── Performance indexes on frequently queried foreign keys ──
-    const indexes = [
-        'CREATE INDEX IF NOT EXISTS idx_contracts_player_id ON contracts(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_contracts_club_id ON contracts(club_id)',
-        'CREATE INDEX IF NOT EXISTS idx_contracts_end_date ON contracts(end_date)',
-        'CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status)',
-        'CREATE INDEX IF NOT EXISTS idx_players_current_club_id ON players(current_club_id)',
-        'CREATE INDEX IF NOT EXISTS idx_players_status ON players(status)',
-        'CREATE INDEX IF NOT EXISTS idx_offers_player_id ON offers(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(status)',
-        'CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to)',
-        'CREATE INDEX IF NOT EXISTS idx_tasks_player_id ON tasks(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)',
-        'CREATE INDEX IF NOT EXISTS idx_matches_match_date ON matches(match_date)',
-        'CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status)',
-        'CREATE INDEX IF NOT EXISTS idx_injuries_player_id ON injuries(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_payments_player_id ON payments(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)',
-        'CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date)',
-        'CREATE INDEX IF NOT EXISTS idx_invoices_player_id ON invoices(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_documents_player_id ON documents(player_id)',
-        'CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)',
-        'CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read)',
-        'CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id)',
-    ];
+  // ── App Settings (key-value store for runtime config) ──
+  await sequelize.query(`
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key VARCHAR(255) PRIMARY KEY,
+            value JSONB NOT NULL DEFAULT '{}',
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+    `);
 
-    for (const sql of indexes) {
-        try { await sequelize.query(sql); } catch { /* table may not exist yet */ }
+  // ── Performance indexes on frequently queried foreign keys ──
+  const indexes = [
+    "CREATE INDEX IF NOT EXISTS idx_contracts_player_id ON contracts(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_contracts_club_id ON contracts(club_id)",
+    "CREATE INDEX IF NOT EXISTS idx_contracts_end_date ON contracts(end_date)",
+    "CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status)",
+    "CREATE INDEX IF NOT EXISTS idx_players_current_club_id ON players(current_club_id)",
+    "CREATE INDEX IF NOT EXISTS idx_players_status ON players(status)",
+    "CREATE INDEX IF NOT EXISTS idx_offers_player_id ON offers(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_offers_status ON offers(status)",
+    "CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON tasks(assigned_to)",
+    "CREATE INDEX IF NOT EXISTS idx_tasks_player_id ON tasks(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)",
+    "CREATE INDEX IF NOT EXISTS idx_matches_match_date ON matches(match_date)",
+    "CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status)",
+    "CREATE INDEX IF NOT EXISTS idx_injuries_player_id ON injuries(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_player_id ON payments(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)",
+    "CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date)",
+    "CREATE INDEX IF NOT EXISTS idx_invoices_player_id ON invoices(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_documents_player_id ON documents(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id)",
+    "CREATE INDEX IF NOT EXISTS idx_contracts_player_contract_type ON contracts(player_contract_type)",
+    "CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner_type, owner_id)",
+    "CREATE INDEX IF NOT EXISTS idx_player_club_history_player ON player_club_history(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_technical_reports_player ON technical_reports(player_id)",
+  ];
+
+  for (const sql of indexes) {
+    try {
+      await sequelize.query(sql);
+    } catch {
+      /* table may not exist yet */
     }
+  }
 
-    console.log('✅ Missing tables & indexes ensured');
+  console.log("✅ Missing tables & indexes ensured");
 }
 
 export async function createViews() {
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE OR REPLACE VIEW vw_dashboard_kpis AS
         SELECT
             (SELECT COUNT(*)::INT FROM players WHERE status = 'active') AS total_active_players,
@@ -170,7 +223,7 @@ export async function createViews() {
             (SELECT COUNT(*)::INT FROM tasks WHERE status != 'Completed') AS open_tasks;
     `);
 
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE OR REPLACE VIEW vw_expiring_contracts AS
         SELECT c.id AS contract_id,
                p.first_name || ' ' || p.last_name AS player_name,
@@ -180,7 +233,7 @@ export async function createViews() {
         ORDER BY days_remaining ASC;
     `);
 
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE OR REPLACE VIEW vw_overdue_payments AS
         SELECT py.id AS payment_id,
                p.first_name || ' ' || p.last_name AS player_name,
@@ -190,7 +243,7 @@ export async function createViews() {
         WHERE py.status = 'Overdue' ORDER BY days_overdue DESC;
     `);
 
-    await sequelize.query(`
+  await sequelize.query(`
         CREATE OR REPLACE VIEW vw_injury_match_conflicts AS
         SELECT p.first_name || ' ' || p.last_name AS player_name,
                mp.availability AS status_in_match, m.id AS match_id,
@@ -203,5 +256,5 @@ export async function createViews() {
         WHERE mp.availability = 'injured' AND m.status = 'upcoming';
     `);
 
-    console.log('✅ Dashboard views created/updated');
+  console.log("✅ Dashboard views created/updated");
 }

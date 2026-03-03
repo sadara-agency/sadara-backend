@@ -2,11 +2,15 @@
 // src/modules/training/training.controller.ts
 // ═══════════════════════════════════════════════════════════════
 
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import * as svc from './training.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import * as svc from "./training.service";
 
 // ══════════════════════════════════════════
 // COURSES (Admin)
@@ -24,19 +28,31 @@ export async function getCourse(req: AuthRequest, res: Response) {
 
 export async function createCourse(req: AuthRequest, res: Response) {
   const course = await svc.createCourse(req.body, req.user!.id);
-  await logAudit('CREATE', 'training', course.id, buildAuditContext(req.user!, req.ip), `Created course: ${course.title}`);
+  await logAudit(
+    "CREATE",
+    "training",
+    course.id,
+    buildAuditContext(req.user!, req.ip),
+    `Created course: ${course.title}`,
+  );
   sendCreated(res, course);
 }
 
 export async function updateCourse(req: AuthRequest, res: Response) {
   const course = await svc.updateCourse(req.params.id, req.body);
-  sendSuccess(res, course, 'Course updated');
+  sendSuccess(res, course, "Course updated");
 }
 
 export async function deleteCourse(req: AuthRequest, res: Response) {
   const result = await svc.deleteCourse(req.params.id);
-  await logAudit('DELETE', 'training', result.id, buildAuditContext(req.user!, req.ip), 'Course deleted');
-  sendSuccess(res, result, 'Course deleted');
+  await logAudit(
+    "DELETE",
+    "training",
+    result.id,
+    buildAuditContext(req.user!, req.ip),
+    "Course deleted",
+  );
+  sendSuccess(res, result, "Course deleted");
 }
 
 // ══════════════════════════════════════════
@@ -44,20 +60,32 @@ export async function deleteCourse(req: AuthRequest, res: Response) {
 // ══════════════════════════════════════════
 
 export async function enrollPlayers(req: AuthRequest, res: Response) {
-  const course = await svc.enrollPlayers(req.params.id, req.body.playerIds, req.user!.id);
-  await logAudit('UPDATE', 'training', req.params.id, buildAuditContext(req.user!, req.ip),
-    `Enrolled ${req.body.playerIds.length} players`);
-  sendSuccess(res, course, 'Players enrolled');
+  const course = await svc.enrollPlayers(
+    req.params.id,
+    req.body.playerIds,
+    req.user!.id,
+  );
+  await logAudit(
+    "UPDATE",
+    "training",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    `Enrolled ${req.body.playerIds.length} players`,
+  );
+  sendSuccess(res, course, "Players enrolled");
 }
 
 export async function updateEnrollment(req: AuthRequest, res: Response) {
-  const enrollment = await svc.updateEnrollment(req.params.enrollmentId, req.body);
-  sendSuccess(res, enrollment, 'Enrollment updated');
+  const enrollment = await svc.updateEnrollment(
+    req.params.enrollmentId,
+    req.body,
+  );
+  sendSuccess(res, enrollment, "Enrollment updated");
 }
 
 export async function removeEnrollment(req: AuthRequest, res: Response) {
   const result = await svc.removeEnrollment(req.params.enrollmentId);
-  sendSuccess(res, result, 'Enrollment removed');
+  sendSuccess(res, result, "Enrollment removed");
 }
 
 export async function playerEnrollments(req: AuthRequest, res: Response) {
@@ -81,7 +109,7 @@ export async function completionMatrix(req: AuthRequest, res: Response) {
 export async function myEnrollments(req: AuthRequest, res: Response) {
   const playerId = (req.user as any)?.playerId;
   if (!playerId) {
-    sendSuccess(res, [], 'Player account not linked');
+    sendSuccess(res, [], "Player account not linked");
     return;
   }
   const enrollments = await svc.getMyEnrollments(playerId);
@@ -91,7 +119,9 @@ export async function myEnrollments(req: AuthRequest, res: Response) {
 export async function trackMyActivity(req: AuthRequest, res: Response) {
   const playerId = (req.user as any)?.playerId;
   if (!playerId) {
-    res.status(403).json({ success: false, message: 'Player account not linked' });
+    res
+      .status(403)
+      .json({ success: false, message: "Player account not linked" });
     return;
   }
 
@@ -102,18 +132,22 @@ export async function trackMyActivity(req: AuthRequest, res: Response) {
   );
 
   await logAudit(
-    'UPDATE', 'training', req.params.enrollmentId,
+    "UPDATE",
+    "training",
+    req.params.enrollmentId,
     buildAuditContext(req.user!, req.ip),
     `Player tracked: ${req.body.action} on enrollment ${req.params.enrollmentId}`,
   );
 
-  sendSuccess(res, result, 'Activity tracked');
+  sendSuccess(res, result, "Activity tracked");
 }
 
 export async function updateMyProgress(req: AuthRequest, res: Response) {
   const playerId = (req.user as any)?.playerId;
   if (!playerId) {
-    res.status(403).json({ success: false, message: 'Player account not linked' });
+    res
+      .status(403)
+      .json({ success: false, message: "Player account not linked" });
     return;
   }
 
@@ -123,5 +157,5 @@ export async function updateMyProgress(req: AuthRequest, res: Response) {
     req.body,
   );
 
-  sendSuccess(res, enrollment, 'Progress updated');
+  sendSuccess(res, enrollment, "Progress updated");
 }

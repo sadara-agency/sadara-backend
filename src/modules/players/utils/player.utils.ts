@@ -11,15 +11,17 @@ import {
   RawPlayerStatsRow,
   DerivedContractInfo,
   ContractStatusLabel,
-} from './player.types';
+} from "./player.types";
 
 // ── Constants ──
 export const CONTRACT_EXPIRY_WARNING_MONTHS = 6;
 
 // ── deriveContractInfo ──
-export function deriveContractInfo(contract?: RawContractRow | null): DerivedContractInfo {
+export function deriveContractInfo(
+  contract?: RawContractRow | null,
+): DerivedContractInfo {
   if (!contract) {
-    return { contractStatus: 'Expired', contractEnd: null, commissionRate: 0 };
+    return { contractStatus: "Expired", contractEnd: null, commissionRate: 0 };
   }
 
   const endDate = new Date(contract.endDate);
@@ -30,17 +32,17 @@ export function deriveContractInfo(contract?: RawContractRow | null): DerivedCon
 
   let contractStatus: ContractStatusLabel;
   if (monthsLeft <= 0) {
-    contractStatus = 'Expired';
+    contractStatus = "Expired";
   } else if (monthsLeft <= CONTRACT_EXPIRY_WARNING_MONTHS) {
-    contractStatus = 'Expiring Soon';
+    contractStatus = "Expiring Soon";
   } else {
-    contractStatus = 'Active';
+    contractStatus = "Active";
   }
 
   return {
     contractStatus,
     contractEnd: contract.endDate,
-    commissionRate: Number(contract.commissionPct) || 0,  // FIX: was agencyCommissionPercent
+    commissionRate: Number(contract.commissionPct) || 0, // FIX: was agencyCommissionPercent
   };
 }
 
@@ -57,16 +59,15 @@ export function calculatePerformance(input: PerformanceInput): number {
 
   if (matches <= 0) return 0;
 
-  const raw =
-    (goals / matches) * 30 +
-    (assists / matches) * 20 +
-    avgRating * 5;
+  const raw = (goals / matches) * 30 + (assists / matches) * 20 + avgRating * 5;
 
   return Math.min(100, Math.max(0, Math.round(raw)));
 }
 
 // ── buildContractMap ──
-export function buildContractMap(rows: RawContractRow[]): Map<string, RawContractRow> {
+export function buildContractMap(
+  rows: RawContractRow[],
+): Map<string, RawContractRow> {
   const map = new Map<string, RawContractRow>();
 
   for (const contract of rows) {
@@ -89,7 +90,9 @@ export function buildInjuryMap(rows: RawInjuryCountRow[]): Map<string, number> {
 }
 
 // ── buildStatsMap ──
-export function buildStatsMap(rows: RawPlayerStatsRow[]): Map<string, RawPlayerStatsRow> {
+export function buildStatsMap(
+  rows: RawPlayerStatsRow[],
+): Map<string, RawPlayerStatsRow> {
   const map = new Map<string, RawPlayerStatsRow>();
   for (const row of rows) {
     map.set(row.playerId, row);

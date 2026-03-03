@@ -11,32 +11,45 @@
 //   total_commission)
 // - Consistent with player/user/task/contract service patterns
 // ─────────────────────────────────────────────────────────────
-import { Op, Sequelize, QueryTypes } from 'sequelize';
-import { Club } from './club.model';
-import { sequelize } from '../../config/database';
-import { AppError } from '../../middleware/errorHandler';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { CreateClubInput, UpdateClubInput, CreateContactInput, UpdateContactInput } from './club.schema';
+import { Op, Sequelize, QueryTypes } from "sequelize";
+import { Club } from "./club.model";
+import { sequelize } from "../../config/database";
+import { AppError } from "../../middleware/errorHandler";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import {
+  CreateClubInput,
+  UpdateClubInput,
+  CreateContactInput,
+  UpdateContactInput,
+} from "./club.schema";
 
 // ── Shared computed attributes (subqueries) ──
 // These are appended to every Club query so the frontend
 // always gets enriched data without extra round-trips.
 const CLUB_AGGREGATES = [
   [
-    Sequelize.literal(`(SELECT COUNT(*) FROM players p WHERE p.current_club_id = "Club".id)`),
-    'player_count',
+    Sequelize.literal(
+      `(SELECT COUNT(*) FROM players p WHERE p.current_club_id = "Club".id)`,
+    ),
+    "player_count",
   ],
   [
-    Sequelize.literal(`(SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = "Club".id AND ct.status = 'Active')`),
-    'active_contracts',
+    Sequelize.literal(
+      `(SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = "Club".id AND ct.status = 'Active')`,
+    ),
+    "active_contracts",
   ],
   [
-    Sequelize.literal(`(SELECT COALESCE(SUM(ct.base_salary), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`),
-    'total_contract_value',
+    Sequelize.literal(
+      `(SELECT COALESCE(SUM(ct.base_salary), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
+    ),
+    "total_contract_value",
   ],
   [
-    Sequelize.literal(`(SELECT COALESCE(SUM(ct.total_commission), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`),
-    'total_commission',
+    Sequelize.literal(
+      `(SELECT COALESCE(SUM(ct.total_commission), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
+    ),
+    "total_commission",
   ],
 ] as [ReturnType<typeof Sequelize.literal>, string][];
 
@@ -44,13 +57,17 @@ const CLUB_AGGREGATES = [
 // List Clubs (with aggregated financial data)
 // ────────────────────────────────────────────────────────────
 export async function listClubs(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'name');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "name",
+  );
 
   const where: any = { isActive: true };
 
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.league) where.league = queryParams.league;
-  if (queryParams.country) where.country = { [Op.iLike]: `%${queryParams.country}%` };
+  if (queryParams.country)
+    where.country = { [Op.iLike]: `%${queryParams.country}%` };
 
   if (search) {
     const pattern = `%${search}%`;
@@ -84,7 +101,7 @@ export async function getClubById(id: string) {
     },
   });
 
-  if (!club) throw new AppError('Club not found', 404);
+  if (!club) throw new AppError("Club not found", 404);
 
   // Fetch related entities in parallel
   // These use raw SQL because Contact/Player/Contract models
@@ -156,7 +173,7 @@ export async function createClub(input: CreateClubInput) {
 // ────────────────────────────────────────────────────────────
 export async function updateClub(id: string, input: UpdateClubInput) {
   const club = await Club.findByPk(id);
-  if (!club) throw new AppError('Club not found', 404);
+  if (!club) throw new AppError("Club not found", 404);
   return await club.update(input as any);
 }
 
@@ -165,7 +182,7 @@ export async function updateClub(id: string, input: UpdateClubInput) {
 // ────────────────────────────────────────────────────────────
 export async function deleteClub(id: string) {
   const club = await Club.findByPk(id);
-  if (!club) throw new AppError('Club not found', 404);
+  if (!club) throw new AppError("Club not found", 404);
 
   const txn = await sequelize.transaction();
   try {
@@ -176,16 +193,40 @@ export async function deleteClub(id: string) {
     );
 
     // Null out FK references in matches, players, contracts
-    await sequelize.query(`UPDATE matches SET home_club_id = NULL WHERE home_club_id = :id`, { replacements: { id }, transaction: txn });
-    await sequelize.query(`UPDATE matches SET away_club_id = NULL WHERE away_club_id = :id`, { replacements: { id }, transaction: txn });
-    await sequelize.query(`UPDATE players SET current_club_id = NULL WHERE current_club_id = :id`, { replacements: { id }, transaction: txn });
-    await sequelize.query(`UPDATE contracts SET club_id = NULL WHERE club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(
+      `UPDATE matches SET home_club_id = NULL WHERE home_club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE matches SET away_club_id = NULL WHERE away_club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE players SET current_club_id = NULL WHERE current_club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE contracts SET club_id = NULL WHERE club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
 
     // Null out SAFF FK references
-    await sequelize.query(`UPDATE saff_standings SET club_id = NULL WHERE club_id = :id`, { replacements: { id }, transaction: txn });
-    await sequelize.query(`UPDATE saff_fixtures SET home_club_id = NULL WHERE home_club_id = :id`, { replacements: { id }, transaction: txn });
-    await sequelize.query(`UPDATE saff_fixtures SET away_club_id = NULL WHERE away_club_id = :id`, { replacements: { id }, transaction: txn });
-    await sequelize.query(`UPDATE saff_team_maps SET club_id = NULL WHERE club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(
+      `UPDATE saff_standings SET club_id = NULL WHERE club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE saff_fixtures SET home_club_id = NULL WHERE home_club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE saff_fixtures SET away_club_id = NULL WHERE away_club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE saff_team_maps SET club_id = NULL WHERE club_id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
 
     await txn.commit();
     return { id };
@@ -211,16 +252,40 @@ export async function deleteClubs(ids: string[]) {
     const affectedCount = (meta as any)?.rowCount ?? 0;
 
     // Null out FK references in matches, players, contracts
-    await sequelize.query(`UPDATE matches SET home_club_id = NULL WHERE home_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
-    await sequelize.query(`UPDATE matches SET away_club_id = NULL WHERE away_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
-    await sequelize.query(`UPDATE players SET current_club_id = NULL WHERE current_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
-    await sequelize.query(`UPDATE contracts SET club_id = NULL WHERE club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(
+      `UPDATE matches SET home_club_id = NULL WHERE home_club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE matches SET away_club_id = NULL WHERE away_club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE players SET current_club_id = NULL WHERE current_club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE contracts SET club_id = NULL WHERE club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
 
     // Null out SAFF FK references
-    await sequelize.query(`UPDATE saff_standings SET club_id = NULL WHERE club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
-    await sequelize.query(`UPDATE saff_fixtures SET home_club_id = NULL WHERE home_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
-    await sequelize.query(`UPDATE saff_fixtures SET away_club_id = NULL WHERE away_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
-    await sequelize.query(`UPDATE saff_team_maps SET club_id = NULL WHERE club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(
+      `UPDATE saff_standings SET club_id = NULL WHERE club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE saff_fixtures SET home_club_id = NULL WHERE home_club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE saff_fixtures SET away_club_id = NULL WHERE away_club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
+    await sequelize.query(
+      `UPDATE saff_team_maps SET club_id = NULL WHERE club_id IN (:ids)`,
+      { replacements: { ids }, transaction: txn },
+    );
 
     await txn.commit();
     return { count: affectedCount };
@@ -235,7 +300,7 @@ export async function deleteClubs(ids: string[]) {
 // ────────────────────────────────────────────────────────────
 export async function updateClubLogo(id: string, logoUrl: string) {
   const club = await Club.findByPk(id);
-  if (!club) throw new AppError('Club not found', 404);
+  if (!club) throw new AppError("Club not found", 404);
   return await club.update({ logoUrl });
 }
 
@@ -244,7 +309,7 @@ export async function updateClubLogo(id: string, logoUrl: string) {
 // ────────────────────────────────────────────────────────────
 export async function createContact(clubId: string, input: CreateContactInput) {
   const club = await Club.findByPk(clubId);
-  if (!club) throw new AppError('Club not found', 404);
+  if (!club) throw new AppError("Club not found", 404);
 
   const results = await sequelize.query(
     `INSERT INTO contacts (id, name, name_ar, role, email, phone, is_primary, club_id, created_at, updated_at)
@@ -269,26 +334,49 @@ export async function createContact(clubId: string, input: CreateContactInput) {
 // ────────────────────────────────────────────────────────────
 // Update Contact (raw SQL)
 // ────────────────────────────────────────────────────────────
-export async function updateContact(contactId: string, clubId: string, input: UpdateContactInput) {
+export async function updateContact(
+  contactId: string,
+  clubId: string,
+  input: UpdateContactInput,
+) {
   const fields: string[] = [];
   const replacements: Record<string, any> = { contactId, clubId };
 
-  if (input.name !== undefined) { fields.push('name = :name'); replacements.name = input.name; }
-  if (input.name_ar !== undefined) { fields.push('name_ar = :name_ar'); replacements.name_ar = input.name_ar; }
-  if (input.role !== undefined) { fields.push('role = :role'); replacements.role = input.role; }
-  if (input.email !== undefined) { fields.push('email = :email'); replacements.email = input.email || null; }
-  if (input.phone !== undefined) { fields.push('phone = :phone'); replacements.phone = input.phone || null; }
-  if (input.is_primary !== undefined) { fields.push('is_primary = :is_primary'); replacements.is_primary = input.is_primary; }
+  if (input.name !== undefined) {
+    fields.push("name = :name");
+    replacements.name = input.name;
+  }
+  if (input.name_ar !== undefined) {
+    fields.push("name_ar = :name_ar");
+    replacements.name_ar = input.name_ar;
+  }
+  if (input.role !== undefined) {
+    fields.push("role = :role");
+    replacements.role = input.role;
+  }
+  if (input.email !== undefined) {
+    fields.push("email = :email");
+    replacements.email = input.email || null;
+  }
+  if (input.phone !== undefined) {
+    fields.push("phone = :phone");
+    replacements.phone = input.phone || null;
+  }
+  if (input.is_primary !== undefined) {
+    fields.push("is_primary = :is_primary");
+    replacements.is_primary = input.is_primary;
+  }
 
-  if (fields.length === 0) throw new AppError('No fields to update', 400);
-  fields.push('updated_at = NOW()');
+  if (fields.length === 0) throw new AppError("No fields to update", 400);
+  fields.push("updated_at = NOW()");
 
   const [, metadata] = await sequelize.query(
-    `UPDATE contacts SET ${fields.join(', ')} WHERE id = :contactId AND club_id = :clubId`,
+    `UPDATE contacts SET ${fields.join(", ")} WHERE id = :contactId AND club_id = :clubId`,
     { replacements },
   );
 
-  if ((metadata as any)?.rowCount === 0) throw new AppError('Contact not found', 404);
+  if ((metadata as any)?.rowCount === 0)
+    throw new AppError("Contact not found", 404);
 
   const updated = await sequelize.query(
     `SELECT id, name, name_ar, role, email, phone, is_primary FROM contacts WHERE id = :contactId`,
@@ -305,6 +393,7 @@ export async function deleteContact(contactId: string, clubId: string) {
     `DELETE FROM contacts WHERE id = :contactId AND club_id = :clubId`,
     { replacements: { contactId, clubId } },
   );
-  if ((metadata as any)?.rowCount === 0) throw new AppError('Contact not found', 404);
+  if ((metadata as any)?.rowCount === 0)
+    throw new AppError("Contact not found", 404);
   return { id: contactId };
 }

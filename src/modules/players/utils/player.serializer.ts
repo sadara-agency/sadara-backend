@@ -15,8 +15,8 @@ import {
   RawContractRow,
   RawPlayerStatsRow,
   EnrichedPlayerListItem,
-} from './player.types';
-import { deriveContractInfo, calculatePerformance } from './player.utils';
+} from "./player.types";
+import { deriveContractInfo, calculatePerformance } from "./player.utils";
 
 export interface EnrichmentMaps {
   contractMap: Map<string, RawContractRow>;
@@ -42,7 +42,12 @@ function computeAge(dob: string | null): number {
 /**
  * Generate 2-character initials from Arabic or English name.
  */
-function getInitials(firstNameAr: string | null, lastNameAr: string | null, firstName: string, lastName: string): string {
+function getInitials(
+  firstNameAr: string | null,
+  lastNameAr: string | null,
+  firstName: string,
+  lastName: string,
+): string {
   if (firstNameAr && lastNameAr) {
     return `${firstNameAr.charAt(0)}${lastNameAr.charAt(0)}`;
   }
@@ -60,14 +65,20 @@ export function toPlayerListItem(
   const p = plainPlayer;
   const contract = maps.contractMap.get(p.id);
   const stats = maps.statsMap.get(p.id);
-  const { contractStatus, contractEnd, commissionRate } = deriveContractInfo(contract);
+  const { contractStatus, contractEnd, commissionRate } =
+    deriveContractInfo(contract);
 
   const matches = Number(stats?.matches) || 0;
   const goals = Number(stats?.goals) || 0;
   const assists = Number(stats?.assists) || 0;
   const avgRating = Number(stats?.avgRating) || 0;
 
-  const performance = calculatePerformance({ matches, goals, assists, avgRating });
+  const performance = calculatePerformance({
+    matches,
+    goals,
+    assists,
+    avgRating,
+  });
 
   return {
     id: p.id,
@@ -76,12 +87,14 @@ export function toPlayerListItem(
     firstNameAr: p.firstNameAr,
     lastNameAr: p.lastNameAr,
     fullName: `${p.firstName} ${p.lastName}`,
-    fullNameAr: p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null,
+    fullNameAr:
+      p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null,
 
     // ── Flat convenience fields for the frontend ──
-    name: p.firstNameAr && p.lastNameAr
-      ? `${p.firstNameAr} ${p.lastNameAr}`
-      : `${p.firstName} ${p.lastName}`,
+    name:
+      p.firstNameAr && p.lastNameAr
+        ? `${p.firstNameAr} ${p.lastNameAr}`
+        : `${p.firstName} ${p.lastName}`,
     initials: getInitials(p.firstNameAr, p.lastNameAr, p.firstName, p.lastName),
     age: computeAge(p.dateOfBirth),
 
@@ -99,7 +112,7 @@ export function toPlayerListItem(
 
     // ── Club: nested object + flat string ──
     club: p.club ? p.club.nameAr || p.club.name : null,
-    clubData: p.club,  // rich object for detail pages
+    clubData: p.club, // rich object for detail pages
 
     // ── Agent: nested object + flat string ──
     agent: p.agent ? p.agent.fullNameAr || p.agent.fullName : null,

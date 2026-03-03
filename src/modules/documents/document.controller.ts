@@ -1,9 +1,13 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import { AppError } from '../../middleware/errorHandler';
-import * as svc from './document.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { AppError } from "../../middleware/errorHandler";
+import * as svc from "./document.service";
 
 // ── List ──
 
@@ -22,20 +26,20 @@ export async function getById(req: AuthRequest, res: Response) {
 
 export async function upload(req: AuthRequest, res: Response) {
   if (!req.file) {
-    throw new AppError('No file uploaded', 400);
+    throw new AppError("No file uploaded", 400);
   }
 
   const file = req.file;
   const body = req.body;
 
   // Build the public URL for the file
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
   const fileUrl = `${baseUrl}/uploads/documents/${file.filename}`;
 
   const input = {
     name: body.name || file.originalname,
-    type: body.type || 'Other',
-    status: body.status || 'Active',
+    type: body.type || "Other",
+    status: body.status || "Active",
     fileUrl,
     fileSize: file.size,
     mimeType: file.mimetype,
@@ -43,16 +47,22 @@ export async function upload(req: AuthRequest, res: Response) {
     contractId: body.contractId || null,
     issueDate: body.issueDate || null,
     expiryDate: body.expiryDate || null,
-    tags: body.tags ? (typeof body.tags === 'string' ? JSON.parse(body.tags) : body.tags) : [],
+    tags: body.tags
+      ? typeof body.tags === "string"
+        ? JSON.parse(body.tags)
+        : body.tags
+      : [],
     notes: body.notes || null,
   };
 
   const doc = await svc.createDocument(input, req.user!.id);
 
   await logAudit(
-    'CREATE', 'documents', doc!.id,
+    "CREATE",
+    "documents",
+    doc!.id,
     buildAuditContext(req.user!, req.ip),
-    `Uploaded: ${doc!.name} (${file.originalname}, ${(file.size / 1024).toFixed(0)} KB)`
+    `Uploaded: ${doc!.name} (${file.originalname}, ${(file.size / 1024).toFixed(0)} KB)`,
   );
 
   sendCreated(res, doc);
@@ -64,9 +74,11 @@ export async function create(req: AuthRequest, res: Response) {
   const doc = await svc.createDocument(req.body, req.user!.id);
 
   await logAudit(
-    'CREATE', 'documents', doc!.id,
+    "CREATE",
+    "documents",
+    doc!.id,
     buildAuditContext(req.user!, req.ip),
-    `Created: ${doc!.name}`
+    `Created: ${doc!.name}`,
   );
 
   sendCreated(res, doc);
@@ -78,12 +90,14 @@ export async function update(req: AuthRequest, res: Response) {
   const doc = await svc.updateDocument(req.params.id, req.body);
 
   await logAudit(
-    'UPDATE', 'documents', doc!.id,
+    "UPDATE",
+    "documents",
+    doc!.id,
     buildAuditContext(req.user!, req.ip),
-    `Updated: ${doc!.name}`
+    `Updated: ${doc!.name}`,
   );
 
-  sendSuccess(res, doc, 'Document updated');
+  sendSuccess(res, doc, "Document updated");
 }
 
 // ── Delete ──
@@ -92,10 +106,12 @@ export async function remove(req: AuthRequest, res: Response) {
   const r = await svc.deleteDocument(req.params.id);
 
   await logAudit(
-    'DELETE', 'documents', r.id,
+    "DELETE",
+    "documents",
+    r.id,
     buildAuditContext(req.user!, req.ip),
-    'Document deleted'
+    "Document deleted",
   );
 
-  sendSuccess(res, r, 'Document deleted');
+  sendSuccess(res, r, "Document deleted");
 }

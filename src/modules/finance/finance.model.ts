@@ -1,12 +1,12 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../../config/database';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../../config/database";
 
 // ── Enum Types ──
 
-export type PaymentStatus = 'Paid' | 'Expected' | 'Overdue' | 'Cancelled';
-export type PaymentType = 'Commission' | 'Sponsorship' | 'Bonus';
-export type ValuationTrend = 'up' | 'down' | 'stable';
-export type LedgerSide = 'Debit' | 'Credit';
+export type PaymentStatus = "Paid" | "Expected" | "Overdue" | "Cancelled";
+export type PaymentType = "Commission" | "Sponsorship" | "Bonus";
+export type ValuationTrend = "up" | "down" | "stable";
+export type LedgerSide = "Debit" | "Credit";
 
 // ══════════════════════════════════════════
 // INVOICE
@@ -34,9 +34,21 @@ export interface InvoiceAttributes {
   updatedAt?: Date;
 }
 
-interface InvoiceCreation extends Optional<InvoiceAttributes, 'id' | 'invoiceNumber' | 'taxAmount' | 'currency' | 'status' | 'createdAt' | 'updatedAt'> {}
+interface InvoiceCreation extends Optional<
+  InvoiceAttributes,
+  | "id"
+  | "invoiceNumber"
+  | "taxAmount"
+  | "currency"
+  | "status"
+  | "createdAt"
+  | "updatedAt"
+> {}
 
-export class Invoice extends Model<InvoiceAttributes, InvoiceCreation> implements InvoiceAttributes {
+export class Invoice
+  extends Model<InvoiceAttributes, InvoiceCreation>
+  implements InvoiceAttributes
+{
   declare id: string;
   declare invoiceNumber: string;
   declare contractId: string | null;
@@ -58,25 +70,53 @@ export class Invoice extends Model<InvoiceAttributes, InvoiceCreation> implement
   declare updatedAt: Date;
 }
 
-Invoice.init({
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  invoiceNumber: { type: DataTypes.STRING(50), unique: true, allowNull: false, field: 'invoice_number' },
-  contractId: { type: DataTypes.UUID, field: 'contract_id' },
-  playerId: { type: DataTypes.UUID, field: 'player_id' },
-  clubId: { type: DataTypes.UUID, field: 'club_id' },
-  amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
-  taxAmount: { type: DataTypes.DECIMAL(15, 2), defaultValue: 0, field: 'tax_amount' },
-  totalAmount: { type: DataTypes.DECIMAL(15, 2), allowNull: false, field: 'total_amount' },
-  currency: { type: DataTypes.STRING(3), defaultValue: 'SAR' },
-  status: { type: DataTypes.ENUM('Paid', 'Expected', 'Overdue', 'Cancelled'), defaultValue: 'Expected' },
-  issueDate: { type: DataTypes.DATEONLY, allowNull: false, defaultValue: DataTypes.NOW, field: 'issue_date' },
-  dueDate: { type: DataTypes.DATEONLY, allowNull: false, field: 'due_date' },
-  paidDate: { type: DataTypes.DATEONLY, field: 'paid_date' },
-  description: { type: DataTypes.TEXT },
-  lineItems: { type: DataTypes.JSONB, defaultValue: [], field: 'line_items' },
-  documentUrl: { type: DataTypes.TEXT, field: 'document_url' },
-  createdBy: { type: DataTypes.UUID, field: 'created_by' },
-}, { sequelize, tableName: 'invoices', underscored: true, timestamps: true });
+Invoice.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    invoiceNumber: {
+      type: DataTypes.STRING(50),
+      unique: true,
+      allowNull: false,
+      field: "invoice_number",
+    },
+    contractId: { type: DataTypes.UUID, field: "contract_id" },
+    playerId: { type: DataTypes.UUID, field: "player_id" },
+    clubId: { type: DataTypes.UUID, field: "club_id" },
+    amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    taxAmount: {
+      type: DataTypes.DECIMAL(15, 2),
+      defaultValue: 0,
+      field: "tax_amount",
+    },
+    totalAmount: {
+      type: DataTypes.DECIMAL(15, 2),
+      allowNull: false,
+      field: "total_amount",
+    },
+    currency: { type: DataTypes.STRING(3), defaultValue: "SAR" },
+    status: {
+      type: DataTypes.ENUM("Paid", "Expected", "Overdue", "Cancelled"),
+      defaultValue: "Expected",
+    },
+    issueDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: "issue_date",
+    },
+    dueDate: { type: DataTypes.DATEONLY, allowNull: false, field: "due_date" },
+    paidDate: { type: DataTypes.DATEONLY, field: "paid_date" },
+    description: { type: DataTypes.TEXT },
+    lineItems: { type: DataTypes.JSONB, defaultValue: [], field: "line_items" },
+    documentUrl: { type: DataTypes.TEXT, field: "document_url" },
+    createdBy: { type: DataTypes.UUID, field: "created_by" },
+  },
+  { sequelize, tableName: "invoices", underscored: true, timestamps: true },
+);
 
 // ══════════════════════════════════════════
 // PAYMENT
@@ -100,9 +140,15 @@ export interface PaymentAttributes {
   updatedAt?: Date;
 }
 
-interface PaymentCreation extends Optional<PaymentAttributes, 'id' | 'currency' | 'status' | 'createdAt' | 'updatedAt'> {}
+interface PaymentCreation extends Optional<
+  PaymentAttributes,
+  "id" | "currency" | "status" | "createdAt" | "updatedAt"
+> {}
 
-export class Payment extends Model<PaymentAttributes, PaymentCreation> implements PaymentAttributes {
+export class Payment
+  extends Model<PaymentAttributes, PaymentCreation>
+  implements PaymentAttributes
+{
   declare id: string;
   declare invoiceId: string | null;
   declare milestoneId: string | null;
@@ -120,21 +166,36 @@ export class Payment extends Model<PaymentAttributes, PaymentCreation> implement
   declare updatedAt: Date;
 }
 
-Payment.init({
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  invoiceId: { type: DataTypes.UUID, field: 'invoice_id' },
-  milestoneId: { type: DataTypes.UUID, field: 'milestone_id' },
-  playerId: { type: DataTypes.UUID, field: 'player_id' },
-  amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
-  currency: { type: DataTypes.STRING(3), defaultValue: 'SAR' },
-  paymentType: { type: DataTypes.ENUM('Commission', 'Sponsorship', 'Bonus'), allowNull: false, defaultValue: 'Commission', field: 'payment_type' },
-  status: { type: DataTypes.ENUM('Paid', 'Expected', 'Overdue', 'Cancelled'), defaultValue: 'Expected' },
-  dueDate: { type: DataTypes.DATEONLY, allowNull: false, field: 'due_date' },
-  paidDate: { type: DataTypes.DATEONLY, field: 'paid_date' },
-  reference: { type: DataTypes.STRING(255) },
-  payer: { type: DataTypes.STRING(255) },
-  notes: { type: DataTypes.TEXT },
-}, { sequelize, tableName: 'payments', underscored: true, timestamps: true });
+Payment.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    invoiceId: { type: DataTypes.UUID, field: "invoice_id" },
+    milestoneId: { type: DataTypes.UUID, field: "milestone_id" },
+    playerId: { type: DataTypes.UUID, field: "player_id" },
+    amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    currency: { type: DataTypes.STRING(3), defaultValue: "SAR" },
+    paymentType: {
+      type: DataTypes.ENUM("Commission", "Sponsorship", "Bonus"),
+      allowNull: false,
+      defaultValue: "Commission",
+      field: "payment_type",
+    },
+    status: {
+      type: DataTypes.ENUM("Paid", "Expected", "Overdue", "Cancelled"),
+      defaultValue: "Expected",
+    },
+    dueDate: { type: DataTypes.DATEONLY, allowNull: false, field: "due_date" },
+    paidDate: { type: DataTypes.DATEONLY, field: "paid_date" },
+    reference: { type: DataTypes.STRING(255) },
+    payer: { type: DataTypes.STRING(255) },
+    notes: { type: DataTypes.TEXT },
+  },
+  { sequelize, tableName: "payments", underscored: true, timestamps: true },
+);
 
 // ══════════════════════════════════════════
 // LEDGER ENTRY (double-entry)
@@ -155,9 +216,15 @@ export interface LedgerAttributes {
   createdBy?: string | null;
 }
 
-interface LedgerCreation extends Optional<LedgerAttributes, 'id' | 'transactionId' | 'currency'> {}
+interface LedgerCreation extends Optional<
+  LedgerAttributes,
+  "id" | "transactionId" | "currency"
+> {}
 
-export class LedgerEntry extends Model<LedgerAttributes, LedgerCreation> implements LedgerAttributes {
+export class LedgerEntry
+  extends Model<LedgerAttributes, LedgerCreation>
+  implements LedgerAttributes
+{
   declare id: string;
   declare transactionId: string;
   declare side: LedgerSide;
@@ -172,20 +239,40 @@ export class LedgerEntry extends Model<LedgerAttributes, LedgerCreation> impleme
   declare createdBy: string | null;
 }
 
-LedgerEntry.init({
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  transactionId: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, field: 'transaction_id' },
-  side: { type: DataTypes.ENUM('Debit', 'Credit'), allowNull: false },
-  account: { type: DataTypes.STRING(255), allowNull: false },
-  amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
-  currency: { type: DataTypes.STRING(3), defaultValue: 'SAR' },
-  description: { type: DataTypes.TEXT },
-  referenceType: { type: DataTypes.STRING(100), field: 'reference_type' },
-  referenceId: { type: DataTypes.UUID, field: 'reference_id' },
-  playerId: { type: DataTypes.UUID, field: 'player_id' },
-  postedAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW, field: 'posted_at' },
-  createdBy: { type: DataTypes.UUID, field: 'created_by' },
-}, { sequelize, tableName: 'ledger_entries', underscored: true, timestamps: false });
+LedgerEntry.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    transactionId: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      field: "transaction_id",
+    },
+    side: { type: DataTypes.ENUM("Debit", "Credit"), allowNull: false },
+    account: { type: DataTypes.STRING(255), allowNull: false },
+    amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    currency: { type: DataTypes.STRING(3), defaultValue: "SAR" },
+    description: { type: DataTypes.TEXT },
+    referenceType: { type: DataTypes.STRING(100), field: "reference_type" },
+    referenceId: { type: DataTypes.UUID, field: "reference_id" },
+    playerId: { type: DataTypes.UUID, field: "player_id" },
+    postedAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW,
+      field: "posted_at",
+    },
+    createdBy: { type: DataTypes.UUID, field: "created_by" },
+  },
+  {
+    sequelize,
+    tableName: "ledger_entries",
+    underscored: true,
+    timestamps: false,
+  },
+);
 
 // ══════════════════════════════════════════
 // VALUATION
@@ -204,9 +291,15 @@ export interface ValuationAttributes {
   createdAt?: Date;
 }
 
-interface ValuationCreation extends Optional<ValuationAttributes, 'id' | 'currency' | 'trend' | 'createdAt'> {}
+interface ValuationCreation extends Optional<
+  ValuationAttributes,
+  "id" | "currency" | "trend" | "createdAt"
+> {}
 
-export class Valuation extends Model<ValuationAttributes, ValuationCreation> implements ValuationAttributes {
+export class Valuation
+  extends Model<ValuationAttributes, ValuationCreation>
+  implements ValuationAttributes
+{
   declare id: string;
   declare playerId: string;
   declare value: number;
@@ -219,14 +312,35 @@ export class Valuation extends Model<ValuationAttributes, ValuationCreation> imp
   declare createdAt: Date;
 }
 
-Valuation.init({
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  playerId: { type: DataTypes.UUID, allowNull: false, field: 'player_id' },
-  value: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
-  currency: { type: DataTypes.STRING(3), defaultValue: 'SAR' },
-  source: { type: DataTypes.STRING(255) },
-  trend: { type: DataTypes.ENUM('up', 'down', 'stable'), defaultValue: 'stable' },
-  changePct: { type: DataTypes.DECIMAL(5, 2), field: 'change_pct' },
-  valuedAt: { type: DataTypes.DATEONLY, allowNull: false, defaultValue: DataTypes.NOW, field: 'valued_at' },
-  notes: { type: DataTypes.TEXT },
-}, { sequelize, tableName: 'valuations', underscored: true, timestamps: true, updatedAt: false });
+Valuation.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
+    value: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    currency: { type: DataTypes.STRING(3), defaultValue: "SAR" },
+    source: { type: DataTypes.STRING(255) },
+    trend: {
+      type: DataTypes.ENUM("up", "down", "stable"),
+      defaultValue: "stable",
+    },
+    changePct: { type: DataTypes.DECIMAL(5, 2), field: "change_pct" },
+    valuedAt: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: "valued_at",
+    },
+    notes: { type: DataTypes.TEXT },
+  },
+  {
+    sequelize,
+    tableName: "valuations",
+    underscored: true,
+    timestamps: true,
+    updatedAt: false,
+  },
+);

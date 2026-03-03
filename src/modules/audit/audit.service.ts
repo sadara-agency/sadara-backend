@@ -1,9 +1,12 @@
-import { Op } from 'sequelize';
-import { AuditLog } from './AuditLog.model';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
+import { Op } from "sequelize";
+import { AuditLog } from "./AuditLog.model";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 
 export async function listAuditLogs(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'logged_at');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "logged_at",
+  );
 
   const where: any = {};
 

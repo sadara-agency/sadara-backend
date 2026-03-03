@@ -1,7 +1,12 @@
-import { Response } from 'express';
-import { ApiResponse, PaginationMeta } from '../types';
+import { Response } from "express";
+import { ApiResponse, PaginationMeta } from "../types";
 
-export function sendSuccess<T>(res: Response, data: T, message?: string, statusCode = 200): void {
+export function sendSuccess<T>(
+  res: Response,
+  data: T,
+  message?: string,
+  statusCode = 200,
+): void {
   const response: ApiResponse<T> = {
     success: true,
     data,
@@ -14,7 +19,7 @@ export function sendPaginated<T>(
   res: Response,
   data: T[],
   meta: PaginationMeta,
-  message?: string
+  message?: string,
 ): void {
   const response: ApiResponse<T[]> = {
     success: true,
@@ -25,11 +30,20 @@ export function sendPaginated<T>(
   res.status(200).json(response);
 }
 
-export function sendCreated<T>(res: Response, data: T, message = 'Created successfully'): void {
+export function sendCreated<T>(
+  res: Response,
+  data: T,
+  message = "Created successfully",
+): void {
   sendSuccess(res, data, message, 201);
 }
 
-export function sendError(res: Response, message: string, statusCode = 400, error?: string): void {
+export function sendError(
+  res: Response,
+  message: string,
+  statusCode = 400,
+  error?: string,
+): void {
   const response: ApiResponse = {
     success: false,
     message,
@@ -38,14 +52,17 @@ export function sendError(res: Response, message: string, statusCode = 400, erro
   res.status(statusCode).json(response);
 }
 
-export function sendNotFound(res: Response, entity = 'Resource'): void {
+export function sendNotFound(res: Response, entity = "Resource"): void {
   sendError(res, `${entity} not found`, 404);
 }
 
-export function sendUnauthorized(res: Response, message = 'Unauthorized'): void {
+export function sendUnauthorized(
+  res: Response,
+  message = "Unauthorized",
+): void {
   sendError(res, message, 401);
 }
 
-export function sendForbidden(res: Response, message = 'Forbidden'): void {
+export function sendForbidden(res: Response, message = "Forbidden"): void {
   sendError(res, message, 403);
 }

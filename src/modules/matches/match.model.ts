@@ -1,5 +1,5 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../../config/database';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../../config/database";
 
 // ── Attribute Interfaces ──
 
@@ -11,7 +11,7 @@ export interface MatchAttributes {
   season?: string | null;
   matchDate: Date;
   venue?: string | null;
-  status: 'upcoming' | 'live' | 'completed' | 'cancelled';
+  status: "upcoming" | "live" | "completed" | "cancelled";
   homeScore?: number | null;
   awayScore?: number | null;
   attendance?: number | null;
@@ -24,12 +24,15 @@ export interface MatchAttributes {
 
 interface MatchCreationAttributes extends Optional<
   MatchAttributes,
-  'id' | 'status' | 'createdAt' | 'updatedAt'
+  "id" | "status" | "createdAt" | "updatedAt"
 > {}
 
 // ── Model Class ──
 
-export class Match extends Model<MatchAttributes, MatchCreationAttributes> implements MatchAttributes {
+export class Match
+  extends Model<MatchAttributes, MatchCreationAttributes>
+  implements MatchAttributes
+{
   declare id: string;
   declare homeClubId: string | null;
   declare awayClubId: string | null;
@@ -37,7 +40,7 @@ export class Match extends Model<MatchAttributes, MatchCreationAttributes> imple
   declare season: string | null;
   declare matchDate: Date;
   declare venue: string | null;
-  declare status: 'upcoming' | 'live' | 'completed' | 'cancelled';
+  declare status: "upcoming" | "live" | "completed" | "cancelled";
   declare homeScore: number | null;
   declare awayScore: number | null;
   declare attendance: number | null;
@@ -60,61 +63,64 @@ export class Match extends Model<MatchAttributes, MatchCreationAttributes> imple
 
 // ── Initialization ──
 
-Match.init({
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true,
+Match.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    homeClubId: {
+      type: DataTypes.UUID,
+      field: "home_club_id",
+    },
+    awayClubId: {
+      type: DataTypes.UUID,
+      field: "away_club_id",
+    },
+    competition: {
+      type: DataTypes.STRING,
+    },
+    season: {
+      type: DataTypes.STRING(20),
+    },
+    matchDate: {
+      type: DataTypes.DATE,
+      allowNull: false,
+      field: "match_date",
+    },
+    venue: {
+      type: DataTypes.STRING,
+    },
+    status: {
+      type: DataTypes.ENUM("upcoming", "live", "completed", "cancelled"),
+      defaultValue: "upcoming",
+    },
+    homeScore: {
+      type: DataTypes.INTEGER,
+      field: "home_score",
+    },
+    awayScore: {
+      type: DataTypes.INTEGER,
+      field: "away_score",
+    },
+    attendance: {
+      type: DataTypes.INTEGER,
+    },
+    referee: {
+      type: DataTypes.STRING,
+    },
+    broadcast: {
+      type: DataTypes.STRING,
+    },
+    notes: {
+      type: DataTypes.TEXT,
+    },
   },
-  homeClubId: {
-    type: DataTypes.UUID,
-    field: 'home_club_id',
+  {
+    sequelize,
+    tableName: "matches",
+    underscored: true,
+    timestamps: true,
   },
-  awayClubId: {
-    type: DataTypes.UUID,
-    field: 'away_club_id',
-  },
-  competition: {
-    type: DataTypes.STRING,
-  },
-  season: {
-    type: DataTypes.STRING(20),
-  },
-  matchDate: {
-    type: DataTypes.DATE,
-    allowNull: false,
-    field: 'match_date',
-  },
-  venue: {
-    type: DataTypes.STRING,
-  },
-  status: {
-    type: DataTypes.ENUM('upcoming', 'live', 'completed', 'cancelled'),
-    defaultValue: 'upcoming',
-  },
-  homeScore: {
-    type: DataTypes.INTEGER,
-    field: 'home_score',
-  },
-  awayScore: {
-    type: DataTypes.INTEGER,
-    field: 'away_score',
-  },
-  attendance: {
-    type: DataTypes.INTEGER,
-  },
-  referee: {
-    type: DataTypes.STRING,
-  },
-  broadcast: {
-    type: DataTypes.STRING,
-  },
-  notes: {
-    type: DataTypes.TEXT,
-  },
-}, {
-  sequelize,
-  tableName: 'matches',
-  underscored: true,
-  timestamps: true,
-});
+);

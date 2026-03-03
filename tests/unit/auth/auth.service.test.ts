@@ -58,7 +58,11 @@ describe('Auth Service', () => {
       expect(result).toHaveProperty('token');
       expect(result).toHaveProperty('user');
       expect(result.user).not.toHaveProperty('passwordHash');
-      expect(user.update).toHaveBeenCalledWith({ lastLogin: expect.any(Date) });
+      expect(user.update).toHaveBeenCalledWith({
+        failedLoginAttempts: 0,
+        lastLogin: expect.any(Date),
+        lockedUntil: null,
+      });
     });
 
     it('should throw 401 for invalid email', async () => {

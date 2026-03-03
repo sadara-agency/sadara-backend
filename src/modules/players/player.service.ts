@@ -1,11 +1,12 @@
-import { Op, Sequelize, QueryTypes, literal } from 'sequelize';
-import { Player } from './player.model';
-import { Club } from '../clubs/club.model';
-import { User } from '../Users/user.model';
-import { AppError } from '../../middleware/errorHandler';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { sequelize } from '../../config/database';
-import { ExternalProviderMapping } from './externalProvider.model';
+import { Op, Sequelize, QueryTypes, literal } from "sequelize";
+import { Player } from "./player.model";
+import { Club } from "../clubs/club.model";
+import { User } from "../Users/user.model";
+import { AppError } from "../../middleware/errorHandler";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { sequelize } from "../../config/database";
+import { ExternalProviderMapping } from "./externalProvider.model";
+import { PlayerClubHistory } from "./playerClubHistory.model";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -14,37 +15,86 @@ const COMPUTED_ATTRIBUTES: [any, string][] = [
       NULLIF(CONCAT("Player".first_name_ar, ' ', "Player".last_name_ar), ' '),
       CONCAT("Player".first_name, ' ', "Player".last_name)
     )`),
-    'full_name_ar',
+    "full_name_ar",
   ],
   [
     literal(`CONCAT("Player".first_name, ' ', "Player".last_name)`),
-    'full_name',
+    "full_name",
   ],
   [
-    literal(`EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`),
-    'computed_age',
+    literal(
+      `EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`,
+    ),
+    "computed_age",
   ],
 ];
 
 // ── Heavy computed attributes (correlated subqueries — only for single player detail) ──
 const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
   ...COMPUTED_ATTRIBUTES,
-  [literal(`(SELECT CASE WHEN c.end_date IS NULL THEN 'Active' WHEN c.end_date < CURRENT_DATE THEN 'Expired' WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon' ELSE 'Active' END FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`), 'contract_status'],
-  [literal(`(SELECT c.end_date::text FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`), 'contract_end'],
-  [literal(`(SELECT c.commission_pct FROM contracts c WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL ORDER BY c.created_at DESC LIMIT 1)`), 'commission_rate'],
-  [literal(`(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`), 'matches'],
-  [literal(`(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`), 'goals'],
-  [literal(`(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`), 'assists'],
-  [literal(`(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`), 'rating'],
-  [literal(`(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`), 'minutes_played'],
-  [literal(`(SELECT perf.average_rating FROM performances perf WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`), 'performance'],
+  [
+    literal(
+      `(SELECT CASE WHEN c.end_date IS NULL THEN 'Active' WHEN c.end_date < CURRENT_DATE THEN 'Expired' WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon' ELSE 'Active' END FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`,
+    ),
+    "contract_status",
+  ],
+  [
+    literal(
+      `(SELECT c.end_date::text FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`,
+    ),
+    "contract_end",
+  ],
+  [
+    literal(
+      `(SELECT c.commission_pct FROM contracts c WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL ORDER BY c.created_at DESC LIMIT 1)`,
+    ),
+    "commission_rate",
+  ],
+  [
+    literal(
+      `(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`,
+    ),
+    "matches",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "goals",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "assists",
+  ],
+  [
+    literal(
+      `(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`,
+    ),
+    "rating",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`,
+    ),
+    "minutes_played",
+  ],
+  [
+    literal(
+      `(SELECT perf.average_rating FROM performances perf WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`,
+    ),
+    "performance",
+  ],
 ];
 
 /**
  * Batch-load stats for a set of player IDs in ONE query using LATERAL joins.
  * Replaces 9 correlated subqueries × N rows with 1 aggregated query.
  */
-async function batchLoadPlayerStats(playerIds: string[]): Promise<Map<string, Record<string, any>>> {
+async function batchLoadPlayerStats(
+  playerIds: string[],
+): Promise<Map<string, Record<string, any>>> {
   if (playerIds.length === 0) return new Map();
 
   const rows = await sequelize.query<Record<string, any>>(
@@ -124,7 +174,10 @@ async function getPlayerCounts(playerId: string): Promise<PlayerCounts> {
 // Step 2: Batch-load stats for all returned player IDs in a single query
 // Step 3: Merge stats into player objects
 export async function listPlayers(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "createdAt",
+  );
 
   const where: any = {};
 
@@ -141,7 +194,12 @@ export async function listPlayers(queryParams: any) {
       { firstNameAr: { [Op.iLike]: `%${search}%` } },
       { lastNameAr: { [Op.iLike]: `%${search}%` } },
       Sequelize.where(
-        Sequelize.fn('concat', Sequelize.col('Player.first_name'), ' ', Sequelize.col('Player.last_name')),
+        Sequelize.fn(
+          "concat",
+          Sequelize.col("Player.first_name"),
+          " ",
+          Sequelize.col("Player.last_name"),
+        ),
         { [Op.iLike]: `%${search}%` },
       ),
     ];
@@ -155,17 +213,21 @@ export async function listPlayers(queryParams: any) {
     order: [[sort, order]],
     attributes: { include: COMPUTED_ATTRIBUTES },
     include: [
-      { model: Club, as: 'club', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
-      { model: User, as: 'agent', attributes: ['id', 'fullName'] },
+      {
+        model: Club,
+        as: "club",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
+      { model: User, as: "agent", attributes: ["id", "fullName"] },
     ],
   });
 
   // Step 2: Batch-load stats for all player IDs in a single query
-  const playerIds = rows.map(r => r.id);
+  const playerIds = rows.map((r) => r.id);
   const statsMap = await batchLoadPlayerStats(playerIds);
 
   // Step 3: Merge stats into each player's plain object
-  const data = rows.map(row => {
+  const data = rows.map((row) => {
     const plain = row.get({ plain: true });
     const stats = statsMap.get(row.id) || {};
     return {
@@ -191,11 +253,12 @@ export async function getPlayerById(id: string) {
   const [player, counts, performanceHistory] = await Promise.all([
     Player.findByPk(id, {
       attributes: { include: DETAIL_COMPUTED_ATTRIBUTES },
-      include: ['club', 'agent'],
+      include: ["club", "agent"],
     }),
     getPlayerCounts(id),
-    sequelize.query(
-      `SELECT
+    sequelize
+      .query(
+        `SELECT
          TO_CHAR(perf.created_at, 'YYYY-MM') as month,
          ROUND(AVG(perf.average_rating), 1) as rating
        FROM performances perf
@@ -203,11 +266,12 @@ export async function getPlayerById(id: string) {
        GROUP BY TO_CHAR(perf.created_at, 'YYYY-MM')
        ORDER BY month DESC
        LIMIT 12`,
-      { replacements: { id }, type: QueryTypes.SELECT },
-    ).catch(() => []),
+        { replacements: { id }, type: QueryTypes.SELECT },
+      )
+      .catch(() => []),
   ]);
 
-  if (!player) throw new AppError('Player not found', 404);
+  if (!player) throw new AppError("Player not found", 404);
 
   return {
     ...player.get({ plain: true }),
@@ -223,7 +287,30 @@ export async function createPlayer(input: any, createdBy: string) {
 
 export async function updatePlayer(id: string, input: any) {
   const player = await Player.findByPk(id);
-  if (!player) throw new AppError('Player not found', 404);
+  if (!player) throw new AppError("Player not found", 404);
+
+  // Auto-track club history when currentClubId changes
+  if (
+    input.currentClubId &&
+    input.currentClubId !== player.currentClubId &&
+    player.currentClubId
+  ) {
+    // Close the previous club entry
+    const today = new Date().toISOString().split("T")[0];
+    await PlayerClubHistory.update(
+      { endDate: today },
+      { where: { playerId: id, clubId: player.currentClubId, endDate: null } },
+    );
+    // Open a new club entry
+    await PlayerClubHistory.create({
+      playerId: id,
+      clubId: input.currentClubId,
+      startDate: today,
+      position: input.position || player.position,
+      jerseyNumber: input.jerseyNumber || player.jerseyNumber,
+    });
+  }
+
   return await player.update(input);
 }
 
@@ -234,11 +321,14 @@ export async function deletePlayer(id: string) {
   );
 
   if (deps && deps.active_contracts > 0) {
-    throw new AppError('Cannot delete player with active contracts. Terminate or transfer contracts first.', 400);
+    throw new AppError(
+      "Cannot delete player with active contracts. Terminate or transfer contracts first.",
+      400,
+    );
   }
 
   const deleted = await Player.destroy({ where: { id } });
-  if (!deleted) throw new AppError('Player not found', 404);
+  if (!deleted) throw new AppError("Player not found", 404);
   return { id };
 }
 
@@ -246,18 +336,23 @@ export async function deletePlayer(id: string) {
 // Add to: src/modules/players/player.service.ts (append these functions)
 // ═══════════════════════════════════════════════════════════════
 
-
 export async function getPlayerProviders(playerId: string) {
   return ExternalProviderMapping.findAll({
     where: { playerId },
-    order: [['providerName', 'ASC']],
+    order: [["providerName", "ASC"]],
   });
 }
 
-export async function upsertPlayerProvider(playerId: string, input: {
-  providerName: string; externalPlayerId: string;
-  externalTeamId?: string; apiBaseUrl?: string; notes?: string;
-}) {
+export async function upsertPlayerProvider(
+  playerId: string,
+  input: {
+    providerName: string;
+    externalPlayerId: string;
+    externalTeamId?: string;
+    apiBaseUrl?: string;
+    notes?: string;
+  },
+) {
   const [mapping] = await ExternalProviderMapping.upsert({
     playerId,
     providerName: input.providerName as any,
@@ -269,13 +364,69 @@ export async function upsertPlayerProvider(playerId: string, input: {
   return mapping;
 }
 
-export async function removePlayerProvider(playerId: string, providerName: string) {
+// ── Duplicate Player Check ──
+export async function checkDuplicate(params: {
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+}) {
+  const conditions: string[] = [];
+  const replacements: Record<string, string> = {};
+
+  if (params.firstName && params.lastName) {
+    conditions.push(
+      `(LOWER(first_name) = LOWER(:firstName) AND LOWER(last_name) = LOWER(:lastName))`,
+    );
+    replacements.firstName = params.firstName;
+    replacements.lastName = params.lastName;
+  }
+  if (params.dateOfBirth) {
+    conditions.push(`date_of_birth = :dob`);
+    replacements.dob = params.dateOfBirth;
+  }
+
+  if (conditions.length < 2) return []; // Need at least name + DOB to check
+
+  const rows = await sequelize.query<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    first_name_ar: string;
+    last_name_ar: string;
+    date_of_birth: string;
+    nationality: string;
+  }>(
+    `SELECT id, first_name, last_name, first_name_ar, last_name_ar, date_of_birth, nationality
+     FROM players
+     WHERE ${conditions.join(" AND ")}
+     LIMIT 5`,
+    { replacements, type: QueryTypes.SELECT },
+  );
+
+  return rows;
+}
+
+// ── Player Club History ──
+export async function getClubHistory(playerId: string) {
+  return sequelize.query<any>(
+    `SELECT h.*, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url AS club_logo
+     FROM player_club_history h
+     LEFT JOIN clubs c ON h.club_id = c.id
+     WHERE h.player_id = :playerId
+     ORDER BY h.start_date DESC`,
+    { replacements: { playerId }, type: QueryTypes.SELECT },
+  );
+}
+
+export async function removePlayerProvider(
+  playerId: string,
+  providerName: string,
+) {
   const mapping = await ExternalProviderMapping.findOne({
     where: { playerId, providerName },
   });
-  if (!mapping) throw new Error('Provider mapping not found');
+  if (!mapping) throw new Error("Provider mapping not found");
   await mapping.destroy();
   return { playerId, providerName };
 }
-
- 

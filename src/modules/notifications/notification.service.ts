@@ -1,8 +1,12 @@
-import { Op } from 'sequelize';
-import { Notification, NotificationType, NotificationPriority } from './notification.model';
-import { User } from '../Users/user.model';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { logger } from '../../config/logger';
+import { Op } from "sequelize";
+import {
+  Notification,
+  NotificationType,
+  NotificationPriority,
+} from "./notification.model";
+import { User } from "../Users/user.model";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { logger } from "../../config/logger";
 
 // ── Create a single notification ──
 
@@ -24,8 +28,10 @@ export async function createNotification(input: CreateNotificationInput) {
     return await Notification.create(input as any);
   } catch (err: any) {
     // Unique constraint violation = duplicate → skip silently
-    if (err.name === 'SequelizeUniqueConstraintError') {
-      logger.debug(`Duplicate notification skipped: ${input.sourceType}/${input.sourceId} for user ${input.userId}`);
+    if (err.name === "SequelizeUniqueConstraintError") {
+      logger.debug(
+        `Duplicate notification skipped: ${input.sourceType}/${input.sourceId} for user ${input.userId}`,
+      );
       return null;
     }
     throw err;
@@ -36,41 +42,50 @@ export async function createNotification(input: CreateNotificationInput) {
 
 export async function notifyByRole(
   roles: string[],
-  input: Omit<CreateNotificationInput, 'userId'>
+  input: Omit<CreateNotificationInput, "userId">,
 ) {
   const users = await User.findAll({
     where: { role: { [Op.in]: roles }, isActive: true },
-    attributes: ['id'],
+    attributes: ["id"],
   });
 
   if (users.length === 0) return 0;
 
-  const records = users.map(u => ({ ...input, userId: u.id }));
+  const records = users.map((u) => ({ ...input, userId: u.id }));
 
-  const results = await Notification.bulkCreate(records as any[], { ignoreDuplicates: true });
+  const results = await Notification.bulkCreate(records as any[], {
+    ignoreDuplicates: true,
+  });
 
-  logger.info(`Notified ${results.length}/${users.length} users (roles: ${roles.join(',')}) — ${input.type}: ${input.title}`);
+  logger.info(
+    `Notified ${results.length}/${users.length} users (roles: ${roles.join(",")}) — ${input.type}: ${input.title}`,
+  );
   return results.length;
 }
 
 // ── Notify a specific user ──
 
-export async function notifyUser(userId: string, input: Omit<CreateNotificationInput, 'userId'>) {
+export async function notifyUser(
+  userId: string,
+  input: Omit<CreateNotificationInput, "userId">,
+) {
   return createNotification({ ...input, userId });
 }
 
 // ── List notifications for a user ──
 
 export async function listNotifications(userId: string, queryParams: any) {
-  const { limit, offset, page } = parsePagination(queryParams, 'createdAt');
+  const { limit, offset, page } = parsePagination(queryParams, "createdAt");
   const where: any = { userId, isDismissed: false };
 
-  if (queryParams.unreadOnly === 'true') where.isRead = false;
+  if (queryParams.unreadOnly === "true") where.isRead = false;
   if (queryParams.type) where.type = queryParams.type;
 
   const { count, rows } = await Notification.findAndCountAll({
-    where, limit, offset,
-    order: [['createdAt', 'DESC']],
+    where,
+    limit,
+    offset,
+    order: [["createdAt", "DESC"]],
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
@@ -79,7 +94,9 @@ export async function listNotifications(userId: string, queryParams: any) {
 // ── Unread count ──
 
 export async function getUnreadCount(userId: string) {
-  return Notification.count({ where: { userId, isRead: false, isDismissed: false } });
+  return Notification.count({
+    where: { userId, isRead: false, isDismissed: false },
+  });
 }
 
 // ── Mark as read ──
@@ -87,7 +104,7 @@ export async function getUnreadCount(userId: string) {
 export async function markAsRead(userId: string, notificationId: string) {
   const [updated] = await Notification.update(
     { isRead: true },
-    { where: { id: notificationId, userId } }
+    { where: { id: notificationId, userId } },
   );
   return updated > 0;
 }
@@ -97,17 +114,20 @@ export async function markAsRead(userId: string, notificationId: string) {
 export async function markAllAsRead(userId: string) {
   const [updated] = await Notification.update(
     { isRead: true },
-    { where: { userId, isRead: false } }
+    { where: { userId, isRead: false } },
   );
   return updated;
 }
 
 // ── Dismiss ──
 
-export async function dismissNotification(userId: string, notificationId: string) {
+export async function dismissNotification(
+  userId: string,
+  notificationId: string,
+) {
   const [updated] = await Notification.update(
     { isDismissed: true },
-    { where: { id: notificationId, userId } }
+    { where: { id: notificationId, userId } },
   );
   return updated > 0;
 }
@@ -122,6 +142,9 @@ export async function cleanupOldNotifications(daysOld = 90) {
     where: { createdAt: { [Op.lt]: cutoff } },
   });
 
-  if (deleted > 0) logger.info(`Cleaned up ${deleted} notifications older than ${daysOld} days`);
+  if (deleted > 0)
+    logger.info(
+      `Cleaned up ${deleted} notifications older than ${daysOld} days`,
+    );
   return deleted;
 }

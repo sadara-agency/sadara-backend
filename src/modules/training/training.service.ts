@@ -2,20 +2,32 @@
 // src/modules/training/training.service.ts
 // ═══════════════════════════════════════════════════════════════
 
-import { Op, Sequelize } from 'sequelize';
-import { TrainingCourse, TrainingEnrollment, TrainingActivity } from './training.model';
-import { Player } from '../players/player.model';
-import { AppError } from '../../middleware/errorHandler';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
+import { Op, Sequelize } from "sequelize";
+import {
+  TrainingCourse,
+  TrainingEnrollment,
+  TrainingActivity,
+} from "./training.model";
+import { Player } from "../players/player.model";
+import { AppError } from "../../middleware/errorHandler";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import type {
   CreateCourseInput,
   UpdateCourseInput,
   UpdateEnrollmentInput,
   TrackActivityInput,
   SelfUpdateProgressInput,
-} from './training.schema';
+} from "./training.schema";
 
-const PLAYER_ATTRS = ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'position', 'photoUrl'] as const;
+const PLAYER_ATTRS = [
+  "id",
+  "firstName",
+  "lastName",
+  "firstNameAr",
+  "lastNameAr",
+  "position",
+  "photoUrl",
+] as const;
 
 // Helper type for eager-loaded enrollment rows
 type EnrollmentWithIncludes = TrainingEnrollment & {
@@ -28,11 +40,15 @@ type EnrollmentWithIncludes = TrainingEnrollment & {
 // ══════════════════════════════════════════
 
 export async function listCourses(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "createdAt",
+  );
   const where: any = {};
 
   if (queryParams.category) where.category = queryParams.category;
-  if (queryParams.isActive !== undefined) where.isActive = queryParams.isActive === 'true';
+  if (queryParams.isActive !== undefined)
+    where.isActive = queryParams.isActive === "true";
   if (search) {
     where[Op.or] = [
       { title: { [Op.iLike]: `%${search}%` } },
@@ -42,12 +58,24 @@ export async function listCourses(queryParams: any) {
   }
 
   const { count, rows } = await TrainingCourse.findAndCountAll({
-    where, limit, offset,
+    where,
+    limit,
+    offset,
     order: [[sort, order]],
     attributes: {
       include: [
-        [Sequelize.literal(`(SELECT COUNT(*) FROM training_enrollments WHERE training_enrollments.course_id = "TrainingCourse".id)`), 'enrollmentCount'],
-        [Sequelize.literal(`(SELECT COUNT(*) FROM training_enrollments WHERE training_enrollments.course_id = "TrainingCourse".id AND training_enrollments.status = 'Completed')`), 'completedCount'],
+        [
+          Sequelize.literal(
+            `(SELECT COUNT(*) FROM training_enrollments WHERE training_enrollments.course_id = "TrainingCourse".id)`,
+          ),
+          "enrollmentCount",
+        ],
+        [
+          Sequelize.literal(
+            `(SELECT COUNT(*) FROM training_enrollments WHERE training_enrollments.course_id = "TrainingCourse".id AND training_enrollments.status = 'Completed')`,
+          ),
+          "completedCount",
+        ],
       ],
     },
     distinct: true,
@@ -58,31 +86,42 @@ export async function listCourses(queryParams: any) {
 
 export async function getCourseById(id: string) {
   const course = await TrainingCourse.findByPk(id, {
-    include: [{
-      model: TrainingEnrollment, as: 'enrollments',
-      include: [
-        { model: Player, as: 'player', attributes: [...PLAYER_ATTRS] },
-        { model: TrainingActivity, as: 'activities', attributes: ['id', 'action', 'createdAt'], required: false },
-      ],
-    }],
+    include: [
+      {
+        model: TrainingEnrollment,
+        as: "enrollments",
+        include: [
+          { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+          {
+            model: TrainingActivity,
+            as: "activities",
+            attributes: ["id", "action", "createdAt"],
+            required: false,
+          },
+        ],
+      },
+    ],
   });
-  if (!course) throw new AppError('Course not found', 404);
+  if (!course) throw new AppError("Course not found", 404);
   return course;
 }
 
-export async function createCourse(input: CreateCourseInput, createdBy: string) {
+export async function createCourse(
+  input: CreateCourseInput,
+  createdBy: string,
+) {
   return TrainingCourse.create({ ...input, createdBy } as any);
 }
 
 export async function updateCourse(id: string, input: UpdateCourseInput) {
   const course = await TrainingCourse.findByPk(id);
-  if (!course) throw new AppError('Course not found', 404);
+  if (!course) throw new AppError("Course not found", 404);
   return course.update(input as any);
 }
 
 export async function deleteCourse(id: string) {
   const course = await TrainingCourse.findByPk(id);
-  if (!course) throw new AppError('Course not found', 404);
+  if (!course) throw new AppError("Course not found", 404);
   await course.destroy();
   return { id };
 }
@@ -91,39 +130,48 @@ export async function deleteCourse(id: string) {
 // ENROLLMENTS (Admin)
 // ══════════════════════════════════════════
 
-export async function enrollPlayers(courseId: string, playerIds: string[], assignedBy: string) {
+export async function enrollPlayers(
+  courseId: string,
+  playerIds: string[],
+  assignedBy: string,
+) {
   const course = await TrainingCourse.findByPk(courseId);
-  if (!course) throw new AppError('Course not found', 404);
+  if (!course) throw new AppError("Course not found", 404);
 
   const existing = await Player.findAll({
     where: { id: { [Op.in]: playerIds } },
-    attributes: ['id'],
+    attributes: ["id"],
   });
   if (existing.length !== playerIds.length) {
-    throw new AppError('Some players not found', 404);
+    throw new AppError("Some players not found", 404);
   }
 
-  const records = playerIds.map(playerId => ({
-    courseId, playerId, assignedBy,
+  const records = playerIds.map((playerId) => ({
+    courseId,
+    playerId,
+    assignedBy,
   }));
 
   await TrainingEnrollment.bulkCreate(records as any, {
-    updateOnDuplicate: ['assignedBy', 'updatedAt'],
+    updateOnDuplicate: ["assignedBy", "updatedAt"],
   });
 
   return getCourseById(courseId);
 }
 
-export async function updateEnrollment(enrollmentId: string, input: UpdateEnrollmentInput) {
+export async function updateEnrollment(
+  enrollmentId: string,
+  input: UpdateEnrollmentInput,
+) {
   const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError('Enrollment not found', 404);
+  if (!enrollment) throw new AppError("Enrollment not found", 404);
 
   const updates: any = { ...input };
 
-  if (input.status === 'InProgress' && !enrollment.startedAt) {
+  if (input.status === "InProgress" && !enrollment.startedAt) {
     updates.startedAt = new Date();
   }
-  if (input.status === 'Completed') {
+  if (input.status === "Completed") {
     updates.completedAt = new Date();
     updates.progressPct = 100;
   }
@@ -133,7 +181,7 @@ export async function updateEnrollment(enrollmentId: string, input: UpdateEnroll
 
 export async function removeEnrollment(enrollmentId: string) {
   const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError('Enrollment not found', 404);
+  if (!enrollment) throw new AppError("Enrollment not found", 404);
   await enrollment.destroy();
   return { id: enrollmentId };
 }
@@ -141,8 +189,8 @@ export async function removeEnrollment(enrollmentId: string) {
 export async function getPlayerEnrollments(playerId: string) {
   return TrainingEnrollment.findAll({
     where: { playerId },
-    include: [{ model: TrainingCourse, as: 'course' }],
-    order: [['enrolledAt', 'DESC']],
+    include: [{ model: TrainingCourse, as: "course" }],
+    order: [["enrolledAt", "DESC"]],
   });
 }
 
@@ -155,28 +203,36 @@ export async function getPlayerEnrollments(playerId: string) {
  * Returns enriched enrollments with course data + activity log
  */
 export async function getMyEnrollments(playerId: string) {
-  if (!playerId) throw new AppError('Player account not linked', 403);
+  if (!playerId) throw new AppError("Player account not linked", 403);
 
   const enrollments = await TrainingEnrollment.findAll({
     where: { playerId },
     include: [
       {
         model: TrainingCourse,
-        as: 'course',
+        as: "course",
         attributes: [
-          'id', 'title', 'titleAr', 'description', 'descriptionAr',
-          'contentType', 'contentUrl', 'category', 'difficulty',
-          'durationHours', 'isActive',
+          "id",
+          "title",
+          "titleAr",
+          "description",
+          "descriptionAr",
+          "contentType",
+          "contentUrl",
+          "category",
+          "difficulty",
+          "durationHours",
+          "isActive",
         ],
       },
       {
         model: TrainingActivity,
-        as: 'activities',
-        attributes: ['id', 'action', 'metadata', 'createdAt'],
+        as: "activities",
+        attributes: ["id", "action", "metadata", "createdAt"],
         required: false,
       },
     ],
-    order: [['enrolledAt', 'DESC']],
+    order: [["enrolledAt", "DESC"]],
   });
 
   return enrollments;
@@ -192,11 +248,11 @@ export async function trackActivity(
   input: TrackActivityInput,
 ) {
   const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError('Enrollment not found', 404);
+  if (!enrollment) throw new AppError("Enrollment not found", 404);
 
   // Security: player can only track their own enrollments
   if (enrollment.playerId !== playerId) {
-    throw new AppError('Forbidden — not your enrollment', 403);
+    throw new AppError("Forbidden — not your enrollment", 403);
   }
 
   // Create the activity record
@@ -214,16 +270,16 @@ export async function trackActivity(
 
   // Clicked / VideoStarted → move from NotStarted → InProgress
   if (
-    ['Clicked', 'VideoStarted', 'Viewed'].includes(input.action) &&
-    enrollment.status === 'NotStarted'
+    ["Clicked", "VideoStarted", "Viewed"].includes(input.action) &&
+    enrollment.status === "NotStarted"
   ) {
-    updates.status = 'InProgress';
+    updates.status = "InProgress";
     updates.startedAt = new Date();
   }
 
   // VideoCompleted → mark as Completed with 100% progress
-  if (input.action === 'VideoCompleted') {
-    updates.status = 'Completed';
+  if (input.action === "VideoCompleted") {
+    updates.status = "Completed";
     updates.completedAt = new Date();
     updates.progressPct = 100;
   }
@@ -246,9 +302,9 @@ export async function selfUpdateProgress(
   input: SelfUpdateProgressInput,
 ) {
   const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError('Enrollment not found', 404);
+  if (!enrollment) throw new AppError("Enrollment not found", 404);
   if (enrollment.playerId !== playerId) {
-    throw new AppError('Forbidden — not your enrollment', 403);
+    throw new AppError("Forbidden — not your enrollment", 403);
   }
 
   const updates: Record<string, unknown> = {};
@@ -257,14 +313,14 @@ export async function selfUpdateProgress(
     updates.progressPct = input.progressPct;
 
     // Auto-start if setting progress > 0
-    if (input.progressPct > 0 && enrollment.status === 'NotStarted') {
-      updates.status = 'InProgress';
+    if (input.progressPct > 0 && enrollment.status === "NotStarted") {
+      updates.status = "InProgress";
       updates.startedAt = new Date();
     }
 
     // Auto-complete at 100%
     if (input.progressPct >= 100) {
-      updates.status = 'Completed';
+      updates.status = "Completed";
       updates.completedAt = new Date();
     }
   }
@@ -298,25 +354,36 @@ export async function getCompletionMatrix(queryParams: any) {
 
   const courses = await TrainingCourse.findAll({
     where: courseWhere,
-    attributes: ['id', 'title', 'titleAr', 'category', 'difficulty'],
-    order: [['title', 'ASC']],
+    attributes: ["id", "title", "titleAr", "category", "difficulty"],
+    order: [["title", "ASC"]],
   });
 
   // Get all enrollments grouped by player
-  const enrollments = await TrainingEnrollment.findAll({
-    where: { courseId: { [Op.in]: courses.map(c => c.id) } },
+  const enrollments = (await TrainingEnrollment.findAll({
+    where: { courseId: { [Op.in]: courses.map((c) => c.id) } },
     include: [
-      { model: Player, as: 'player', attributes: [...PLAYER_ATTRS] },
-      { model: TrainingActivity, as: 'activities', attributes: ['action', 'createdAt'], required: false },
+      { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+      {
+        model: TrainingActivity,
+        as: "activities",
+        attributes: ["action", "createdAt"],
+        required: false,
+      },
     ],
-    order: [['enrolledAt', 'ASC']],
-  }) as EnrollmentWithIncludes[];
+    order: [["enrolledAt", "ASC"]],
+  })) as EnrollmentWithIncludes[];
 
   // Build player → course → enrollment map
-  const playerMap = new Map<string, {
-    player: EnrollmentWithIncludes['player'];
-    courses: Map<string, { status: string; progressPct: number; lastActivity: string | null }>;
-  }>();
+  const playerMap = new Map<
+    string,
+    {
+      player: EnrollmentWithIncludes["player"];
+      courses: Map<
+        string,
+        { status: string; progressPct: number; lastActivity: string | null }
+      >;
+    }
+  >();
 
   for (const e of enrollments) {
     const pId = e.playerId;
@@ -327,10 +394,20 @@ export async function getCompletionMatrix(queryParams: any) {
       });
     }
 
-const activities = (e.activities ?? []) as unknown as { action: string; createdAt: Date }[];
-    const lastAct = activities.length > 0
-      ? activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0].createdAt.toISOString()
-      : null;
+    const activities = (e.activities ?? []) as unknown as {
+      action: string;
+      createdAt: Date;
+    }[];
+    const lastAct =
+      activities.length > 0
+        ? activities
+            .sort(
+              (a, b) =>
+                new Date(b.createdAt).getTime() -
+                new Date(a.createdAt).getTime(),
+            )[0]
+            .createdAt.toISOString()
+        : null;
 
     playerMap.get(pId)!.courses.set(e.courseId, {
       status: e.status,
@@ -342,9 +419,13 @@ const activities = (e.activities ?? []) as unknown as { action: string; createdA
   // Flatten into response
   const players = Array.from(playerMap.entries()).map(([playerId, data]) => ({
     player: data.player,
-    completions: courses.map(c => ({
+    completions: courses.map((c) => ({
       courseId: c.id,
-      ...(data.courses.get(c.id) ?? { status: 'NotEnrolled', progressPct: 0, lastActivity: null }),
+      ...(data.courses.get(c.id) ?? {
+        status: "NotEnrolled",
+        progressPct: 0,
+        lastActivity: null,
+      }),
     })),
   }));
 

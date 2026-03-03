@@ -13,74 +13,89 @@
 //   ├── matches.seed.ts     — 8 matches + match players + stats
 //   └── operations.seed.ts  — Offers, tasks, finance, docs, gates, referrals, scouting
 // ─────────────────────────────────────────────────────────────
-import { sequelize } from '../config/database';
-import { env } from '../config/env';
-import { User } from '../modules/Users/user.model';
+import { sequelize } from "../config/database";
+import { env } from "../config/env";
+import { User } from "../modules/Users/user.model";
 
 // Schema
-import { createMissingTables, createViews } from './schema';
+import { createMissingTables, createViews } from "./schema";
 
 // Data seeders
-import { seedUsers } from './users.seed';
-import { seedClubs } from './clubs.seed';
-import { seedPlayers } from './players.seed';
-import { seedContracts } from './contracts.seed';
-import { seedMatches, seedMatchPlayers, seedMatchStats, seedPerformances } from './matches.seed';
-import { seedOffers, seedTasks, seedFinance, seedDocuments, seedGates, seedReferrals, seedScouting } from './operations.seed';
+import { seedUsers } from "./users.seed";
+import { seedClubs } from "./clubs.seed";
+import { seedPlayers } from "./players.seed";
+import { seedContracts } from "./contracts.seed";
+import {
+  seedMatches,
+  seedMatchPlayers,
+  seedMatchStats,
+  seedPerformances,
+} from "./matches.seed";
+import {
+  seedOffers,
+  seedTasks,
+  seedFinance,
+  seedDocuments,
+  seedGates,
+  seedReferrals,
+  seedScouting,
+} from "./operations.seed";
 
 export async function seedDatabase(): Promise<void> {
-    if (env.nodeEnv !== 'development') {
-        console.log('⏭️  Skipping seed — not in development mode');
-        return;
+  if (env.nodeEnv !== "development") {
+    console.log("⏭️  Skipping seed — not in development mode");
+    return;
+  }
+
+  try {
+    // Ensure schema migrations run on every startup (e.g. new columns)
+    await createMissingTables();
+
+    // Check if already seeded
+    const existingAdmin = await User.findOne({
+      where: { email: "admin@sadara.com" },
+    });
+    if (existingAdmin) {
+      console.log("⏭️  Database already seeded (admin user exists)");
+      return;
     }
 
-    try {
-        // Ensure schema migrations run on every startup (e.g. new columns)
-        await createMissingTables();
+    console.log("🌱 Seeding development database...");
 
-        // Check if already seeded
-        const existingAdmin = await User.findOne({ where: { email: 'admin@sadara.com' } });
-        if (existingAdmin) {
-            console.log('⏭️  Database already seeded (admin user exists)');
-            return;
-        }
+    // Sync models → create tables (first-time only)
+    await sequelize.sync({ alter: false });
 
-        console.log('🌱 Seeding development database...');
+    // Seed in FK order
+    await seedUsers();
+    await seedClubs();
+    await seedPlayers();
+    await seedContracts();
+    await seedMatches();
+    await seedOffers();
+    await seedTasks();
+    await seedFinance();
+    await seedDocuments();
+    await seedGates();
+    await seedReferrals();
+    await seedScouting();
+    await seedPerformances();
+    await seedMatchPlayers();
+    await seedMatchStats();
 
-        // Sync models → create tables (first-time only)
-        await sequelize.sync({ alter: false });
+    // Views depend on data
+    await createViews();
 
-        // Seed in FK order
-        await seedUsers();
-        await seedClubs();
-        await seedPlayers();
-        await seedContracts();
-        await seedMatches();
-        await seedOffers();
-        await seedTasks();
-        await seedFinance();
-        await seedDocuments();
-        await seedGates();
-        await seedReferrals();
-        await seedScouting();
-        await seedPerformances();
-        await seedMatchPlayers();
-        await seedMatchStats();
-
-        // Views depend on data
-        await createViews();
-
-        console.log('');
-        console.log('🎉 Development seed complete!');
-        console.log('   📧 admin@sadara.com   / Sadara2025!');
-        console.log('   📧 agent@sadara.com   / Sadara2025!');
-        console.log('   📧 analyst@sadara.com / Sadara2025!');
-        console.log('   📧 scout@sadara.com   / Sadara2025!');
-        console.log('   📧 salem@sadara.com   / Sadara2025! (Player)');
-    } catch (err) {
-        console.error('❌ Seed failed:', (err as Error).message);
-        console.error((err as Error).stack);
-        // Re-throw error to prevent server from starting with incomplete data
-        throw err;
-    }
+    console.log("");
+    console.log("🎉 Development seed complete!");
+    console.log("   📧 admin@sadara.com   / Sadara2025!");
+    console.log("   📧 agent@sadara.com   / Sadara2025!");
+    console.log("   📧 analyst@sadara.com / Sadara2025!");
+    console.log("   📧 scout@sadara.com   / Sadara2025!");
+    console.log("   📧 salem@sadara.com   / Sadara2025! (Player)");
+  } catch (err) {
+    console.error("❌ Seed failed:", (err as Error).message);
+    console.error((err as Error).stack);
+    // Re-throw error to prevent server from starting with incomplete data
+    throw err;
+  }
 }

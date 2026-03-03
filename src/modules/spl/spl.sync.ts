@@ -12,24 +12,38 @@
 // Performances: raw SQL using ON CONFLICT (player_id, season, competition)
 // ─────────────────────────────────────────────────────────────
 
-import { Op, Sequelize } from 'sequelize';
-import { sequelize } from '../../config/database';
-import { Player } from '../players/player.model';
-import { Club } from '../clubs/club.model';
-import { ExternalProviderMapping } from '../players/externalProvider.model';
-import { scrapePlayerProfile, scrapeTeamRoster } from './spl.scraper';
-import { SPL_CLUB_REGISTRY } from './spl.registry';
-import { ScrapedPlayerFull, PlayerSyncResult, SplSyncSummary } from './spl.types';
+import { Op, Sequelize } from "sequelize";
+import { sequelize } from "../../config/database";
+import { Player } from "../players/player.model";
+import { Club } from "../clubs/club.model";
+import { ExternalProviderMapping } from "../players/externalProvider.model";
+import { scrapePlayerProfile, scrapeTeamRoster } from "./spl.scraper";
+import { SPL_CLUB_REGISTRY } from "./spl.registry";
+import {
+  ScrapedPlayerFull,
+  PlayerSyncResult,
+  SplSyncSummary,
+} from "./spl.types";
 
-const PROVIDER_SPL = 'SPL';
-const PROVIDER_PULSELIVE = 'PulseLive';
+const PROVIDER_SPL = "SPL";
+const PROVIDER_PULSELIVE = "PulseLive";
 
 const POSITION_MAP: Record<string, string> = {
-  goalkeeper: 'GK', defender: 'CB', midfielder: 'CM', forward: 'ST',
-  striker: 'ST', winger: 'LW', 'left back': 'LB', 'right back': 'RB',
-  'centre back': 'CB', 'center back': 'CB', 'central midfielder': 'CM',
-  'defensive midfielder': 'CDM', 'attacking midfielder': 'CAM',
-  'left winger': 'LW', 'right winger': 'RW',
+  goalkeeper: "GK",
+  defender: "CB",
+  midfielder: "CM",
+  forward: "ST",
+  striker: "ST",
+  winger: "LW",
+  "left back": "LB",
+  "right back": "RB",
+  "centre back": "CB",
+  "center back": "CB",
+  "central midfielder": "CM",
+  "defensive midfielder": "CDM",
+  "attacking midfielder": "CAM",
+  "left winger": "LW",
+  "right winger": "RW",
 };
 
 function normalizePosition(raw: string | null): string | null {
@@ -39,15 +53,18 @@ function normalizePosition(raw: string | null): string | null {
 
 function splitName(full: string): { firstName: string; lastName: string } {
   const p = full.trim().split(/\s+/);
-  return p.length === 1 ? { firstName: p[0], lastName: '' } : { firstName: p[0], lastName: p.slice(1).join(' ') };
+  return p.length === 1
+    ? { firstName: p[0], lastName: "" }
+    : { firstName: p[0], lastName: p.slice(1).join(" ") };
 }
-
 
 // ══════════════════════════════════════════
 // RESOLVE PLAYER — find or create
 // ══════════════════════════════════════════
 
-async function resolvePlayer(scraped: ScrapedPlayerFull): Promise<PlayerSyncResult> {
+async function resolvePlayer(
+  scraped: ScrapedPlayerFull,
+): Promise<PlayerSyncResult> {
   const { bio, currentSeasonStats } = scraped;
   const { firstName, lastName } = splitName(bio.fullName);
 
@@ -59,13 +76,21 @@ async function resolvePlayer(scraped: ScrapedPlayerFull): Promise<PlayerSyncResu
   if (existing) {
     const player = await Player.findByPk(existing.playerId);
     if (!player) {
-      return { splPlayerId: bio.splPlayerId, playerName: bio.fullName, sadaraPlayerId: existing.playerId, action: 'skipped', reason: 'Mapping exists but player missing' };
+      return {
+        splPlayerId: bio.splPlayerId,
+        playerName: bio.fullName,
+        sadaraPlayerId: existing.playerId,
+        action: "skipped",
+        reason: "Mapping exists but player missing",
+      };
     }
 
     // Update fields that may have changed
     const updates: Record<string, any> = {};
-    if (bio.photoUrl && !player.getDataValue('photoUrl')) updates.photoUrl = bio.photoUrl;
-    if (bio.heightCm && !player.getDataValue('heightCm')) updates.heightCm = bio.heightCm;
+    if (bio.photoUrl && !player.getDataValue("photoUrl"))
+      updates.photoUrl = bio.photoUrl;
+    if (bio.heightCm && !player.getDataValue("heightCm"))
+      updates.heightCm = bio.heightCm;
     if (bio.jerseyNumber !== null) updates.jerseyNumber = bio.jerseyNumber;
     if (bio.position) updates.position = normalizePosition(bio.position);
     if (bio.splTeamId) {
@@ -75,8 +100,14 @@ async function resolvePlayer(scraped: ScrapedPlayerFull): Promise<PlayerSyncResu
     if (Object.keys(updates).length > 0) await player.update(updates);
     await existing.update({ lastSyncedAt: new Date() });
 
-    if (currentSeasonStats) await upsertPerformance(player.id, currentSeasonStats);
-    return { splPlayerId: bio.splPlayerId, playerName: bio.fullName, sadaraPlayerId: player.id, action: 'updated' };
+    if (currentSeasonStats)
+      await upsertPerformance(player.id, currentSeasonStats);
+    return {
+      splPlayerId: bio.splPlayerId,
+      playerName: bio.fullName,
+      sadaraPlayerId: player.id,
+      action: "updated",
+    };
   }
 
   // ── 2. Fuzzy match name + DOB ──
@@ -84,44 +115,69 @@ async function resolvePlayer(scraped: ScrapedPlayerFull): Promise<PlayerSyncResu
   if (fuzzy) {
     await createMappings(fuzzy.id, bio);
     await fuzzy.update({
-      photoUrl: bio.photoUrl || fuzzy.getDataValue('photoUrl'),
-      heightCm: bio.heightCm || fuzzy.getDataValue('heightCm'),
-      jerseyNumber: bio.jerseyNumber ?? fuzzy.getDataValue('jerseyNumber'),
+      photoUrl: bio.photoUrl || fuzzy.getDataValue("photoUrl"),
+      heightCm: bio.heightCm || fuzzy.getDataValue("heightCm"),
+      jerseyNumber: bio.jerseyNumber ?? fuzzy.getDataValue("jerseyNumber"),
     });
-    if (currentSeasonStats) await upsertPerformance(fuzzy.id, currentSeasonStats);
-    return { splPlayerId: bio.splPlayerId, playerName: bio.fullName, sadaraPlayerId: fuzzy.id, action: 'updated', reason: 'Linked via name+DOB' };
+    if (currentSeasonStats)
+      await upsertPerformance(fuzzy.id, currentSeasonStats);
+    return {
+      splPlayerId: bio.splPlayerId,
+      playerName: bio.fullName,
+      sadaraPlayerId: fuzzy.id,
+      action: "updated",
+      reason: "Linked via name+DOB",
+    };
   }
 
   // ── 3. Create new player ──
-  const clubId = bio.splTeamId ? (await findClubBySplId(bio.splTeamId))?.id : null;
+  const clubId = bio.splTeamId
+    ? (await findClubBySplId(bio.splTeamId))?.id
+    : null;
   const newPlayer = await Player.create({
-    firstName, lastName,
-    dateOfBirth: bio.dateOfBirth || '2000-01-01',
+    firstName,
+    lastName,
+    dateOfBirth: bio.dateOfBirth || "2000-01-01",
     nationality: bio.nationality || undefined,
     position: normalizePosition(bio.position) || undefined,
     heightCm: bio.heightCm || undefined,
     jerseyNumber: bio.jerseyNumber || undefined,
     photoUrl: bio.photoUrl || undefined,
     currentClubId: clubId || undefined,
-    playerType: 'Pro',
-    status: 'active',
+    playerType: "Pro",
+    status: "active",
   } as any);
 
   await createMappings(newPlayer.id, bio);
-  if (currentSeasonStats) await upsertPerformance(newPlayer.id, currentSeasonStats);
-  return { splPlayerId: bio.splPlayerId, playerName: bio.fullName, sadaraPlayerId: newPlayer.id, action: 'created' };
+  if (currentSeasonStats)
+    await upsertPerformance(newPlayer.id, currentSeasonStats);
+  return {
+    splPlayerId: bio.splPlayerId,
+    playerName: bio.fullName,
+    sadaraPlayerId: newPlayer.id,
+    action: "created",
+  };
 }
-
 
 // ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
 
-async function findByNameDob(first: string, last: string, dob: string | null): Promise<Player | null> {
+async function findByNameDob(
+  first: string,
+  last: string,
+  dob: string | null,
+): Promise<Player | null> {
   const where: any = {
     [Op.and]: [
-      Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('first_name')), first.toLowerCase()),
-      Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('last_name')), last.toLowerCase()),
+      Sequelize.where(
+        Sequelize.fn("LOWER", Sequelize.col("first_name")),
+        first.toLowerCase(),
+      ),
+      Sequelize.where(
+        Sequelize.fn("LOWER", Sequelize.col("last_name")),
+        last.toLowerCase(),
+      ),
     ],
   };
   if (dob) where.dateOfBirth = dob;
@@ -129,7 +185,7 @@ async function findByNameDob(first: string, last: string, dob: string | null): P
 }
 
 async function findClubBySplId(splTeamId: string): Promise<Club | null> {
-  const entry = SPL_CLUB_REGISTRY.find(c => c.splTeamId === splTeamId);
+  const entry = SPL_CLUB_REGISTRY.find((c) => c.splTeamId === splTeamId);
   // Try spl_team_id column first, then name fallback
   return Club.findOne({
     where: {
@@ -141,7 +197,10 @@ async function findClubBySplId(splTeamId: string): Promise<Club | null> {
   });
 }
 
-async function createMappings(playerId: string, bio: ScrapedPlayerFull['bio']): Promise<void> {
+async function createMappings(
+  playerId: string,
+  bio: ScrapedPlayerFull["bio"],
+): Promise<void> {
   // Real constraint: UNIQUE(player_id, provider_name)
   await ExternalProviderMapping.upsert({
     playerId,
@@ -163,7 +222,6 @@ async function createMappings(playerId: string, bio: ScrapedPlayerFull['bio']): 
   }
 }
 
-
 // ── Performance upsert (raw SQL → real constraint) ──
 // Real table: performances
 // Real constraint: UNIQUE(player_id, season, competition)
@@ -173,10 +231,10 @@ async function createMappings(playerId: string, bio: ScrapedPlayerFull['bio']): 
 
 async function upsertPerformance(
   playerId: string,
-  stats: NonNullable<ScrapedPlayerFull['currentSeasonStats']>,
+  stats: NonNullable<ScrapedPlayerFull["currentSeasonStats"]>,
 ): Promise<void> {
-  const season = '2025-2026';
-  const competition = 'Saudi Pro League';
+  const season = "2025-2026";
+  const competition = "Saudi Pro League";
   const starts = stats.appearances - stats.substitutions;
 
   await sequelize.query(
@@ -205,8 +263,10 @@ async function upsertPerformance(
        updated_at = NOW()`,
     {
       replacements: {
-        playerId, season, competition,
-        dataSource: 'SPL',
+        playerId,
+        season,
+        competition,
+        dataSource: "SPL",
         appearances: stats.appearances,
         starts,
         goals: stats.goals,
@@ -218,21 +278,33 @@ async function upsertPerformance(
   );
 }
 
-
 // ══════════════════════════════════════════
 // PUBLIC API
 // ══════════════════════════════════════════
 
-export async function syncPlayer(splPlayerId: string, slug?: string): Promise<PlayerSyncResult> {
-  const scraped = await scrapePlayerProfile(splPlayerId, slug || 'player');
-  if (!scraped) return { splPlayerId, playerName: 'Unknown', sadaraPlayerId: '', action: 'skipped', reason: 'Profile not found' };
+export async function syncPlayer(
+  splPlayerId: string,
+  slug?: string,
+): Promise<PlayerSyncResult> {
+  const scraped = await scrapePlayerProfile(splPlayerId, slug || "player");
+  if (!scraped)
+    return {
+      splPlayerId,
+      playerName: "Unknown",
+      sadaraPlayerId: "",
+      action: "skipped",
+      reason: "Profile not found",
+    };
   return resolvePlayer(scraped);
 }
 
 export async function syncTeam(splTeamId: string): Promise<SplSyncSummary> {
   const start = Date.now();
   const results: PlayerSyncResult[] = [];
-  let created = 0, updated = 0, skipped = 0, errors = 0;
+  let created = 0,
+    updated = 0,
+    skipped = 0,
+    errors = 0;
 
   const roster = await scrapeTeamRoster(splTeamId);
   console.log(`[SPL Sync] Team ${splTeamId}: ${roster.length} players`);
@@ -241,38 +313,89 @@ export async function syncTeam(splTeamId: string): Promise<SplSyncSummary> {
     const { splPlayerId, slug, name } = roster[i];
     try {
       const scraped = await scrapePlayerProfile(splPlayerId, slug);
-      if (!scraped) { results.push({ splPlayerId, playerName: name, sadaraPlayerId: '', action: 'skipped', reason: 'No data' }); skipped++; continue; }
+      if (!scraped) {
+        results.push({
+          splPlayerId,
+          playerName: name,
+          sadaraPlayerId: "",
+          action: "skipped",
+          reason: "No data",
+        });
+        skipped++;
+        continue;
+      }
       const r = await resolvePlayer(scraped);
       results.push(r);
-      if (r.action === 'created') created++; else if (r.action === 'updated') updated++; else skipped++;
+      if (r.action === "created") created++;
+      else if (r.action === "updated") updated++;
+      else skipped++;
     } catch (err: any) {
       console.error(`[SPL Sync] Error ${name}: ${err.message}`);
-      results.push({ splPlayerId, playerName: name, sadaraPlayerId: '', action: 'skipped', reason: err.message });
+      results.push({
+        splPlayerId,
+        playerName: name,
+        sadaraPlayerId: "",
+        action: "skipped",
+        reason: err.message,
+      });
       errors++;
     }
-    if (i < roster.length - 1) await new Promise(r => setTimeout(r, 1500));
+    if (i < roster.length - 1) await new Promise((r) => setTimeout(r, 1500));
   }
 
-  const summary: SplSyncSummary = { total: roster.length, created, updated, skipped, errors, results, syncedAt: new Date(), durationMs: Date.now() - start };
-  console.log(`[SPL Sync] ✓ Team ${splTeamId}: ${created}c ${updated}u ${skipped}s ${errors}e (${summary.durationMs}ms)`);
+  const summary: SplSyncSummary = {
+    total: roster.length,
+    created,
+    updated,
+    skipped,
+    errors,
+    results,
+    syncedAt: new Date(),
+    durationMs: Date.now() - start,
+  };
+  console.log(
+    `[SPL Sync] ✓ Team ${splTeamId}: ${created}c ${updated}u ${skipped}s ${errors}e (${summary.durationMs}ms)`,
+  );
   return summary;
 }
 
 export async function syncAllTeams(
   onProgress?: (name: string, i: number, total: number) => void,
-): Promise<{ teams: number; totalPlayers: number; created: number; updated: number; errors: number }> {
-  let total = 0, c = 0, u = 0, e = 0;
+): Promise<{
+  teams: number;
+  totalPlayers: number;
+  created: number;
+  updated: number;
+  errors: number;
+}> {
+  let total = 0,
+    c = 0,
+    u = 0,
+    e = 0;
   for (let i = 0; i < SPL_CLUB_REGISTRY.length; i++) {
     const club = SPL_CLUB_REGISTRY[i];
     if (onProgress) onProgress(club.nameEn, i, SPL_CLUB_REGISTRY.length);
-    console.log(`\n[SPL Sync] ── ${club.nameEn} (${i + 1}/${SPL_CLUB_REGISTRY.length}) ──`);
+    console.log(
+      `\n[SPL Sync] ── ${club.nameEn} (${i + 1}/${SPL_CLUB_REGISTRY.length}) ──`,
+    );
     try {
       const s = await syncTeam(club.splTeamId);
-      total += s.total; c += s.created; u += s.updated; e += s.errors;
+      total += s.total;
+      c += s.created;
+      u += s.updated;
+      e += s.errors;
     } catch (err: any) {
-      console.error(`[SPL Sync] ✗ ${club.nameEn}: ${err.message}`); e++;
+      console.error(`[SPL Sync] ✗ ${club.nameEn}: ${err.message}`);
+      e++;
     }
-    if (i < SPL_CLUB_REGISTRY.length - 1) await new Promise(r => setTimeout(r, 3000));
+    if (i < SPL_CLUB_REGISTRY.length - 1)
+      await new Promise((r) => setTimeout(r, 3000));
   }
-  return { teams: SPL_CLUB_REGISTRY.length, totalPlayers: total, created: c, updated: u, errors: e };
+  return {
+    teams: SPL_CLUB_REGISTRY.length,
+    totalPlayers: total,
+    created: c,
+    updated: u,
+    errors: e,
+  };
 }

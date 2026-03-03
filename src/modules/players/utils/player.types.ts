@@ -8,10 +8,10 @@ export interface ListPlayersQuery {
   page?: number;
   limit?: number;
   sort?: string;
-  order?: 'asc' | 'desc';
+  order?: "asc" | "desc";
   search?: string;
-  status?: 'active' | 'injured' | 'inactive';
-  playerType?: 'Pro' | 'Youth';
+  status?: "active" | "injured" | "inactive";
+  playerType?: "Pro" | "Youth";
   clubId?: string;
   position?: string;
   nationality?: string;
@@ -43,7 +43,7 @@ export interface RawPlayerStatsRow {
 }
 
 // ── Derived contract status ──
-export type ContractStatusLabel = 'Active' | 'Expiring Soon' | 'Expired';
+export type ContractStatusLabel = "Active" | "Expiring Soon" | "Expired";
 
 export interface DerivedContractInfo {
   contractStatus: ContractStatusLabel;
@@ -62,16 +62,22 @@ export interface EnrichedPlayerListItem {
   fullNameAr: string | null;
   dateOfBirth: string;
   nationality: string | null;
-  playerType: 'Pro' | 'Youth';
+  playerType: "Pro" | "Youth";
   position: string | null;
-  status: 'active' | 'injured' | 'inactive';
+  status: "active" | "injured" | "inactive";
   email: string | null;
   phone: string | null;
   photoUrl: string | null;
   marketValue: number | null;
-  marketValueCurrency: 'SAR' | 'USD' | 'EUR';
+  marketValueCurrency: "SAR" | "USD" | "EUR";
   currentClubId: string | null;
-  club: { id: string; name: string; nameAr?: string; logoUrl?: string; league?: string } | null;
+  club: {
+    id: string;
+    name: string;
+    nameAr?: string;
+    logoUrl?: string;
+    league?: string;
+  } | null;
   agent: { id: string; fullName: string; fullNameAr?: string } | null;
 
   // Enriched fields

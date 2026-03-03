@@ -5,25 +5,27 @@
 // FIX: Changed 'agencyCommissionPercent' → 'commissionPct'
 // to match the actual contracts table column (commission_pct).
 // ─────────────────────────────────────────────────────────────
-import { Op, fn, col } from 'sequelize';
-import { sequelize } from '../../../config/database';
+import { Op, fn, col } from "sequelize";
+import { sequelize } from "../../../config/database";
 import {
   RawContractRow,
   RawInjuryCountRow,
   RawPlayerStatsRow,
-} from './player.types';
+} from "./player.types";
 import {
   buildContractMap,
   buildInjuryMap,
   buildStatsMap,
-} from './player.utils';
-import { EnrichmentMaps } from './player.serializer';
+} from "./player.utils";
+import { EnrichmentMaps } from "./player.serializer";
 
 /**
  * Given an array of player IDs, fires 3 parallel queries and
  * returns lookup Maps for contracts, injuries, and match stats.
  */
-export async function fetchEnrichmentMaps(playerIds: string[]): Promise<EnrichmentMaps> {
+export async function fetchEnrichmentMaps(
+  playerIds: string[],
+): Promise<EnrichmentMaps> {
   const Contract = sequelize.models.Contract;
   const Injury = sequelize.models.Injury;
   const PlayerMatchStats = sequelize.models.PlayerMatchStats;
@@ -34,8 +36,8 @@ export async function fetchEnrichmentMaps(playerIds: string[]): Promise<Enrichme
     // ── Active contracts (latest per player) ──
     Contract
       ? Contract.findAll({
-          where: { playerId: playerIdFilter, status: 'Active' },
-          attributes: ['playerId', 'endDate', 'commissionPct'],  // FIX: was 'agencyCommissionPercent'
+          where: { playerId: playerIdFilter, status: "Active" },
+          attributes: ["playerId", "endDate", "commissionPct"], // FIX: was 'agencyCommissionPercent'
           raw: true,
         })
       : Promise.resolve([]),
@@ -43,9 +45,9 @@ export async function fetchEnrichmentMaps(playerIds: string[]): Promise<Enrichme
     // ── Active injury count per player ──
     Injury
       ? Injury.findAll({
-          where: { playerId: playerIdFilter, status: 'UnderTreatment' },
-          attributes: ['playerId', [fn('COUNT', col('id')), 'count']],
-          group: ['playerId'],
+          where: { playerId: playerIdFilter, status: "UnderTreatment" },
+          attributes: ["playerId", [fn("COUNT", col("id")), "count"]],
+          group: ["playerId"],
           raw: true,
         })
       : Promise.resolve([]),
@@ -55,14 +57,14 @@ export async function fetchEnrichmentMaps(playerIds: string[]): Promise<Enrichme
       ? PlayerMatchStats.findAll({
           where: { playerId: playerIdFilter },
           attributes: [
-            'playerId',
-            [fn('COUNT', col('id')), 'matches'],
-            [fn('SUM', col('goals')), 'goals'],
-            [fn('SUM', col('assists')), 'assists'],
-            [fn('SUM', col('minutes_played')), 'minutesPlayed'],
-            [fn('AVG', col('rating')), 'avgRating'],
+            "playerId",
+            [fn("COUNT", col("id")), "matches"],
+            [fn("SUM", col("goals")), "goals"],
+            [fn("SUM", col("assists")), "assists"],
+            [fn("SUM", col("minutes_played")), "minutesPlayed"],
+            [fn("AVG", col("rating")), "avgRating"],
           ],
-          group: ['playerId'],
+          group: ["playerId"],
           raw: true,
         })
       : Promise.resolve([]),

@@ -1,8 +1,12 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import * as contractService from './contract.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import * as contractService from "./contract.service";
 
 // ── List Contracts ──
 export async function list(req: AuthRequest, res: Response) {
@@ -21,11 +25,11 @@ export async function create(req: AuthRequest, res: Response) {
   const contract = await contractService.createContract(req.body, req.user!.id);
 
   await logAudit(
-    'CREATE',
-    'contracts',
+    "CREATE",
+    "contracts",
     contract.id,
     buildAuditContext(req.user!, req.ip),
-    `Created contract: ${contract.title || 'Untitled'}`,
+    `Created contract: ${contract.title || "Untitled"}`,
   );
 
   sendCreated(res, contract);
@@ -33,17 +37,20 @@ export async function create(req: AuthRequest, res: Response) {
 
 // ── Update Contract ──
 export async function update(req: AuthRequest, res: Response) {
-  const contract = await contractService.updateContract(req.params.id, req.body);
-
-  await logAudit(
-    'UPDATE',
-    'contracts',
+  const contract = await contractService.updateContract(
     req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    `Updated contract: ${contract.title || 'Untitled'}`,
+    req.body,
   );
 
-  sendSuccess(res, contract, 'Contract updated');
+  await logAudit(
+    "UPDATE",
+    "contracts",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    `Updated contract: ${contract.title || "Untitled"}`,
+  );
+
+  sendSuccess(res, contract, "Contract updated");
 }
 
 // ── Delete Contract ──
@@ -51,14 +58,14 @@ export async function remove(req: AuthRequest, res: Response) {
   const result = await contractService.deleteContract(req.params.id);
 
   await logAudit(
-    'DELETE',
-    'contracts',
+    "DELETE",
+    "contracts",
     result.id,
     buildAuditContext(req.user!, req.ip),
-    'Contract deleted',
+    "Contract deleted",
   );
 
-  sendSuccess(res, result, 'Contract deleted');
+  sendSuccess(res, result, "Contract deleted");
 }
 
 // ── Terminate Contract (NEW) ──
@@ -70,12 +77,12 @@ export async function terminate(req: AuthRequest, res: Response) {
   );
 
   await logAudit(
-    'UPDATE',
-    'contracts',
+    "UPDATE",
+    "contracts",
     req.params.id,
     buildAuditContext(req.user!, req.ip),
-    `Contract terminated: ${contract.title || 'Untitled'} — Reason: ${req.body.reason}`,
+    `Contract terminated: ${contract.title || "Untitled"} — Reason: ${req.body.reason}`,
   );
 
-  sendSuccess(res, contract, 'Contract terminated');
+  sendSuccess(res, contract, "Contract terminated");
 }

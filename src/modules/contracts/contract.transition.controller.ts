@@ -7,29 +7,29 @@
 //  3. Agent signatures stored in agentSignatureData/agentSignedAt/agentSigningMethod
 //  4. Player signatures stay in signedDocumentUrl/signedAt/signingMethod
 // ─────────────────────────────────────────────────────────────
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import { AppError } from '../../middleware/errorHandler';
-import { Contract } from './contract.model';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import { sendSuccess } from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { AppError } from "../../middleware/errorHandler";
+import { Contract } from "./contract.model";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {
   Draft: {
-    submit_review: 'Review',
+    submit_review: "Review",
   },
   Review: {
-    approve: 'Signing',
-    reject_to_draft: 'Draft',
+    approve: "Signing",
+    reject_to_draft: "Draft",
   },
   Signing: {
-    agent_sign_digital: 'AwaitingPlayer',   // Agent signs → awaiting player
-    agent_sign_upload: 'AwaitingPlayer',     // Agent uploads → awaiting player
-    return_review: 'Review',
+    agent_sign_digital: "AwaitingPlayer", // Agent signs → awaiting player
+    agent_sign_upload: "AwaitingPlayer", // Agent uploads → awaiting player
+    return_review: "Review",
   },
   AwaitingPlayer: {
-    return_review: 'Review',                 // Admin can pull back
+    return_review: "Review", // Admin can pull back
   },
   // Note: AwaitingPlayer → Active happens via player portal (portal.service.ts)
 };
@@ -41,19 +41,22 @@ export async function transitionContract(req: AuthRequest, res: Response) {
   const { action, signatureData, signedDocumentUrl, notes } = req.body;
 
   const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   const currentStatus = contract.status;
   const allowedActions = TRANSITION_MAP[currentStatus];
 
   if (!allowedActions) {
-    throw new AppError(`Contract in status '${currentStatus}' cannot be transitioned`, 400);
+    throw new AppError(
+      `Contract in status '${currentStatus}' cannot be transitioned`,
+      400,
+    );
   }
 
   const nextStatus = allowedActions[action];
   if (!nextStatus) {
     throw new AppError(
-      `Action '${action}' is not valid for status '${currentStatus}'. Allowed: ${Object.keys(allowedActions).join(', ')}`,
+      `Action '${action}' is not valid for status '${currentStatus}'. Allowed: ${Object.keys(allowedActions).join(", ")}`,
       400,
     );
   }
@@ -64,29 +67,32 @@ export async function transitionContract(req: AuthRequest, res: Response) {
   };
 
   // ── Agent digital signature → stored in agent fields ──
-  if (action === 'agent_sign_digital') {
+  if (action === "agent_sign_digital") {
     if (!signatureData) {
-      throw new AppError('signatureData is required for digital signing', 400);
+      throw new AppError("signatureData is required for digital signing", 400);
     }
-    updatePayload.agentSignatureData = signatureData;   // base64 image
+    updatePayload.agentSignatureData = signatureData; // base64 image
     updatePayload.agentSignedAt = new Date();
-    updatePayload.agentSigningMethod = 'digital';
+    updatePayload.agentSigningMethod = "digital";
   }
 
   // ── Agent upload signature → stored in agent fields ──
-  if (action === 'agent_sign_upload') {
+  if (action === "agent_sign_upload") {
     if (!signedDocumentUrl) {
-      throw new AppError('signedDocumentUrl is required for upload signing', 400);
+      throw new AppError(
+        "signedDocumentUrl is required for upload signing",
+        400,
+      );
     }
     updatePayload.agentSignatureData = signedDocumentUrl;
     updatePayload.agentSignedAt = new Date();
-    updatePayload.agentSigningMethod = 'upload';
+    updatePayload.agentSigningMethod = "upload";
   }
 
   // Add notes if provided
   if (notes) {
-    const existing = contract.notes || '';
-    const timestamp = new Date().toISOString().split('T')[0];
+    const existing = contract.notes || "";
+    const timestamp = new Date().toISOString().split("T")[0];
     updatePayload.notes = existing
       ? `${existing}\n[${timestamp}] ${action}: ${notes}`
       : `[${timestamp}] ${action}: ${notes}`;
@@ -96,8 +102,8 @@ export async function transitionContract(req: AuthRequest, res: Response) {
 
   // Audit log
   await logAudit(
-    'UPDATE',
-    'contracts',
+    "UPDATE",
+    "contracts",
     id,
     buildAuditContext(req.user!, req.ip),
     `Contract transitioned: ${currentStatus} → ${nextStatus} (action: ${action})`,
