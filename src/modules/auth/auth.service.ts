@@ -286,20 +286,8 @@ export async function forgotPassword(email: string) {
     resetUrl,
   );
 
-  // Also log to console as backup (useful for Railway logs)
-  console.log('═══════════════════════════════════════════════');
-  console.log('🔑 PASSWORD RESET REQUEST');
-  console.log(`   Email:      ${email}`);
-  console.log(`   Email sent: ${emailSent ? '✅ Yes' : '❌ No (logged only)'}`);
-  console.log(`   Expiry:     ${expiry.toISOString()}`);
-  console.log('═══════════════════════════════════════════════');
-
-  // In dev mode, return the token in the response for testing
-  const isDev = env.nodeEnv !== 'production';
-
   return {
     message: 'If this email exists, a reset link has been sent.',
-    ...(isDev && { resetUrl, token: rawToken }),
   };
 }
 

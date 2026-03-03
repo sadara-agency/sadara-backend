@@ -182,10 +182,10 @@ export async function generatePdf(req: AuthRequest, res: Response) {
 
   // Validate brand assets exist
   if (!fs.existsSync(COVER_PDF)) {
-    throw new AppError(`Brand asset not found: ${COVER_PDF}. Place cover_page.pdf in src/assets/pdf/`, 500);
+    throw new AppError('Brand asset cover_page.pdf not found. Place it in src/assets/pdf/', 500);
   }
   if (!fs.existsSync(BACK_PDF)) {
-    throw new AppError(`Brand asset not found: ${BACK_PDF}. Place back_page.pdf in src/assets/pdf/`, 500);
+    throw new AppError('Brand asset back_page.pdf not found. Place it in src/assets/pdf/', 500);
   }
 
   const d = getData(contract);
@@ -245,6 +245,6 @@ export async function generatePdf(req: AuthRequest, res: Response) {
   } catch (err: any) {
     if (browser) try { await browser.close(); } catch {}
     console.error('PDF generation error:', err.message);
-    throw new AppError(`PDF generation failed: ${err.message}`, 500);
+    throw new AppError('PDF generation failed. Please try again or contact support.', 500);
   }
 }

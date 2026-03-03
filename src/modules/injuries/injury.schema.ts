@@ -64,7 +64,7 @@ export const injuryQuerySchema = z.object({
   to: z.string().optional(),
   page: z.string().optional(),
   limit: z.string().optional(),
-  sort: z.string().optional(),
+  sort: z.enum(['created_at', 'updated_at', 'injury_date', 'expected_return_date', 'severity', 'status']).optional(),
   order: z.enum(['ASC', 'DESC', 'asc', 'desc']).optional(),
   search: z.string().optional(),
 });

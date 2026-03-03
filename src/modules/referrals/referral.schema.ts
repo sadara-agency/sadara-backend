@@ -45,7 +45,7 @@ export const updateReferralStatusSchema = z.object({
 export const referralQuerySchema = z.object({
     page: z.coerce.number().min(1).default(1),
     limit: z.coerce.number().min(1).max(100).default(20),
-    sort: z.string().default('created_at'),
+    sort: z.enum(['created_at', 'updated_at', 'priority', 'status', 'referral_type', 'due_date']).default('created_at'),
     order: z.enum(['asc', 'desc']).default('desc'),
     search: z.string().optional(),
     status: z.enum(referralStatuses).optional(),

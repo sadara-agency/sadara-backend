@@ -33,6 +33,21 @@ export async function remove(req: AuthRequest, res: Response) {
   sendSuccess(res, result, 'Club deleted');
 }
 
+// ── Bulk Delete ──
+
+export async function bulkRemove(req: AuthRequest, res: Response) {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) {
+    throw new AppError('ids must be a non-empty array', 400);
+  }
+  if (ids.length > 100) {
+    throw new AppError('Cannot delete more than 100 clubs at once', 400);
+  }
+  const result = await clubService.deleteClubs(ids);
+  await logAudit('DELETE', 'clubs', null, buildAuditContext(req.user!, req.ip), `Bulk deleted ${result.count} clubs`);
+  sendSuccess(res, result, `${result.count} clubs deleted`);
+}
+
 // ── Upload Club Logo ──
 
 export async function uploadLogo(req: AuthRequest, res: Response) {

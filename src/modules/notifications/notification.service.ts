@@ -43,13 +43,14 @@ export async function notifyByRole(
     attributes: ['id'],
   });
 
-  const results = await Promise.allSettled(
-    users.map(u => createNotification({ ...input, userId: u.id }))
-  );
+  if (users.length === 0) return 0;
 
-  const created = results.filter(r => r.status === 'fulfilled' && r.value).length;
-  logger.info(`Notified ${created}/${users.length} users (roles: ${roles.join(',')}) — ${input.type}: ${input.title}`);
-  return created;
+  const records = users.map(u => ({ ...input, userId: u.id }));
+
+  const results = await Notification.bulkCreate(records as any[], { ignoreDuplicates: true });
+
+  logger.info(`Notified ${results.length}/${users.length} users (roles: ${roles.join(',')}) — ${input.type}: ${input.title}`);
+  return results.length;
 }
 
 // ── Notify a specific user ──

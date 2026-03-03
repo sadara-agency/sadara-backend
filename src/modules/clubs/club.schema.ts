@@ -33,10 +33,11 @@ export const updateClubSchema = createClubSchema.partial();
 export const clubQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(200).default(20),
-  sort: z.string().default('name'),
+  sort: z.enum(['name', 'created_at', 'updated_at', 'country', 'league', 'type']).default('name'),
   order: z.enum(['asc', 'desc']).default('asc'),
   search: z.string().optional(),
   type: z.enum(['Club', 'Sponsor']).optional(),
+  league: z.string().optional(),
   country: z.string().optional(),
 });
 

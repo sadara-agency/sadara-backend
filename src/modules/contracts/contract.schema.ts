@@ -78,7 +78,7 @@ export const transitionStatusSchema = z.object({
 export const contractQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.string().default('created_at'),
+  sort: z.enum(['created_at', 'updated_at', 'start_date', 'end_date', 'status', 'base_salary']).default('created_at'),
   order: z.enum(['asc', 'desc']).default('desc'),
   search: z.string().optional(),
   status: z.enum(CONTRACT_STATUSES).optional(),

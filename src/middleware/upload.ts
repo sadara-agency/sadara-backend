@@ -64,3 +64,56 @@ export const uploadSingle = multer({
 }).single('file');
 
 export const UPLOAD_DIR_PATH = UPLOAD_DIR;
+
+// ── Magic byte verification middleware ──
+// Checks actual file content to prevent MIME type spoofing.
+
+const MAGIC_BYTES: Record<string, { bytes: number[]; offset?: number }[]> = {
+  'application/pdf':    [{ bytes: [0x25, 0x50, 0x44, 0x46] }],           // %PDF
+  'image/jpeg':         [{ bytes: [0xFF, 0xD8, 0xFF] }],
+  'image/png':          [{ bytes: [0x89, 0x50, 0x4E, 0x47] }],
+  'image/webp':         [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }], // RIFF
+  'application/msword': [{ bytes: [0xD0, 0xCF, 0x11, 0xE0] }],           // OLE2
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [{ bytes: [0x50, 0x4B, 0x03, 0x04] }], // ZIP/PK
+  'application/vnd.ms-excel':     [{ bytes: [0xD0, 0xCF, 0x11, 0xE0] }],
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':     [{ bytes: [0x50, 0x4B, 0x03, 0x04] }],
+};
+
+import { Request, Response, NextFunction } from 'express';
+
+export function verifyFileType(req: Request, res: Response, next: NextFunction): void {
+  const file = req.file;
+  if (!file) return next();
+
+  const mime = file.mimetype;
+  const signatures = MAGIC_BYTES[mime];
+
+  // Text/CSV files have no reliable magic bytes — allow them through
+  if (!signatures) return next();
+
+  try {
+    const fd = fs.openSync(file.path, 'r');
+    const buf = Buffer.alloc(8);
+    fs.readSync(fd, buf, 0, 8, 0);
+    fs.closeSync(fd);
+
+    const match = signatures.some(sig => {
+      const offset = sig.offset || 0;
+      return sig.bytes.every((b, i) => buf[offset + i] === b);
+    });
+
+    if (!match) {
+      // Delete the spoofed file
+      fs.unlinkSync(file.path);
+      res.status(400).json({
+        success: false,
+        message: 'File content does not match its declared type.',
+      });
+      return;
+    }
+  } catch {
+    // If we can't verify, allow through (fail open for reads)
+  }
+
+  next();
+}

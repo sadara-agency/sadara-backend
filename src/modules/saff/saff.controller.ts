@@ -71,6 +71,17 @@ export async function importToSadara(req: AuthRequest, res: Response) {
   sendSuccess(res, { imported: result }, 'Import completed');
 }
 
+// ── Fetch Team Logos ──
+
+export async function fetchTeamLogos(req: AuthRequest, res: Response) {
+  const { season = '2025-2026' } = req.body;
+  const result = await saffService.fetchTeamLogos(season);
+  await logAudit('UPDATE', 'saff_team_maps', null, buildAuditContext(req.user!, req.ip),
+    `Fetched ${result.fetched} team logos out of ${result.total}`
+  );
+  sendSuccess(res, result, `Fetched ${result.fetched} logos`);
+}
+
 // ── Stats ──
 
 export async function getStats(req: AuthRequest, res: Response) {

@@ -2,6 +2,15 @@
 import nodemailer from 'nodemailer';
 import { env } from '../../config/env';
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ═══════════════════════════════════════════════════════════
 // Transporter (lazy-initialized singleton)
 // ═══════════════════════════════════════════════════════════
@@ -176,7 +185,7 @@ export async function sendPasswordResetEmail(
       إعادة تعيين كلمة المرور
     </h1>
     <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
-      مرحباً ${userName || ''}، تم طلب إعادة تعيين كلمة المرور لحسابك في صدارة.
+      مرحباً ${escapeHtml(userName || '')}، تم طلب إعادة تعيين كلمة المرور لحسابك في صدارة.
     </p>
 
     <!-- Button -->
@@ -230,7 +239,7 @@ export async function sendWelcomeEmail(
       مرحباً بك في صدارة!
     </h1>
     <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
-      مرحباً ${userName}، تم تسجيل حسابك بنجاح. سيقوم المسؤول بتفعيل حسابك قريباً وستتمكن من الوصول إلى المنصة.
+      مرحباً ${escapeHtml(userName)}، تم تسجيل حسابك بنجاح. سيقوم المسؤول بتفعيل حسابك قريباً وستتمكن من الوصول إلى المنصة.
     </p>
 
     <div style="background-color:rgba(60,60,250,0.05); border-radius:10px; padding:16px; border:1px solid rgba(60,60,250,0.1);">
@@ -268,7 +277,7 @@ export async function sendPasswordChangedEmail(
       تم تغيير كلمة المرور
     </h1>
     <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
-      مرحباً ${userName}، تم تغيير كلمة المرور الخاصة بحسابك في صدارة بنجاح.
+      مرحباً ${escapeHtml(userName)}، تم تغيير كلمة المرور الخاصة بحسابك في صدارة بنجاح.
     </p>
 
     <div style="background-color:rgba(239,68,68,0.05); border-radius:10px; padding:16px; margin-bottom:20px; border:1px solid rgba(239,68,68,0.1);">

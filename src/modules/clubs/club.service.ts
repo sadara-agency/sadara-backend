@@ -49,6 +49,7 @@ export async function listClubs(queryParams: any) {
   const where: any = { isActive: true };
 
   if (queryParams.type) where.type = queryParams.type;
+  if (queryParams.league) where.league = queryParams.league;
   if (queryParams.country) where.country = { [Op.iLike]: `%${queryParams.country}%` };
 
   if (search) {
@@ -160,12 +161,73 @@ export async function updateClub(id: string, input: UpdateClubInput) {
 }
 
 // ────────────────────────────────────────────────────────────
-// Delete Club
+// Delete Club (soft delete + FK cleanup)
 // ────────────────────────────────────────────────────────────
 export async function deleteClub(id: string) {
-  const deleted = await Club.destroy({ where: { id } });
-  if (!deleted) throw new AppError('Club not found', 404);
-  return { id };
+  const club = await Club.findByPk(id);
+  if (!club) throw new AppError('Club not found', 404);
+
+  const txn = await sequelize.transaction();
+  try {
+    // Soft delete
+    await sequelize.query(
+      `UPDATE clubs SET is_active = false, updated_at = NOW() WHERE id = :id`,
+      { replacements: { id }, transaction: txn },
+    );
+
+    // Null out FK references in matches, players, contracts
+    await sequelize.query(`UPDATE matches SET home_club_id = NULL WHERE home_club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(`UPDATE matches SET away_club_id = NULL WHERE away_club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(`UPDATE players SET current_club_id = NULL WHERE current_club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(`UPDATE contracts SET club_id = NULL WHERE club_id = :id`, { replacements: { id }, transaction: txn });
+
+    // Null out SAFF FK references
+    await sequelize.query(`UPDATE saff_standings SET club_id = NULL WHERE club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(`UPDATE saff_fixtures SET home_club_id = NULL WHERE home_club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(`UPDATE saff_fixtures SET away_club_id = NULL WHERE away_club_id = :id`, { replacements: { id }, transaction: txn });
+    await sequelize.query(`UPDATE saff_team_maps SET club_id = NULL WHERE club_id = :id`, { replacements: { id }, transaction: txn });
+
+    await txn.commit();
+    return { id };
+  } catch (error) {
+    await txn.rollback();
+    throw error;
+  }
+}
+
+// ────────────────────────────────────────────────────────────
+// Bulk Delete Clubs (soft delete + FK cleanup)
+// ────────────────────────────────────────────────────────────
+export async function deleteClubs(ids: string[]) {
+  if (!ids.length) return { count: 0 };
+
+  const txn = await sequelize.transaction();
+  try {
+    // Use raw SQL to guarantee correct column names
+    const [, meta] = await sequelize.query(
+      `UPDATE clubs SET is_active = false, updated_at = NOW() WHERE id IN (:ids) AND is_active = true`,
+      { replacements: { ids }, transaction: txn },
+    );
+    const affectedCount = (meta as any)?.rowCount ?? 0;
+
+    // Null out FK references in matches, players, contracts
+    await sequelize.query(`UPDATE matches SET home_club_id = NULL WHERE home_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(`UPDATE matches SET away_club_id = NULL WHERE away_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(`UPDATE players SET current_club_id = NULL WHERE current_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(`UPDATE contracts SET club_id = NULL WHERE club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+
+    // Null out SAFF FK references
+    await sequelize.query(`UPDATE saff_standings SET club_id = NULL WHERE club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(`UPDATE saff_fixtures SET home_club_id = NULL WHERE home_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(`UPDATE saff_fixtures SET away_club_id = NULL WHERE away_club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+    await sequelize.query(`UPDATE saff_team_maps SET club_id = NULL WHERE club_id IN (:ids)`, { replacements: { ids }, transaction: txn });
+
+    await txn.commit();
+    return { count: affectedCount };
+  } catch (error) {
+    await txn.rollback();
+    throw error;
+  }
 }
 
 // ────────────────────────────────────────────────────────────

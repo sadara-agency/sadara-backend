@@ -3,7 +3,7 @@ import { asyncHandler } from '../../middleware/errorHandler';
 import { authenticate, authorize } from '../../middleware/auth';
 import { validate } from '../../middleware/validate';
 import { createDocumentSchema, updateDocumentSchema, documentQuerySchema } from './document.schema';
-import { uploadSingle } from '../../middleware/upload';
+import { uploadSingle, verifyFileType } from '../../middleware/upload';
 import * as ctrl from './document.controller';
 
 const router = Router();
@@ -27,6 +27,7 @@ router.post('/upload',
       next();
     });
   },
+  verifyFileType,
   asyncHandler(ctrl.upload)
 );
 
