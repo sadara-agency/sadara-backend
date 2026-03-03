@@ -1,8 +1,8 @@
-import { Response } from 'express';
-import { sendSuccess, sendCreated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import { AuthRequest } from '../../shared/types';
-import * as portalService from './portal.service';
+import { Response } from "express";
+import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { AuthRequest } from "../../shared/types";
+import * as portalService from "./portal.service";
 
 // ── My Profile ──
 
@@ -52,12 +52,20 @@ export async function signMyContract(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { action, signatureData, signedDocumentUrl } = req.body;
   const contract = await portalService.signMyContract(
-    req.user!.id, id, action, signatureData, signedDocumentUrl,
+    req.user!.id,
+    id,
+    action,
+    signatureData,
+    signedDocumentUrl,
   );
-  await logAudit('UPDATE', 'contracts', id, buildAuditContext(req.user!, req.ip),
+  await logAudit(
+    "UPDATE",
+    "contracts",
+    id,
+    buildAuditContext(req.user!, req.ip),
     `Player signed contract via portal (method: ${action})`,
   );
-  sendSuccess(res, contract, 'Contract signed successfully');
+  sendSuccess(res, contract, "Contract signed successfully");
 }
 
 // ── Generate Invite Link (Admin/Manager only) ──
@@ -65,8 +73,12 @@ export async function signMyContract(req: AuthRequest, res: Response) {
 export async function generateInvite(req: AuthRequest, res: Response) {
   const { playerId } = req.body;
   const data = await portalService.generatePlayerInvite(playerId, req.user!.id);
-  await logAudit('CREATE', 'users', null, buildAuditContext(req.user!, req.ip),
-    `Generated player portal invite for ${data.playerName} (${data.playerEmail})`
+  await logAudit(
+    "CREATE",
+    "users",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Generated player portal invite for ${data.playerName} (${data.playerEmail})`,
   );
   sendCreated(res, data);
 }

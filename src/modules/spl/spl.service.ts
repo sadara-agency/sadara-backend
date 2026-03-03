@@ -4,16 +4,18 @@
 // Club external IDs use Sequelize model columns (splTeamId, espnTeamId).
 // ─────────────────────────────────────────────────────────────
 
-import { Op, Sequelize } from 'sequelize';
-import { Club } from '../clubs/club.model';
-import { SPL_CLUB_REGISTRY } from './spl.registry';
-
+import { Op, Sequelize } from "sequelize";
+import { Club } from "../clubs/club.model";
+import { SPL_CLUB_REGISTRY } from "./spl.registry";
 
 // ══════════════════════════════════════════
 // SEED CLUB EXTERNAL IDS
 // ══════════════════════════════════════════
 
-export async function seedClubExternalIds(): Promise<{ updated: number; notFound: string[] }> {
+export async function seedClubExternalIds(): Promise<{
+  updated: number;
+  notFound: string[];
+}> {
   let updated = 0;
   const notFound: string[] = [];
 
@@ -21,9 +23,14 @@ export async function seedClubExternalIds(): Promise<{ updated: number; notFound
     const club = await Club.findOne({
       where: {
         [Op.or]: [
-          Sequelize.where(Sequelize.fn('LOWER', Sequelize.col('name')), entry.nameEn.toLowerCase()),
+          Sequelize.where(
+            Sequelize.fn("LOWER", Sequelize.col("name")),
+            entry.nameEn.toLowerCase(),
+          ),
           { name: { [Op.iLike]: `%${entry.nameEn}%` } },
-          ...(entry.nameAr ? [{ nameAr: { [Op.like]: `%${entry.nameAr}%` } }] : []),
+          ...(entry.nameAr
+            ? [{ nameAr: { [Op.like]: `%${entry.nameAr}%` } }]
+            : []),
         ],
       },
     });
@@ -34,7 +41,9 @@ export async function seedClubExternalIds(): Promise<{ updated: number; notFound
         espnTeamId: parseInt(entry.espnTeamId, 10),
       });
       updated++;
-      console.log(`[SPL Service] ✓ ${entry.nameEn} → spl=${entry.splTeamId} espn=${entry.espnTeamId}`);
+      console.log(
+        `[SPL Service] ✓ ${entry.nameEn} → spl=${entry.splTeamId} espn=${entry.espnTeamId}`,
+      );
     } else {
       notFound.push(entry.nameEn);
       console.warn(`[SPL Service] ✗ No Sadara club for "${entry.nameEn}"`);
@@ -43,7 +52,6 @@ export async function seedClubExternalIds(): Promise<{ updated: number; notFound
 
   return { updated, notFound };
 }
-
 
 // ══════════════════════════════════════════
 // SYNC STATE (in-memory)
@@ -57,5 +65,9 @@ interface SyncState {
 
 const state: SyncState = { isRunning: false, lastRun: null, lastResult: null };
 
-export function getSyncState() { return { ...state }; }
-export function updateSyncState(p: Partial<SyncState>) { Object.assign(state, p); }
+export function getSyncState() {
+  return { ...state };
+}
+export function updateSyncState(p: Partial<SyncState>) {
+  Object.assign(state, p);
+}

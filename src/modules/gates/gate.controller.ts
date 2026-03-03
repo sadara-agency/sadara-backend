@@ -1,8 +1,12 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import * as gateService from './gate.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import * as gateService from "./gate.service";
 
 // ── List Gates ──
 
@@ -31,11 +35,11 @@ export async function create(req: AuthRequest, res: Response) {
   const gate = await gateService.createGate(req.body);
 
   await logAudit(
-    'CREATE',
-    'gates',
+    "CREATE",
+    "gates",
     gate.id,
     buildAuditContext(req.user!, req.ip),
-    `Created Gate ${gate.gateNumber} for player ${gate.playerId}`
+    `Created Gate ${gate.gateNumber} for player ${gate.playerId}`,
   );
 
   sendCreated(res, gate);
@@ -50,15 +54,15 @@ export async function initialize(req: AuthRequest, res: Response) {
     {
       autoStart: req.body.autoStart ?? false,
       notes: req.body.notes,
-    }
+    },
   );
 
   await logAudit(
-    'CREATE',
-    'gates',
+    "CREATE",
+    "gates",
     (gate as any).id,
     buildAuditContext(req.user!, req.ip),
-    `Initialized Gate ${req.body.gateNumber} for player ${req.body.playerId} with default checklist`
+    `Initialized Gate ${req.body.gateNumber} for player ${req.body.playerId} with default checklist`,
   );
 
   sendCreated(res, gate);
@@ -71,18 +75,22 @@ export async function advance(req: AuthRequest, res: Response) {
     req.params.id,
     req.body.action,
     req.user!.id,
-    req.body.notes
+    req.body.notes,
   );
 
   await logAudit(
-    'UPDATE',
-    'gates',
+    "UPDATE",
+    "gates",
     gate.id,
     buildAuditContext(req.user!, req.ip),
-    `Gate ${gate.gateNumber} ${req.body.action === 'start' ? 'started' : 'completed'}`
+    `Gate ${gate.gateNumber} ${req.body.action === "start" ? "started" : "completed"}`,
   );
 
-  sendSuccess(res, gate, `Gate ${req.body.action === 'start' ? 'started' : 'completed'}`);
+  sendSuccess(
+    res,
+    gate,
+    `Gate ${req.body.action === "start" ? "started" : "completed"}`,
+  );
 }
 
 // ── Update Gate ──
@@ -91,14 +99,14 @@ export async function update(req: AuthRequest, res: Response) {
   const gate = await gateService.updateGate(req.params.id, req.body);
 
   await logAudit(
-    'UPDATE',
-    'gates',
+    "UPDATE",
+    "gates",
     gate.id,
     buildAuditContext(req.user!, req.ip),
-    `Updated Gate ${gate.gateNumber}`
+    `Updated Gate ${gate.gateNumber}`,
   );
 
-  sendSuccess(res, gate, 'Gate updated');
+  sendSuccess(res, gate, "Gate updated");
 }
 
 // ── Delete Gate ──
@@ -107,14 +115,14 @@ export async function remove(req: AuthRequest, res: Response) {
   const result = await gateService.deleteGate(req.params.id);
 
   await logAudit(
-    'DELETE',
-    'gates',
+    "DELETE",
+    "gates",
     result.id,
     buildAuditContext(req.user!, req.ip),
-    'Gate deleted'
+    "Gate deleted",
   );
 
-  sendSuccess(res, result, 'Gate deleted');
+  sendSuccess(res, result, "Gate deleted");
 }
 
 // ══════════════════════════════════════════
@@ -127,11 +135,11 @@ export async function addChecklistItem(req: AuthRequest, res: Response) {
   const item = await gateService.addChecklistItem(req.params.gateId, req.body);
 
   await logAudit(
-    'CREATE',
-    'gate_checklists',
+    "CREATE",
+    "gate_checklists",
     item.id,
     buildAuditContext(req.user!, req.ip),
-    `Added checklist item to gate ${req.params.gateId}`
+    `Added checklist item to gate ${req.params.gateId}`,
   );
 
   sendCreated(res, item);
@@ -143,18 +151,22 @@ export async function toggleChecklistItem(req: AuthRequest, res: Response) {
   const item = await gateService.toggleChecklistItem(
     req.params.itemId,
     req.body,
-    req.user!.id
+    req.user!.id,
   );
 
   await logAudit(
-    'UPDATE',
-    'gate_checklists',
+    "UPDATE",
+    "gate_checklists",
     item.id,
     buildAuditContext(req.user!, req.ip),
-    `Checklist item ${item.isCompleted ? 'completed' : 'unchecked'}: ${item.item}`
+    `Checklist item ${item.isCompleted ? "completed" : "unchecked"}: ${item.item}`,
   );
 
-  sendSuccess(res, item, item.isCompleted ? 'Item completed' : 'Item unchecked');
+  sendSuccess(
+    res,
+    item,
+    item.isCompleted ? "Item completed" : "Item unchecked",
+  );
 }
 
 // ── Delete Checklist Item ──
@@ -163,12 +175,12 @@ export async function deleteChecklistItem(req: AuthRequest, res: Response) {
   const result = await gateService.deleteChecklistItem(req.params.itemId);
 
   await logAudit(
-    'DELETE',
-    'gate_checklists',
+    "DELETE",
+    "gate_checklists",
     result.id,
     buildAuditContext(req.user!, req.ip),
-    'Checklist item deleted'
+    "Checklist item deleted",
   );
 
-  sendSuccess(res, result, 'Checklist item deleted');
+  sendSuccess(res, result, "Checklist item deleted");
 }

@@ -2,12 +2,16 @@
 // src/modules/saff/saff.controller.ts
 // ─────────────────────────────────────────────────────────────
 
-import { Response } from 'express';
-import { sendSuccess, sendPaginated, sendCreated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import { AuthRequest } from '../../shared/types';
-import * as saffService from './saff.service';
-import { getSyncStatus as getSchedulerStatus, runSync } from './saff.scheduler';
+import { Response } from "express";
+import {
+  sendSuccess,
+  sendPaginated,
+  sendCreated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { AuthRequest } from "../../shared/types";
+import * as saffService from "./saff.service";
+import { getSyncStatus as getSchedulerStatus, runSync } from "./saff.scheduler";
 
 // ── Tournaments ──
 
@@ -18,7 +22,13 @@ export async function listTournaments(req: AuthRequest, res: Response) {
 
 export async function seedTournaments(req: AuthRequest, res: Response) {
   const count = await saffService.seedTournaments();
-  await logAudit('CREATE', 'saff_tournaments', null, buildAuditContext(req.user!, req.ip), `Seeded ${count} SAFF tournaments`);
+  await logAudit(
+    "CREATE",
+    "saff_tournaments",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Seeded ${count} SAFF tournaments`,
+  );
   sendSuccess(res, { count }, `Seeded ${count} new tournaments`);
 }
 
@@ -26,8 +36,12 @@ export async function seedTournaments(req: AuthRequest, res: Response) {
 
 export async function fetchFromSaff(req: AuthRequest, res: Response) {
   const result = await saffService.fetchFromSaff(req.body);
-  await logAudit('CREATE', 'saff_standings', null, buildAuditContext(req.user!, req.ip),
-    `SAFF fetch: ${result.results} tournaments, ${result.standings} standings, ${result.fixtures} fixtures`
+  await logAudit(
+    "CREATE",
+    "saff_standings",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF fetch: ${result.results} tournaments, ${result.standings} standings, ${result.fixtures} fixtures`,
   );
   sendSuccess(res, result, `Fetched data from ${result.results} tournaments`);
 }
@@ -55,29 +69,41 @@ export async function listTeamMaps(req: AuthRequest, res: Response) {
 
 export async function mapTeam(req: AuthRequest, res: Response) {
   const result = await saffService.mapTeamToClub(req.body);
-  await logAudit('UPDATE', 'saff_team_maps', null, buildAuditContext(req.user!, req.ip),
-    `Mapped SAFF team ${req.body.saffTeamId} → club ${req.body.clubId}`
+  await logAudit(
+    "UPDATE",
+    "saff_team_maps",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Mapped SAFF team ${req.body.saffTeamId} → club ${req.body.clubId}`,
   );
-  sendSuccess(res, result, 'Team mapped successfully');
+  sendSuccess(res, result, "Team mapped successfully");
 }
 
 // ── Import ──
 
 export async function importToSadara(req: AuthRequest, res: Response) {
   const result = await saffService.importToSadara(req.body);
-  await logAudit('CREATE', 'clubs', null, buildAuditContext(req.user!, req.ip),
-    `SAFF import: ${result.clubs} clubs, ${result.matches} matches`
+  await logAudit(
+    "CREATE",
+    "clubs",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF import: ${result.clubs} clubs, ${result.matches} matches`,
   );
-  sendSuccess(res, { imported: result }, 'Import completed');
+  sendSuccess(res, { imported: result }, "Import completed");
 }
 
 // ── Fetch Team Logos ──
 
 export async function fetchTeamLogos(req: AuthRequest, res: Response) {
-  const { season = '2025-2026' } = req.body;
+  const { season = "2025-2026" } = req.body;
   const result = await saffService.fetchTeamLogos(season);
-  await logAudit('UPDATE', 'saff_team_maps', null, buildAuditContext(req.user!, req.ip),
-    `Fetched ${result.fetched} team logos out of ${result.total}`
+  await logAudit(
+    "UPDATE",
+    "saff_team_maps",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Fetched ${result.fetched} team logos out of ${result.total}`,
   );
   sendSuccess(res, result, `Fetched ${result.fetched} logos`);
 }
@@ -97,10 +123,11 @@ export async function getSyncStatus(req: AuthRequest, res: Response) {
 }
 
 export async function triggerSync(req: AuthRequest, res: Response) {
-  const { agencyValues = ['Critical', 'High'], season = '2025-2026' } = req.body;
+  const { agencyValues = ["Critical", "High"], season = "2025-2026" } =
+    req.body;
 
   // Run in background — don't await
   runSync(agencyValues, season, `manual:${req.user!.email}`);
 
-  sendSuccess(res, { agencyValues, season }, 'Sync triggered in background');
+  sendSuccess(res, { agencyValues, season }, "Sync triggered in background");
 }

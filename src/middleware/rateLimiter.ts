@@ -1,6 +1,6 @@
-import rateLimit from 'express-rate-limit';
-import { RedisStore } from 'rate-limit-redis';
-import { getRedisClient, isRedisConnected } from '../config/redis';
+import rateLimit from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
+import { getRedisClient, isRedisConnected } from "../config/redis";
 
 // ═══════════════════════════════════════════════════════════
 // Rate Limiter — Redis-backed (falls back to in-memory)
@@ -12,7 +12,7 @@ function getStore() {
     return new RedisStore({
       // Use `sendCommand` for compatibility with redis v4+
       sendCommand: (...args: string[]) => client.sendCommand(args),
-      prefix: 'rl:',
+      prefix: "rl:",
     });
   }
   // Falls back to express-rate-limit's default MemoryStore
@@ -23,7 +23,10 @@ function getStore() {
 export const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200,
-  message: { success: false, message: 'Too many requests, please try again later' },
+  message: {
+    success: false,
+    message: "Too many requests, please try again later",
+  },
   standardHeaders: true,
   legacyHeaders: false,
   store: getStore(),
@@ -33,7 +36,10 @@ export const apiLimiter = rateLimit({
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 15,
-  message: { success: false, message: 'Too many auth attempts, please try again later' },
+  message: {
+    success: false,
+    message: "Too many auth attempts, please try again later",
+  },
   standardHeaders: true,
   legacyHeaders: false,
   store: getStore(),
@@ -43,7 +49,10 @@ export const authLimiter = rateLimit({
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 5,
-  message: { success: false, message: 'Too many password reset attempts, please try again later' },
+  message: {
+    success: false,
+    message: "Too many password reset attempts, please try again later",
+  },
   standardHeaders: true,
   legacyHeaders: false,
   store: getStore(),

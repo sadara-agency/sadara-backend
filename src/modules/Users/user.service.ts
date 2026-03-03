@@ -6,24 +6,27 @@
 // login/register/profile for the authenticated user.
 // This module lets Admins manage ALL users in the system.
 // ─────────────────────────────────────────────────────────────
-import { Op, Sequelize } from 'sequelize';
-import bcrypt from 'bcryptjs';
-import { User } from './user.model';
-import { env } from '../../config/env';
-import { AppError } from '../../middleware/errorHandler';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { CreateUserInput, UpdateUserInput } from './user.schema';
+import { Op, Sequelize } from "sequelize";
+import bcrypt from "bcryptjs";
+import { User } from "./user.model";
+import { env } from "../../config/env";
+import { AppError } from "../../middleware/errorHandler";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { CreateUserInput, UpdateUserInput } from "./user.schema";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {
-  exclude: ['passwordHash'],
+  exclude: ["passwordHash"],
 };
 
 // ────────────────────────────────────────────────────────────
 // List Users
 // ────────────────────────────────────────────────────────────
 export async function listUsers(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "createdAt",
+  );
 
   const where: any = {};
 
@@ -58,7 +61,7 @@ export async function getUserById(id: string) {
     attributes: SAFE_ATTRIBUTES,
   });
 
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) throw new AppError("User not found", 404);
   return user;
 }
 
@@ -68,7 +71,7 @@ export async function getUserById(id: string) {
 export async function createUser(input: CreateUserInput) {
   // Check for duplicate email
   const existing = await User.findOne({ where: { email: input.email } });
-  if (existing) throw new AppError('Email already registered', 409);
+  if (existing) throw new AppError("Email already registered", 409);
 
   // Hash the password
   const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
@@ -93,12 +96,12 @@ export async function createUser(input: CreateUserInput) {
 // ────────────────────────────────────────────────────────────
 export async function updateUser(id: string, input: UpdateUserInput) {
   const user = await User.findByPk(id);
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) throw new AppError("User not found", 404);
 
   // If email is being changed, check for duplicates
   if (input.email && input.email !== user.email) {
     const existing = await User.findOne({ where: { email: input.email } });
-    if (existing) throw new AppError('Email already in use', 409);
+    if (existing) throw new AppError("Email already in use", 409);
   }
 
   await user.update(input);
@@ -113,12 +116,12 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 // ────────────────────────────────────────────────────────────
 export async function resetPassword(id: string, newPassword: string) {
   const user = await User.findByPk(id);
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) throw new AppError("User not found", 404);
 
   const passwordHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
   await user.update({ passwordHash });
 
-  return { message: 'Password reset successfully' };
+  return { message: "Password reset successfully" };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -127,11 +130,11 @@ export async function resetPassword(id: string, newPassword: string) {
 export async function deleteUser(id: string, requesterId: string) {
   // Prevent self-deletion
   if (id === requesterId) {
-    throw new AppError('Cannot delete your own account', 400);
+    throw new AppError("Cannot delete your own account", 400);
   }
 
   const user = await User.findByPk(id);
-  if (!user) throw new AppError('User not found', 404);
+  if (!user) throw new AppError("User not found", 404);
 
   await user.destroy();
   return { id };

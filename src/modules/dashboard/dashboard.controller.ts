@@ -1,7 +1,7 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess } from '../../shared/utils/apiResponse';
-import * as dashboardService from './dashboard.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import { sendSuccess } from "../../shared/utils/apiResponse";
+import * as dashboardService from "./dashboard.service";
 
 // GET /dashboard — full aggregated dashboard
 export async function getFullDashboard(_req: AuthRequest, res: Response) {

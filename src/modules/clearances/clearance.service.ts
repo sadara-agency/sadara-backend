@@ -2,27 +2,55 @@
 // src/modules/clearances/clearance.service.ts
 // Business logic for clearance (مخالصة) operations.
 // ─────────────────────────────────────────────────────────────
-import { Op } from 'sequelize';
-import { Clearance } from './clearance.model';
-import { Contract } from '../contracts/contract.model';
-import { Player } from '../players/player.model';
-import { User } from '../Users/user.model';
-import { AppError } from '../../middleware/errorHandler';
+import { Op } from "sequelize";
+import { Clearance } from "./clearance.model";
+import { Contract } from "../contracts/contract.model";
+import { Player } from "../players/player.model";
+import { User } from "../Users/user.model";
+import { AppError } from "../../middleware/errorHandler";
 
 // ── Associations ──
-
 
 const INCLUDE_RELATIONS = [
   {
     model: Contract,
-    as: 'contract',
-    attributes: ['id', 'title', 'startDate', 'endDate', 'status', 'commissionPct'],
+    as: "contract",
+    attributes: [
+      "id",
+      "title",
+      "startDate",
+      "endDate",
+      "status",
+      "commissionPct",
+    ],
     include: [
-      { model: Player, as: 'player', attributes: ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'photoUrl'] },
+      {
+        model: Player,
+        as: "player",
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+          "photoUrl",
+        ],
+      },
     ],
   },
-  { model: Player, as: 'player', attributes: ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr', 'photoUrl'] },
-  { model: User, as: 'creator', attributes: ['id', 'fullName', 'fullNameAr'] },
+  {
+    model: Player,
+    as: "player",
+    attributes: [
+      "id",
+      "firstName",
+      "lastName",
+      "firstNameAr",
+      "lastNameAr",
+      "photoUrl",
+    ],
+  },
+  { model: User, as: "creator", attributes: ["id", "fullName", "fullNameAr"] },
 ];
 
 // ── List clearances ──
@@ -36,7 +64,7 @@ export async function listClearances(query: any) {
   const { rows, count } = await Clearance.findAndCountAll({
     where,
     include: INCLUDE_RELATIONS,
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
     limit,
     offset: (page - 1) * limit,
   });
@@ -58,20 +86,26 @@ export async function getClearanceById(id: string) {
 export async function createClearance(data: any, userId: string) {
   // Validate contract exists and is active
   const contract = await Contract.findByPk(data.contractId);
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   // Check contract is in a terminable state
-  const terminableStatuses = ['Active', 'Expiring Soon', 'Review', 'Signing'];
+  const terminableStatuses = ["Active", "Expiring Soon", "Review", "Signing"];
   if (!terminableStatuses.includes(contract.status)) {
-    throw new AppError(`Cannot create clearance for contract with status "${contract.status}"`, 400);
+    throw new AppError(
+      `Cannot create clearance for contract with status "${contract.status}"`,
+      400,
+    );
   }
 
   // Check no existing active clearance for this contract
   const existing = await Clearance.findOne({
-    where: { contractId: data.contractId, status: 'Processing' },
+    where: { contractId: data.contractId, status: "Processing" },
   });
   if (existing) {
-    throw new AppError('An active clearance already exists for this contract', 400);
+    throw new AppError(
+      "An active clearance already exists for this contract",
+      400,
+    );
   }
 
   const clearance = await Clearance.create({
@@ -86,9 +120,9 @@ export async function createClearance(data: any, userId: string) {
 // ── Update clearance ──
 export async function updateClearance(id: string, data: any) {
   const clearance = await Clearance.findByPk(id);
-  if (!clearance) throw new AppError('Clearance not found', 404);
-  if (clearance.status === 'Completed') {
-    throw new AppError('Cannot update a completed clearance', 400);
+  if (!clearance) throw new AppError("Clearance not found", 404);
+  if (clearance.status === "Completed") {
+    throw new AppError("Cannot update a completed clearance", 400);
   }
 
   await clearance.update(data);
@@ -98,27 +132,30 @@ export async function updateClearance(id: string, data: any) {
 // ── Complete clearance (sign + terminate contract) ──
 export async function completeClearance(id: string, data: any) {
   const clearance = await Clearance.findByPk(id);
-  if (!clearance) throw new AppError('Clearance not found', 404);
-  if (clearance.status === 'Completed') {
-    throw new AppError('Clearance is already completed', 400);
+  if (!clearance) throw new AppError("Clearance not found", 404);
+  if (clearance.status === "Completed") {
+    throw new AppError("Clearance is already completed", 400);
   }
 
   // Must have no-claims declaration
   if (!clearance.noClaimsDeclaration) {
-    throw new AppError('No-claims declaration must be accepted before completing', 400);
+    throw new AppError(
+      "No-claims declaration must be accepted before completing",
+      400,
+    );
   }
 
   const updateData: any = {
-    status: 'Completed',
+    status: "Completed",
     signedAt: new Date(),
   };
 
-  if (data.action === 'sign_digital') {
+  if (data.action === "sign_digital") {
     updateData.signedDocumentUrl = data.signatureData;
-    updateData.signingMethod = 'digital';
-  } else if (data.action === 'sign_upload') {
+    updateData.signingMethod = "digital";
+  } else if (data.action === "sign_upload") {
     updateData.signedDocumentUrl = data.signedDocumentUrl;
-    updateData.signingMethod = 'upload';
+    updateData.signingMethod = "upload";
   }
 
   await clearance.update(updateData);
@@ -126,7 +163,7 @@ export async function completeClearance(id: string, data: any) {
   // ── Auto-terminate the parent contract ──
   await Contract.update(
     {
-      status: 'Terminated' as any,
+      status: "Terminated" as any,
       terminatedByClearanceId: clearance.id,
     } as any,
     { where: { id: clearance.contractId } },
@@ -138,9 +175,9 @@ export async function completeClearance(id: string, data: any) {
 // ── Delete clearance (only if Processing) ──
 export async function deleteClearance(id: string) {
   const clearance = await Clearance.findByPk(id);
-  if (!clearance) throw new AppError('Clearance not found', 404);
-  if (clearance.status === 'Completed') {
-    throw new AppError('Cannot delete a completed clearance', 400);
+  if (!clearance) throw new AppError("Clearance not found", 404);
+  if (clearance.status === "Completed") {
+    throw new AppError("Cannot delete a completed clearance", 400);
   }
   await clearance.destroy();
 }
@@ -150,6 +187,6 @@ export async function getClearancesByContract(contractId: string) {
   return Clearance.findAll({
     where: { contractId },
     include: INCLUDE_RELATIONS,
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
   });
 }

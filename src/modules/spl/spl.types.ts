@@ -49,7 +49,7 @@ export interface PlayerSyncResult {
   splPlayerId: string;
   playerName: string;
   sadaraPlayerId: string;
-  action: 'created' | 'updated' | 'skipped';
+  action: "created" | "updated" | "skipped";
   reason?: string;
 }
 

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ── Tournament Queries ──
 
@@ -14,9 +14,14 @@ export const tournamentQuerySchema = z.object({
 // ── Fetch Request — trigger SAFF scrape ──
 
 export const fetchRequestSchema = z.object({
-  tournamentIds: z.array(z.number().int().positive()).min(1, 'Select at least one tournament'),
-  season: z.string().regex(/^\d{4}-\d{4}$/, 'Season must be YYYY-YYYY format'),
-  dataTypes: z.array(z.enum(['standings', 'fixtures', 'teams'])).min(1).default(['standings', 'fixtures', 'teams']),
+  tournamentIds: z
+    .array(z.number().int().positive())
+    .min(1, "Select at least one tournament"),
+  season: z.string().regex(/^\d{4}-\d{4}$/, "Season must be YYYY-YYYY format"),
+  dataTypes: z
+    .array(z.enum(["standings", "fixtures", "teams"]))
+    .min(1)
+    .default(["standings", "fixtures", "teams"]),
 });
 
 // ── Standing Queries ──
@@ -38,7 +43,7 @@ export const fixtureQuerySchema = z.object({
   tournamentId: z.string().uuid().optional(),
   saffTournamentId: z.coerce.number().int().optional(),
   season: z.string().optional(),
-  status: z.enum(['upcoming', 'completed', 'cancelled']).optional(),
+  status: z.enum(["upcoming", "completed", "cancelled"]).optional(),
   clubId: z.string().uuid().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
@@ -67,7 +72,7 @@ export const mapTeamSchema = z.object({
 export const importRequestSchema = z.object({
   tournamentIds: z.array(z.number().int().positive()).min(1),
   season: z.string().regex(/^\d{4}-\d{4}$/),
-  importTypes: z.array(z.enum(['clubs', 'matches', 'standings'])).min(1),
+  importTypes: z.array(z.enum(["clubs", "matches", "standings"])).min(1),
 });
 
 // ── Inferred Types ──

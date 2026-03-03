@@ -1,7 +1,7 @@
-import { Request } from 'express';
+import { Request } from "express";
 
 // ── User Roles ──
-export type UserRole = 'Admin' | 'Manager' | 'Analyst' | 'Scout' | 'Player';
+export type UserRole = "Admin" | "Manager" | "Analyst" | "Scout" | "Player";
 
 // ── Authenticated Request ──
 export interface AuthUser {
@@ -37,7 +37,7 @@ export interface PaginationQuery {
   page?: number;
   limit?: number;
   sort?: string;
-  order?: 'asc' | 'desc';
+  order?: "asc" | "desc";
   search?: string;
 }
 

@@ -1,9 +1,13 @@
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { AppError } from '../../middleware/errorHandler';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import * as clubService from './club.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import { AppError } from "../../middleware/errorHandler";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import * as clubService from "./club.service";
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await clubService.listClubs(req.query);
@@ -17,20 +21,38 @@ export async function getById(req: AuthRequest, res: Response) {
 
 export async function create(req: AuthRequest, res: Response) {
   const club = await clubService.createClub(req.body);
-  await logAudit('CREATE', 'clubs', club.id, buildAuditContext(req.user!, req.ip), `Created club: ${club.name}`);
+  await logAudit(
+    "CREATE",
+    "clubs",
+    club.id,
+    buildAuditContext(req.user!, req.ip),
+    `Created club: ${club.name}`,
+  );
   sendCreated(res, club);
 }
 
 export async function update(req: AuthRequest, res: Response) {
   const club = await clubService.updateClub(req.params.id, req.body);
-  await logAudit('UPDATE', 'clubs', club.id, buildAuditContext(req.user!, req.ip), `Updated club: ${club.name}`);
-  sendSuccess(res, club, 'Club updated');
+  await logAudit(
+    "UPDATE",
+    "clubs",
+    club.id,
+    buildAuditContext(req.user!, req.ip),
+    `Updated club: ${club.name}`,
+  );
+  sendSuccess(res, club, "Club updated");
 }
 
 export async function remove(req: AuthRequest, res: Response) {
   const result = await clubService.deleteClub(req.params.id);
-  await logAudit('DELETE', 'clubs', result.id, buildAuditContext(req.user!, req.ip), 'Club deleted');
-  sendSuccess(res, result, 'Club deleted');
+  await logAudit(
+    "DELETE",
+    "clubs",
+    result.id,
+    buildAuditContext(req.user!, req.ip),
+    "Club deleted",
+  );
+  sendSuccess(res, result, "Club deleted");
 }
 
 // ── Bulk Delete ──
@@ -38,48 +60,82 @@ export async function remove(req: AuthRequest, res: Response) {
 export async function bulkRemove(req: AuthRequest, res: Response) {
   const { ids } = req.body;
   if (!Array.isArray(ids) || ids.length === 0) {
-    throw new AppError('ids must be a non-empty array', 400);
+    throw new AppError("ids must be a non-empty array", 400);
   }
   if (ids.length > 100) {
-    throw new AppError('Cannot delete more than 100 clubs at once', 400);
+    throw new AppError("Cannot delete more than 100 clubs at once", 400);
   }
   const result = await clubService.deleteClubs(ids);
-  await logAudit('DELETE', 'clubs', null, buildAuditContext(req.user!, req.ip), `Bulk deleted ${result.count} clubs`);
+  await logAudit(
+    "DELETE",
+    "clubs",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Bulk deleted ${result.count} clubs`,
+  );
   sendSuccess(res, result, `${result.count} clubs deleted`);
 }
 
 // ── Upload Club Logo ──
 
 export async function uploadLogo(req: AuthRequest, res: Response) {
-  if (!req.file) throw new AppError('No file uploaded', 400);
+  if (!req.file) throw new AppError("No file uploaded", 400);
 
-  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
   const logoUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
 
   const club = await clubService.updateClubLogo(req.params.id, logoUrl);
-  await logAudit('UPDATE', 'clubs', club.id, buildAuditContext(req.user!, req.ip), 'Updated club logo');
-  sendSuccess(res, { logoUrl }, 'Logo uploaded');
+  await logAudit(
+    "UPDATE",
+    "clubs",
+    club.id,
+    buildAuditContext(req.user!, req.ip),
+    "Updated club logo",
+  );
+  sendSuccess(res, { logoUrl }, "Logo uploaded");
 }
 
 // ── Contact CRUD ──
 
 export async function createContact(req: AuthRequest, res: Response) {
   const contact = await clubService.createContact(req.params.id, req.body);
-  await logAudit('CREATE', 'contacts', contact.id, buildAuditContext(req.user!, req.ip),
-    `Created contact: ${contact.name} for club ${req.params.id}`);
+  await logAudit(
+    "CREATE",
+    "contacts",
+    contact.id,
+    buildAuditContext(req.user!, req.ip),
+    `Created contact: ${contact.name} for club ${req.params.id}`,
+  );
   sendCreated(res, contact);
 }
 
 export async function updateContact(req: AuthRequest, res: Response) {
-  const contact = await clubService.updateContact(req.params.contactId, req.params.id, req.body);
-  await logAudit('UPDATE', 'contacts', req.params.contactId, buildAuditContext(req.user!, req.ip),
-    `Updated contact for club ${req.params.id}`);
-  sendSuccess(res, contact, 'Contact updated');
+  const contact = await clubService.updateContact(
+    req.params.contactId,
+    req.params.id,
+    req.body,
+  );
+  await logAudit(
+    "UPDATE",
+    "contacts",
+    req.params.contactId,
+    buildAuditContext(req.user!, req.ip),
+    `Updated contact for club ${req.params.id}`,
+  );
+  sendSuccess(res, contact, "Contact updated");
 }
 
 export async function deleteContact(req: AuthRequest, res: Response) {
-  const result = await clubService.deleteContact(req.params.contactId, req.params.id);
-  await logAudit('DELETE', 'contacts', result.id, buildAuditContext(req.user!, req.ip),
-    `Deleted contact from club ${req.params.id}`);
-  sendSuccess(res, result, 'Contact deleted');
+  const result = await clubService.deleteContact(
+    req.params.contactId,
+    req.params.id,
+  );
+  await logAudit(
+    "DELETE",
+    "contacts",
+    result.id,
+    buildAuditContext(req.user!, req.ip),
+    `Deleted contact from club ${req.params.id}`,
+  );
+  sendSuccess(res, result, "Contact deleted");
 }

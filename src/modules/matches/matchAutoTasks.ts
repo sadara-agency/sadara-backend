@@ -15,13 +15,84 @@
  *  6. 90 min played + rating ≥ 8 → "Highlight for report" (low, positive)
  */
 
-import { Task } from '../tasks/task.model';
-import { MatchPlayer } from './matchPlayer.model';
-import { PlayerMatchStats } from './playerMatchStats.model';
-import { Player } from '../players/player.model';
-import { Match } from './match.model';
-import { Club } from '../clubs/club.model';
-import { Op } from 'sequelize';
+import { Task } from "../tasks/task.model";
+import { MatchPlayer } from "./matchPlayer.model";
+import { PlayerMatchStats } from "./playerMatchStats.model";
+import { Player } from "../players/player.model";
+import { Match } from "./match.model";
+import { Club } from "../clubs/club.model";
+import { sequelize } from "../../config/database";
+import { Op } from "sequelize";
+
+// ── Configurable thresholds ──
+// Defaults can be overridden via the settings API (GET/PATCH /settings/task-rules)
+
+export interface TaskRuleConfig {
+  enabled: boolean;
+  dueDays: number;
+  threshold?: number;
+}
+
+export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
+  red_card: { enabled: true, dueDays: 1 },
+  yellow_cards_accumulated: { enabled: true, dueDays: 2, threshold: 2 },
+  critical_performance: { enabled: true, dueDays: 1, threshold: 3.0 },
+  low_performance: { enabled: true, dueDays: 3, threshold: 5.0 },
+  injury_assessment: { enabled: true, dueDays: 1 },
+  highlight_performance: { enabled: true, dueDays: 5, threshold: 8.0 },
+  high_fouls: { enabled: true, dueDays: 3, threshold: 4 },
+};
+
+let _ruleConfig: Record<string, TaskRuleConfig> = {
+  ...DEFAULT_TASK_RULE_CONFIG,
+};
+
+export function getTaskRuleConfig(): Record<string, TaskRuleConfig> {
+  return { ...DEFAULT_TASK_RULE_CONFIG, ..._ruleConfig };
+}
+
+export function updateTaskRuleConfig(
+  updates: Partial<Record<string, Partial<TaskRuleConfig>>>,
+) {
+  for (const [ruleId, patch] of Object.entries(updates)) {
+    if (_ruleConfig[ruleId] && patch) {
+      _ruleConfig[ruleId] = { ..._ruleConfig[ruleId], ...patch };
+    }
+  }
+}
+
+/** Load persisted config from DB (called on server startup) */
+export async function loadTaskRuleConfigFromDB() {
+  try {
+    const [row] = (await sequelize.query(
+      `SELECT value FROM app_settings WHERE key = 'task_rule_config' LIMIT 1`,
+      { type: "SELECT" as any },
+    )) as any[];
+    if (row?.value) {
+      const parsed =
+        typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      _ruleConfig = { ...DEFAULT_TASK_RULE_CONFIG, ...parsed };
+    }
+  } catch {
+    // Table may not exist yet — use defaults silently
+  }
+}
+
+/** Persist current config to DB */
+export async function saveTaskRuleConfigToDB() {
+  try {
+    await sequelize.query(
+      `INSERT INTO app_settings (key, value) VALUES ('task_rule_config', :val)
+       ON CONFLICT (key) DO UPDATE SET value = :val`,
+      {
+        replacements: { val: JSON.stringify(_ruleConfig) },
+        type: "RAW" as any,
+      },
+    );
+  } catch {
+    // Table may not exist yet — silently ignore
+  }
+}
 
 // ── Rule definitions ──
 
@@ -31,9 +102,9 @@ interface AutoTaskRule {
   titleAr: string;
   descriptionEn: (ctx: RuleContext) => string;
   descriptionAr: (ctx: RuleContext) => string;
-  priority: 'low' | 'medium' | 'high' | 'critical';
+  priority: "low" | "medium" | "high" | "critical";
   condition: (ctx: RuleContext) => boolean;
-  /** Days from now for due date */
+  /** Days from now for due date (reads from config) */
   dueDays: number;
 }
 
@@ -45,96 +116,135 @@ interface RuleContext {
   availability: string | null;
 }
 
+function cfg(ruleId: string): TaskRuleConfig {
+  return getTaskRuleConfig()[ruleId] ?? { enabled: true, dueDays: 3 };
+}
+
 const RULES: AutoTaskRule[] = [
   {
-    id: 'red_card',
-    titleEn: 'Review player suspension',
-    titleAr: 'مراجعة إيقاف اللاعب',
+    id: "red_card",
+    titleEn: "Review player suspension",
+    titleAr: "مراجعة إيقاف اللاعب",
     descriptionEn: (ctx) =>
       `${ctx.playerName} received a red card in ${ctx.matchLabel}. Review suspension rules and upcoming match availability.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} حصل على بطاقة حمراء في ${ctx.matchLabel}. مراجعة قواعد الإيقاف وجاهزية المباريات القادمة.`,
-    priority: 'critical',
-    condition: (ctx) => (ctx.stats.redCards ?? 0) > 0,
-    dueDays: 1,
+    priority: "critical",
+    condition: (ctx) =>
+      cfg("red_card").enabled && (ctx.stats.redCards ?? 0) > 0,
+    get dueDays() {
+      return cfg("red_card").dueDays;
+    },
   },
   {
-    id: 'yellow_cards_accumulated',
-    titleEn: 'Review accumulated bookings',
-    titleAr: 'مراجعة البطاقات المتراكمة',
+    id: "yellow_cards_accumulated",
+    titleEn: "Review accumulated bookings",
+    titleAr: "مراجعة البطاقات المتراكمة",
     descriptionEn: (ctx) =>
       `${ctx.playerName} received ${ctx.stats.yellowCards} yellow card(s) in ${ctx.matchLabel}. Check accumulated bookings threshold.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} حصل على ${ctx.stats.yellowCards} بطاقة صفراء في ${ctx.matchLabel}. تحقق من عتبة البطاقات المتراكمة.`,
-    priority: 'high',
-    condition: (ctx) => (ctx.stats.yellowCards ?? 0) >= 2,
-    dueDays: 2,
+    priority: "high",
+    condition: (ctx) =>
+      cfg("yellow_cards_accumulated").enabled &&
+      (ctx.stats.yellowCards ?? 0) >=
+        (cfg("yellow_cards_accumulated").threshold ?? 2),
+    get dueDays() {
+      return cfg("yellow_cards_accumulated").dueDays;
+    },
   },
   {
-    id: 'critical_performance',
-    titleEn: 'Urgent performance intervention',
-    titleAr: 'تدخل عاجل لأداء اللاعب',
+    id: "critical_performance",
+    titleEn: "Urgent performance intervention",
+    titleAr: "تدخل عاجل لأداء اللاعب",
     descriptionEn: (ctx) =>
       `${ctx.playerName} rated ${ctx.stats.rating?.toFixed(1)} in ${ctx.matchLabel}. Immediate coaching review required.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} حصل على تقييم ${ctx.stats.rating?.toFixed(1)} في ${ctx.matchLabel}. مطلوب مراجعة تدريبية فورية.`,
-    priority: 'critical',
-    condition: (ctx) => ctx.stats.rating != null && Number(ctx.stats.rating) < 3.0,
-    dueDays: 1,
+    priority: "critical",
+    condition: (ctx) =>
+      cfg("critical_performance").enabled &&
+      ctx.stats.rating != null &&
+      Number(ctx.stats.rating) < (cfg("critical_performance").threshold ?? 3.0),
+    get dueDays() {
+      return cfg("critical_performance").dueDays;
+    },
   },
   {
-    id: 'low_performance',
-    titleEn: 'Performance review needed',
-    titleAr: 'مطلوب مراجعة الأداء',
+    id: "low_performance",
+    titleEn: "Performance review needed",
+    titleAr: "مطلوب مراجعة الأداء",
     descriptionEn: (ctx) =>
       `${ctx.playerName} rated ${ctx.stats.rating?.toFixed(1)} in ${ctx.matchLabel}. Schedule a performance review session.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} حصل على تقييم ${ctx.stats.rating?.toFixed(1)} في ${ctx.matchLabel}. جدولة جلسة مراجعة أداء.`,
-    priority: 'high',
-    condition: (ctx) =>
-      ctx.stats.rating != null &&
-      Number(ctx.stats.rating) >= 3.0 &&
-      Number(ctx.stats.rating) < 5.0,
-    dueDays: 3,
+    priority: "high",
+    condition: (ctx) => {
+      const c = cfg("low_performance");
+      return (
+        c.enabled &&
+        ctx.stats.rating != null &&
+        Number(ctx.stats.rating) >=
+          (cfg("critical_performance").threshold ?? 3.0) &&
+        Number(ctx.stats.rating) < (c.threshold ?? 5.0)
+      );
+    },
+    get dueDays() {
+      return cfg("low_performance").dueDays;
+    },
   },
   {
-    id: 'injury_assessment',
-    titleEn: 'Arrange medical assessment',
-    titleAr: 'ترتيب تقييم طبي',
+    id: "injury_assessment",
+    titleEn: "Arrange medical assessment",
+    titleAr: "ترتيب تقييم طبي",
     descriptionEn: (ctx) =>
       `${ctx.playerName} was marked as injured for ${ctx.matchLabel}. Arrange medical assessment and update injury records.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} تم تسجيله مصاباً في ${ctx.matchLabel}. ترتيب تقييم طبي وتحديث سجل الإصابات.`,
-    priority: 'critical',
-    condition: (ctx) => ctx.availability === 'injured',
-    dueDays: 1,
+    priority: "critical",
+    condition: (ctx) =>
+      cfg("injury_assessment").enabled && ctx.availability === "injured",
+    get dueDays() {
+      return cfg("injury_assessment").dueDays;
+    },
   },
   {
-    id: 'highlight_performance',
-    titleEn: 'Highlight outstanding performance',
-    titleAr: 'إبراز الأداء المتميز',
+    id: "highlight_performance",
+    titleEn: "Highlight outstanding performance",
+    titleAr: "إبراز الأداء المتميز",
     descriptionEn: (ctx) =>
       `${ctx.playerName} rated ${ctx.stats.rating?.toFixed(1)} (${ctx.stats.goals ?? 0}G, ${ctx.stats.assists ?? 0}A) in ${ctx.matchLabel}. Add to performance report and consider for media highlight.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} حصل على تقييم ${ctx.stats.rating?.toFixed(1)} (${ctx.stats.goals ?? 0} أهداف، ${ctx.stats.assists ?? 0} تمريرات) في ${ctx.matchLabel}. إضافة لتقرير الأداء والنظر في إبراز إعلامي.`,
-    priority: 'low',
-    condition: (ctx) =>
-      ctx.stats.rating != null &&
-      Number(ctx.stats.rating) >= 8.0 &&
-      (ctx.stats.minutesPlayed ?? 0) >= 60,
-    dueDays: 5,
+    priority: "low",
+    condition: (ctx) => {
+      const c = cfg("highlight_performance");
+      return (
+        c.enabled &&
+        ctx.stats.rating != null &&
+        Number(ctx.stats.rating) >= (c.threshold ?? 8.0) &&
+        (ctx.stats.minutesPlayed ?? 0) >= 60
+      );
+    },
+    get dueDays() {
+      return cfg("highlight_performance").dueDays;
+    },
   },
   {
-    id: 'high_fouls',
-    titleEn: 'Review player discipline',
-    titleAr: 'مراجعة انضباط اللاعب',
+    id: "high_fouls",
+    titleEn: "Review player discipline",
+    titleAr: "مراجعة انضباط اللاعب",
     descriptionEn: (ctx) =>
       `${ctx.playerName} committed ${ctx.stats.foulsCommitted} fouls in ${ctx.matchLabel}. Review with coaching staff.`,
     descriptionAr: (ctx) =>
       `${ctx.playerNameAr} ارتكب ${ctx.stats.foulsCommitted} أخطاء في ${ctx.matchLabel}. مراجعة مع الجهاز الفني.`,
-    priority: 'medium',
-    condition: (ctx) => (ctx.stats.foulsCommitted ?? 0) >= 4,
-    dueDays: 3,
+    priority: "medium",
+    condition: (ctx) =>
+      cfg("high_fouls").enabled &&
+      (ctx.stats.foulsCommitted ?? 0) >= (cfg("high_fouls").threshold ?? 4),
+    get dueDays() {
+      return cfg("high_fouls").dueDays;
+    },
   },
 ];
 
@@ -143,7 +253,7 @@ const RULES: AutoTaskRule[] = [
 function dueDate(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  return d.toISOString().split("T")[0]; // YYYY-MM-DD
 }
 
 // ── Main generator function ──
@@ -155,15 +265,15 @@ export async function generateAutoTasks(
   // Load match info for labels
   const match = await Match.findByPk(matchId, {
     include: [
-      { model: Club, as: 'homeClub', attributes: ['name', 'nameAr'] },
-      { model: Club, as: 'awayClub', attributes: ['name', 'nameAr'] },
+      { model: Club, as: "homeClub", attributes: ["name", "nameAr"] },
+      { model: Club, as: "awayClub", attributes: ["name", "nameAr"] },
     ],
   });
   if (!match) return { created: 0, rules: [] };
 
   const homeClub = (match as any).homeClub;
   const awayClub = (match as any).awayClub;
-  const matchLabel = `${homeClub?.name ?? 'TBD'} vs ${awayClub?.name ?? 'TBD'}`;
+  const matchLabel = `${homeClub?.name ?? "TBD"} vs ${awayClub?.name ?? "TBD"}`;
 
   // Load all stats for this match
   const allStats = await PlayerMatchStats.findAll({
@@ -171,8 +281,14 @@ export async function generateAutoTasks(
     include: [
       {
         model: Player,
-        as: 'player',
-        attributes: ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr'],
+        as: "player",
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+        ],
       },
     ],
   });
@@ -180,7 +296,7 @@ export async function generateAutoTasks(
   // Load match_players for availability info
   const matchPlayers = await MatchPlayer.findAll({
     where: { matchId },
-    attributes: ['playerId', 'availability'],
+    attributes: ["playerId", "availability"],
   });
   const availabilityMap = new Map(
     matchPlayers.map((mp) => [mp.playerId, mp.availability]),
@@ -194,7 +310,7 @@ export async function generateAutoTasks(
 
     const playerName = `${player.firstName} ${player.lastName}`.trim();
     const playerNameAr = player.firstNameAr
-      ? `${player.firstNameAr} ${player.lastNameAr || ''}`.trim()
+      ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
       : playerName;
 
     const ctx: RuleContext = {
@@ -225,9 +341,9 @@ export async function generateAutoTasks(
         title: rule.titleEn,
         titleAr: rule.titleAr,
         description: rule.descriptionEn(ctx),
-        type: 'Match',
+        type: "Match",
         priority: rule.priority,
-        status: 'Open',
+        status: "Open",
         playerId: player.id,
         matchId,
         assignedBy: triggeredBy,
@@ -243,7 +359,7 @@ export async function generateAutoTasks(
 
   // Also check injured players who might not have stats yet
   for (const mp of matchPlayers) {
-    if (mp.availability !== 'injured') continue;
+    if (mp.availability !== "injured") continue;
 
     // Skip if already processed via stats
     const hasStats = allStats.some((s) => s.playerId === mp.playerId);
@@ -251,48 +367,56 @@ export async function generateAutoTasks(
 
     // Load player info
     const player = await Player.findByPk(mp.playerId, {
-      attributes: ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr'],
+      attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr"],
     });
     if (!player) continue;
 
     const playerName = `${player.firstName} ${player.lastName}`.trim();
     const playerNameAr = player.firstNameAr
-      ? `${player.firstNameAr} ${player.lastNameAr || ''}`.trim()
+      ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
       : playerName;
 
-    const injuryRule = RULES.find((r) => r.id === 'injury_assessment')!;
+    const injuryRule = RULES.find((r) => r.id === "injury_assessment")!;
 
     const existing = await Task.findOne({
       where: {
         matchId,
         playerId: player.id,
-        triggerRuleId: 'injury_assessment',
+        triggerRuleId: "injury_assessment",
         isAutoCreated: true,
       },
     });
 
     if (!existing) {
-      const dummyStats = { redCards: 0, yellowCards: 0, rating: null, foulsCommitted: 0, minutesPlayed: 0, goals: 0, assists: 0 } as any;
+      const dummyStats = {
+        redCards: 0,
+        yellowCards: 0,
+        rating: null,
+        foulsCommitted: 0,
+        minutesPlayed: 0,
+        goals: 0,
+        assists: 0,
+      } as any;
       const ctx: RuleContext = {
         playerName,
         playerNameAr,
         matchLabel,
         stats: dummyStats,
-        availability: 'injured',
+        availability: "injured",
       };
 
       await Task.create({
         title: injuryRule.titleEn,
         titleAr: injuryRule.titleAr,
         description: injuryRule.descriptionEn(ctx),
-        type: 'Match',
-        priority: 'critical',
-        status: 'Open',
+        type: "Match",
+        priority: "critical",
+        status: "Open",
         playerId: player.id,
         matchId,
         assignedBy: triggeredBy,
         isAutoCreated: true,
-        triggerRuleId: 'injury_assessment',
+        triggerRuleId: "injury_assessment",
         dueDate: dueDate(1),
         notes: injuryRule.descriptionAr(ctx),
       } as any);

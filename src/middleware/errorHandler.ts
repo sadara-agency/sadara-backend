@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from 'express';
-import { env } from '../config/env';
-import { logger } from '../config/logger';
+import { Request, Response, NextFunction } from "express";
+import { env } from "../config/env";
+import { logger } from "../config/logger";
 
 export class AppError extends Error {
   statusCode: number;
@@ -22,7 +22,7 @@ export function errorHandler(
 ): void {
   if (err instanceof AppError) {
     // Operational errors — expected, log at warn level
-    logger.warn('Operational error', {
+    logger.warn("Operational error", {
       status: err.statusCode,
       message: err.message,
       path: req.path,
@@ -37,19 +37,19 @@ export function errorHandler(
   }
 
   // Unexpected errors — log full stack at error level
-  logger.error('Unexpected error', {
+  logger.error("Unexpected error", {
     message: err.message,
     stack: err.stack,
     path: req.path,
     method: req.method,
-    body: env.nodeEnv === 'development' ? req.body : undefined,
+    body: env.nodeEnv === "development" ? req.body : undefined,
   });
 
   res.status(500).json({
     success: false,
-    message: 'Internal server error',
+    message: "Internal server error",
     // Only expose details in development
-    ...(env.nodeEnv === 'development' && {
+    ...(env.nodeEnv === "development" && {
       error: err.message,
       stack: err.stack,
     }),

@@ -2,20 +2,20 @@
 // src/modules/clearances/clearance.schema.ts
 // Zod validation schemas for clearance (مخالصة) endpoints.
 // ─────────────────────────────────────────────────────────────
-import { z } from 'zod';
+import { z } from "zod";
 
 const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-const CLEARANCE_STATUSES = ['Processing', 'Completed'] as const;
-const CURRENCIES = ['SAR', 'USD', 'EUR'] as const;
+const CLEARANCE_STATUSES = ["Processing", "Completed"] as const;
+const CURRENCIES = ["SAR", "USD", "EUR"] as const;
 
 // ── Create Clearance ──
 export const createClearanceSchema = z.object({
-  contractId: z.string().uuid('Invalid contract ID'),
-  reason: z.string().min(1, 'Reason is required').max(2000),
-  terminationDate: z.string().regex(DATE_REGEX, 'Date must be YYYY-MM-DD'),
+  contractId: z.string().uuid("Invalid contract ID"),
+  reason: z.string().min(1, "Reason is required").max(2000),
+  terminationDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
   hasOutstanding: z.boolean().default(false),
   outstandingAmount: z.number().min(0).default(0),
-  outstandingCurrency: z.enum(CURRENCIES).default('SAR'),
+  outstandingCurrency: z.enum(CURRENCIES).default("SAR"),
   outstandingDetails: z.string().optional(),
   noClaimsDeclaration: z.boolean().default(false),
   declarationText: z.string().optional(),
@@ -36,18 +36,20 @@ export const updateClearanceSchema = z.object({
 });
 
 // ── Complete Clearance (sign & finalize) ──
-export const completeClearanceSchema = z.object({
-  action: z.enum(['sign_digital', 'sign_upload', 'complete']),
-  signatureData: z.string().optional(),        // base64 for digital
-  signedDocumentUrl: z.string().optional(),     // URL for upload
-}).refine(
-  (data) => {
-    if (data.action === 'sign_digital') return !!data.signatureData;
-    if (data.action === 'sign_upload') return !!data.signedDocumentUrl;
-    return true;
-  },
-  { message: 'Signature data required for signing actions' },
-);
+export const completeClearanceSchema = z
+  .object({
+    action: z.enum(["sign_digital", "sign_upload", "complete"]),
+    signatureData: z.string().optional(), // base64 for digital
+    signedDocumentUrl: z.string().optional(), // URL for upload
+  })
+  .refine(
+    (data) => {
+      if (data.action === "sign_digital") return !!data.signatureData;
+      if (data.action === "sign_upload") return !!data.signedDocumentUrl;
+      return true;
+    },
+    { message: "Signature data required for signing actions" },
+  );
 
 // ── Query ──
 export const clearanceQuerySchema = z.object({

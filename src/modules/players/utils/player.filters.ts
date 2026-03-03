@@ -9,8 +9,8 @@
 // - If you add new filters (e.g. ageRange, preferredFoot), you
 //   add them here without touching the main service flow.
 // ─────────────────────────────────────────────────────────────
-import { Op, Sequelize, fn, col } from 'sequelize';
-import { ListPlayersQuery } from './player.types';
+import { Op, Sequelize, fn, col } from "sequelize";
+import { ListPlayersQuery } from "./player.types";
 
 /**
  * Builds a Sequelize-compatible `where` clause from the
@@ -20,7 +20,10 @@ import { ListPlayersQuery } from './player.types';
  * @param search  - The trimmed search string (from parsePagination)
  * @returns       - A Sequelize WhereOptions object
  */
-export function buildPlayerWhere(params: ListPlayersQuery, search?: string): any {
+export function buildPlayerWhere(
+  params: ListPlayersQuery,
+  search?: string,
+): any {
   const where: any = {};
 
   // ── Direct equality filters ──
@@ -39,13 +42,12 @@ export function buildPlayerWhere(params: ListPlayersQuery, search?: string): any
       { firstNameAr: { [Op.iLike]: pattern } },
       { lastNameAr: { [Op.iLike]: pattern } },
       // Full name (English): "Salem Al-Dawsari"
-      Sequelize.where(
-        fn('concat', col('first_name'), ' ', col('last_name')),
-        { [Op.iLike]: pattern },
-      ),
+      Sequelize.where(fn("concat", col("first_name"), " ", col("last_name")), {
+        [Op.iLike]: pattern,
+      }),
       // Full name (Arabic): "سالم الدوسري"
       Sequelize.where(
-        fn('concat', col('first_name_ar'), ' ', col('last_name_ar')),
+        fn("concat", col("first_name_ar"), " ", col("last_name_ar")),
         { [Op.iLike]: pattern },
       ),
     ];

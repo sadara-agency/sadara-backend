@@ -1,9 +1,9 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-import * as iconv from 'iconv-lite';
+import axios from "axios";
+import * as cheerio from "cheerio";
+import * as iconv from "iconv-lite";
 
-const BASE_URL_EN = 'https://www.saff.com.sa/en';
-const BASE_URL_AR = 'https://www.saff.com.sa/ar';
+const BASE_URL_EN = "https://www.saff.com.sa/en";
+const BASE_URL_AR = "https://www.saff.com.sa/ar";
 const REQUEST_DELAY = 1500; // ms between requests to be respectful
 
 // ── Types ──
@@ -24,8 +24,8 @@ export interface ScrapedStanding {
 }
 
 export interface ScrapedFixture {
-  date: string;       // YYYY-MM-DD
-  time: string;       // HH:MM
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
   saffHomeTeamId: number;
   homeTeamNameEn: string;
   homeTeamNameAr: string;
@@ -57,7 +57,7 @@ export interface ScrapeResult {
 // ── Utility: Delay between requests ──
 
 function delay(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 // ── Utility: Extract SAFF team ID from href ──
@@ -71,9 +71,9 @@ function extractTeamId(href: string | undefined): number {
 // ── Utility: Parse score string "2 - 3" → [2, 3] ──
 
 function parseScore(scoreStr: string): [number | null, number | null] {
-  const cleaned = scoreStr.replace(/\s/g, '');
-  if (cleaned === '-' || cleaned === 'vs' || !cleaned) return [null, null];
-  const parts = cleaned.split('-');
+  const cleaned = scoreStr.replace(/\s/g, "");
+  if (cleaned === "-" || cleaned === "vs" || !cleaned) return [null, null];
+  const parts = cleaned.split("-");
   if (parts.length !== 2) return [null, null];
   const home = parseInt(parts[0], 10);
   const away = parseInt(parts[1], 10);
@@ -82,25 +82,28 @@ function parseScore(scoreStr: string): [number | null, number | null] {
 
 // ── Fetch page with proper encoding ──
 
-async function fetchPage(url: string, lang: 'en' | 'ar' = 'en'): Promise<cheerio.CheerioAPI> {
+async function fetchPage(
+  url: string,
+  lang: "en" | "ar" = "en",
+): Promise<cheerio.CheerioAPI> {
   const response = await axios.get(url, {
-    responseType: 'arraybuffer',
+    responseType: "arraybuffer",
     timeout: 15000,
     headers: {
-      'User-Agent': 'Sadara-Sports-Platform/1.0 (data-integration)',
-      'Accept': 'text/html',
-      'Accept-Language': lang,
+      "User-Agent": "Sadara-Sports-Platform/1.0 (data-integration)",
+      Accept: "text/html",
+      "Accept-Language": lang,
     },
   });
 
   // SAFF uses windows-1256 encoding — decode properly
-  const contentType = response.headers['content-type'] || '';
+  const contentType = response.headers["content-type"] || "";
   let html: string;
 
-  if (contentType.includes('1256')) {
-    html = iconv.decode(Buffer.from(response.data), 'windows-1256');
+  if (contentType.includes("1256")) {
+    html = iconv.decode(Buffer.from(response.data), "windows-1256");
   } else {
-    html = Buffer.from(response.data).toString('utf-8');
+    html = Buffer.from(response.data).toString("utf-8");
   }
 
   return cheerio.load(html);
@@ -112,15 +115,15 @@ async function fetchPage(url: string, lang: 'en' | 'ar' = 'en'): Promise<cheerio
 
 export async function scrapeChampionship(
   saffId: number,
-  season: string
+  season: string,
 ): Promise<ScrapeResult> {
   const urlEn = `${BASE_URL_EN}/championship.php?id=${saffId}`;
   const urlAr = `${BASE_URL_AR}/championship.php?id=${saffId}`;
 
   // Fetch both EN and AR pages in parallel for bilingual data
   const [$en, $ar] = await Promise.all([
-    fetchPage(urlEn, 'en'),
-    fetchPage(urlAr, 'ar'),
+    fetchPage(urlEn, "en"),
+    fetchPage(urlAr, "ar"),
   ]);
 
   // Scrape English data (primary)
@@ -136,34 +139,42 @@ export async function scrapeChampionship(
   // Build Arabic name lookup by saffTeamId
   // Note: "teamNameEn" from the AR page actually contains the Arabic text
   const arNameMap = new Map<number, string>();
-  standingsAr.forEach(s => arNameMap.set(s.saffTeamId, s.teamNameEn));
-  teamsAr.forEach(t => arNameMap.set(t.saffTeamId, t.teamNameEn));
+  standingsAr.forEach((s) => arNameMap.set(s.saffTeamId, s.teamNameEn));
+  teamsAr.forEach((t) => arNameMap.set(t.saffTeamId, t.teamNameEn));
 
   // Merge Arabic names into English standings
-  const standings = standingsEn.map(s => ({
+  const standings = standingsEn.map((s) => ({
     ...s,
-    teamNameAr: arNameMap.get(s.saffTeamId) || '',
+    teamNameAr: arNameMap.get(s.saffTeamId) || "",
   }));
 
   // Merge Arabic names into fixtures
   const arFixtureMap = new Map<string, { home: string; away: string }>();
-  fixturesAr.forEach(f => {
+  fixturesAr.forEach((f) => {
     arFixtureMap.set(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`, {
       home: f.homeTeamNameEn,
       away: f.awayTeamNameEn,
     });
   });
 
-  const fixtures = fixturesEn.map(f => ({
+  const fixtures = fixturesEn.map((f) => ({
     ...f,
-    homeTeamNameAr: arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)?.home || arNameMap.get(f.saffHomeTeamId) || '',
-    awayTeamNameAr: arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)?.away || arNameMap.get(f.saffAwayTeamId) || '',
+    homeTeamNameAr:
+      arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)
+        ?.home ||
+      arNameMap.get(f.saffHomeTeamId) ||
+      "",
+    awayTeamNameAr:
+      arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)
+        ?.away ||
+      arNameMap.get(f.saffAwayTeamId) ||
+      "",
   }));
 
   // Merge Arabic names into teams
-  const teams = teamsEn.map(t => ({
+  const teams = teamsEn.map((t) => ({
     ...t,
-    teamNameAr: arNameMap.get(t.saffTeamId) || '',
+    teamNameAr: arNameMap.get(t.saffTeamId) || "",
   }));
 
   return {
@@ -182,89 +193,99 @@ function scrapeStandings($: cheerio.CheerioAPI): ScrapedStanding[] {
   const standings: ScrapedStanding[] = [];
 
   // Find the standings table — it has headers: P, W, D, L, GF, GA, +/-, Pts
-  $('table').each((_, table) => {
-    const headers = $(table).find('th').map((_, th) => $(th).text().trim()).get();
+  $("table").each((_, table) => {
+    const headers = $(table)
+      .find("th")
+      .map((_, th) => $(th).text().trim())
+      .get();
 
     // Identify standings table by checking for "Pts" or "P" columns
-    const hasPts = headers.some(h => h === 'Pts' || h === 'نقاط');
-    const hasP = headers.some(h => h === 'P' || h === 'لعب');
+    const hasPts = headers.some((h) => h === "Pts" || h === "نقاط");
+    const hasP = headers.some((h) => h === "P" || h === "لعب");
 
     if (!hasPts || !hasP) return;
 
     // Find column indices from headers
     const colIdx = {
-      pts: headers.findIndex(h => h === 'Pts' || h === 'نقاط'),
-      p: headers.findIndex(h => h === 'P' || h === 'لعب'),
-      w: headers.findIndex(h => h === 'W' || h === 'فوز'),
-      d: headers.findIndex(h => h === 'D' || h === 'تعادل'),
-      l: headers.findIndex(h => h === 'L' || h === 'خسارة'),
-      gf: headers.findIndex(h => h === 'GF' || h === 'له'),
-      ga: headers.findIndex(h => h === 'GA' || h === 'عليه'),
-      gd: headers.findIndex(h => h === '+/-' || h === 'الفارق' || h === 'فرق'),
+      pts: headers.findIndex((h) => h === "Pts" || h === "نقاط"),
+      p: headers.findIndex((h) => h === "P" || h === "لعب"),
+      w: headers.findIndex((h) => h === "W" || h === "فوز"),
+      d: headers.findIndex((h) => h === "D" || h === "تعادل"),
+      l: headers.findIndex((h) => h === "L" || h === "خسارة"),
+      gf: headers.findIndex((h) => h === "GF" || h === "له"),
+      ga: headers.findIndex((h) => h === "GA" || h === "عليه"),
+      gd: headers.findIndex(
+        (h) => h === "+/-" || h === "الفارق" || h === "فرق",
+      ),
     };
 
     let rowNum = 0;
 
-    $(table).find('tbody tr').each((_, row) => {
-      const cells = $(row).find('td');
-      if (cells.length < 8) return;
+    $(table)
+      .find("tbody tr")
+      .each((_, row) => {
+        const cells = $(row).find("td");
+        if (cells.length < 8) return;
 
-      // Find team link
-      const teamLink = $(row).find('a[href*="team.php"]');
-      if (!teamLink.length) return;
+        // Find team link
+        const teamLink = $(row).find('a[href*="team.php"]');
+        if (!teamLink.length) return;
 
-      const saffTeamId = extractTeamId(teamLink.attr('href'));
-      const teamNameEn = teamLink.text().trim();
-      if (!saffTeamId || !teamNameEn) return;
+        const saffTeamId = extractTeamId(teamLink.attr("href"));
+        const teamNameEn = teamLink.text().trim();
+        if (!saffTeamId || !teamNameEn) return;
 
-      rowNum++;
+        rowNum++;
 
-      // Helper: parse a cell's text as integer (handles +46, -7, etc.)
-      const cellInt = (idx: number): number => {
-        if (idx < 0 || idx >= cells.length) return 0;
-        const text = $(cells[idx]).text().trim().replace(/\+/, '');
-        const n = parseInt(text, 10);
-        return isNaN(n) ? 0 : n;
-      };
+        // Helper: parse a cell's text as integer (handles +46, -7, etc.)
+        const cellInt = (idx: number): number => {
+          if (idx < 0 || idx >= cells.length) return 0;
+          const text = $(cells[idx]).text().trim().replace(/\+/, "");
+          const n = parseInt(text, 10);
+          return isNaN(n) ? 0 : n;
+        };
 
-      // Try to get position from first cell, fall back to row number
-      const firstCellText = $(cells[0]).text().trim().replace(/[^\d]/g, '');
-      const position = parseInt(firstCellText, 10) || rowNum;
+        // Try to get position from first cell, fall back to row number
+        const firstCellText = $(cells[0]).text().trim().replace(/[^\d]/g, "");
+        const position = parseInt(firstCellText, 10) || rowNum;
 
-      // Parse stats by column index (most reliable method)
-      const played = cellInt(colIdx.p);
-      const won = cellInt(colIdx.w);
-      const drawn = cellInt(colIdx.d);
-      const lost = cellInt(colIdx.l);
-      const goalsFor = cellInt(colIdx.gf);
-      const goalsAgainst = cellInt(colIdx.ga);
-      const points = cellInt(colIdx.pts);
+        // Parse stats by column index (most reliable method)
+        const played = cellInt(colIdx.p);
+        const won = cellInt(colIdx.w);
+        const drawn = cellInt(colIdx.d);
+        const lost = cellInt(colIdx.l);
+        const goalsFor = cellInt(colIdx.gf);
+        const goalsAgainst = cellInt(colIdx.ga);
+        const points = cellInt(colIdx.pts);
 
-      // Goal difference: parse from column if available, otherwise compute
-      let goalDifference = 0;
-      if (colIdx.gd >= 0) {
-        const gdText = $(cells[colIdx.gd]).text().trim();
-        goalDifference = parseInt(gdText.replace(/\+/, ''), 10);
-        if (isNaN(goalDifference)) goalDifference = goalsFor - goalsAgainst;
-      } else {
-        goalDifference = goalsFor - goalsAgainst;
-      }
+        // Goal difference: parse from column if available, otherwise compute
+        let goalDifference = 0;
+        if (colIdx.gd >= 0) {
+          const gdText = $(cells[colIdx.gd]).text().trim();
+          goalDifference = parseInt(gdText.replace(/\+/, ""), 10);
+          if (isNaN(goalDifference)) goalDifference = goalsFor - goalsAgainst;
+        } else {
+          goalDifference = goalsFor - goalsAgainst;
+        }
 
-      // Validate: at least played > 0 or points > 0 to avoid junk rows
-      if (played > 0 || points > 0) {
-        standings.push({
-          position,
-          saffTeamId,
-          teamNameEn,
-          teamNameAr: '',
-          played, won, drawn, lost,
-          goalsFor,
-          goalsAgainst,
-          goalDifference,
-          points,
-        });
-      }
-    });
+        // Validate: at least played > 0 or points > 0 to avoid junk rows
+        if (played > 0 || points > 0) {
+          standings.push({
+            position,
+            saffTeamId,
+            teamNameEn,
+            teamNameAr: "",
+            played,
+            won,
+            drawn,
+            lost,
+            goalsFor,
+            goalsAgainst,
+            goalDifference,
+            points,
+          });
+        }
+      });
   });
 
   // Sort by position
@@ -277,18 +298,18 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
   const fixtures: ScrapedFixture[] = [];
 
   // Find fixture tables — they have team links and time/score columns
-  $('table').each((_, table) => {
-    const rows = $(table).find('tr');
+  $("table").each((_, table) => {
+    const rows = $(table).find("tr");
 
-    let currentDate = '';
+    let currentDate = "";
 
     rows.each((_, row) => {
-      const cells = $(row).find('td');
+      const cells = $(row).find("td");
 
       // Date row — contains a calendar link
       const dateLink = $(row).find('a[href*="calendar_date"]');
       if (dateLink.length) {
-        const href = dateLink.attr('href') || '';
+        const href = dateLink.attr("href") || "";
         const dateMatch = href.match(/calendar_date=(\d{4}-\d{2}-\d{2})/);
         if (dateMatch) currentDate = dateMatch[1];
       }
@@ -299,13 +320,13 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
         const homeLink = teamLinks.eq(0);
         const awayLink = teamLinks.eq(1);
 
-        const homeId = extractTeamId(homeLink.attr('href'));
-        const awayId = extractTeamId(awayLink.attr('href'));
+        const homeId = extractTeamId(homeLink.attr("href"));
+        const awayId = extractTeamId(awayLink.attr("href"));
         const homeName = homeLink.text().trim();
         const awayName = awayLink.text().trim();
 
         // Find time and score
-        let time = '';
+        let time = "";
         let homeScore: number | null = null;
         let awayScore: number | null = null;
 
@@ -324,10 +345,10 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
         });
 
         // Stadium — usually the last text cell
-        let stadium = '';
-        let city = '';
+        let stadium = "";
+        let city = "";
         const lastCell = cells.last().text().trim();
-        if (lastCell && !lastCell.match(/^\d/) && lastCell !== '-') {
+        if (lastCell && !lastCell.match(/^\d/) && lastCell !== "-") {
           // Parse "Stadium Name (City)"
           const stadiumMatch = lastCell.match(/^(.+?)\s*\((.+?)\)\s*$/);
           if (stadiumMatch) {
@@ -344,10 +365,10 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
             time,
             saffHomeTeamId: homeId,
             homeTeamNameEn: homeName,
-            homeTeamNameAr: '',  // filled by merge in scrapeChampionship
+            homeTeamNameAr: "", // filled by merge in scrapeChampionship
             saffAwayTeamId: awayId,
             awayTeamNameEn: awayName,
-            awayTeamNameAr: '',  // filled by merge in scrapeChampionship
+            awayTeamNameAr: "", // filled by merge in scrapeChampionship
             homeScore,
             awayScore,
             stadium,
@@ -360,7 +381,7 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
 
   // Deduplicate (page sometimes renders mobile + desktop tables)
   const seen = new Set<string>();
-  return fixtures.filter(f => {
+  return fixtures.filter((f) => {
     const key = `${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`;
     if (seen.has(key)) return false;
     seen.add(key);
@@ -374,7 +395,7 @@ function extractTeams($: cheerio.CheerioAPI): ScrapedTeam[] {
   const teamMap = new Map<number, string>();
 
   $('a[href*="team.php"]').each((_, el) => {
-    const href = $(el).attr('href') || '';
+    const href = $(el).attr("href") || "";
     const id = extractTeamId(href);
     const name = $(el).text().trim();
     if (id && name && !teamMap.has(id)) {
@@ -385,36 +406,43 @@ function extractTeams($: cheerio.CheerioAPI): ScrapedTeam[] {
   return Array.from(teamMap.entries()).map(([saffTeamId, teamNameEn]) => ({
     saffTeamId,
     teamNameEn,
-    teamNameAr: '',  // filled by merge in scrapeChampionship
+    teamNameAr: "", // filled by merge in scrapeChampionship
   }));
 }
-
 
 // ══════════════════════════════════════════
 // SCRAPE TEAM LOGO
 // ══════════════════════════════════════════
 
-export async function scrapeTeamLogo(saffTeamId: number): Promise<string | null> {
+export async function scrapeTeamLogo(
+  saffTeamId: number,
+): Promise<string | null> {
   try {
     const url = `${BASE_URL_EN}/team.php?id=${saffTeamId}`;
-    const $ = await fetchPage(url, 'en');
+    const $ = await fetchPage(url, "en");
 
     // Look for team logo image - check common patterns on SAFF team pages
     let logoImg = $('img[src*="logo"]').first();
     if (!logoImg.length) logoImg = $('img[src*="team"]').first();
-    if (!logoImg.length) logoImg = $('.team-logo img, .team-header img, .club-logo img, .team-img img').first();
+    if (!logoImg.length)
+      logoImg = $(
+        ".team-logo img, .team-header img, .club-logo img, .team-img img",
+      ).first();
     // Fallback: first large image in the profile/header area
-    if (!logoImg.length) logoImg = $('img[width]').filter((_, el) => {
-      const w = parseInt($(el).attr('width') || '0', 10);
-      return w >= 50 && w <= 200;
-    }).first();
+    if (!logoImg.length)
+      logoImg = $("img[width]")
+        .filter((_, el) => {
+          const w = parseInt($(el).attr("width") || "0", 10);
+          return w >= 50 && w <= 200;
+        })
+        .first();
 
-    let src = logoImg.attr('src');
+    let src = logoImg.attr("src");
     if (!src) return null;
 
     // Make absolute URL
-    if (!src.startsWith('http')) {
-      src = `https://www.saff.com.sa${src.startsWith('/') ? '' : '/'}${src}`;
+    if (!src.startsWith("http")) {
+      src = `https://www.saff.com.sa${src.startsWith("/") ? "" : "/"}${src}`;
     }
     return src;
   } catch {
@@ -447,7 +475,6 @@ export async function scrapeTeamLogos(
   return logos;
 }
 
-
 // ══════════════════════════════════════════
 // SCRAPE SPECIFIC WEEK
 // ══════════════════════════════════════════
@@ -455,7 +482,7 @@ export async function scrapeTeamLogos(
 export async function scrapeWeek(
   saffId: number,
   season: string,
-  week: number
+  week: number,
 ): Promise<ScrapedFixture[]> {
   // The SAFF site uses JavaScript to switch weeks via dropdown
   // For server-side scraping, we'd need to find if there's a
@@ -466,7 +493,6 @@ export async function scrapeWeek(
   return result.fixtures;
 }
 
-
 // ══════════════════════════════════════════
 // SCRAPE ALL WEEKS (iterate 1-34)
 // ══════════════════════════════════════════
@@ -474,15 +500,16 @@ export async function scrapeWeek(
 export async function scrapeAllWeeks(
   saffId: number,
   season: string,
-  totalWeeks: number = 34
+  totalWeeks: number = 34,
 ): Promise<ScrapedFixture[]> {
   // This would require understanding the SAFF site's week
   // switching mechanism. Placeholder for phased implementation.
-  console.log(`[SAFF Scraper] Scraping all ${totalWeeks} weeks for championship ${saffId}`);
+  console.log(
+    `[SAFF Scraper] Scraping all ${totalWeeks} weeks for championship ${saffId}`,
+  );
   const result = await scrapeChampionship(saffId, season);
   return result.fixtures;
 }
-
 
 // ══════════════════════════════════════════
 // BATCH SCRAPE MULTIPLE TOURNAMENTS
@@ -491,7 +518,7 @@ export async function scrapeAllWeeks(
 export async function scrapeBatch(
   saffIds: number[],
   season: string,
-  onProgress?: (current: number, total: number, name: string) => void
+  onProgress?: (current: number, total: number, name: string) => void,
 ): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
 
@@ -499,14 +526,15 @@ export async function scrapeBatch(
     const saffId = saffIds[i];
 
     try {
-      if (onProgress) onProgress(i + 1, saffIds.length, `Championship #${saffId}`);
+      if (onProgress)
+        onProgress(i + 1, saffIds.length, `Championship #${saffId}`);
 
       const result = await scrapeChampionship(saffId, season);
       results.push(result);
 
       console.log(
         `[SAFF Scraper] ✓ #${saffId}: ${result.standings.length} standings, ` +
-        `${result.fixtures.length} fixtures, ${result.teams.length} teams`
+          `${result.fixtures.length} fixtures, ${result.teams.length} teams`,
       );
     } catch (error: any) {
       console.error(`[SAFF Scraper] ✗ #${saffId}: ${error.message}`);

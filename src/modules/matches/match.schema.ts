@@ -1,15 +1,17 @@
-import { z } from 'zod';
+import { z } from "zod";
 
 // ── Create Match ──
 
 export const createMatchSchema = z.object({
-  homeClubId: z.string().uuid('Invalid club ID').optional(),
-  awayClubId: z.string().uuid('Invalid club ID').optional(),
-  competition: z.string().min(1, 'Competition is required').optional(),
+  homeClubId: z.string().uuid("Invalid club ID").optional(),
+  awayClubId: z.string().uuid("Invalid club ID").optional(),
+  competition: z.string().min(1, "Competition is required").optional(),
   season: z.string().max(20).optional(),
-  matchDate: z.string().min(1, 'Match date is required'),
+  matchDate: z.string().min(1, "Match date is required"),
   venue: z.string().optional(),
-  status: z.enum(['upcoming', 'live', 'completed', 'cancelled']).default('upcoming'),
+  status: z
+    .enum(["upcoming", "live", "completed", "cancelled"])
+    .default("upcoming"),
   homeScore: z.number().int().min(0).optional(),
   awayScore: z.number().int().min(0).optional(),
   attendance: z.number().int().min(0).optional(),
@@ -27,13 +29,13 @@ export const updateMatchSchema = createMatchSchema.partial();
 export const updateScoreSchema = z.object({
   homeScore: z.number().int().min(0),
   awayScore: z.number().int().min(0),
-  status: z.enum(['live', 'completed']).optional(),
+  status: z.enum(["live", "completed"]).optional(),
 });
 
 // ── Update Match Status ──
 
 export const updateMatchStatusSchema = z.object({
-  status: z.enum(['upcoming', 'live', 'completed', 'cancelled']),
+  status: z.enum(["upcoming", "live", "completed", "cancelled"]),
 });
 
 // ── Query Matches ──
@@ -41,10 +43,12 @@ export const updateMatchStatusSchema = z.object({
 export const matchQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.enum(['match_date', 'created_at', 'updated_at', 'status', 'competition']).default('match_date'),
-  order: z.enum(['asc', 'desc']).default('desc'),
+  sort: z
+    .enum(["match_date", "created_at", "updated_at", "status", "competition"])
+    .default("match_date"),
+  order: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
-  status: z.enum(['upcoming', 'live', 'completed', 'cancelled']).optional(),
+  status: z.enum(["upcoming", "live", "completed", "cancelled"]).optional(),
   competition: z.string().optional(),
   season: z.string().optional(),
   clubId: z.string().uuid().optional(),
@@ -56,8 +60,8 @@ export const matchQuerySchema = z.object({
 // ── Calendar Query ──
 
 export const calendarQuerySchema = z.object({
-  from: z.string().min(1, 'Start date required'),
-  to: z.string().min(1, 'End date required'),
+  from: z.string().min(1, "Start date required"),
+  to: z.string().min(1, "End date required"),
   playerId: z.string().uuid().optional(),
   clubId: z.string().uuid().optional(),
   competition: z.string().optional(),
@@ -66,23 +70,27 @@ export const calendarQuerySchema = z.object({
 // ── Match Players (assign/update players to match) ──
 
 export const matchPlayerSchema = z.object({
-  playerId: z.string().uuid('Invalid player ID'),
-  availability: z.enum(['starter', 'bench', 'injured', 'suspended', 'not_called']).default('starter'),
+  playerId: z.string().uuid("Invalid player ID"),
+  availability: z
+    .enum(["starter", "bench", "injured", "suspended", "not_called"])
+    .default("starter"),
   positionInMatch: z.string().max(50).optional(),
   minutesPlayed: z.number().int().min(0).optional(),
   notes: z.string().optional(),
 });
 
 export const assignPlayersSchema = z.object({
-  players: z.array(matchPlayerSchema).min(1, 'At least one player required'),
+  players: z.array(matchPlayerSchema).min(1, "At least one player required"),
 });
 
-export const updateMatchPlayerSchema = matchPlayerSchema.partial().omit({ playerId: true });
+export const updateMatchPlayerSchema = matchPlayerSchema
+  .partial()
+  .omit({ playerId: true });
 
 // ── Player Match Stats ──
 
 export const playerMatchStatsSchema = z.object({
-  playerId: z.string().uuid('Invalid player ID'),
+  playerId: z.string().uuid("Invalid player ID"),
   minutesPlayed: z.number().int().min(0).optional(),
   goals: z.number().int().min(0).optional(),
   assists: z.number().int().min(0).optional(),
@@ -108,14 +116,16 @@ export const bulkStatsSchema = z.object({
   stats: z.array(playerMatchStatsSchema).min(1),
 });
 
-export const updateStatsSchema = playerMatchStatsSchema.partial().omit({ playerId: true });
+export const updateStatsSchema = playerMatchStatsSchema
+  .partial()
+  .omit({ playerId: true });
 
 // ── Player Matches Query (for player profile) ──
 
 export const playerMatchesQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  status: z.enum(['upcoming', 'live', 'completed', 'cancelled']).optional(),
+  status: z.enum(["upcoming", "live", "completed", "cancelled"]).optional(),
   competition: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),

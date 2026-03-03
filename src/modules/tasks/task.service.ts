@@ -9,43 +9,46 @@
 //   - Player name + assignee name via eager loading
 //   - Auto-set completedAt when status → Completed
 // ─────────────────────────────────────────────────────────────
-import { Op, Sequelize, literal } from 'sequelize';
-import { Task } from './task.model';
-import { Player } from '../players/player.model';
-import { User } from '../Users/user.model';
-import { AppError } from '../../middleware/errorHandler';
-import { parsePagination, buildMeta } from '../../shared/utils/pagination';
-import { CreateTaskInput, UpdateTaskInput } from './task.schema';
+import { Op, Sequelize, literal } from "sequelize";
+import { Task } from "./task.model";
+import { Player } from "../players/player.model";
+import { User } from "../Users/user.model";
+import { AppError } from "../../middleware/errorHandler";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { CreateTaskInput, UpdateTaskInput } from "./task.schema";
 
 // ── Shared includes for player + assignee names ──
 const TASK_INCLUDES = [
   {
     model: Player,
-    as: 'player',
-    attributes: ['id', 'firstName', 'lastName', 'firstNameAr', 'lastNameAr'],
+    as: "player",
+    attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr"],
   },
   {
     model: User,
-    as: 'assignee',
-    attributes: ['id', 'fullName', 'fullNameAr'],
+    as: "assignee",
+    attributes: ["id", "fullName", "fullNameAr"],
   },
   {
     model: User,
-    as: 'assigner',
-    attributes: ['id', 'fullName', 'fullNameAr'],
+    as: "assigner",
+    attributes: ["id", "fullName", "fullNameAr"],
   },
 ];
 
 // ── Priority ordering (matches the old raw SQL CASE statement) ──
 const PRIORITY_ORDER = literal(
-  `CASE "Task"."priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`
+  `CASE "Task"."priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`,
 );
 
 // ────────────────────────────────────────────────────────────
 // List Tasks
 // ────────────────────────────────────────────────────────────
 export async function listTasks(queryParams: any) {
-  const { limit, offset, page, sort, order, search } = parsePagination(queryParams, 'createdAt');
+  const { limit, offset, page, sort, order, search } = parsePagination(
+    queryParams,
+    "createdAt",
+  );
 
   const where: any = {};
 
@@ -66,9 +69,9 @@ export async function listTasks(queryParams: any) {
 
   // Default sort: priority (critical first) → due_date ascending
   // Unless the user explicitly requests a different sort
-  const isDefaultSort = sort === 'createdAt' && order === 'DESC';
+  const isDefaultSort = sort === "createdAt" && order === "DESC";
   const orderClause = isDefaultSort
-    ? [[PRIORITY_ORDER, 'ASC'], [literal('"Task"."due_date" ASC NULLS LAST')]]
+    ? [[PRIORITY_ORDER, "ASC"], [literal('"Task"."due_date" ASC NULLS LAST')]]
     : [[sort, order]];
 
   const { count, rows } = await Task.findAndCountAll({
@@ -90,7 +93,7 @@ export async function getTaskById(id: string) {
     include: TASK_INCLUDES,
   });
 
-  if (!task) throw new AppError('Task not found', 404);
+  if (!task) throw new AppError("Task not found", 404);
   return task;
 }
 
@@ -122,7 +125,7 @@ export async function createTask(input: CreateTaskInput, assignedBy: string) {
 // ────────────────────────────────────────────────────────────
 export async function updateTask(id: string, input: UpdateTaskInput) {
   const task = await Task.findByPk(id);
-  if (!task) throw new AppError('Task not found', 404);
+  if (!task) throw new AppError("Task not found", 404);
 
   await task.update(input);
 
@@ -133,12 +136,15 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
 // ────────────────────────────────────────────────────────────
 // Update Status (dedicated — handles completedAt logic)
 // ────────────────────────────────────────────────────────────
-export async function updateTaskStatus(id: string, status: 'Open' | 'InProgress' | 'Completed') {
+export async function updateTaskStatus(
+  id: string,
+  status: "Open" | "InProgress" | "Completed",
+) {
   const task = await Task.findByPk(id);
-  if (!task) throw new AppError('Task not found', 404);
+  if (!task) throw new AppError("Task not found", 404);
 
   // Auto-set or clear completedAt based on status
-  const completedAt = status === 'Completed' ? new Date() : null;
+  const completedAt = status === "Completed" ? new Date() : null;
   await task.update({ status, completedAt });
 
   return getTaskById(id);
@@ -149,7 +155,7 @@ export async function updateTaskStatus(id: string, status: 'Open' | 'InProgress'
 // ────────────────────────────────────────────────────────────
 export async function deleteTask(id: string) {
   const task = await Task.findByPk(id);
-  if (!task) throw new AppError('Task not found', 404);
+  if (!task) throw new AppError("Task not found", 404);
 
   await task.destroy();
   return { id };

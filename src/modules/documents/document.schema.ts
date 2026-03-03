@@ -1,14 +1,21 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-const docTypes = ['Contract', 'Passport', 'Medical', 'ID', 'Agreement', 'Other'] as const;
-const docStatuses = ['Active', 'Valid', 'Pending', 'Expired'] as const;
+const docTypes = [
+  "Contract",
+  "Passport",
+  "Medical",
+  "ID",
+  "Agreement",
+  "Other",
+] as const;
+const docStatuses = ["Active", "Valid", "Pending", "Expired"] as const;
 
 export const createDocumentSchema = z.object({
   playerId: z.string().uuid().optional(),
   contractId: z.string().uuid().optional(),
   name: z.string().min(1).max(500),
-  type: z.enum(docTypes).default('Other'),
-  status: z.enum(docStatuses).default('Active'),
+  type: z.enum(docTypes).default("Other"),
+  status: z.enum(docStatuses).default("Active"),
   fileUrl: z.string().min(1),
   fileSize: z.number().int().min(0).optional(),
   mimeType: z.string().max(100).optional(),
@@ -34,8 +41,10 @@ export const updateDocumentSchema = z.object({
 export const documentQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z.enum(['created_at', 'updated_at', 'name', 'type', 'status', 'expiry_date']).default('created_at'),
-  order: z.enum(['asc', 'desc']).default('desc'),
+  sort: z
+    .enum(["created_at", "updated_at", "name", "type", "status", "expiry_date"])
+    .default("created_at"),
+  order: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
   type: z.enum(docTypes).optional(),
   status: z.enum(docStatuses).optional(),

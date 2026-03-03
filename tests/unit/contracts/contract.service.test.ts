@@ -26,8 +26,12 @@ jest.mock('../../../src/modules/contracts/contract.model', () => ({
   },
 }));
 
+const mockPlayerFindByPk = jest.fn();
 jest.mock('../../../src/modules/players/player.model', () => ({
-  Player: { name: 'Player' },
+  Player: {
+    name: 'Player',
+    findByPk: (...args: unknown[]) => mockPlayerFindByPk(...args),
+  },
 }));
 
 jest.mock('../../../src/modules/clubs/club.model', () => ({
@@ -164,6 +168,7 @@ describe('Contract Service', () => {
       });
       mockCreate.mockResolvedValue(createdContract);
       mockFindByPk.mockResolvedValue(createdContract);
+      mockPlayerFindByPk.mockResolvedValue({ contractType: 'Professional' });
 
       await contractService.createContract(
         {

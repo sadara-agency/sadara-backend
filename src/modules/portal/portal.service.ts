@@ -1,17 +1,17 @@
-import { Op, QueryTypes } from 'sequelize';
-import crypto from 'crypto';
-import bcrypt from 'bcryptjs';
-import { sequelize } from '../../config/database';
-import { env } from '../../config/env';
-import { Player } from '../players/player.model';
-import { Club } from '../clubs/club.model';
-import { User } from '../Users/user.model';
-import { Contract } from '../contracts/contract.model';
-import { Match } from '../matches/match.model';
-import { Document } from '../documents/document.model';
-import { Gate, GateChecklist } from '../gates/gate.model';
-import { Task } from '../tasks/task.model';
-import { AppError } from '../../middleware/errorHandler';
+import { Op, QueryTypes } from "sequelize";
+import crypto from "crypto";
+import bcrypt from "bcryptjs";
+import { sequelize } from "../../config/database";
+import { env } from "../../config/env";
+import { Player } from "../players/player.model";
+import { Club } from "../clubs/club.model";
+import { User } from "../Users/user.model";
+import { Contract } from "../contracts/contract.model";
+import { Match } from "../matches/match.model";
+import { Document } from "../documents/document.model";
+import { Gate, GateChecklist } from "../gates/gate.model";
+import { Task } from "../tasks/task.model";
+import { AppError } from "../../middleware/errorHandler";
 
 // ══════════════════════════════════════════
 // RESOLVE: User → Player
@@ -26,11 +26,13 @@ import { AppError } from '../../middleware/errorHandler';
  */
 export async function getLinkedPlayer(userId: string): Promise<Player> {
   // ── Path 1: Check the users table ──
-  const user = await User.findByPk(userId, { attributes: ['id', 'email', 'role'] });
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "email", "role"],
+  });
 
   if (user) {
-    if (user.role !== 'Player') {
-      throw new AppError('This endpoint is for player accounts only', 403);
+    if (user.role !== "Player") {
+      throw new AppError("This endpoint is for player accounts only", 403);
     }
 
     const playerId = (user as any).playerId;
@@ -41,7 +43,10 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
 
     const player = await Player.findOne({ where: { email: user.email } });
     if (!player) {
-      throw new AppError('No player profile linked to this account. Contact your agent.', 404);
+      throw new AppError(
+        "No player profile linked to this account. Contact your agent.",
+        404,
+      );
     }
 
     await (user as any).update({ playerId: player.id });
@@ -56,16 +61,19 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
 
   const account = accounts[0];
   if (!account) {
-    throw new AppError('User not found', 404);
+    throw new AppError("User not found", 404);
   }
 
-  if (account.status !== 'active') {
-    throw new AppError('Account is not yet activated', 403);
+  if (account.status !== "active") {
+    throw new AppError("Account is not yet activated", 403);
   }
 
   const player = await Player.findByPk(account.player_id);
   if (!player) {
-    throw new AppError('No player profile linked to this account. Contact your agent.', 404);
+    throw new AppError(
+      "No player profile linked to this account. Contact your agent.",
+      404,
+    );
   }
 
   return player;
@@ -76,8 +84,8 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
  * Prevents "undefined" issues when passing to WHERE clauses or raw SQL.
  */
 function getPlayerId(player: Player): string {
-  const id = player.getDataValue('id') ?? (player as any).id;
-  if (!id) throw new AppError('Player record has no ID', 500);
+  const id = player.getDataValue("id") ?? (player as any).id;
+  if (!id) throw new AppError("Player record has no ID", 500);
   return id;
 }
 
@@ -91,16 +99,38 @@ export async function getMyProfile(userId: string) {
 
   const profile = await Player.findByPk(playerId, {
     include: [
-      { model: Club, as: 'club', attributes: ['id', 'name', 'nameAr', 'logoUrl', 'league', 'city', 'stadium'] },
-      { model: User, as: 'agent', attributes: ['id', 'fullName', 'fullNameAr', 'email'] },
+      {
+        model: Club,
+        as: "club",
+        attributes: [
+          "id",
+          "name",
+          "nameAr",
+          "logoUrl",
+          "league",
+          "city",
+          "stadium",
+        ],
+      },
+      {
+        model: User,
+        as: "agent",
+        attributes: ["id", "fullName", "fullNameAr", "email"],
+      },
     ],
   });
 
   // Get active contract
   const activeContract = await Contract.findOne({
-    where: { playerId, status: 'Active' },
-    include: [{ model: Club, as: 'club', attributes: ['id', 'name', 'nameAr', 'logoUrl'] }],
-    order: [['endDate', 'DESC']],
+    where: { playerId, status: "Active" },
+    include: [
+      {
+        model: Club,
+        as: "club",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
+    ],
+    order: [["endDate", "DESC"]],
   });
 
   // Get quick stats via raw SQL (safe — playerId is a verified string)
@@ -140,10 +170,18 @@ export async function getMySchedule(userId: string, query: any = {}) {
       matchDate: { [Op.gte]: now },
     },
     include: [
-      { model: Club, as: 'homeClub', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
-      { model: Club, as: 'awayClub', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
+      {
+        model: Club,
+        as: "homeClub",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
+      {
+        model: Club,
+        as: "awayClub",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
     ],
-    order: [['matchDate', 'ASC']],
+    order: [["matchDate", "ASC"]],
     limit: 10,
   });
 
@@ -153,16 +191,24 @@ export async function getMySchedule(userId: string, query: any = {}) {
       matchDate: { [Op.lt]: now },
     },
     include: [
-      { model: Club, as: 'homeClub', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
-      { model: Club, as: 'awayClub', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
+      {
+        model: Club,
+        as: "homeClub",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
+      {
+        model: Club,
+        as: "awayClub",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
     ],
-    order: [['matchDate', 'DESC']],
+    order: [["matchDate", "DESC"]],
     limit: 10,
   });
 
   const tasks = await Task.findAll({
-    where: { playerId, status: { [Op.ne]: 'Completed' } },
-    order: [['dueDate', 'ASC']],
+    where: { playerId, status: { [Op.ne]: "Completed" } },
+    order: [["dueDate", "ASC"]],
     limit: 10,
   });
 
@@ -179,18 +225,33 @@ export async function getMyDocuments(userId: string) {
 
   const documents = await Document.findAll({
     where: { playerId },
-    include: [
-      { model: User, as: 'uploader', attributes: ['id', 'fullName'] },
-    ],
-    order: [['createdAt', 'DESC']],
+    include: [{ model: User, as: "uploader", attributes: ["id", "fullName"] }],
+    order: [["createdAt", "DESC"]],
   });
 
   const grouped = {
-    contracts: documents.filter((d: any) => d.type === 'Contract' || d.type === 'contract'),
-    identity: documents.filter((d: any) => ['ID', 'Passport', 'id', 'passport'].includes(d.type)),
-    medical: documents.filter((d: any) => ['Medical', 'medical', 'Fitness'].includes(d.type)),
-    other: documents.filter((d: any) =>
-      !['Contract', 'contract', 'ID', 'Passport', 'id', 'passport', 'Medical', 'medical', 'Fitness'].includes(d.type)
+    contracts: documents.filter(
+      (d: any) => d.type === "Contract" || d.type === "contract",
+    ),
+    identity: documents.filter((d: any) =>
+      ["ID", "Passport", "id", "passport"].includes(d.type),
+    ),
+    medical: documents.filter((d: any) =>
+      ["Medical", "medical", "Fitness"].includes(d.type),
+    ),
+    other: documents.filter(
+      (d: any) =>
+        ![
+          "Contract",
+          "contract",
+          "ID",
+          "Passport",
+          "id",
+          "passport",
+          "Medical",
+          "medical",
+          "Fitness",
+        ].includes(d.type),
     ),
   };
 
@@ -208,16 +269,21 @@ export async function getMyDevelopment(userId: string) {
   const gates = await Gate.findAll({
     where: { playerId },
     include: [
-      { model: GateChecklist, as: 'checklist', order: [['sortOrder', 'ASC']] },
-      { model: User, as: 'approver', attributes: ['id', 'fullName', 'fullNameAr'] },
+      { model: GateChecklist, as: "checklist", order: [["sortOrder", "ASC"]] },
+      {
+        model: User,
+        as: "approver",
+        attributes: ["id", "fullName", "fullNameAr"],
+      },
     ],
-    order: [['gateNumber', 'ASC']],
+    order: [["gateNumber", "ASC"]],
   });
 
-  const passedGates = gates.filter((g: any) => g.status === 'Completed');
-  const currentGateNumber = passedGates.length > 0
-    ? Math.max(...passedGates.map((g: any) => g.gateNumber)) + 1
-    : 0;
+  const passedGates = gates.filter((g: any) => g.status === "Completed");
+  const currentGateNumber =
+    passedGates.length > 0
+      ? Math.max(...passedGates.map((g: any) => g.gateNumber)) + 1
+      : 0;
 
   const totalGates = 4;
   const gateProgress = Math.round((passedGates.length / totalGates) * 100);
@@ -238,7 +304,7 @@ export async function getMyDevelopment(userId: string) {
 export async function getMyStats(userId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
-  const isGoalkeeper = player.position === 'GK';
+  const isGoalkeeper = player.position === "GK";
 
   // ── Career aggregate totals ──
   const [totals] = await sequelize.query<any>(
@@ -263,12 +329,16 @@ export async function getMyStats(userId: string) {
       COALESCE(SUM(fouls_drawn), 0)::INT          AS "foulsDrawn",
       COALESCE(SUM(passes_total), 0)::INT         AS "passesTotal",
       COALESCE(SUM(passes_completed), 0)::INT     AS "passesCompleted"
-      ${isGoalkeeper ? `,
+      ${
+        isGoalkeeper
+          ? `,
       COALESCE(SUM(saves), 0)::INT                AS "saves",
       COUNT(*) FILTER (WHERE clean_sheet = true)::INT AS "cleanSheets",
       COALESCE(SUM(goals_conceded), 0)::INT       AS "goalsConceded",
       COALESCE(SUM(penalties_saved), 0)::INT      AS "penaltiesSaved"
-      ` : ''}
+      `
+          : ""
+      }
     FROM player_match_stats
     WHERE player_id = :playerId`,
     { replacements: { playerId }, type: QueryTypes.SELECT },
@@ -321,12 +391,16 @@ export async function getMyStats(userId: string) {
       pms.red_cards       AS "redCards",
       pms.rating,
       pms.position_in_match AS "positionInMatch"
-      ${isGoalkeeper ? `,
+      ${
+        isGoalkeeper
+          ? `,
       pms.saves,
       pms.clean_sheet     AS "cleanSheet",
       pms.goals_conceded  AS "goalsConceded",
       pms.penalties_saved  AS "penaltiesSaved"
-      ` : ''}
+      `
+          : ""
+      }
     FROM player_match_stats pms
     JOIN matches m ON m.id = pms.match_id
     LEFT JOIN clubs hc ON hc.id = m.home_club_id
@@ -334,7 +408,10 @@ export async function getMyStats(userId: string) {
     WHERE pms.player_id = :playerId
     ORDER BY m.match_date DESC
     LIMIT 10`,
-    { replacements: { playerId, clubId: player.currentClubId || '' }, type: QueryTypes.SELECT },
+    {
+      replacements: { playerId, clubId: player.currentClubId || "" },
+      type: QueryTypes.SELECT,
+    },
   );
 
   return {
@@ -371,12 +448,14 @@ export async function getMyStats(userId: string) {
       foulsCommitted: t.foulsCommitted || 0,
       foulsDrawn: t.foulsDrawn || 0,
     },
-    goalkeeping: isGoalkeeper ? {
-      saves: t.saves || 0,
-      cleanSheets: t.cleanSheets || 0,
-      goalsConceded: t.goalsConceded || 0,
-      penaltiesSaved: t.penaltiesSaved || 0,
-    } : null,
+    goalkeeping: isGoalkeeper
+      ? {
+          saves: t.saves || 0,
+          cleanSheets: t.cleanSheets || 0,
+          goalsConceded: t.goalsConceded || 0,
+          penaltiesSaved: t.penaltiesSaved || 0,
+        }
+      : null,
     recentForm,
   };
 }
@@ -392,9 +471,13 @@ export async function getMyContracts(userId: string) {
   const contracts = await Contract.findAll({
     where: { playerId },
     include: [
-      { model: Club, as: 'club', attributes: ['id', 'name', 'nameAr', 'logoUrl'] },
+      {
+        model: Club,
+        as: "club",
+        attributes: ["id", "name", "nameAr", "logoUrl"],
+      },
     ],
-    order: [['createdAt', 'DESC']],
+    order: [["createdAt", "DESC"]],
   });
 
   return { contracts };
@@ -403,7 +486,7 @@ export async function getMyContracts(userId: string) {
 export async function signMyContract(
   userId: string,
   contractId: string,
-  action: 'sign_digital' | 'sign_upload',
+  action: "sign_digital" | "sign_upload",
   signatureData?: string,
   signedDocumentUrl?: string,
 ) {
@@ -411,34 +494,40 @@ export async function signMyContract(
   const playerId = getPlayerId(player);
 
   const contract = await Contract.findByPk(contractId);
-  if (!contract) throw new AppError('Contract not found', 404);
+  if (!contract) throw new AppError("Contract not found", 404);
 
   // Ensure this contract belongs to the player
   if (contract.playerId !== playerId) {
-    throw new AppError('You are not authorized to sign this contract', 403);
+    throw new AppError("You are not authorized to sign this contract", 403);
   }
 
   // ── FIX: Player signs when status is 'AwaitingPlayer' ──
-  if (contract.status !== 'AwaitingPlayer') {
+  if (contract.status !== "AwaitingPlayer") {
     throw new AppError(
-      'This contract is not awaiting your signature. Current status: ' + contract.status,
+      "This contract is not awaiting your signature. Current status: " +
+        contract.status,
       400,
     );
   }
 
   const updatePayload: Record<string, unknown> = {
-    status: 'Active',
+    status: "Active",
     signedAt: new Date(),
   };
 
-  if (action === 'sign_digital') {
-    if (!signatureData) throw new AppError('Signature data is required for digital signing', 400);
+  if (action === "sign_digital") {
+    if (!signatureData)
+      throw new AppError("Signature data is required for digital signing", 400);
     updatePayload.signedDocumentUrl = signatureData;
-    updatePayload.signingMethod = 'digital';
+    updatePayload.signingMethod = "digital";
   } else {
-    if (!signedDocumentUrl) throw new AppError('Signed document URL is required for upload signing', 400);
+    if (!signedDocumentUrl)
+      throw new AppError(
+        "Signed document URL is required for upload signing",
+        400,
+      );
     updatePayload.signedDocumentUrl = signedDocumentUrl;
-    updatePayload.signingMethod = 'upload';
+    updatePayload.signingMethod = "upload";
   }
 
   await contract.update(updatePayload);
@@ -450,37 +539,51 @@ export async function signMyContract(
 // INVITE: Generate invite link for a player
 // ══════════════════════════════════════════
 
-export async function generatePlayerInvite(playerId: string, generatedBy: string) {
+export async function generatePlayerInvite(
+  playerId: string,
+  generatedBy: string,
+) {
   const player = await Player.findByPk(playerId);
-  if (!player) throw new AppError('Player not found', 404);
-  if (!player.email) throw new AppError('Player must have an email to generate an invite', 400);
+  if (!player) throw new AppError("Player not found", 404);
+  if (!player.email)
+    throw new AppError("Player must have an email to generate an invite", 400);
 
   const existingUser = await User.findOne({
     where: { [Op.or]: [{ email: player.email }, { playerId }] } as any,
   });
-  if (existingUser) throw new AppError('A user account already exists for this player', 409);
+  if (existingUser)
+    throw new AppError("A user account already exists for this player", 409);
 
   const existingAccount = await sequelize.query<{ id: string }>(
     `SELECT id FROM player_accounts WHERE player_id = :playerId OR email = :email LIMIT 1`,
-    { replacements: { playerId, email: player.email }, type: QueryTypes.SELECT },
+    {
+      replacements: { playerId, email: player.email },
+      type: QueryTypes.SELECT,
+    },
   );
-  if (existingAccount[0]) throw new AppError('A player account already exists for this player', 409);
+  if (existingAccount[0])
+    throw new AppError("A player account already exists for this player", 409);
 
-  const token = crypto.randomBytes(32).toString('hex');
+  const token = crypto.randomBytes(32).toString("hex");
   const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  const placeholderPassword = crypto.randomBytes(32).toString('hex');
-  const passwordHash = await bcrypt.hash(placeholderPassword, env.bcrypt.saltRounds);
+  const placeholderPassword = crypto.randomBytes(32).toString("hex");
+  const passwordHash = await bcrypt.hash(
+    placeholderPassword,
+    env.bcrypt.saltRounds,
+  );
 
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
   await User.create({
     email: player.email,
     passwordHash,
     fullName: `${player.firstName} ${player.lastName}`,
-    fullNameAr: player.firstNameAr && player.lastNameAr
-      ? `${player.firstNameAr} ${player.lastNameAr}` : undefined,
-    role: 'Player',
+    fullNameAr:
+      player.firstNameAr && player.lastNameAr
+        ? `${player.firstNameAr} ${player.lastNameAr}`
+        : undefined,
+    role: "Player",
     isActive: false,
     inviteToken: hashedToken,
     inviteTokenExpiry: expiry,
@@ -502,8 +605,11 @@ export async function generatePlayerInvite(playerId: string, generatedBy: string
 // SELF-REGISTER: Player completes registration via invite link
 // ══════════════════════════════════════════
 
-export async function completePlayerRegistration(token: string, password: string) {
-  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+export async function completePlayerRegistration(
+  token: string,
+  password: string,
+) {
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
   const user = await User.findOne({
     where: {
@@ -512,7 +618,7 @@ export async function completePlayerRegistration(token: string, password: string
     } as any,
   });
 
-  if (!user) throw new AppError('Invalid or expired invite link', 400);
+  if (!user) throw new AppError("Invalid or expired invite link", 400);
 
   const hashedPassword = await bcrypt.hash(password, env.bcrypt.saltRounds);
 
@@ -523,5 +629,8 @@ export async function completePlayerRegistration(token: string, password: string
     inviteTokenExpiry: null,
   });
 
-  return { message: 'Registration complete. You can now log in.', email: user.email };
+  return {
+    message: "Registration complete. You can now log in.",
+    email: user.email,
+  };
 }

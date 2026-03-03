@@ -5,11 +5,15 @@
 //
 // Follows the same pattern as player.controller.ts.
 // ─────────────────────────────────────────────────────────────
-import { Response } from 'express';
-import { AuthRequest } from '../../shared/types';
-import { sendSuccess, sendCreated, sendPaginated } from '../../shared/utils/apiResponse';
-import { logAudit, buildAuditContext } from '../../shared/utils/audit';
-import * as userService from './user.service';
+import { Response } from "express";
+import { AuthRequest } from "../../shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import * as userService from "./user.service";
 
 // ── List Users ──
 export async function list(req: AuthRequest, res: Response) {
@@ -28,8 +32,8 @@ export async function create(req: AuthRequest, res: Response) {
   const user = await userService.createUser(req.body);
 
   await logAudit(
-    'CREATE',
-    'users',
+    "CREATE",
+    "users",
     user.id,
     buildAuditContext(req.user!, req.ip),
     `Created user: ${user.fullName} (${user.role})`,
@@ -43,26 +47,29 @@ export async function update(req: AuthRequest, res: Response) {
   const user = await userService.updateUser(req.params.id, req.body);
 
   await logAudit(
-    'UPDATE',
-    'users',
+    "UPDATE",
+    "users",
     user.id,
     buildAuditContext(req.user!, req.ip),
     `Updated user: ${user.fullName}`,
   );
 
-  sendSuccess(res, user, 'User updated');
+  sendSuccess(res, user, "User updated");
 }
 
 // ── Reset Password ──
 export async function resetPassword(req: AuthRequest, res: Response) {
-  const result = await userService.resetPassword(req.params.id, req.body.newPassword);
+  const result = await userService.resetPassword(
+    req.params.id,
+    req.body.newPassword,
+  );
 
   await logAudit(
-    'UPDATE',
-    'users',
+    "UPDATE",
+    "users",
     req.params.id,
     buildAuditContext(req.user!, req.ip),
-    'Admin reset user password',
+    "Admin reset user password",
   );
 
   sendSuccess(res, result);
@@ -73,12 +80,12 @@ export async function remove(req: AuthRequest, res: Response) {
   const result = await userService.deleteUser(req.params.id, req.user!.id);
 
   await logAudit(
-    'DELETE',
-    'users',
+    "DELETE",
+    "users",
     result.id,
     buildAuditContext(req.user!, req.ip),
-    'User deleted',
+    "User deleted",
   );
 
-  sendSuccess(res, result, 'User deleted');
+  sendSuccess(res, result, "User deleted");
 }

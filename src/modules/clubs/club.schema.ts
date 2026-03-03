@@ -6,17 +6,17 @@
 // used in player.schema.ts, user.schema.ts, task.schema.ts,
 // and contract.schema.ts.
 // ─────────────────────────────────────────────────────────────
-import { z } from 'zod';
+import { z } from "zod";
 
 // ── Create Club ──
 export const createClubSchema = z.object({
-  name: z.string().min(1, 'Club name is required'),
+  name: z.string().min(1, "Club name is required"),
   nameAr: z.string().optional(),
-  type: z.enum(['Club', 'Sponsor']).default('Club'),
+  type: z.enum(["Club", "Sponsor"]).default("Club"),
   country: z.string().optional(),
   city: z.string().optional(),
   league: z.string().optional(),
-  logoUrl: z.string().url('Invalid URL').optional(),
+  logoUrl: z.string().url("Invalid URL").optional(),
   website: z.string().optional(),
   foundedYear: z.number().int().optional(),
   stadium: z.string().optional(),
@@ -33,20 +33,22 @@ export const updateClubSchema = createClubSchema.partial();
 export const clubQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(200).default(20),
-  sort: z.enum(['name', 'created_at', 'updated_at', 'country', 'league', 'type']).default('name'),
-  order: z.enum(['asc', 'desc']).default('asc'),
+  sort: z
+    .enum(["name", "created_at", "updated_at", "country", "league", "type"])
+    .default("name"),
+  order: z.enum(["asc", "desc"]).default("asc"),
   search: z.string().optional(),
-  type: z.enum(['Club', 'Sponsor']).optional(),
+  type: z.enum(["Club", "Sponsor"]).optional(),
   league: z.string().optional(),
   country: z.string().optional(),
 });
 
 // ── Create Contact ──
 export const createContactSchema = z.object({
-  name: z.string().min(1, 'Contact name is required'),
+  name: z.string().min(1, "Contact name is required"),
   name_ar: z.string().optional(),
-  role: z.string().min(1, 'Contact role is required'),
-  email: z.string().email('Invalid email').optional().or(z.literal('')),
+  role: z.string().min(1, "Contact role is required"),
+  email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
   is_primary: z.boolean().default(false),
 });

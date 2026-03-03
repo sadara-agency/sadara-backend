@@ -1,9 +1,13 @@
-import { DataTypes, Model, Optional } from 'sequelize';
-import { sequelize } from '../../config/database';
+import { DataTypes, Model, Optional } from "sequelize";
+import { sequelize } from "../../config/database";
 
-export type InjuryStatus = 'UnderTreatment' | 'Recovered' | 'Relapsed' | 'Chronic';
-export type InjurySeverity = 'Minor' | 'Moderate' | 'Severe' | 'Critical';
-export type InjuryCause = 'Training' | 'Match' | 'NonFootball' | 'Unknown';
+export type InjuryStatus =
+  | "UnderTreatment"
+  | "Recovered"
+  | "Relapsed"
+  | "Chronic";
+export type InjurySeverity = "Minor" | "Moderate" | "Severe" | "Critical";
+export type InjuryCause = "Training" | "Match" | "NonFootball" | "Unknown";
 
 interface InjuryAttributes {
   id: string;
@@ -45,10 +49,22 @@ interface InjuryAttributes {
   updatedAt?: Date;
 }
 
-interface InjuryCreation extends Optional<InjuryAttributes,
-  'id' | 'severity' | 'cause' | 'status' | 'isSurgeryRequired' | 'isRecurring' | 'createdAt' | 'updatedAt'> { }
+interface InjuryCreation extends Optional<
+  InjuryAttributes,
+  | "id"
+  | "severity"
+  | "cause"
+  | "status"
+  | "isSurgeryRequired"
+  | "isRecurring"
+  | "createdAt"
+  | "updatedAt"
+> {}
 
-export class Injury extends Model<InjuryAttributes, InjuryCreation> implements InjuryAttributes {
+export class Injury
+  extends Model<InjuryAttributes, InjuryCreation>
+  implements InjuryAttributes
+{
   declare id: string;
   declare playerId: string;
   declare matchId: string | null;
@@ -82,52 +98,82 @@ export class Injury extends Model<InjuryAttributes, InjuryCreation> implements I
   declare createdBy: string | null;
 }
 
-Injury.init({
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  playerId: { type: DataTypes.UUID, allowNull: false, field: 'player_id' },
-  matchId: { type: DataTypes.UUID, field: 'match_id' },
+Injury.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
+    matchId: { type: DataTypes.UUID, field: "match_id" },
 
-  // ── Core ──
-  injuryType: { type: DataTypes.STRING(255), allowNull: false, field: 'injury_type' },
-  injuryTypeAr: { type: DataTypes.STRING(255), field: 'injury_type_ar' },
-  bodyPart: { type: DataTypes.STRING(255), allowNull: false, field: 'body_part' },
-  bodyPartAr: { type: DataTypes.STRING(255), field: 'body_part_ar' },
-  severity: { type: DataTypes.STRING(50), defaultValue: 'Moderate' },
-  cause: { type: DataTypes.STRING(50), defaultValue: 'Unknown' },
-  status: { type: DataTypes.STRING(50), defaultValue: 'UnderTreatment' },
+    // ── Core ──
+    injuryType: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      field: "injury_type",
+    },
+    injuryTypeAr: { type: DataTypes.STRING(255), field: "injury_type_ar" },
+    bodyPart: {
+      type: DataTypes.STRING(255),
+      allowNull: false,
+      field: "body_part",
+    },
+    bodyPartAr: { type: DataTypes.STRING(255), field: "body_part_ar" },
+    severity: { type: DataTypes.STRING(50), defaultValue: "Moderate" },
+    cause: { type: DataTypes.STRING(50), defaultValue: "Unknown" },
+    status: { type: DataTypes.STRING(50), defaultValue: "UnderTreatment" },
 
-  // ── Timeline ──
-  injuryDate: { type: DataTypes.DATEONLY, allowNull: false, field: 'injury_date' },
-  expectedReturnDate: { type: DataTypes.DATEONLY, field: 'expected_return_date' },   // col #8
-  actualReturnDate: { type: DataTypes.DATEONLY, field: 'actual_return_date' },     // col #9
-  estimatedDaysOut: { type: DataTypes.INTEGER, field: 'estimated_days_out' },      // col #29
-  daysOut: { type: DataTypes.INTEGER, field: 'days_out' },                // col #10
+    // ── Timeline ──
+    injuryDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      field: "injury_date",
+    },
+    expectedReturnDate: {
+      type: DataTypes.DATEONLY,
+      field: "expected_return_date",
+    }, // col #8
+    actualReturnDate: { type: DataTypes.DATEONLY, field: "actual_return_date" }, // col #9
+    estimatedDaysOut: { type: DataTypes.INTEGER, field: "estimated_days_out" }, // col #29
+    daysOut: { type: DataTypes.INTEGER, field: "days_out" }, // col #10
 
-  // ── Medical ──
-  diagnosis: { type: DataTypes.TEXT },                                       // col #11
-  diagnosisAr: { type: DataTypes.TEXT, field: 'diagnosis_ar' },               // col #23
-  treatment: { type: DataTypes.TEXT },                                       // col #12 (original)
-  treatmentPlan: { type: DataTypes.TEXT, field: 'treatment_plan' },             // col #26 (new)
-  treatmentPlanAr: { type: DataTypes.TEXT, field: 'treatment_plan_ar' },          // col #24
-  surgeon: { type: DataTypes.STRING(255) },                               // col #13 (original)
-  surgeonName: { type: DataTypes.STRING(255), field: 'surgeon_name' },        // col #28 (new)
-  facility: { type: DataTypes.STRING(255) },                               // col #14 (original)
-  medicalProvider: { type: DataTypes.STRING(255), field: 'medical_provider' },    // col #27 (new)
-  actualDaysOut: { type: DataTypes.INTEGER, field: 'actual_days_out' },         // col #30
-  isSurgeryRequired: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_surgery_required' }, // col #31
-  surgeryDate: { type: DataTypes.DATEONLY, field: 'surgery_date' },           // col #32
+    // ── Medical ──
+    diagnosis: { type: DataTypes.TEXT }, // col #11
+    diagnosisAr: { type: DataTypes.TEXT, field: "diagnosis_ar" }, // col #23
+    treatment: { type: DataTypes.TEXT }, // col #12 (original)
+    treatmentPlan: { type: DataTypes.TEXT, field: "treatment_plan" }, // col #26 (new)
+    treatmentPlanAr: { type: DataTypes.TEXT, field: "treatment_plan_ar" }, // col #24
+    surgeon: { type: DataTypes.STRING(255) }, // col #13 (original)
+    surgeonName: { type: DataTypes.STRING(255), field: "surgeon_name" }, // col #28 (new)
+    facility: { type: DataTypes.STRING(255) }, // col #14 (original)
+    medicalProvider: { type: DataTypes.STRING(255), field: "medical_provider" }, // col #27 (new)
+    actualDaysOut: { type: DataTypes.INTEGER, field: "actual_days_out" }, // col #30
+    isSurgeryRequired: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_surgery_required",
+    }, // col #31
+    surgeryDate: { type: DataTypes.DATEONLY, field: "surgery_date" }, // col #32
 
-  // ── Context ──
-  isRecurring: { type: DataTypes.BOOLEAN, defaultValue: false, field: 'is_recurring' },  // col #16
-  relatedInjuryId: { type: DataTypes.UUID, field: 'related_injury_id' },          // col #17
-  notes: { type: DataTypes.TEXT },                                       // col #18
-  createdBy: { type: DataTypes.UUID, field: 'created_by' },                 // col #33
-}, {
-  sequelize,
-  tableName: 'injuries',
-  underscored: true,
-  timestamps: true,
-});
+    // ── Context ──
+    isRecurring: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_recurring",
+    }, // col #16
+    relatedInjuryId: { type: DataTypes.UUID, field: "related_injury_id" }, // col #17
+    notes: { type: DataTypes.TEXT }, // col #18
+    createdBy: { type: DataTypes.UUID, field: "created_by" }, // col #33
+  },
+  {
+    sequelize,
+    tableName: "injuries",
+    underscored: true,
+    timestamps: true,
+  },
+);
 
 // ── Injury Update sub-model ──
 
@@ -142,9 +188,15 @@ interface InjuryUpdateAttributes {
   createdAt?: Date;
 }
 
-interface InjuryUpdateCreation extends Optional<InjuryUpdateAttributes, 'id' | 'createdAt'> { }
+interface InjuryUpdateCreation extends Optional<
+  InjuryUpdateAttributes,
+  "id" | "createdAt"
+> {}
 
-export class InjuryUpdate extends Model<InjuryUpdateAttributes, InjuryUpdateCreation> implements InjuryUpdateAttributes {
+export class InjuryUpdate
+  extends Model<InjuryUpdateAttributes, InjuryUpdateCreation>
+  implements InjuryUpdateAttributes
+{
   declare id: string;
   declare injuryId: string;
   declare updateDate: string;
@@ -154,18 +206,30 @@ export class InjuryUpdate extends Model<InjuryUpdateAttributes, InjuryUpdateCrea
   declare updatedBy: string | null;
 }
 
-InjuryUpdate.init({
-  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
-  injuryId: { type: DataTypes.UUID, allowNull: false, field: 'injury_id' },
-  updateDate: { type: DataTypes.DATEONLY, allowNull: false, defaultValue: DataTypes.NOW, field: 'update_date' },
-  status: { type: DataTypes.STRING(50) },
-  notes: { type: DataTypes.TEXT },
-  notesAr: { type: DataTypes.TEXT, field: 'notes_ar' },
-  updatedBy: { type: DataTypes.UUID, field: 'updated_by' },
-}, {
-  sequelize,
-  tableName: 'injury_updates',
-  underscored: true,
-  timestamps: true,
-  updatedAt: false,
-});
+InjuryUpdate.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    injuryId: { type: DataTypes.UUID, allowNull: false, field: "injury_id" },
+    updateDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+      field: "update_date",
+    },
+    status: { type: DataTypes.STRING(50) },
+    notes: { type: DataTypes.TEXT },
+    notesAr: { type: DataTypes.TEXT, field: "notes_ar" },
+    updatedBy: { type: DataTypes.UUID, field: "updated_by" },
+  },
+  {
+    sequelize,
+    tableName: "injury_updates",
+    underscored: true,
+    timestamps: true,
+    updatedAt: false,
+  },
+);

@@ -1,14 +1,14 @@
 // ─────────────────────────────────────────────────────────────
 // src/shared/middleware/upload.ts — Multer file upload middleware
 // ─────────────────────────────────────────────────────────────
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import crypto from 'crypto';
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import crypto from "crypto";
 
 // ── Upload directory ──
 
-const UPLOAD_DIR = path.resolve(process.cwd(), 'uploads', 'documents');
+const UPLOAD_DIR = path.resolve(process.cwd(), "uploads", "documents");
 
 // Ensure directory exists at startup
 if (!fs.existsSync(UPLOAD_DIR)) {
@@ -18,16 +18,16 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 // ── Allowed MIME types ──
 
 const ALLOWED_MIMES = [
-  'application/pdf',
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-  'text/csv',
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/plain",
+  "text/csv",
 ];
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -47,11 +47,15 @@ const storage = multer.diskStorage({
 
 // ── File filter ──
 
-const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
+const fileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
   if (ALLOWED_MIMES.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error(`File type '${file.mimetype}' is not allowed. Allowed: PDF, images, Word, Excel, text.`));
+    cb(
+      new Error(
+        `File type '${file.mimetype}' is not allowed. Allowed: PDF, images, Word, Excel, text.`,
+      ),
+    );
   }
 };
 
@@ -61,7 +65,7 @@ export const uploadSingle = multer({
   storage,
   fileFilter,
   limits: { fileSize: MAX_FILE_SIZE },
-}).single('file');
+}).single("file");
 
 export const UPLOAD_DIR_PATH = UPLOAD_DIR;
 
@@ -69,19 +73,27 @@ export const UPLOAD_DIR_PATH = UPLOAD_DIR;
 // Checks actual file content to prevent MIME type spoofing.
 
 const MAGIC_BYTES: Record<string, { bytes: number[]; offset?: number }[]> = {
-  'application/pdf':    [{ bytes: [0x25, 0x50, 0x44, 0x46] }],           // %PDF
-  'image/jpeg':         [{ bytes: [0xFF, 0xD8, 0xFF] }],
-  'image/png':          [{ bytes: [0x89, 0x50, 0x4E, 0x47] }],
-  'image/webp':         [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }], // RIFF
-  'application/msword': [{ bytes: [0xD0, 0xCF, 0x11, 0xE0] }],           // OLE2
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': [{ bytes: [0x50, 0x4B, 0x03, 0x04] }], // ZIP/PK
-  'application/vnd.ms-excel':     [{ bytes: [0xD0, 0xCF, 0x11, 0xE0] }],
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':     [{ bytes: [0x50, 0x4B, 0x03, 0x04] }],
+  "application/pdf": [{ bytes: [0x25, 0x50, 0x44, 0x46] }], // %PDF
+  "image/jpeg": [{ bytes: [0xff, 0xd8, 0xff] }],
+  "image/png": [{ bytes: [0x89, 0x50, 0x4e, 0x47] }],
+  "image/webp": [{ bytes: [0x52, 0x49, 0x46, 0x46], offset: 0 }], // RIFF
+  "application/msword": [{ bytes: [0xd0, 0xcf, 0x11, 0xe0] }], // OLE2
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document": [
+    { bytes: [0x50, 0x4b, 0x03, 0x04] },
+  ], // ZIP/PK
+  "application/vnd.ms-excel": [{ bytes: [0xd0, 0xcf, 0x11, 0xe0] }],
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [
+    { bytes: [0x50, 0x4b, 0x03, 0x04] },
+  ],
 };
 
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
 
-export function verifyFileType(req: Request, res: Response, next: NextFunction): void {
+export function verifyFileType(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
   const file = req.file;
   if (!file) return next();
 
@@ -92,12 +104,12 @@ export function verifyFileType(req: Request, res: Response, next: NextFunction):
   if (!signatures) return next();
 
   try {
-    const fd = fs.openSync(file.path, 'r');
+    const fd = fs.openSync(file.path, "r");
     const buf = Buffer.alloc(8);
     fs.readSync(fd, buf, 0, 8, 0);
     fs.closeSync(fd);
 
-    const match = signatures.some(sig => {
+    const match = signatures.some((sig) => {
       const offset = sig.offset || 0;
       return sig.bytes.every((b, i) => buf[offset + i] === b);
     });
@@ -107,7 +119,7 @@ export function verifyFileType(req: Request, res: Response, next: NextFunction):
       fs.unlinkSync(file.path);
       res.status(400).json({
         success: false,
-        message: 'File content does not match its declared type.',
+        message: "File content does not match its declared type.",
       });
       return;
     }

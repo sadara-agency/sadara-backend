@@ -1,8 +1,7 @@
-import { Request, Response, NextFunction } from 'express';
-import { cacheGet, cacheSet, CacheTTL } from '../shared/utils/cache';
-import { isRedisConnected } from '../config/redis';
-import { AuthRequest } from '../shared/types';
-
+import { Request, Response, NextFunction } from "express";
+import { cacheGet, cacheSet, CacheTTL } from "../shared/utils/cache";
+import { isRedisConnected } from "../config/redis";
+import { AuthRequest } from "../shared/types";
 
 interface CacheRouteOptions {
   /** Include user ID in cache key for per-user caching (default: false) */
@@ -16,7 +15,11 @@ export function cacheRoute(
   ttlSeconds: number = CacheTTL.MEDIUM,
   options: CacheRouteOptions = {},
 ) {
-  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  return async (
+    req: Request,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     // Skip caching if Redis is down — just pass through
     if (!isRedisConnected()) {
       next();
@@ -24,7 +27,7 @@ export function cacheRoute(
     }
 
     // Only cache GET requests
-    if (req.method !== 'GET') {
+    if (req.method !== "GET") {
       next();
       return;
     }
@@ -35,28 +38,31 @@ export function cacheRoute(
       cacheKey = options.keyBuilder(req);
     } else {
       const queryString = Object.keys(req.query)
-        .filter((k) => req.query[k] !== undefined && req.query[k] !== '')
+        .filter((k) => req.query[k] !== undefined && req.query[k] !== "")
         .sort()
         .map((k) => `${k}=${req.query[k]}`)
-        .join('&');
+        .join("&");
 
-      const userSegment = options.perUser && (req as AuthRequest).user
-        ? `:u${(req as AuthRequest).user!.id}`
-        : '';
+      const userSegment =
+        options.perUser && (req as AuthRequest).user
+          ? `:u${(req as AuthRequest).user!.id}`
+          : "";
 
       const roleSegment = (req as AuthRequest).user
         ? `:r${(req as AuthRequest).user!.role}`
-        : '';
+        : "";
 
-      cacheKey = `${prefix}${userSegment}${roleSegment}:${req.path}:${queryString || 'default'}`;
+      cacheKey = `${prefix}${userSegment}${roleSegment}:${req.path}:${queryString || "default"}`;
     }
 
     // Try to get from cache
     try {
-      const cached = await cacheGet<{ body: any; statusCode: number }>(cacheKey);
+      const cached = await cacheGet<{ body: any; statusCode: number }>(
+        cacheKey,
+      );
 
       if (cached) {
-        res.setHeader('X-Cache', 'HIT');
+        res.setHeader("X-Cache", "HIT");
         res.status(cached.statusCode).json(cached.body);
         return;
       }
@@ -65,13 +71,17 @@ export function cacheRoute(
     }
 
     // Cache miss — intercept the response to cache it
-    res.setHeader('X-Cache', 'MISS');
+    res.setHeader("X-Cache", "MISS");
 
     const originalJson = res.json.bind(res);
     res.json = ((body: any) => {
       // Only cache successful responses
       if (res.statusCode >= 200 && res.statusCode < 300) {
-        cacheSet(cacheKey, { body, statusCode: res.statusCode }, ttlSeconds).catch(() => {});
+        cacheSet(
+          cacheKey,
+          { body, statusCode: res.statusCode },
+          ttlSeconds,
+        ).catch(() => {});
       }
       return originalJson(body);
     }) as any;
