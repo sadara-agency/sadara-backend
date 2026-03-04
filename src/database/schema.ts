@@ -170,15 +170,110 @@ export async function createMissingTables() {
         EXCEPTION WHEN duplicate_column THEN NULL;
         END $$;`,
   );
-  // Add 'Converted' to offers status enum if missing (only if the type exists)
-  await sequelize.query(
-    `DO $$ BEGIN
-            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_offers_status') THEN
-                ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Converted';
-            END IF;
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END $$;`,
-  );
+  // Add 'Converted' to offers status enum if missing
+  // NOTE: ALTER TYPE...ADD VALUE cannot run inside a PL/pgSQL block / transaction,
+  // so we check existence first, then run it as a top-level statement.
+  const [enumCheck] = await sequelize.query(
+    `SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
+     WHERE t.typname = 'enum_offers_status' AND e.enumlabel = 'Converted'`,
+    { type: QueryTypes.SELECT },
+  ).catch(() => [[]]); // table may not exist yet
+  const typeExists = await sequelize.query(
+    `SELECT 1 FROM pg_type WHERE typname = 'enum_offers_status'`,
+    { type: QueryTypes.SELECT },
+  ).catch(() => []);
+  if (typeExists.length > 0 && !enumCheck) {
+    await sequelize.query(
+      `ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Converted'`,
+    );
+  }
+
+  // ── Notes ──
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS notes (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      owner_type VARCHAR(50) NOT NULL,
+      owner_id UUID NOT NULL,
+      content TEXT NOT NULL,
+      created_by UUID NOT NULL REFERENCES users(id),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  // ── Player Club History ──
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS player_club_history (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      club_id UUID NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+      start_date DATE NOT NULL,
+      end_date DATE,
+      position VARCHAR(50),
+      jersey_number INT,
+      contract_id UUID,
+      notes TEXT,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  // ── Technical Reports ──
+  await sequelize.query(`
+    DO $$ BEGIN
+        CREATE TYPE enum_technical_reports_period_type AS ENUM ('Season','DateRange','LastNMatches');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+  await sequelize.query(`
+    DO $$ BEGIN
+        CREATE TYPE enum_technical_reports_status AS ENUM ('Draft','Generating','Generated','Failed');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS technical_reports (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+      title VARCHAR(255) NOT NULL,
+      period_type enum_technical_reports_period_type NOT NULL,
+      period_params JSONB NOT NULL DEFAULT '{}',
+      file_path TEXT,
+      status enum_technical_reports_status DEFAULT 'Draft',
+      notes TEXT,
+      created_by UUID NOT NULL REFERENCES users(id),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
+  // ── Approval Requests ──
+  await sequelize.query(`
+    DO $$ BEGIN
+        CREATE TYPE enum_approval_requests_status AS ENUM ('Pending','Approved','Rejected');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `);
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS approval_requests (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      entity_type VARCHAR(50) NOT NULL,
+      entity_id UUID NOT NULL,
+      entity_title VARCHAR(500) NOT NULL,
+      action VARCHAR(100) NOT NULL,
+      status enum_approval_requests_status DEFAULT 'Pending',
+      priority VARCHAR(20) DEFAULT 'normal',
+      requested_by UUID NOT NULL REFERENCES users(id),
+      assigned_to UUID,
+      assigned_role VARCHAR(50),
+      comment TEXT,
+      due_date DATE,
+      resolved_by UUID,
+      resolved_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
 
   // ── Match Analyses ──
   await sequelize.query(`

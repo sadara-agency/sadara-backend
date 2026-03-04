@@ -298,7 +298,7 @@ export async function getFinancialDashboard(playerContractType?: string) {
         WHERE pay.status = 'Paid' AND pay.payment_type = 'Commission') AS collected_commissions,
        (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
         ${commissionPayJoin}
-        WHERE pay.status IN ('Pending', 'Overdue', 'Expected') AND pay.payment_type = 'Commission') AS outstanding_commissions
+        WHERE pay.status IN ('Expected', 'Overdue') AND pay.payment_type = 'Commission') AS outstanding_commissions
      FROM contracts c ${commissionTypeJoin}
      WHERE c.status IN ('Active', 'Expiring Soon')`,
     { type: QueryTypes.SELECT, ...typeBind },

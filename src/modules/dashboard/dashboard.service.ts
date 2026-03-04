@@ -274,13 +274,13 @@ export async function getQuickStats() {
 /** Offer counts grouped by status (for pipeline chart). */
 export async function getOfferPipeline() {
   return sequelize.query(
-    `SELECT status, COUNT(*)::INT AS count
+    `SELECT status::TEXT, COUNT(*)::INT AS count
      FROM offers
      GROUP BY status
-     ORDER BY CASE status
+     ORDER BY CASE status::TEXT
        WHEN 'New' THEN 1 WHEN 'Under Review' THEN 2
        WHEN 'Negotiation' THEN 3 WHEN 'Closed' THEN 4
-       WHEN 'Converted' THEN 5 END`,
+       WHEN 'Converted' THEN 5 ELSE 6 END`,
     { type: QueryTypes.SELECT },
   );
 }

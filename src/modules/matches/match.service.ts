@@ -502,7 +502,7 @@ export async function getPlayerAggregateStats(
 //  MATCH ANALYSIS
 // ═══════════════════════════════════════════════════════════════
 
-const ANALYST_ATTRS = ["id", "name", "email"] as const;
+const ANALYST_ATTRS = ["id", "fullName", "email"] as const;
 
 export async function getMatchAnalyses(matchId: string) {
   const match = await Match.findByPk(matchId);
