@@ -124,7 +124,12 @@ export async function gatherReportData(
   periodType: string,
   periodParams: Record<string, any>,
 ) {
-  const dateFilter = buildDateFilter(periodType, periodParams);
+  // buildDateFilter returns { clause, binds } with $N starting at startIdx
+  const matchDate = buildDateFilter(periodType, periodParams, 2);
+  const matchBinds = [playerId, ...matchDate.binds];
+
+  // For injuries, rebuild with i.injury_date instead of m.match_date
+  const injuryDateClause = matchDate.clause.replace(/m\.match_date/g, "i.injury_date");
 
   // ── Player profile ──
   const [profile] = await sequelize.query<any>(
@@ -157,8 +162,8 @@ export async function gatherReportData(
        ROUND(AVG(pms.rating), 2) AS avg_rating
      FROM player_match_stats pms
      JOIN matches m ON pms.match_id = m.id
-     WHERE pms.player_id = $1 ${dateFilter}`,
-    { bind: [playerId], type: QueryTypes.SELECT },
+     WHERE pms.player_id = $1 ${matchDate.clause}`,
+    { bind: matchBinds, type: QueryTypes.SELECT },
   );
 
   // ── Match list (individual match details) ──
@@ -173,9 +178,9 @@ export async function gatherReportData(
      JOIN matches m ON pms.match_id = m.id
      LEFT JOIN clubs hc ON m.home_club_id = hc.id
      LEFT JOIN clubs ac ON m.away_club_id = ac.id
-     WHERE pms.player_id = $1 ${dateFilter}
+     WHERE pms.player_id = $1 ${matchDate.clause}
      ORDER BY m.match_date DESC`,
-    { bind: [playerId], type: QueryTypes.SELECT },
+    { bind: matchBinds, type: QueryTypes.SELECT },
   );
 
   // ── Injury history ──
@@ -184,9 +189,9 @@ export async function gatherReportData(
             i.severity, i.status, i.injury_date, i.actual_return_date,
             i.days_out, i.is_surgery_required
      FROM injuries i
-     WHERE i.player_id = $1 ${dateFilter.replace(/m\.match_date/g, "i.injury_date")}
+     WHERE i.player_id = $1 ${injuryDateClause}
      ORDER BY i.injury_date DESC`,
-    { bind: [playerId], type: QueryTypes.SELECT },
+    { bind: matchBinds, type: QueryTypes.SELECT },
   );
 
   return { profile, statsAgg, matchList, injuries };
@@ -204,26 +209,52 @@ interface ReportFilters {
   playerContractType?: string;
 }
 
-function buildWhereClause(
+/** Build parameterized WHERE fragments. Returns { clauses, binds, nextIdx }. */
+function buildSafeWhere(
   filters: ReportFilters,
   dateCol: string,
   tableAlias: string,
-): string {
+  startIdx = 1,
+) {
   const clauses: string[] = [];
-  if (filters.dateFrom) clauses.push(`${dateCol} >= '${filters.dateFrom}'`);
-  if (filters.dateTo) clauses.push(`${dateCol} <= '${filters.dateTo}'`);
-  if (filters.playerId)
-    clauses.push(`${tableAlias}.player_id = '${filters.playerId}'`);
-  if (filters.clubId)
-    clauses.push(`${tableAlias}.club_id = '${filters.clubId}'`);
-  return clauses.length ? "AND " + clauses.join(" AND ") : "";
+  const binds: any[] = [];
+  let idx = startIdx;
+  if (filters.dateFrom) {
+    clauses.push(`${dateCol} >= $${idx++}`);
+    binds.push(filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    clauses.push(`${dateCol} <= $${idx++}`);
+    binds.push(filters.dateTo);
+  }
+  if (filters.playerId) {
+    clauses.push(`${tableAlias}.player_id = $${idx++}`);
+    binds.push(filters.playerId);
+  }
+  if (filters.clubId) {
+    clauses.push(`${tableAlias}.club_id = $${idx++}`);
+    binds.push(filters.clubId);
+  }
+  return {
+    clause: clauses.length ? "AND " + clauses.join(" AND ") : "",
+    binds,
+    nextIdx: idx,
+  };
 }
 
 // ── Player Portfolio Report ──
 export async function getPlayerPortfolioReport(filters: ReportFilters) {
-  const where: string[] = ["p.status = 'active'"];
-  if (filters.playerId) where.push(`p.id = '${filters.playerId}'`);
-  if (filters.clubId) where.push(`p.current_club_id = '${filters.clubId}'`);
+  const clauses: string[] = ["p.status = 'active'"];
+  const binds: any[] = [];
+  let idx = 1;
+  if (filters.playerId) {
+    clauses.push(`p.id = $${idx++}`);
+    binds.push(filters.playerId);
+  }
+  if (filters.clubId) {
+    clauses.push(`p.current_club_id = $${idx++}`);
+    binds.push(filters.clubId);
+  }
 
   const players = await sequelize.query<any>(
     `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
@@ -232,9 +263,9 @@ export async function getPlayerPortfolioReport(filters: ReportFilters) {
             c.name AS club_name, c.name_ar AS club_name_ar
      FROM players p
      LEFT JOIN clubs c ON p.current_club_id = c.id
-     WHERE ${where.join(" AND ")}
+     WHERE ${clauses.join(" AND ")}
      ORDER BY p.market_value DESC NULLS LAST`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   const [summary] = await sequelize.query<any>(
@@ -253,10 +284,17 @@ export async function getPlayerPortfolioReport(filters: ReportFilters) {
 
 // ── Contract & Commission Report ──
 export async function getContractCommissionReport(filters: ReportFilters) {
-  const extra = buildWhereClause(filters, "c.start_date", "c");
-  const pctFilter = filters.playerContractType
-    ? `AND c.player_contract_type = '${filters.playerContractType}'`
-    : "";
+  const { clause: extra, binds, nextIdx } = buildSafeWhere(
+    filters,
+    "c.start_date",
+    "c",
+  );
+  let idx = nextIdx;
+  let pctFilter = "";
+  if (filters.playerContractType) {
+    pctFilter = `AND c.player_contract_type = $${idx++}`;
+    binds.push(filters.playerContractType);
+  }
 
   const contracts = await sequelize.query<any>(
     `SELECT c.id, c.title, c.status, c.start_date, c.end_date,
@@ -269,7 +307,7 @@ export async function getContractCommissionReport(filters: ReportFilters) {
      LEFT JOIN clubs cl ON c.club_id = cl.id
      WHERE c.status IN ('Active', 'Expiring Soon') ${extra} ${pctFilter}
      ORDER BY c.end_date ASC`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   const [summary] = await sequelize.query<any>(
@@ -287,31 +325,40 @@ export async function getContractCommissionReport(filters: ReportFilters) {
 
 // ── Injury Summary Report ──
 export async function getInjurySummaryReport(filters: ReportFilters) {
-  const dateFilter =
-    filters.dateFrom && filters.dateTo
-      ? `AND i.injury_date >= '${filters.dateFrom}' AND i.injury_date <= '${filters.dateTo}'`
-      : "";
-  const playerFilter = filters.playerId
-    ? `AND i.player_id = '${filters.playerId}'`
-    : "";
+  const clauses: string[] = [];
+  const binds: any[] = [];
+  let idx = 1;
+  if (filters.dateFrom) {
+    clauses.push(`i.injury_date >= $${idx++}`);
+    binds.push(filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    clauses.push(`i.injury_date <= $${idx++}`);
+    binds.push(filters.dateTo);
+  }
+  if (filters.playerId) {
+    clauses.push(`i.player_id = $${idx++}`);
+    binds.push(filters.playerId);
+  }
+  const whereExtra = clauses.length ? "AND " + clauses.join(" AND ") : "";
 
   const byBodyPart = await sequelize.query<any>(
     `SELECT i.body_part, COUNT(*)::INT AS count,
             ROUND(AVG(i.days_out))::INT AS avg_days_out
      FROM injuries i
-     WHERE 1=1 ${dateFilter} ${playerFilter}
+     WHERE 1=1 ${whereExtra}
      GROUP BY i.body_part
      ORDER BY count DESC`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   const bySeverity = await sequelize.query<any>(
     `SELECT i.severity, COUNT(*)::INT AS count
      FROM injuries i
-     WHERE 1=1 ${dateFilter} ${playerFilter}
+     WHERE 1=1 ${whereExtra}
      GROUP BY i.severity
      ORDER BY count DESC`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   const [summary] = await sequelize.query<any>(
@@ -321,8 +368,8 @@ export async function getInjurySummaryReport(filters: ReportFilters) {
        ROUND(AVG(days_out))::INT AS avg_days_out,
        COUNT(*) FILTER (WHERE is_surgery_required = true)::INT AS surgeries
      FROM injuries i
-     WHERE 1=1 ${dateFilter} ${playerFilter}`,
-    { type: QueryTypes.SELECT },
+     WHERE 1=1 ${whereExtra}`,
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   return { summary, byBodyPart, bySeverity };
@@ -330,13 +377,23 @@ export async function getInjurySummaryReport(filters: ReportFilters) {
 
 // ── Match & Tasks Report ──
 export async function getMatchTasksReport(filters: ReportFilters) {
-  const dateFilter =
-    filters.dateFrom && filters.dateTo
-      ? `AND m.match_date >= '${filters.dateFrom}' AND m.match_date <= '${filters.dateTo}'`
-      : "";
-  const clubFilter = filters.clubId
-    ? `AND (m.home_club_id = '${filters.clubId}' OR m.away_club_id = '${filters.clubId}')`
-    : "";
+  const clauses: string[] = [];
+  const binds: any[] = [];
+  let idx = 1;
+  if (filters.dateFrom) {
+    clauses.push(`m.match_date >= $${idx++}`);
+    binds.push(filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    clauses.push(`m.match_date <= $${idx++}`);
+    binds.push(filters.dateTo);
+  }
+  if (filters.clubId) {
+    clauses.push(`(m.home_club_id = $${idx} OR m.away_club_id = $${idx})`);
+    binds.push(filters.clubId);
+    idx++;
+  }
+  const whereExtra = clauses.length ? "AND " + clauses.join(" AND ") : "";
 
   const matches = await sequelize.query<any>(
     `SELECT m.id, m.match_date, m.competition, m.status,
@@ -348,9 +405,9 @@ export async function getMatchTasksReport(filters: ReportFilters) {
      FROM matches m
      LEFT JOIN clubs hc ON m.home_club_id = hc.id
      LEFT JOIN clubs ac ON m.away_club_id = ac.id
-     WHERE 1=1 ${dateFilter} ${clubFilter}
+     WHERE 1=1 ${whereExtra}
      ORDER BY m.match_date DESC`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   const [summary] = await sequelize.query<any>(
@@ -359,8 +416,8 @@ export async function getMatchTasksReport(filters: ReportFilters) {
        COUNT(*) FILTER (WHERE status = 'upcoming')::INT AS upcoming,
        COUNT(*) FILTER (WHERE status = 'completed')::INT AS completed
      FROM matches m
-     WHERE 1=1 ${dateFilter} ${clubFilter}`,
-    { type: QueryTypes.SELECT },
+     WHERE 1=1 ${whereExtra}`,
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   return { summary, matches };
@@ -368,9 +425,12 @@ export async function getMatchTasksReport(filters: ReportFilters) {
 
 // ── Financial Summary Report ──
 export async function getFinancialSummaryReport(filters: ReportFilters) {
-  const playerFilter = filters.playerId
-    ? `AND p.id = '${filters.playerId}'`
-    : "";
+  const binds: any[] = [];
+  let playerFilter = "";
+  if (filters.playerId) {
+    playerFilter = "AND p.id = $1";
+    binds.push(filters.playerId);
+  }
 
   const [overview] = await sequelize.query<any>(
     `SELECT
@@ -380,7 +440,7 @@ export async function getFinancialSummaryReport(filters: ReportFilters) {
        (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments WHERE status IN ('Pending', 'Overdue')) AS outstanding_revenue
      FROM players p
      WHERE p.status = 'active' ${playerFilter}`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   const topPlayers = await sequelize.query<any>(
@@ -392,34 +452,43 @@ export async function getFinancialSummaryReport(filters: ReportFilters) {
      WHERE p.status = 'active' AND p.market_value IS NOT NULL ${playerFilter}
      ORDER BY p.market_value DESC
      LIMIT 10`,
-    { type: QueryTypes.SELECT },
+    { bind: binds, type: QueryTypes.SELECT },
   );
 
   return { overview, topPlayers };
 }
 
-// ── Build date filter clause based on period type ──
+// ── Build date filter clause based on period type (parameterized) ──
+// Returns { clause, binds } — caller must merge binds into their query.
+// startIdx = next available $N position in the caller's query (after playerId = $1).
 function buildDateFilter(
   periodType: string,
   params: Record<string, any>,
-): string {
+  startIdx = 2,
+): { clause: string; binds: any[] } {
   switch (periodType) {
     case "DateRange":
       if (params.startDate && params.endDate) {
-        return `AND m.match_date >= '${params.startDate}' AND m.match_date <= '${params.endDate}'`;
+        return {
+          clause: `AND m.match_date >= $${startIdx} AND m.match_date <= $${startIdx + 1}`,
+          binds: [params.startDate, params.endDate],
+        };
       }
-      return "";
+      return { clause: "", binds: [] };
     case "Season":
       if (params.season) {
-        // Season format: "2024-2025" → Aug 1 to Jul 31
         const [startYear] = params.season.split("-");
-        return `AND m.match_date >= '${startYear}-08-01' AND m.match_date <= '${Number(startYear) + 1}-07-31'`;
+        const seasonStart = `${startYear}-08-01`;
+        const seasonEnd = `${Number(startYear) + 1}-07-31`;
+        return {
+          clause: `AND m.match_date >= $${startIdx} AND m.match_date <= $${startIdx + 1}`,
+          binds: [seasonStart, seasonEnd],
+        };
       }
-      return "";
+      return { clause: "", binds: [] };
     case "LastNMatches":
-      // This is handled by LIMIT in a subquery — return empty and use match list length
-      return "";
+      return { clause: "", binds: [] };
     default:
-      return "";
+      return { clause: "", binds: [] };
   }
 }
