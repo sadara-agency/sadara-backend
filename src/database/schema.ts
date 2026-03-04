@@ -157,6 +157,27 @@ export async function createMissingTables() {
         END $$;`,
   );
 
+  // Add converted_contract_id and converted_at to offers if missing
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE offers ADD COLUMN converted_contract_id UUID;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE offers ADD COLUMN converted_at TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+  // Add 'Converted' to offers status enum if missing
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Converted';
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;`,
+  );
+
   // ── App Settings (key-value store for runtime config) ──
   await sequelize.query(`
         CREATE TABLE IF NOT EXISTS app_settings (

@@ -262,33 +262,46 @@ export async function createValuation(input: any) {
 // FINANCIAL DASHBOARD (PRD enhanced)
 // ══════════════════════════════════════════
 
-export async function getFinancialDashboard() {
+export async function getFinancialDashboard(playerContractType?: string) {
+  // Build optional contract-type filter for player queries
+  const typeFilter = playerContractType ? "AND contract_type = $1" : "";
+  const typeBind = playerContractType ? { bind: [playerContractType] } : {};
+
   // Total portfolio market value
   const [marketValue] = await sequelize.query<any>(
     `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
             COUNT(*)::INT AS total_players
-     FROM players WHERE status = 'active'`,
-    { type: QueryTypes.SELECT },
+     FROM players WHERE status = 'active' ${typeFilter}`,
+    { type: QueryTypes.SELECT, ...typeBind },
   );
 
   // Player distribution by contract type
   const distribution = await sequelize.query<any>(
     `SELECT contract_type, COUNT(*)::INT AS count
-     FROM players WHERE status = 'active'
+     FROM players WHERE status = 'active' ${typeFilter}
      GROUP BY contract_type ORDER BY count DESC`,
-    { type: QueryTypes.SELECT },
+    { type: QueryTypes.SELECT, ...typeBind },
   );
 
   // Expected vs collected commissions
+  const commissionTypeJoin = playerContractType
+    ? "JOIN players p ON c.player_id = p.id AND p.contract_type = $1"
+    : "";
+  const commissionPayJoin = playerContractType
+    ? "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = $1"
+    : "";
   const [commissions] = await sequelize.query<any>(
     `SELECT
-       COALESCE(SUM(total_commission), 0)::NUMERIC AS expected_commissions,
-       (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments
-        WHERE status = 'Paid' AND payment_type = 'Commission') AS collected_commissions,
-       (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments
-        WHERE status IN ('Pending', 'Overdue', 'Expected') AND payment_type = 'Commission') AS outstanding_commissions
-     FROM contracts WHERE status IN ('Active', 'Expiring Soon')`,
-    { type: QueryTypes.SELECT },
+       COALESCE(SUM(c.total_commission), 0)::NUMERIC AS expected_commissions,
+       (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
+        ${commissionPayJoin}
+        WHERE pay.status = 'Paid' AND pay.payment_type = 'Commission') AS collected_commissions,
+       (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
+        ${commissionPayJoin}
+        WHERE pay.status IN ('Pending', 'Overdue', 'Expected') AND pay.payment_type = 'Commission') AS outstanding_commissions
+     FROM contracts c ${commissionTypeJoin}
+     WHERE c.status IN ('Active', 'Expiring Soon')`,
+    { type: QueryTypes.SELECT, ...typeBind },
   );
 
   // Top 10 valued players
@@ -298,21 +311,25 @@ export async function getFinancialDashboard() {
             c.name AS club_name, c.name_ar AS club_name_ar
      FROM players p
      LEFT JOIN clubs c ON p.current_club_id = c.id
-     WHERE p.status = 'active' AND p.market_value IS NOT NULL
+     WHERE p.status = 'active' AND p.market_value IS NOT NULL ${typeFilter}
      ORDER BY p.market_value DESC LIMIT 10`,
-    { type: QueryTypes.SELECT },
+    { type: QueryTypes.SELECT, ...typeBind },
   );
 
   // Market value trend (monthly for last 12 months from valuations)
+  const trendTypeJoin = playerContractType
+    ? "JOIN players p ON v.player_id = p.id AND p.contract_type = $1"
+    : "";
   const marketValueTrend = await sequelize.query<any>(
-    `SELECT TO_CHAR(DATE_TRUNC('month', valued_at), 'YYYY-MM') AS month,
-            SUM(value)::NUMERIC AS total_value,
-            COUNT(DISTINCT player_id)::INT AS players_valued
-     FROM valuations
-     WHERE valued_at >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
-     GROUP BY DATE_TRUNC('month', valued_at)
+    `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
+            SUM(v.value)::NUMERIC AS total_value,
+            COUNT(DISTINCT v.player_id)::INT AS players_valued
+     FROM valuations v
+     ${trendTypeJoin}
+     WHERE v.valued_at >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+     GROUP BY DATE_TRUNC('month', v.valued_at)
      ORDER BY month`,
-    { type: QueryTypes.SELECT },
+    { type: QueryTypes.SELECT, ...typeBind },
   );
 
   return {

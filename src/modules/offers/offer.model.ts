@@ -9,7 +9,7 @@ interface OfferAttributes {
   fromClubId?: string | null;
   toClubId?: string | null;
   offerType: "Transfer" | "Loan";
-  status: "New" | "Under Review" | "Negotiation" | "Closed";
+  status: "New" | "Under Review" | "Negotiation" | "Closed" | "Converted";
 
   // Financial terms
   transferFee?: number | null;
@@ -27,6 +27,10 @@ interface OfferAttributes {
   deadline?: string | null;
   respondedAt?: Date | null;
   closedAt?: Date | null;
+
+  // Conversion tracking
+  convertedContractId?: string | null;
+  convertedAt?: Date | null;
 
   // Notes & meta
   notes?: string | null;
@@ -57,7 +61,7 @@ export class Offer
   declare fromClubId: string | null;
   declare toClubId: string | null;
   declare offerType: "Transfer" | "Loan";
-  declare status: "New" | "Under Review" | "Negotiation" | "Closed";
+  declare status: "New" | "Under Review" | "Negotiation" | "Closed" | "Converted";
 
   declare transferFee: number | null;
   declare salaryOffered: number | null;
@@ -72,6 +76,9 @@ export class Offer
   declare deadline: string | null;
   declare respondedAt: Date | null;
   declare closedAt: Date | null;
+
+  declare convertedContractId: string | null;
+  declare convertedAt: Date | null;
 
   declare notes: string | null;
   declare createdBy: string | null;
@@ -108,7 +115,7 @@ Offer.init(
       field: "offer_type",
     },
     status: {
-      type: DataTypes.ENUM("New", "Under Review", "Negotiation", "Closed"),
+      type: DataTypes.ENUM("New", "Under Review", "Negotiation", "Closed", "Converted"),
       defaultValue: "New",
     },
 
@@ -161,6 +168,16 @@ Offer.init(
     closedAt: {
       type: DataTypes.DATE,
       field: "closed_at",
+    },
+
+    // Conversion tracking
+    convertedContractId: {
+      type: DataTypes.UUID,
+      field: "converted_contract_id",
+    },
+    convertedAt: {
+      type: DataTypes.DATE,
+      field: "converted_at",
     },
 
     // Notes & meta

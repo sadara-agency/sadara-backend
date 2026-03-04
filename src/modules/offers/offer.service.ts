@@ -215,8 +215,7 @@ export async function convertOfferToContract(
     }
 
     // Check if already converted
-    const plain = offer.get({ plain: true }) as any;
-    if (plain.convertedContractId) {
+    if (offer.convertedContractId) {
       throw new AppError(
         "This offer has already been converted to a contract",
         400,
@@ -246,12 +245,13 @@ export async function convertOfferToContract(
       { transaction: t },
     );
 
-    // Link offer to contract
+    // Link offer to contract and mark as Converted
     await offer.update(
       {
+        status: "Converted",
         convertedContractId: contract.id,
         convertedAt: new Date(),
-      } as any,
+      },
       { transaction: t },
     );
 

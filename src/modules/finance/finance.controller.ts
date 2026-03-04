@@ -130,5 +130,5 @@ export async function summary(req: AuthRequest, res: Response) {
 
 // ── Financial Dashboard (PRD enhanced) ──
 export async function dashboard(req: AuthRequest, res: Response) {
-  sendSuccess(res, await svc.getFinancialDashboard());
+  sendSuccess(res, await svc.getFinancialDashboard(req.query.playerContractType as string | undefined));
 }
