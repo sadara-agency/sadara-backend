@@ -438,7 +438,7 @@ export async function getFinancialSummaryReport(filters: ReportFilters) {
        COALESCE(SUM(p.market_value), 0)::NUMERIC AS total_market_value,
        (SELECT COALESCE(SUM(total_commission), 0)::NUMERIC FROM contracts WHERE status IN ('Active', 'Expiring Soon')) AS expected_commissions,
        (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments WHERE status = 'Paid') AS collected_revenue,
-       (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments WHERE status IN ('Pending', 'Overdue')) AS outstanding_revenue
+       (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments WHERE status IN ('Expected', 'Overdue')) AS outstanding_revenue
      FROM players p
      WHERE p.status = 'active' ${playerFilter}`,
     { bind: binds, type: QueryTypes.SELECT },
