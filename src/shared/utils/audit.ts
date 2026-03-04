@@ -45,3 +45,24 @@ export function buildAuditContext(
     ip,
   };
 }
+
+/**
+ * Compare old and new values, returning only fields that changed.
+ * Pass the result to logAudit() as the `changes` parameter.
+ */
+export function buildChanges(
+  oldValues: Record<string, any>,
+  newValues: Record<string, any>,
+): Record<string, { old: any; new: any }> | null {
+  const changes: Record<string, { old: any; new: any }> = {};
+
+  for (const key of Object.keys(newValues)) {
+    if (newValues[key] === undefined) continue;
+    const oldVal = oldValues[key];
+    const newVal = newValues[key];
+    if (String(oldVal ?? "") === String(newVal ?? "")) continue;
+    changes[key] = { old: oldVal ?? null, new: newVal ?? null };
+  }
+
+  return Object.keys(changes).length > 0 ? changes : null;
+}

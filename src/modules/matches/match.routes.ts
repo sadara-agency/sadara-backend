@@ -14,6 +14,8 @@ import {
   bulkStatsSchema,
   updateStatsSchema,
   playerMatchesQuerySchema,
+  createMatchAnalysisSchema,
+  updateMatchAnalysisSchema,
 } from "./match.schema";
 import * as ctrl from "./match.controller";
 
@@ -105,6 +107,32 @@ router.delete(
   "/:id/stats/:playerId",
   authorize("Admin", "Manager"),
   asyncHandler(ctrl.deletePlayerStats),
+);
+
+// ── Match Analysis ──
+router.get("/:id/analysis", asyncHandler(ctrl.listAnalyses));
+router.get("/:id/analysis/:analysisId", asyncHandler(ctrl.getAnalysis));
+router.post(
+  "/:id/analysis",
+  authorize("Admin", "Manager", "Analyst"),
+  validate(createMatchAnalysisSchema),
+  asyncHandler(ctrl.createAnalysis),
+);
+router.patch(
+  "/:id/analysis/:analysisId",
+  authorize("Admin", "Manager", "Analyst"),
+  validate(updateMatchAnalysisSchema),
+  asyncHandler(ctrl.updateAnalysis),
+);
+router.patch(
+  "/:id/analysis/:analysisId/publish",
+  authorize("Admin", "Manager"),
+  asyncHandler(ctrl.publishAnalysis),
+);
+router.delete(
+  "/:id/analysis/:analysisId",
+  authorize("Admin", "Manager"),
+  asyncHandler(ctrl.removeAnalysis),
 );
 
 export default router;

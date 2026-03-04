@@ -2,8 +2,10 @@ import { Op, Sequelize } from "sequelize";
 import { Match, type MatchAttributes } from "./match.model";
 import { MatchPlayer } from "./matchPlayer.model";
 import { PlayerMatchStats } from "./playerMatchStats.model";
+import { MatchAnalysis } from "./matchAnalysis.model";
 import { Club } from "../clubs/club.model";
 import { Player } from "../players/player.model";
+import { User } from "../Users/user.model";
 import { Task } from "../tasks/task.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
@@ -494,4 +496,57 @@ export async function getPlayerAggregateStats(
   });
 
   return result[0] ?? {};
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  MATCH ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+const ANALYST_ATTRS = ["id", "name", "email"] as const;
+
+export async function getMatchAnalyses(matchId: string) {
+  const match = await Match.findByPk(matchId);
+  if (!match) throw new AppError("Match not found", 404);
+  return MatchAnalysis.findAll({
+    where: { matchId },
+    include: [{ model: User, as: "analyst", attributes: [...ANALYST_ATTRS] }],
+    order: [["createdAt", "DESC"]],
+  });
+}
+
+export async function getMatchAnalysisById(matchId: string, analysisId: string) {
+  const analysis = await MatchAnalysis.findOne({
+    where: { id: analysisId, matchId },
+    include: [{ model: User, as: "analyst", attributes: [...ANALYST_ATTRS] }],
+  });
+  if (!analysis) throw new AppError("Analysis not found", 404);
+  return analysis;
+}
+
+export async function createMatchAnalysis(matchId: string, analystId: string, input: any) {
+  const match = await Match.findByPk(matchId);
+  if (!match) throw new AppError("Match not found", 404);
+  const analysis = await MatchAnalysis.create({ ...input, matchId, analystId });
+  return getMatchAnalysisById(matchId, analysis.id);
+}
+
+export async function updateMatchAnalysis(matchId: string, analysisId: string, input: any) {
+  const analysis = await MatchAnalysis.findOne({ where: { id: analysisId, matchId } });
+  if (!analysis) throw new AppError("Analysis not found", 404);
+  await analysis.update(input);
+  return getMatchAnalysisById(matchId, analysisId);
+}
+
+export async function publishMatchAnalysis(matchId: string, analysisId: string) {
+  const analysis = await MatchAnalysis.findOne({ where: { id: analysisId, matchId } });
+  if (!analysis) throw new AppError("Analysis not found", 404);
+  await analysis.update({ status: "published" });
+  return getMatchAnalysisById(matchId, analysisId);
+}
+
+export async function deleteMatchAnalysis(matchId: string, analysisId: string) {
+  const analysis = await MatchAnalysis.findOne({ where: { id: analysisId, matchId } });
+  if (!analysis) throw new AppError("Analysis not found", 404);
+  await analysis.destroy();
+  return { id: analysisId, matchId };
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { asyncHandler } from "../../middleware/errorHandler";
 import { authenticate, authorize } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
+import { uploadSingle, verifyFileType } from "../../middleware/upload";
 import * as portalController from "./portal.controller";
 
 const router = Router();
@@ -48,6 +49,13 @@ router.get(
   "/documents",
   authorize("Player"),
   asyncHandler(portalController.getMyDocuments),
+);
+router.post(
+  "/documents/upload",
+  authorize("Player"),
+  uploadSingle,
+  verifyFileType,
+  asyncHandler(portalController.uploadMyDocument),
 );
 router.get(
   "/contracts",

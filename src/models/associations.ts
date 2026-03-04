@@ -39,6 +39,7 @@ import { Notification } from "../modules/notifications/notification.model";
 import { Note } from "../modules/notes/note.model";
 import { PlayerClubHistory } from "../modules/players/playerClubHistory.model";
 import { TechnicalReport } from "../modules/reports/report.model";
+import { MatchAnalysis } from "../modules/matches/matchAnalysis.model";
 
 export function setupAssociations() {
   // Player ↔ Club
@@ -236,6 +237,11 @@ export function setupAssociations() {
   });
   PlayerClubHistory.belongsTo(Player, { foreignKey: "playerId", as: "player" });
   PlayerClubHistory.belongsTo(Club, { foreignKey: "clubId", as: "club" });
+
+  // ── Match Analyses ──
+  Match.hasMany(MatchAnalysis, { foreignKey: "matchId", as: "analyses" });
+  MatchAnalysis.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  MatchAnalysis.belongsTo(User, { foreignKey: "analystId", as: "analyst" });
 
   // ── Technical Reports ──
   TechnicalReport.belongsTo(Player, { foreignKey: "playerId", as: "player" });

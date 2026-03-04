@@ -131,6 +131,19 @@ export const playerMatchesQuerySchema = z.object({
   to: z.string().optional(),
 });
 
+// ── Match Analysis ──
+
+export const createMatchAnalysisSchema = z.object({
+  type: z.enum(["pre-match", "post-match", "tactical"]),
+  title: z.string().min(1, "Title is required").max(500),
+  content: z.string().min(1, "Content is required"),
+  keyFindings: z.array(z.record(z.any())).optional(),
+  recommendedActions: z.array(z.string()).optional(),
+  rating: z.number().min(0).max(10).optional(),
+});
+
+export const updateMatchAnalysisSchema = createMatchAnalysisSchema.partial();
+
 // ── Inferred Types ──
 
 export type CreateMatchInput = z.infer<typeof createMatchSchema>;
@@ -140,3 +153,5 @@ export type MatchQuery = z.infer<typeof matchQuerySchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
 export type MatchPlayerInput = z.infer<typeof matchPlayerSchema>;
 export type PlayerMatchStatsInput = z.infer<typeof playerMatchStatsSchema>;
+export type CreateMatchAnalysisInput = z.infer<typeof createMatchAnalysisSchema>;
+export type UpdateMatchAnalysisInput = z.infer<typeof updateMatchAnalysisSchema>;
