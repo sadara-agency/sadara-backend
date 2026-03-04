@@ -170,10 +170,12 @@ export async function createMissingTables() {
         EXCEPTION WHEN duplicate_column THEN NULL;
         END $$;`,
   );
-  // Add 'Converted' to offers status enum if missing
+  // Add 'Converted' to offers status enum if missing (only if the type exists)
   await sequelize.query(
     `DO $$ BEGIN
-            ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Converted';
+            IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_offers_status') THEN
+                ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Converted';
+            END IF;
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;`,
   );
