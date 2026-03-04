@@ -7,6 +7,7 @@ import {
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import * as svc from "./finance.service";
+import { createApprovalRequest } from "../approvals/approval.service";
 
 // ── Invoices ──
 export async function listInvoices(req: AuthRequest, res: Response) {
@@ -25,6 +26,20 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Invoice created: ${inv.totalAmount}`,
   );
+  // High-value invoice → approval required
+  const amount = Number(inv.totalAmount) || 0;
+  if (amount >= 50000) {
+    createApprovalRequest({
+      entityType: "payment",
+      entityId: inv.id,
+      entityTitle: `Invoice: ${inv.invoiceNumber || inv.id} (${amount.toLocaleString()})`,
+      action: "approve_payment",
+      requestedBy: req.user!.id,
+      assignedRole: "Admin",
+      priority: amount >= 100000 ? "critical" : "high",
+    }).catch(() => {});
+  }
+
   sendCreated(res, inv);
 }
 export async function updateInvoice(req: AuthRequest, res: Response) {

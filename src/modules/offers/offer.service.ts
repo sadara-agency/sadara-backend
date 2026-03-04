@@ -7,6 +7,11 @@ import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { Contract } from "../contracts/contract.model";
 import { transaction } from "../../config/database";
+import { notifyByRole } from "../notifications/notification.service";
+import {
+  createApprovalRequest,
+  resolveApprovalByEntity,
+} from "../approvals/approval.service";
 
 // ── List Offers ──
 
@@ -131,7 +136,23 @@ export async function createOffer(input: any, createdBy: string) {
     if (!club) throw new AppError("To-club not found", 404);
   }
 
-  return await Offer.create({ ...input, createdBy });
+  const offer = await Offer.create({ ...input, createdBy });
+
+  // Notify Admin/Manager about new offer
+  const playerName = player.firstName
+    ? `${player.firstName} ${player.lastName || ""}`.trim()
+    : "Unknown";
+  notifyByRole(["Admin", "Manager"], {
+    type: "contract",
+    title: `New offer: ${playerName}`,
+    titleAr: `عرض جديد: ${playerName}`,
+    link: `/dashboard/offers/${offer.id}`,
+    sourceType: "offer",
+    sourceId: offer.id,
+    priority: "normal",
+  }).catch(() => {});
+
+  return offer;
 }
 
 // ── Update Offer ──
@@ -170,7 +191,20 @@ export async function updateOfferStatus(
     updateData.closedAt = new Date();
   }
 
-  return await offer.update(updateData);
+  await offer.update(updateData);
+
+  // Notify Admin/Manager about status change
+  notifyByRole(["Admin", "Manager"], {
+    type: "contract",
+    title: `Offer status → ${input.status}`,
+    titleAr: `حالة العرض → ${input.status}`,
+    link: `/dashboard/offers/${id}`,
+    sourceType: "offer",
+    sourceId: id,
+    priority: "high",
+  }).catch(() => {});
+
+  return offer;
 }
 
 // ── Delete Offer ──
@@ -254,6 +288,20 @@ export async function convertOfferToContract(
       },
       { transaction: t },
     );
+
+    // Notify Admin/Manager about conversion
+    const playerName = (offer as any).player
+      ? `${(offer as any).player.firstName} ${(offer as any).player.lastName || ""}`.trim()
+      : "Unknown";
+    notifyByRole(["Admin", "Manager"], {
+      type: "contract",
+      title: `Offer converted to contract: ${playerName}`,
+      titleAr: `تم تحويل العرض إلى عقد: ${playerName}`,
+      link: `/dashboard/contracts/${contract.id}`,
+      sourceType: "contract",
+      sourceId: contract.id,
+      priority: "high",
+    }).catch(() => {});
 
     return {
       offer: await Offer.findByPk(offerId, { transaction: t }),

@@ -7,6 +7,10 @@ import {
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import * as offerService from "./offer.service";
+import {
+  createApprovalRequest,
+  resolveApprovalByEntity,
+} from "../approvals/approval.service";
 
 // ── List Offers ──
 
@@ -73,6 +77,23 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Offer status changed to ${offer.status}`,
   );
+
+  // Approval hooks
+  if (req.body.status === "Under Review") {
+    createApprovalRequest({
+      entityType: "offer",
+      entityId: offer.id,
+      entityTitle: `Offer: ${offer.id}`,
+      action: "review_offer",
+      requestedBy: req.user!.id,
+      assignedRole: "Manager",
+      priority: "normal",
+    }).catch(() => {});
+  } else if (["Negotiation", "Closed", "Converted"].includes(req.body.status)) {
+    resolveApprovalByEntity("offer", offer.id, req.user!.id, "Approved").catch(
+      () => {},
+    );
+  }
 
   sendSuccess(res, offer, `Offer status updated to ${offer.status}`);
 }

@@ -82,4 +82,20 @@ router.get(
   asyncHandler(dashboardController.getQuickStats),
 );
 
+router.get(
+  "/offer-pipeline",
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getOfferPipeline),
+);
+router.get(
+  "/injury-trends",
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getInjuryTrends),
+);
+router.get(
+  "/kpi-trends",
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getKpiTrends),
+);
+
 export default router;

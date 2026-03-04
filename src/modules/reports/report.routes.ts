@@ -14,6 +14,12 @@ router.get("/contract-commission", asyncHandler(ctrl.contractCommission));
 router.get("/injury-summary", asyncHandler(ctrl.injurySummary));
 router.get("/match-tasks", asyncHandler(ctrl.matchTasks));
 router.get("/financial-summary", asyncHandler(ctrl.financialSummary));
+router.get("/scouting-pipeline", asyncHandler(ctrl.scoutingPipeline));
+router.get("/expiring-contracts", asyncHandler(ctrl.expiringContracts));
+
+// Export endpoints (must be before /:id to avoid route conflicts)
+router.get("/:type/xlsx", asyncHandler(ctrl.exportXlsx));
+router.get("/:type/pdf", asyncHandler(ctrl.exportPdf));
 
 // Technical reports CRUD
 router.get("/", validate(reportQuerySchema, "query"), asyncHandler(ctrl.list));

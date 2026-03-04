@@ -18,6 +18,15 @@ const generateInviteSchema = z.object({
   playerId: z.string().uuid("Invalid player ID format"),
 });
 
+const updateProfileSchema = z.object({
+  phone: z.string().optional(),
+  guardianName: z.string().optional(),
+  guardianPhone: z.string().optional(),
+  guardianRelation: z.string().optional(),
+  heightCm: z.number().min(100).max(250).optional(),
+  weightKg: z.number().min(30).max(200).optional(),
+});
+
 const signContractSchema = z.object({
   action: z.enum(["sign_digital", "sign_upload"]),
   signatureData: z.string().optional(),
@@ -39,6 +48,17 @@ router.get(
   "/me",
   authorize("Player"),
   asyncHandler(portalController.getMyProfile),
+);
+router.patch(
+  "/me",
+  authorize("Player"),
+  validate(updateProfileSchema),
+  asyncHandler(portalController.updateMyProfile),
+);
+router.get(
+  "/injuries",
+  authorize("Player"),
+  asyncHandler(portalController.getMyInjuries),
 );
 router.get(
   "/schedule",
