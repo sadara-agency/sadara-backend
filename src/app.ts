@@ -36,6 +36,7 @@ import auditRoutes from "./modules/audit/audit.routes";
 import splRoutes from "./modules/spl/spl.routes";
 import noteRoutes from "./modules/notes/note.routes";
 import reportRoutes from "./modules/reports/report.routes";
+import approvalRoutes from "./modules/approvals/approval.routes";
 
 const app = express();
 
@@ -136,6 +137,7 @@ app.use("/api/v1/audit", auditRoutes);
 app.use("/api/v1/spl", splRoutes);
 app.use("/api/v1/notes", noteRoutes);
 app.use("/api/v1/reports", reportRoutes);
+app.use("/api/v1/approvals", approvalRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

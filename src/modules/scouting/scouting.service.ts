@@ -10,6 +10,7 @@ import {
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { notifyByRole } from "../notifications/notification.service";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 
@@ -135,11 +136,26 @@ export async function createScreeningCase(input: any, userId: string) {
   if (wl.status === "Active")
     await wl.update({ status: "Shortlisted" as WatchlistAttributes["status"] });
 
-  return await ScreeningCase.create({
+  const sc = await ScreeningCase.create({
     ...input,
     caseNumber,
     createdBy: userId,
   });
+
+  // Notify Admin/Manager about new screening
+  notifyByRole(["Admin", "Manager"], {
+    type: "system",
+    title: `Screening started: ${wl.prospectName}`,
+    titleAr: `بدأ الفحص: ${wl.prospectNameAr || wl.prospectName}`,
+    body: `Case ${caseNumber} opened`,
+    bodyAr: `تم فتح الحالة ${caseNumber}`,
+    link: `/dashboard/scouting/${wl.id}`,
+    sourceType: "screening",
+    sourceId: sc.id,
+    priority: "normal",
+  }).catch(() => {});
+
+  return sc;
 }
 
 export async function getScreeningCase(id: string) {
@@ -174,12 +190,30 @@ export async function markPackReady(id: string, userId: string) {
   if (!sc.medicalClearance)
     throw new AppError("Medical clearance is required", 400);
 
-  return await sc.update({
+  await sc.update({
     isPackReady: true,
     packPreparedAt: new Date(),
     packPreparedBy: userId,
     status: "PackReady" as ScreeningCaseAttributes["status"],
   });
+
+  // Notify Admin/Manager about pack ready
+  const wl = await Watchlist.findByPk(sc.watchlistId);
+  const name = wl?.prospectName || sc.caseNumber;
+  const nameAr = wl?.prospectNameAr || name;
+  notifyByRole(["Admin", "Manager"], {
+    type: "system",
+    title: `Scouting pack ready: ${name}`,
+    titleAr: `ملف الاستكشاف جاهز: ${nameAr}`,
+    body: `Case ${sc.caseNumber} is ready for review`,
+    bodyAr: `الحالة ${sc.caseNumber} جاهزة للمراجعة`,
+    link: `/dashboard/scouting/${sc.watchlistId}`,
+    sourceType: "screening",
+    sourceId: sc.id,
+    priority: "high",
+  }).catch(() => {});
+
+  return sc;
 }
 
 // ══════════════════════════════════════════
@@ -208,6 +242,21 @@ export async function createDecision(input: any, userId: string) {
     if (wl)
       await wl.update({ status: "Rejected" as WatchlistAttributes["status"] });
   }
+
+  // Notify Admin/Manager/Scout about decision
+  const prospectName = (sc as any).watchlist?.prospectName || sc.caseNumber;
+  const prospectNameAr = (sc as any).watchlist?.prospectNameAr || prospectName;
+  notifyByRole(["Admin", "Manager", "Scout"], {
+    type: "system",
+    title: `Decision: ${input.decision} — ${prospectName}`,
+    titleAr: `القرار: ${input.decision === "Approved" ? "مقبول" : input.decision === "Rejected" ? "مرفوض" : "مؤجل"} — ${prospectNameAr}`,
+    body: `Committee: ${input.committeeName}`,
+    bodyAr: `اللجنة: ${input.committeeName}`,
+    link: `/dashboard/scouting/${(sc as any).watchlist?.id || ""}`,
+    sourceType: "decision",
+    sourceId: decision.id,
+    priority: "high",
+  }).catch(() => {});
 
   return decision;
 }

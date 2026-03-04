@@ -9,6 +9,8 @@ import {
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import * as svc from "./report.service";
+import { generateReportXlsx } from "./report.xlsx";
+import { generatePredefinedReportPdf } from "./report.predefined-pdf";
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await svc.listReports(req.query);
@@ -96,4 +98,108 @@ export async function matchTasks(req: AuthRequest, res: Response) {
 export async function financialSummary(req: AuthRequest, res: Response) {
   const data = await svc.getFinancialSummaryReport(req.query as any);
   sendSuccess(res, data);
+}
+
+export async function scoutingPipeline(req: AuthRequest, res: Response) {
+  const data = await svc.getScoutingPipelineReport(req.query as any);
+  sendSuccess(res, data);
+}
+
+export async function expiringContracts(req: AuthRequest, res: Response) {
+  const data = await svc.getExpiringContractsReport(req.query as any);
+  sendSuccess(res, data);
+}
+
+// ── Generic Export Dispatch ──
+
+const REPORT_DATA_MAP: Record<string, {
+  fetch: (f: any) => Promise<any>;
+  title: string;
+  extractSections: (d: any) => { sheetName: string; rows: any[] }[];
+}> = {
+  "player-portfolio": {
+    fetch: svc.getPlayerPortfolioReport,
+    title: "Player Portfolio Report",
+    extractSections: (d) => [{ sheetName: "Players", rows: d.players }],
+  },
+  "contract-commission": {
+    fetch: svc.getContractCommissionReport,
+    title: "Contract & Commission Report",
+    extractSections: (d) => [{ sheetName: "Contracts", rows: d.contracts }],
+  },
+  "injury-summary": {
+    fetch: svc.getInjurySummaryReport,
+    title: "Injury Summary Report",
+    extractSections: (d) => [
+      { sheetName: "By Body Part", rows: d.byBodyPart },
+      { sheetName: "By Severity", rows: d.bySeverity },
+    ],
+  },
+  "match-tasks": {
+    fetch: svc.getMatchTasksReport,
+    title: "Match & Tasks Report",
+    extractSections: (d) => [{ sheetName: "Matches", rows: d.matches }],
+  },
+  "financial-summary": {
+    fetch: svc.getFinancialSummaryReport,
+    title: "Financial Summary Report",
+    extractSections: (d) => [{ sheetName: "Top Players", rows: d.topPlayers }],
+  },
+  "scouting-pipeline": {
+    fetch: svc.getScoutingPipelineReport,
+    title: "Scouting Pipeline Report",
+    extractSections: (d) => [{ sheetName: "Prospects", rows: d.prospects }],
+  },
+  "expiring-contracts": {
+    fetch: svc.getExpiringContractsReport,
+    title: "Expiring Contracts Report",
+    extractSections: (d) => [{ sheetName: "Contracts", rows: d.contracts }],
+  },
+};
+
+export async function exportXlsx(req: AuthRequest, res: Response): Promise<void> {
+  const { type } = req.params;
+  const config = REPORT_DATA_MAP[type];
+  if (!config) {
+    res.status(400).json({ success: false, message: "Invalid report type" });
+    return;
+  }
+
+  const data = await config.fetch(req.query as any);
+  const summary = data.summary || data.overview;
+  const buffer = await generateReportXlsx({
+    reportTitle: config.title,
+    summary,
+    dataSections: config.extractSections(data),
+  });
+
+  const fileName = `sadara-${type}-${new Date().toISOString().split("T")[0]}.xlsx`;
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  res.send(buffer);
+}
+
+export async function exportPdf(req: AuthRequest, res: Response): Promise<void> {
+  const { type } = req.params;
+  const config = REPORT_DATA_MAP[type];
+  if (!config) {
+    res.status(400).json({ success: false, message: "Invalid report type" });
+    return;
+  }
+
+  const data = await config.fetch(req.query as any);
+  const summary = data.summary || data.overview;
+  const buffer = await generatePredefinedReportPdf({
+    reportTitle: config.title,
+    summary,
+    dataSections: config.extractSections(data).map((s) => ({
+      sectionTitle: s.sheetName,
+      rows: s.rows,
+    })),
+  });
+
+  const fileName = `sadara-${type}-${new Date().toISOString().split("T")[0]}.pdf`;
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+  res.send(buffer);
 }

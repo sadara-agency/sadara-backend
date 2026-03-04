@@ -13,6 +13,7 @@ import {
   createDecisionSchema,
 } from "./scouting.schema";
 import * as ctrl from "./scouting.controller";
+import { generatePackPdf } from "./scouting.pdf.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -71,6 +72,7 @@ router.patch(
   validate(markPackReadySchema),
   asyncHandler(ctrl.markPackReady),
 );
+router.get("/screening/:id/pdf", asyncHandler(generatePackPdf));
 
 // ── Selection Decisions (immutable — create + read only) ──
 router.post(

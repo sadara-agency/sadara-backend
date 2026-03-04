@@ -13,6 +13,10 @@ import { sendSuccess } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import { AppError } from "../../middleware/errorHandler";
 import { Contract } from "./contract.model";
+import {
+  createApprovalRequest,
+  resolveApprovalByEntity,
+} from "../approvals/approval.service";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {
@@ -108,6 +112,31 @@ export async function transitionContract(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Contract transitioned: ${currentStatus} → ${nextStatus} (action: ${action})`,
   );
+
+  // ── Approval hooks ──
+  if (action === "submit_review") {
+    const due = new Date();
+    due.setDate(due.getDate() + 3);
+    createApprovalRequest({
+      entityType: "contract",
+      entityId: id,
+      entityTitle: `Contract: ${contract.title || id}`,
+      action: "review",
+      requestedBy: req.user!.id,
+      assignedRole: "Manager",
+      priority: "high",
+      dueDate: due.toISOString().split("T")[0],
+    }).catch(() => {});
+  }
+
+  if (action === "approve" || action === "reject_to_draft") {
+    resolveApprovalByEntity(
+      "contract",
+      id,
+      req.user!.id,
+      action === "approve" ? "Approved" : "Rejected",
+    ).catch(() => {});
+  }
 
   sendSuccess(res, contract, `Contract transitioned to ${nextStatus}`);
 }

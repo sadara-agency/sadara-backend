@@ -40,6 +40,7 @@ import { Note } from "../modules/notes/note.model";
 import { PlayerClubHistory } from "../modules/players/playerClubHistory.model";
 import { TechnicalReport } from "../modules/reports/report.model";
 import { MatchAnalysis } from "../modules/matches/matchAnalysis.model";
+import { ApprovalRequest } from "../modules/approvals/approval.model";
 
 export function setupAssociations() {
   // Player ↔ Club
@@ -250,4 +251,9 @@ export function setupAssociations() {
     foreignKey: "playerId",
     as: "technicalReports",
   });
+
+  // ── Approval Requests ──
+  ApprovalRequest.belongsTo(User, { foreignKey: "requestedBy", as: "requester" });
+  ApprovalRequest.belongsTo(User, { foreignKey: "assignedTo", as: "assignee" });
+  ApprovalRequest.belongsTo(User, { foreignKey: "resolvedBy", as: "resolver" });
 }

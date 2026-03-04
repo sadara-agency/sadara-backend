@@ -122,6 +122,27 @@ export async function uploadMyDocument(req: AuthRequest, res: Response) {
   sendCreated(res, doc, "Document uploaded successfully");
 }
 
+// ── Update My Profile ──
+
+export async function updateMyProfile(req: AuthRequest, res: Response) {
+  const data = await portalService.updateMyProfile(req.user!.id, req.body);
+  await logAudit(
+    "UPDATE",
+    "players",
+    (data as any).id ?? null,
+    buildAuditContext(req.user!, req.ip),
+    "Player updated profile via portal",
+  );
+  sendSuccess(res, data, "Profile updated");
+}
+
+// ── My Injuries ──
+
+export async function getMyInjuries(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyInjuries(req.user!.id);
+  sendSuccess(res, data);
+}
+
 // ── Complete Registration (public — no auth) ──
 
 export async function completeRegistration(req: AuthRequest, res: Response) {

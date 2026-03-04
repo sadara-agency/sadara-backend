@@ -38,6 +38,19 @@ export async function createNotification(input: CreateNotificationInput) {
   }
 }
 
+// ── Notification type → preference key mapping ──
+
+const TYPE_TO_PREF: Record<string, string> = {
+  contract: "contracts",
+  injury: "injuries",
+  payment: "payments",
+  match: "matches",
+  referral: "referrals",
+  document: "documents",
+  task: "tasks",
+  system: "system",
+};
+
 // ── Notify all users with specific roles ──
 
 export async function notifyByRole(
@@ -46,12 +59,24 @@ export async function notifyByRole(
 ) {
   const users = await User.findAll({
     where: { role: { [Op.in]: roles }, isActive: true },
-    attributes: ["id"],
+    attributes: ["id", "notificationPreferences"],
   });
 
   if (users.length === 0) return 0;
 
-  const records = users.map((u) => ({ ...input, userId: u.id }));
+  // Filter out users who disabled this notification type
+  const prefKey = TYPE_TO_PREF[input.type];
+  const eligible = prefKey
+    ? users.filter((u) => {
+        const prefs = (u as any).notificationPreferences;
+        if (!prefs || typeof prefs !== "object") return true;
+        return prefs[prefKey] !== false;
+      })
+    : users;
+
+  if (eligible.length === 0) return 0;
+
+  const records = eligible.map((u) => ({ ...input, userId: u.id }));
 
   const results = await Notification.bulkCreate(records as any[], {
     ignoreDuplicates: true,
@@ -80,6 +105,7 @@ export async function listNotifications(userId: string, queryParams: any) {
 
   if (queryParams.unreadOnly === "true") where.isRead = false;
   if (queryParams.type) where.type = queryParams.type;
+  if (queryParams.priority) where.priority = queryParams.priority;
 
   const { count, rows } = await Notification.findAndCountAll({
     where,

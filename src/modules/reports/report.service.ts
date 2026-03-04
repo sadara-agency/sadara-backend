@@ -207,6 +207,7 @@ interface ReportFilters {
   playerId?: string;
   clubId?: string;
   playerContractType?: string;
+  expiryWindow?: number;
 }
 
 /** Build parameterized WHERE fragments. Returns { clauses, binds, nextIdx }. */
@@ -491,4 +492,103 @@ function buildDateFilter(
     default:
       return { clause: "", binds: [] };
   }
+}
+
+// ── Scouting Pipeline Report ──
+export async function getScoutingPipelineReport(filters: ReportFilters) {
+  const clauses: string[] = [];
+  const binds: any[] = [];
+  let idx = 1;
+  if (filters.dateFrom) {
+    clauses.push(`w.created_at >= $${idx++}`);
+    binds.push(filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    clauses.push(`w.created_at <= $${idx++}`);
+    binds.push(filters.dateTo);
+  }
+  const whereExtra = clauses.length ? "AND " + clauses.join(" AND ") : "";
+
+  const prospects = await sequelize.query<any>(
+    `SELECT w.id, w.prospect_name, w.prospect_name_ar, w.position,
+            w.current_club, w.current_league, w.status, w.priority,
+            w.technical_rating, w.physical_rating, w.mental_rating, w.potential_rating,
+            sc.case_number, sc.status AS screening_status, sc.identity_check,
+            sd.decision, sd.decision_date
+     FROM watchlists w
+     LEFT JOIN screening_cases sc ON sc.watchlist_id = w.id
+     LEFT JOIN selection_decisions sd ON sd.screening_case_id = sc.id
+     WHERE 1=1 ${whereExtra}
+     ORDER BY w.created_at DESC`,
+    { bind: binds, type: QueryTypes.SELECT },
+  );
+
+  const [summary] = await sequelize.query<any>(
+    `SELECT
+       COUNT(DISTINCT w.id)::INT AS total_watchlist,
+       COUNT(DISTINCT w.id) FILTER (WHERE w.status = 'Shortlisted')::INT AS shortlisted,
+       COUNT(DISTINCT sc.id) FILTER (WHERE sc.status = 'InProgress')::INT AS screening_in_progress,
+       COUNT(DISTINCT sd.id) FILTER (WHERE sd.decision = 'Approved')::INT AS approved,
+       COUNT(DISTINCT sd.id) FILTER (WHERE sd.decision = 'Rejected')::INT AS rejected
+     FROM watchlists w
+     LEFT JOIN screening_cases sc ON sc.watchlist_id = w.id
+     LEFT JOIN selection_decisions sd ON sd.screening_case_id = sc.id
+     WHERE 1=1 ${whereExtra}`,
+    { bind: binds, type: QueryTypes.SELECT },
+  );
+
+  return { summary, prospects };
+}
+
+// ── Expiring Contracts Report ──
+export async function getExpiringContractsReport(filters: ReportFilters) {
+  const window = Math.min(Math.max(Number(filters.expiryWindow) || 90, 1), 365);
+
+  const clauses: string[] = [
+    "c.status IN ('Active', 'Expiring Soon')",
+    "c.end_date >= CURRENT_DATE",
+    `c.end_date <= CURRENT_DATE + INTERVAL '${window} days'`,
+  ];
+  const binds: any[] = [];
+  let idx = 1;
+  if (filters.playerId) {
+    clauses.push(`c.player_id = $${idx++}`);
+    binds.push(filters.playerId);
+  }
+  if (filters.clubId) {
+    clauses.push(`c.club_id = $${idx++}`);
+    binds.push(filters.clubId);
+  }
+  if (filters.playerContractType) {
+    clauses.push(`c.player_contract_type = $${idx++}`);
+    binds.push(filters.playerContractType);
+  }
+
+  const contracts = await sequelize.query<any>(
+    `SELECT c.id, c.title, c.status, c.start_date, c.end_date,
+            c.base_salary, c.salary_currency, c.player_contract_type,
+            (c.end_date - CURRENT_DATE)::INT AS days_remaining,
+            p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+            cl.name AS club_name, cl.name_ar AS club_name_ar
+     FROM contracts c
+     LEFT JOIN players p ON c.player_id = p.id
+     LEFT JOIN clubs cl ON c.club_id = cl.id
+     WHERE ${clauses.join(" AND ")}
+     ORDER BY c.end_date ASC`,
+    { bind: binds, type: QueryTypes.SELECT },
+  );
+
+  const [summary] = await sequelize.query<any>(
+    `SELECT
+       COUNT(*) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days')::INT AS expiring_30,
+       COUNT(*) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '60 days')::INT AS expiring_60,
+       COUNT(*) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days')::INT AS expiring_90,
+       COALESCE(SUM(c.base_salary) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${window} days'), 0)::NUMERIC AS salary_at_risk
+     FROM contracts c
+     WHERE c.status IN ('Active', 'Expiring Soon')
+       AND c.end_date >= CURRENT_DATE`,
+    { type: QueryTypes.SELECT },
+  );
+
+  return { summary, contracts };
 }

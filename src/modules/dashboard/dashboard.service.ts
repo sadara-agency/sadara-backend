@@ -271,6 +271,108 @@ export async function getQuickStats() {
   };
 }
 
+/** Offer counts grouped by status (for pipeline chart). */
+export async function getOfferPipeline() {
+  return sequelize.query(
+    `SELECT status, COUNT(*)::INT AS count
+     FROM offers
+     GROUP BY status
+     ORDER BY CASE status
+       WHEN 'New' THEN 1 WHEN 'Under Review' THEN 2
+       WHEN 'Negotiation' THEN 3 WHEN 'Closed' THEN 4
+       WHEN 'Converted' THEN 5 END`,
+    { type: QueryTypes.SELECT },
+  );
+}
+
+/** Monthly injury counts by severity for the last 6 months (for trend chart). */
+export async function getInjuryTrends(months = 6) {
+  const rows = await sequelize.query<{
+    month: string;
+    severity: string;
+    count: number;
+  }>(
+    `SELECT
+       TO_CHAR(DATE_TRUNC('month', injury_date), 'YYYY-MM') AS month,
+       severity,
+       COUNT(*)::INT AS count
+     FROM injuries
+     WHERE injury_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+     GROUP BY DATE_TRUNC('month', injury_date), severity
+     ORDER BY month`,
+    { bind: [months], type: QueryTypes.SELECT },
+  );
+
+  // Pivot rows into { month, minor, moderate, severe, critical }[]
+  const map = new Map<string, { month: string; minor: number; moderate: number; severe: number; critical: number }>();
+  for (const r of rows) {
+    if (!map.has(r.month)) {
+      map.set(r.month, { month: r.month, minor: 0, moderate: 0, severe: 0, critical: 0 });
+    }
+    const entry = map.get(r.month)!;
+    const key = r.severity.toLowerCase() as keyof typeof entry;
+    if (key in entry && key !== "month") {
+      (entry as any)[key] = r.count;
+    }
+  }
+  return Array.from(map.values());
+}
+
+/** Monthly KPI snapshots for sparklines (last 6 months). */
+export async function getKpiTrends(months = 6) {
+  const [players, contracts, revenue, injuries, tasks, matches] = await Promise.all([
+    sequelize.query<{ month: string; value: number }>(
+      `SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+       FROM players WHERE created_at >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+       GROUP BY DATE_TRUNC('month', created_at) ORDER BY month`,
+      { bind: [months], type: QueryTypes.SELECT },
+    ),
+    sequelize.query<{ month: string; value: number }>(
+      `SELECT TO_CHAR(DATE_TRUNC('month', start_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+       FROM contracts WHERE status = 'Active'
+         AND start_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+       GROUP BY DATE_TRUNC('month', start_date) ORDER BY month`,
+      { bind: [months], type: QueryTypes.SELECT },
+    ),
+    sequelize.query<{ month: string; value: number }>(
+      `SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month, SUM(amount)::NUMERIC AS value
+       FROM payments WHERE status = 'Paid'
+         AND paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+       GROUP BY DATE_TRUNC('month', paid_date) ORDER BY month`,
+      { bind: [months], type: QueryTypes.SELECT },
+    ),
+    sequelize.query<{ month: string; value: number }>(
+      `SELECT TO_CHAR(DATE_TRUNC('month', injury_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+       FROM injuries WHERE injury_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+       GROUP BY DATE_TRUNC('month', injury_date) ORDER BY month`,
+      { bind: [months], type: QueryTypes.SELECT },
+    ),
+    sequelize.query<{ month: string; value: number }>(
+      `SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+       FROM tasks WHERE created_at >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+       GROUP BY DATE_TRUNC('month', created_at) ORDER BY month`,
+      { bind: [months], type: QueryTypes.SELECT },
+    ),
+    sequelize.query<{ month: string; value: number }>(
+      `SELECT TO_CHAR(DATE_TRUNC('month', match_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+       FROM matches WHERE match_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+       GROUP BY DATE_TRUNC('month', match_date) ORDER BY month`,
+      { bind: [months], type: QueryTypes.SELECT },
+    ),
+  ]);
+
+  const toValues = (rows: { month: string; value: number }[]) => rows.map((r) => Number(r.value));
+
+  return {
+    players: toValues(players),
+    contracts: toValues(contracts),
+    revenue: toValues(revenue),
+    injuries: toValues(injuries),
+    tasks: toValues(tasks),
+    matches: toValues(matches),
+  };
+}
+
 /**
  * Full dashboard — fires all queries in parallel for initial page load.
  * Uses Promise.allSettled so a single failing query doesn't crash the entire dashboard.
@@ -290,6 +392,9 @@ export async function getFullDashboard() {
     "performanceAvg",
     "recentActivity",
     "quickStats",
+    "offerPipeline",
+    "injuryTrends",
+    "kpiTrends",
   ] as const;
 
   const defaults: Record<string, any> = {
@@ -315,6 +420,9 @@ export async function getFullDashboard() {
       watchlistCount: 0,
       taskCompletionRate: 0,
     },
+    offerPipeline: [],
+    injuryTrends: [],
+    kpiTrends: { players: [], contracts: [], revenue: [], injuries: [], tasks: [], matches: [] },
   };
 
   const results = await Promise.allSettled([
@@ -330,6 +438,9 @@ export async function getFullDashboard() {
     getPerformanceAverages(),
     getRecentActivity(),
     getQuickStats(),
+    getOfferPipeline(),
+    getInjuryTrends(),
+    getKpiTrends(),
   ]);
 
   const dashboard: Record<string, any> = {};

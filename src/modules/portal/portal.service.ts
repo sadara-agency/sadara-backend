@@ -11,6 +11,7 @@ import { Match } from "../matches/match.model";
 import { Document } from "../documents/document.model";
 import { Gate, GateChecklist } from "../gates/gate.model";
 import { Task } from "../tasks/task.model";
+import { Injury, InjuryUpdate } from "../injuries/injury.model";
 import { AppError } from "../../middleware/errorHandler";
 
 // ══════════════════════════════════════════
@@ -632,5 +633,82 @@ export async function completePlayerRegistration(
   return {
     message: "Registration complete. You can now log in.",
     email: user.email,
+  };
+}
+
+// ══════════════════════════════════════════
+// UPDATE MY PROFILE (editable fields only)
+// ══════════════════════════════════════════
+
+const EDITABLE_FIELDS = [
+  "phone",
+  "guardianName",
+  "guardianPhone",
+  "guardianRelation",
+  "heightCm",
+  "weightKg",
+] as const;
+
+export async function updateMyProfile(
+  userId: string,
+  updates: Partial<Record<(typeof EDITABLE_FIELDS)[number], unknown>>,
+) {
+  const player = await getLinkedPlayer(userId);
+
+  const safeUpdates: Record<string, unknown> = {};
+  for (const field of EDITABLE_FIELDS) {
+    if (updates[field] !== undefined) {
+      safeUpdates[field] = updates[field];
+    }
+  }
+
+  if (Object.keys(safeUpdates).length === 0) {
+    throw new AppError("No valid fields to update", 400);
+  }
+
+  await player.update(safeUpdates);
+  return player;
+}
+
+// ══════════════════════════════════════════
+// MY INJURIES (injury history)
+// ══════════════════════════════════════════
+
+export async function getMyInjuries(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  const injuries = await Injury.findAll({
+    where: { playerId },
+    include: [
+      {
+        model: InjuryUpdate,
+        as: "updates",
+        order: [["updateDate", "DESC"]],
+      },
+    ],
+    order: [["injuryDate", "DESC"]],
+  });
+
+  const active = injuries.filter(
+    (i: any) => i.status === "UnderTreatment",
+  ).length;
+
+  const recovered = injuries.filter(
+    (i: any) => i.status === "Recovered" && i.actualDaysOut,
+  );
+  const avgRecovery =
+    recovered.length > 0
+      ? Math.round(
+          recovered.reduce((s: number, i: any) => s + (i.actualDaysOut || 0), 0) /
+            recovered.length,
+        )
+      : 0;
+
+  return {
+    injuries,
+    total: injuries.length,
+    active,
+    avgRecoveryDays: avgRecovery,
   };
 }

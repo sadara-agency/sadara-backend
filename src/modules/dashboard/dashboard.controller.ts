@@ -92,3 +92,21 @@ export async function getQuickStats(_req: AuthRequest, res: Response) {
   const data = await dashboardService.getQuickStats();
   sendSuccess(res, data);
 }
+
+// GET /dashboard/offer-pipeline
+export async function getOfferPipeline(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getOfferPipeline();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/injury-trends
+export async function getInjuryTrends(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getInjuryTrends();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/kpi-trends
+export async function getKpiTrends(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getKpiTrends();
+  sendSuccess(res, data);
+}

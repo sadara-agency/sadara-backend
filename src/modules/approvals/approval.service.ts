@@ -1,0 +1,197 @@
+import { Op } from "sequelize";
+import { ApprovalRequest, ApprovalStatus } from "./approval.model";
+import { User } from "../Users/user.model";
+import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import {
+  createNotification,
+  notifyByRole,
+} from "../notifications/notification.service";
+import { logger } from "../../config/logger";
+
+const USER_ATTRS = ["id", "fullName", "role"] as const;
+
+// ── Types ──
+
+interface CreateApprovalInput {
+  entityType: string;
+  entityId: string;
+  entityTitle: string;
+  action: string;
+  requestedBy: string;
+  assignedTo?: string;
+  assignedRole?: string;
+  priority?: "low" | "normal" | "high" | "critical";
+  dueDate?: string;
+}
+
+// ── Create ──
+
+export async function createApprovalRequest(input: CreateApprovalInput) {
+  // Prevent duplicates: only one Pending approval per entity
+  const existing = await ApprovalRequest.findOne({
+    where: {
+      entityType: input.entityType,
+      entityId: input.entityId,
+      status: "Pending",
+    },
+  });
+  if (existing) return existing;
+
+  const approval = await ApprovalRequest.create(input as any);
+
+  // Notify
+  const notifPayload = {
+    type: "system" as const,
+    title: `Approval needed: ${input.entityTitle}`,
+    titleAr: `مطلوب موافقة: ${input.entityTitle}`,
+    body: `Action: ${input.action}`,
+    bodyAr: `الإجراء: ${input.action}`,
+    link: "/dashboard/approvals",
+    sourceType: "approval",
+    sourceId: approval.id,
+    priority: input.priority || ("normal" as const),
+  };
+
+  if (input.assignedTo) {
+    createNotification({ ...notifPayload, userId: input.assignedTo }).catch(
+      () => {},
+    );
+  } else if (input.assignedRole) {
+    notifyByRole([input.assignedRole], notifPayload).catch(() => {});
+  } else {
+    notifyByRole(["Admin", "Manager"], notifPayload).catch(() => {});
+  }
+
+  return approval;
+}
+
+// ── List ──
+
+export async function listApprovalRequests(queryParams: any, userId: string, userRole: string) {
+  const { limit, offset, page, sort, order } = parsePagination(
+    queryParams,
+    "createdAt",
+  );
+
+  const where: any = {};
+
+  // Role-based visibility
+  if (userRole === "Admin" || userRole === "Manager") {
+    // See all assigned to them or their role, or unassigned
+    if (!queryParams.showAll) {
+      where[Op.or] = [
+        { assignedTo: userId },
+        { assignedRole: userRole },
+        { assignedTo: null, assignedRole: null },
+      ];
+    }
+  } else {
+    // Non-admin: only see their own requests
+    where.requestedBy = userId;
+  }
+
+  if (queryParams.status) where.status = queryParams.status;
+  if (queryParams.entityType) where.entityType = queryParams.entityType;
+  if (queryParams.priority) where.priority = queryParams.priority;
+
+  if (queryParams.search) {
+    where.entityTitle = { [Op.iLike]: `%${queryParams.search}%` };
+  }
+
+  const { count, rows } = await ApprovalRequest.findAndCountAll({
+    where,
+    limit,
+    offset,
+    order: [[sort, order]],
+    include: [
+      { model: User, as: "requester", attributes: [...USER_ATTRS] },
+      { model: User, as: "assignee", attributes: [...USER_ATTRS] },
+      { model: User, as: "resolver", attributes: [...USER_ATTRS] },
+    ],
+  });
+
+  return { data: rows, meta: buildMeta(count, page, limit) };
+}
+
+// ── Stats ──
+
+export async function getApprovalStats(userId: string, userRole: string) {
+  const baseWhere: any = {};
+
+  if (userRole === "Admin" || userRole === "Manager") {
+    baseWhere[Op.or] = [
+      { assignedTo: userId },
+      { assignedRole: userRole },
+      { assignedTo: null, assignedRole: null },
+    ];
+  } else {
+    baseWhere.requestedBy = userId;
+  }
+
+  const [pending, approved, rejected, overdue] = await Promise.all([
+    ApprovalRequest.count({ where: { ...baseWhere, status: "Pending" } }),
+    ApprovalRequest.count({ where: { ...baseWhere, status: "Approved" } }),
+    ApprovalRequest.count({ where: { ...baseWhere, status: "Rejected" } }),
+    ApprovalRequest.count({
+      where: {
+        ...baseWhere,
+        status: "Pending",
+        dueDate: { [Op.lt]: new Date() },
+      },
+    }),
+  ]);
+
+  return { pending, approved, rejected, overdue };
+}
+
+// ── Resolve ──
+
+export async function resolveApproval(
+  id: string,
+  userId: string,
+  decision: "Approved" | "Rejected",
+  comment?: string,
+) {
+  const approval = await ApprovalRequest.findByPk(id);
+  if (!approval) throw new Error("Approval request not found");
+  if (approval.status !== "Pending")
+    throw new Error("Approval already resolved");
+
+  await approval.update({
+    status: decision,
+    resolvedBy: userId,
+    resolvedAt: new Date(),
+    comment: comment || null,
+  });
+
+  // Notify requester
+  const statusLabel = decision === "Approved" ? "approved" : "rejected";
+  const statusLabelAr = decision === "Approved" ? "تمت الموافقة" : "تم الرفض";
+  createNotification({
+    userId: approval.requestedBy,
+    type: "system",
+    title: `Request ${statusLabel}: ${approval.entityTitle}`,
+    titleAr: `${statusLabelAr}: ${approval.entityTitle}`,
+    link: `/dashboard/approvals`,
+    sourceType: "approval",
+    sourceId: approval.id,
+    priority: "normal",
+  }).catch(() => {});
+
+  return approval;
+}
+
+// ── Resolve by entity (for hooks) ──
+
+export async function resolveApprovalByEntity(
+  entityType: string,
+  entityId: string,
+  userId: string,
+  decision: "Approved" | "Rejected",
+) {
+  const approval = await ApprovalRequest.findOne({
+    where: { entityType, entityId, status: "Pending" },
+  });
+  if (!approval) return null;
+  return resolveApproval(approval.id, userId, decision);
+}
