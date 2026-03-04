@@ -72,6 +72,7 @@ async function checkContractExpiry() {
       LEFT JOIN clubs cl ON cl.id = c.club_id
       WHERE c.status = 'Active'
         AND c.end_date = :targetDate
+        AND c.expiry_alert_sent = false
     `,
       { replacements: { targetDate: dateStr }, type: "SELECT" as any },
     );
@@ -93,6 +94,12 @@ async function checkContractExpiry() {
         sourceId: c.id,
         priority: t.priority,
       });
+
+      // Mark as alerted to prevent duplicate notifications
+      await sequelize.query(
+        `UPDATE contracts SET expiry_alert_sent = true WHERE id = :contractId`,
+        { replacements: { contractId: c.id } },
+      );
       notified++;
     }
   }

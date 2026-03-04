@@ -228,3 +228,65 @@ export async function playerAggregateStats(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, stats);
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  MATCH ANALYSIS
+// ═══════════════════════════════════════════════════════════════
+
+export async function listAnalyses(req: AuthRequest, res: Response) {
+  const analyses = await svc.getMatchAnalyses(req.params.id);
+  sendSuccess(res, analyses);
+}
+
+export async function getAnalysis(req: AuthRequest, res: Response) {
+  const analysis = await svc.getMatchAnalysisById(req.params.id, req.params.analysisId);
+  sendSuccess(res, analysis);
+}
+
+export async function createAnalysis(req: AuthRequest, res: Response) {
+  const analysis = await svc.createMatchAnalysis(req.params.id, req.user!.id, req.body);
+  await logAudit(
+    "CREATE",
+    "match_analyses",
+    analysis.id,
+    buildAuditContext(req.user!, req.ip),
+    `Created ${req.body.type} analysis: ${req.body.title}`,
+  );
+  sendCreated(res, analysis);
+}
+
+export async function updateAnalysis(req: AuthRequest, res: Response) {
+  const analysis = await svc.updateMatchAnalysis(req.params.id, req.params.analysisId, req.body);
+  await logAudit(
+    "UPDATE",
+    "match_analyses",
+    req.params.analysisId,
+    buildAuditContext(req.user!, req.ip),
+    `Updated analysis: ${analysis.title}`,
+  );
+  sendSuccess(res, analysis, "Analysis updated");
+}
+
+export async function publishAnalysis(req: AuthRequest, res: Response) {
+  const analysis = await svc.publishMatchAnalysis(req.params.id, req.params.analysisId);
+  await logAudit(
+    "UPDATE",
+    "match_analyses",
+    req.params.analysisId,
+    buildAuditContext(req.user!, req.ip),
+    `Published analysis: ${analysis.title}`,
+  );
+  sendSuccess(res, analysis, "Analysis published");
+}
+
+export async function removeAnalysis(req: AuthRequest, res: Response) {
+  const result = await svc.deleteMatchAnalysis(req.params.id, req.params.analysisId);
+  await logAudit(
+    "DELETE",
+    "match_analyses",
+    req.params.analysisId,
+    buildAuditContext(req.user!, req.ip),
+    "Analysis deleted",
+  );
+  sendSuccess(res, result, "Analysis deleted");
+}

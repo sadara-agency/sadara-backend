@@ -5,7 +5,7 @@ import {
   sendCreated,
   sendPaginated,
 } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { logAudit, buildAuditContext, buildChanges } from "../../shared/utils/audit";
 import * as contractService from "./contract.service";
 
 // ── List Contracts ──
@@ -37,8 +37,14 @@ export async function create(req: AuthRequest, res: Response) {
 
 // ── Update Contract ──
 export async function update(req: AuthRequest, res: Response) {
+  const oldContract = await contractService.getContractById(req.params.id);
   const contract = await contractService.updateContract(
     req.params.id,
+    req.body,
+  );
+
+  const changes = buildChanges(
+    oldContract instanceof Object ? (oldContract as any).get?.({ plain: true }) ?? oldContract : oldContract,
     req.body,
   );
 
@@ -48,6 +54,7 @@ export async function update(req: AuthRequest, res: Response) {
     req.params.id,
     buildAuditContext(req.user!, req.ip),
     `Updated contract: ${contract.title || "Untitled"}`,
+    changes ?? undefined,
   );
 
   sendSuccess(res, contract, "Contract updated");

@@ -1,8 +1,10 @@
 import { Response } from "express";
 import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { AppError } from "../../middleware/errorHandler";
 import { AuthRequest } from "../../shared/types";
 import * as portalService from "./portal.service";
+import * as documentService from "../documents/document.service";
 
 // ── My Profile ──
 
@@ -81,6 +83,43 @@ export async function generateInvite(req: AuthRequest, res: Response) {
     `Generated player portal invite for ${data.playerName} (${data.playerEmail})`,
   );
   sendCreated(res, data);
+}
+
+// ── Upload My Document ──
+
+const ALLOWED_DOC_TYPES = ["ID", "Passport", "Medical"];
+
+export async function uploadMyDocument(req: AuthRequest, res: Response) {
+  const player = await portalService.getLinkedPlayer(req.user!.id);
+  if (!req.file) throw new AppError("No file provided", 400);
+
+  const docType = req.body.type;
+  if (!docType || !ALLOWED_DOC_TYPES.includes(docType)) {
+    throw new AppError(`Document type must be one of: ${ALLOWED_DOC_TYPES.join(", ")}`, 400);
+  }
+
+  const doc = await documentService.createDocument(
+    {
+      playerId: player.id,
+      name: req.body.name || req.file.originalname,
+      type: docType,
+      status: "Pending",
+      fileUrl: `/uploads/documents/${req.file.filename}`,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+    },
+    req.user!.id,
+  );
+
+  await logAudit(
+    "CREATE",
+    "documents",
+    doc?.id ?? null,
+    buildAuditContext(req.user!, req.ip),
+    `Player uploaded document: ${req.body.name || req.file.originalname} (${docType})`,
+  );
+
+  sendCreated(res, doc, "Document uploaded successfully");
 }
 
 // ── Complete Registration (public — no auth) ──

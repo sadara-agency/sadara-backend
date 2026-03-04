@@ -5,7 +5,7 @@ import {
   sendCreated,
   sendPaginated,
 } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { logAudit, buildAuditContext, buildChanges } from "../../shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
 import { AppError } from "../../middleware/errorHandler";
 import * as playerService from "./player.service";
@@ -34,13 +34,21 @@ export async function create(req: AuthRequest, res: Response) {
 }
 
 export async function update(req: AuthRequest, res: Response) {
+  const oldPlayer = await playerService.getPlayerById(req.params.id);
   const player = await playerService.updatePlayer(req.params.id, req.body);
+
+  const changes = buildChanges(
+    oldPlayer instanceof Object ? (oldPlayer as any).get?.({ plain: true }) ?? oldPlayer : oldPlayer,
+    req.body,
+  );
+
   await logAudit(
     "UPDATE",
     "players",
     player.id,
     buildAuditContext(req.user!, req.ip),
     `Updated player: ${player.firstName} ${player.lastName}`,
+    changes ?? undefined,
   );
   await invalidateMultiple([
     CachePrefix.PLAYERS,

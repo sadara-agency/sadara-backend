@@ -178,6 +178,24 @@ export async function createMissingTables() {
         END $$;`,
   );
 
+  // ── Match Analyses ──
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS match_analyses (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      match_id UUID NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+      analyst_id UUID NOT NULL REFERENCES users(id),
+      type VARCHAR(20) NOT NULL CHECK (type IN ('pre-match','post-match','tactical')),
+      title VARCHAR(500) NOT NULL,
+      content TEXT NOT NULL,
+      key_findings JSONB,
+      recommended_actions TEXT[],
+      rating NUMERIC(3,1),
+      status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft','published')),
+      created_at TIMESTAMPTZ DEFAULT NOW(),
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+  `);
+
   // ── App Settings (key-value store for runtime config) ──
   await sequelize.query(`
         CREATE TABLE IF NOT EXISTS app_settings (
@@ -215,6 +233,7 @@ export async function createMissingTables() {
     "CREATE INDEX IF NOT EXISTS idx_notes_owner ON notes(owner_type, owner_id)",
     "CREATE INDEX IF NOT EXISTS idx_player_club_history_player ON player_club_history(player_id)",
     "CREATE INDEX IF NOT EXISTS idx_technical_reports_player ON technical_reports(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_match_analyses_match ON match_analyses(match_id)",
   ];
 
   for (const sql of indexes) {
