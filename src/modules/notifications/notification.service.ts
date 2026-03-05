@@ -40,7 +40,7 @@ export async function createNotification(input: CreateNotificationInput) {
         link: notif.link,
         priority: notif.priority,
         isRead: false,
-        createdAt: notif.createdAt.toISOString(),
+        createdAt: notif.createdAt instanceof Date ? notif.createdAt.toISOString() : String(notif.createdAt),
       };
       publishNotification(input.userId, payload).catch(() => {});
     }
@@ -114,7 +114,7 @@ export async function notifyByRole(
       link: notif.link,
       priority: notif.priority,
       isRead: false,
-      createdAt: notif.createdAt.toISOString(),
+      createdAt: notif.createdAt instanceof Date ? notif.createdAt.toISOString() : String(notif.createdAt),
     };
     publishNotification(notif.userId, payload).catch(() => {});
   }

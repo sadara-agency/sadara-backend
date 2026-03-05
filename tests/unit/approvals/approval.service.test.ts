@@ -30,6 +30,25 @@ jest.mock('../../../src/modules/Users/user.model', () => ({
   User: { name: 'User' },
 }));
 
+jest.mock('../../../src/modules/approvals/approvalStep.model', () => ({
+  ApprovalStep: {
+    findAll: jest.fn().mockResolvedValue([]),
+    update: jest.fn().mockResolvedValue([0]),
+  },
+}));
+
+jest.mock('../../../src/modules/approvals/approvalChainTemplate.model', () => ({
+  ApprovalChainTemplate: { findOne: jest.fn() },
+  ApprovalChainTemplateStep: {},
+}));
+
+jest.mock('../../../src/modules/approvals/approvalChain.service', () => ({
+  findActiveTemplate: jest.fn().mockResolvedValue(null),
+  createStepsForApproval: jest.fn().mockResolvedValue([]),
+  resolveStep: jest.fn().mockResolvedValue(undefined),
+  getApprovalWithSteps: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   createNotification: jest.fn().mockResolvedValue({}),
   notifyByRole: jest.fn().mockResolvedValue(undefined),

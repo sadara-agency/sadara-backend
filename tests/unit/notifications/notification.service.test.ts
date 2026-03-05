@@ -34,6 +34,10 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/notifications/notification.sse', () => ({
+  publishNotification: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as notifService from '../../../src/modules/notifications/notification.service';
 
 describe('Notification Service', () => {
