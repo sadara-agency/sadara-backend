@@ -120,13 +120,13 @@ export async function getContractStatusDistribution() {
   );
 }
 
-/** Active player count grouped by type: Pro vs Youth. */
+/** Active player count grouped by contract type: Professional / Amateur / Youth. */
 export async function getPlayerDistribution() {
   return sequelize.query(
-    `SELECT player_type, COUNT(*)::INT AS count
+    `SELECT contract_type AS player_type, COUNT(*)::INT AS count
      FROM players
      WHERE status = 'active'
-     GROUP BY player_type`,
+     GROUP BY contract_type`,
     { type: QueryTypes.SELECT },
   );
 }

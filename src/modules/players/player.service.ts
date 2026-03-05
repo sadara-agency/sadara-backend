@@ -186,6 +186,7 @@ export async function listPlayers(queryParams: any) {
   if (queryParams.clubId) where.currentClubId = queryParams.clubId;
   if (queryParams.position) where.position = queryParams.position;
   if (queryParams.nationality) where.nationality = queryParams.nationality;
+  if (queryParams.contractType) where.contractType = queryParams.contractType;
 
   if (search) {
     where[Op.or] = [
