@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { ApprovalRequest, ApprovalStatus } from "./approval.model";
+import { ApprovalStep } from "./approvalStep.model";
 import { User } from "../Users/user.model";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import {
@@ -8,6 +9,12 @@ import {
 } from "../notifications/notification.service";
 import { logger } from "../../config/logger";
 import { AppError } from "../../middleware/errorHandler";
+import {
+  findActiveTemplate,
+  createStepsForApproval,
+  resolveStep,
+  getApprovalWithSteps,
+} from "./approvalChain.service";
 
 const USER_ATTRS = ["id", "fullName", "role"] as const;
 
@@ -40,27 +47,35 @@ export async function createApprovalRequest(input: CreateApprovalInput) {
 
   const approval = await ApprovalRequest.create(input as any);
 
-  // Notify
-  const notifPayload = {
-    type: "system" as const,
-    title: `Approval needed: ${input.entityTitle}`,
-    titleAr: `مطلوب موافقة: ${input.entityTitle}`,
-    body: `Action: ${input.action}`,
-    bodyAr: `الإجراء: ${input.action}`,
-    link: "/dashboard/approvals",
-    sourceType: "approval",
-    sourceId: approval.id,
-    priority: input.priority || ("normal" as const),
-  };
+  // Check for a multi-step template
+  const template = await findActiveTemplate(input.entityType, input.action);
 
-  if (input.assignedTo) {
-    createNotification({ ...notifPayload, userId: input.assignedTo }).catch(
-      () => {},
-    );
-  } else if (input.assignedRole) {
-    notifyByRole([input.assignedRole], notifPayload).catch(() => {});
+  if (template && template.steps && template.steps.length > 0) {
+    // Multi-step: create steps from template (handles notification for step 1)
+    await createStepsForApproval(approval, template);
   } else {
-    notifyByRole(["Admin", "Manager"], notifPayload).catch(() => {});
+    // Single-step: send generic notification (existing behavior)
+    const notifPayload = {
+      type: "system" as const,
+      title: `Approval needed: ${input.entityTitle}`,
+      titleAr: `مطلوب موافقة: ${input.entityTitle}`,
+      body: `Action: ${input.action}`,
+      bodyAr: `الإجراء: ${input.action}`,
+      link: "/dashboard/approvals",
+      sourceType: "approval",
+      sourceId: approval.id,
+      priority: input.priority || ("normal" as const),
+    };
+
+    if (input.assignedTo) {
+      createNotification({ ...notifPayload, userId: input.assignedTo }).catch(
+        () => {},
+      );
+    } else if (input.assignedRole) {
+      notifyByRole([input.assignedRole], notifPayload).catch(() => {});
+    } else {
+      notifyByRole(["Admin", "Manager"], notifPayload).catch(() => {});
+    }
   }
 
   return approval;
@@ -78,7 +93,6 @@ export async function listApprovalRequests(queryParams: any, userId: string, use
 
   // Role-based visibility
   if (userRole === "Admin" || userRole === "Manager") {
-    // See all assigned to them or their role, or unassigned
     if (!queryParams.showAll) {
       where[Op.or] = [
         { assignedTo: userId },
@@ -87,7 +101,6 @@ export async function listApprovalRequests(queryParams: any, userId: string, use
       ];
     }
   } else {
-    // Non-admin: only see their own requests
     where.requestedBy = userId;
   }
 
@@ -108,6 +121,13 @@ export async function listApprovalRequests(queryParams: any, userId: string, use
       { model: User, as: "requester", attributes: [...USER_ATTRS] },
       { model: User, as: "assignee", attributes: [...USER_ATTRS] },
       { model: User, as: "resolver", attributes: [...USER_ATTRS] },
+      {
+        model: ApprovalStep,
+        as: "steps",
+        include: [
+          { model: User, as: "resolver", attributes: [...USER_ATTRS] },
+        ],
+      },
     ],
   });
 
@@ -152,12 +172,21 @@ export async function resolveApproval(
   userId: string,
   decision: "Approved" | "Rejected",
   comment?: string,
+  userRole?: string,
 ) {
   const approval = await ApprovalRequest.findByPk(id);
   if (!approval) throw new AppError("Approval request not found", 404);
   if (approval.status !== "Pending")
     throw new AppError("Approval already resolved", 409);
 
+  // Multi-step: delegate to step resolution
+  if (approval.totalSteps > 1) {
+    if (!userRole) throw new AppError("User role required for multi-step approval", 400);
+    const result = await resolveStep(id, userId, userRole, decision, comment);
+    return result.approval;
+  }
+
+  // Single-step: resolve directly (existing behavior)
   await approval.update({
     status: decision,
     resolvedBy: userId,
@@ -194,5 +223,33 @@ export async function resolveApprovalByEntity(
     where: { entityType, entityId, status: "Pending" },
   });
   if (!approval) return null;
-  return resolveApproval(approval.id, userId, decision);
+
+  // For entity-based resolution, auto-resolve all remaining steps
+  if (approval.totalSteps > 1) {
+    await ApprovalStep.update(
+      {
+        status: decision === "Approved" ? "Approved" : "Skipped",
+        resolvedBy: userId,
+        resolvedAt: new Date(),
+      },
+      {
+        where: {
+          approvalRequestId: approval.id,
+          status: { [Op.in]: ["Active", "Pending"] },
+        },
+      },
+    );
+  }
+
+  await approval.update({
+    status: decision,
+    resolvedBy: userId,
+    resolvedAt: new Date(),
+  });
+
+  return approval;
 }
+
+// ── Re-export detail query ──
+
+export { getApprovalWithSteps };

@@ -42,6 +42,7 @@ import noteRoutes from "./modules/notes/note.routes";
 import reportRoutes from "./modules/reports/report.routes";
 import approvalRoutes from "./modules/approvals/approval.routes";
 import gdprRoutes from "./modules/gdpr/gdpr.routes";
+import permissionRoutes from "./modules/permissions/permission.routes";
 import { setupSwagger } from "./config/swagger";
 
 const app = express();
@@ -172,6 +173,7 @@ app.use("/api/v1/notes", noteRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/approvals", approvalRoutes);
 app.use("/api/v1/gdpr", gdprRoutes);
+app.use("/api/v1/permissions", permissionRoutes);
 
 // ── Swagger UI ──
 setupSwagger(app);

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createGateSchema,
@@ -19,6 +19,7 @@ router.use(authenticate);
 // ── Gates CRUD ──
 router.get(
   "/",
+  authorizeModule("gates", "read"),
   validate(gateQuerySchema, "query"),
   asyncHandler(gateController.list),
 );
@@ -26,49 +27,49 @@ router.get(
 // Static paths MUST come before /:id to avoid Express matching "initialize" or "player" as an :id param
 router.post(
   "/initialize",
-  authorize("Admin", "Manager"),
+  authorizeModule("gates", "create"),
   validate(initializeGateSchema),
   asyncHandler(gateController.initialize),
 );
-router.get("/player/:playerId", asyncHandler(gateController.getPlayerGates));
+router.get("/player/:playerId", authorizeModule("gates", "read"), asyncHandler(gateController.getPlayerGates));
 
-router.get("/:id", asyncHandler(gateController.getById));
+router.get("/:id", authorizeModule("gates", "read"), asyncHandler(gateController.getById));
 router.post(
   "/",
-  authorize("Admin", "Manager"),
+  authorizeModule("gates", "create"),
   validate(createGateSchema),
   asyncHandler(gateController.create),
 );
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorizeModule("gates", "update"),
   validate(updateGateSchema),
   asyncHandler(gateController.update),
 );
 router.patch(
   "/:id/advance",
-  authorize("Admin", "Manager"),
+  authorizeModule("gates", "update"),
   validate(advanceGateSchema),
   asyncHandler(gateController.advance),
 );
-router.delete("/:id", authorize("Admin"), asyncHandler(gateController.remove));
+router.delete("/:id", authorizeModule("gates", "delete"), asyncHandler(gateController.remove));
 
 // ── Checklist Items ──
 router.post(
   "/:gateId/checklist",
-  authorize("Admin", "Manager"),
+  authorizeModule("gates", "create"),
   validate(createChecklistItemSchema),
   asyncHandler(gateController.addChecklistItem),
 );
 router.patch(
   "/checklist/:itemId",
-  authorize("Admin", "Manager", "Analyst"),
+  authorizeModule("gates", "update"),
   validate(toggleChecklistItemSchema),
   asyncHandler(gateController.toggleChecklistItem),
 );
 router.delete(
   "/checklist/:itemId",
-  authorize("Admin", "Manager"),
+  authorizeModule("gates", "delete"),
   asyncHandler(gateController.deleteChecklistItem),
 );
 

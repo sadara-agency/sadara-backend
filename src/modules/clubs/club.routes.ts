@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { uploadSingle, verifyFileType } from "../../middleware/upload";
 import {
@@ -17,33 +17,34 @@ router.use(authenticate);
 
 router.get(
   "/",
+  authorizeModule("clubs", "read"),
   validate(clubQuerySchema, "query"),
   asyncHandler(clubController.list),
 );
 router.post(
   "/",
-  authorize("Admin", "Manager"),
+  authorizeModule("clubs", "create"),
   validate(createClubSchema),
   asyncHandler(clubController.create),
 );
 router.post(
   "/bulk-delete",
-  authorize("Admin"),
+  authorizeModule("clubs", "delete"),
   asyncHandler(clubController.bulkRemove),
 );
-router.get("/:id", asyncHandler(clubController.getById));
+router.get("/:id", authorizeModule("clubs", "read"), asyncHandler(clubController.getById));
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorizeModule("clubs", "update"),
   validate(updateClubSchema),
   asyncHandler(clubController.update),
 );
-router.delete("/:id", authorize("Admin"), asyncHandler(clubController.remove));
+router.delete("/:id", authorizeModule("clubs", "delete"), asyncHandler(clubController.remove));
 
 // ── Logo Upload ──
 router.post(
   "/:id/logo",
-  authorize("Admin", "Manager"),
+  authorizeModule("clubs", "create"),
   uploadSingle,
   verifyFileType,
   asyncHandler(clubController.uploadLogo),
@@ -52,19 +53,19 @@ router.post(
 // ── Contact CRUD ──
 router.post(
   "/:id/contacts",
-  authorize("Admin", "Manager"),
+  authorizeModule("clubs", "create"),
   validate(createContactSchema),
   asyncHandler(clubController.createContact),
 );
 router.patch(
   "/:id/contacts/:contactId",
-  authorize("Admin", "Manager"),
+  authorizeModule("clubs", "update"),
   validate(updateContactSchema),
   asyncHandler(clubController.updateContact),
 );
 router.delete(
   "/:id/contacts/:contactId",
-  authorize("Admin", "Manager"),
+  authorizeModule("clubs", "delete"),
   asyncHandler(clubController.deleteContact),
 );
 

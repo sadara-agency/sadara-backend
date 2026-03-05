@@ -7,10 +7,11 @@ import {
 import { User } from "../Users/user.model";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { logger } from "../../config/logger";
+import { publishNotification, type SSENotificationPayload } from "./notification.sse";
 
 // ── Create a single notification ──
 
-interface CreateNotificationInput {
+export interface CreateNotificationInput {
   userId: string;
   type: NotificationType;
   title: string;
@@ -25,7 +26,26 @@ interface CreateNotificationInput {
 
 export async function createNotification(input: CreateNotificationInput) {
   try {
-    return await Notification.create(input as any);
+    const notif = await Notification.create(input as any);
+
+    // Push to SSE (fire-and-forget)
+    if (notif) {
+      const payload: SSENotificationPayload = {
+        id: notif.id,
+        type: notif.type,
+        title: notif.title,
+        titleAr: notif.titleAr,
+        body: notif.body,
+        bodyAr: notif.bodyAr,
+        link: notif.link,
+        priority: notif.priority,
+        isRead: false,
+        createdAt: notif.createdAt.toISOString(),
+      };
+      publishNotification(input.userId, payload).catch(() => {});
+    }
+
+    return notif;
   } catch (err: any) {
     // Unique constraint violation = duplicate → skip silently
     if (err.name === "SequelizeUniqueConstraintError") {
@@ -81,6 +101,23 @@ export async function notifyByRole(
   const results = await Notification.bulkCreate(records as any[], {
     ignoreDuplicates: true,
   });
+
+  // Push each to SSE (fire-and-forget)
+  for (const notif of results) {
+    const payload: SSENotificationPayload = {
+      id: notif.id,
+      type: notif.type,
+      title: notif.title,
+      titleAr: notif.titleAr,
+      body: notif.body,
+      bodyAr: notif.bodyAr,
+      link: notif.link,
+      priority: notif.priority,
+      isRead: false,
+      createdAt: notif.createdAt.toISOString(),
+    };
+    publishNotification(notif.userId, payload).catch(() => {});
+  }
 
   logger.info(
     `Notified ${results.length}/${users.length} users (roles: ${roles.join(",")}) — ${input.type}: ${input.title}`,

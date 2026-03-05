@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   tournamentQuerySchema,
@@ -21,19 +21,20 @@ router.use(authenticate);
 // ── Tournaments ──
 router.get(
   "/tournaments",
+  authorizeModule("saff-data", "read"),
   validate(tournamentQuerySchema, "query"),
   asyncHandler(saffController.listTournaments),
 );
 router.post(
   "/tournaments/seed",
-  authorize("Admin"),
+  authorizeModule("saff-data", "create"),
   asyncHandler(saffController.seedTournaments),
 );
 
 // ── Fetch (Scrape from SAFF) ──
 router.post(
   "/fetch",
-  authorize("Admin", "Manager"),
+  authorizeModule("saff-data", "create"),
   validate(fetchRequestSchema),
   asyncHandler(saffController.fetchFromSaff),
 );
@@ -41,6 +42,7 @@ router.post(
 // ── Standings ──
 router.get(
   "/standings",
+  authorizeModule("saff-data", "read"),
   validate(standingQuerySchema, "query"),
   asyncHandler(saffController.listStandings),
 );
@@ -48,6 +50,7 @@ router.get(
 // ── Fixtures ──
 router.get(
   "/fixtures",
+  authorizeModule("saff-data", "read"),
   validate(fixtureQuerySchema, "query"),
   asyncHandler(saffController.listFixtures),
 );
@@ -55,12 +58,13 @@ router.get(
 // ── Team Mappings ──
 router.get(
   "/team-maps",
+  authorizeModule("saff-data", "read"),
   validate(teamMapQuerySchema, "query"),
   asyncHandler(saffController.listTeamMaps),
 );
 router.post(
   "/team-maps",
-  authorize("Admin", "Manager"),
+  authorizeModule("saff-data", "create"),
   validate(mapTeamSchema),
   asyncHandler(saffController.mapTeam),
 );
@@ -68,7 +72,7 @@ router.post(
 // ── Import to Sadara ──
 router.post(
   "/import",
-  authorize("Admin"),
+  authorizeModule("saff-data", "create"),
   validate(importRequestSchema),
   asyncHandler(saffController.importToSadara),
 );
@@ -76,18 +80,18 @@ router.post(
 // ── Fetch Team Logos ──
 router.post(
   "/fetch-logos",
-  authorize("Admin", "Manager"),
+  authorizeModule("saff-data", "create"),
   asyncHandler(saffController.fetchTeamLogos),
 );
 
 // ── Stats ──
-router.get("/stats", asyncHandler(saffController.getStats));
+router.get("/stats", authorizeModule("saff-data", "read"), asyncHandler(saffController.getStats));
 
 // ── Sync (Scheduler) ──
-router.get("/sync-status", asyncHandler(saffController.getSyncStatus));
+router.get("/sync-status", authorizeModule("saff-data", "read"), asyncHandler(saffController.getSyncStatus));
 router.post(
   "/sync-now",
-  authorize("Admin"),
+  authorizeModule("saff-data", "create"),
   asyncHandler(saffController.triggerSync),
 );
 

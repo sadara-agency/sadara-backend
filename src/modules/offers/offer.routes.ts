@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createOfferSchema,
@@ -16,16 +16,17 @@ router.use(authenticate);
 // ── List & Read ──
 router.get(
   "/",
+  authorizeModule("offers", "read"),
   validate(offerQuerySchema, "query"),
   asyncHandler(offerController.list),
 );
-router.get("/:id", asyncHandler(offerController.getById));
-router.get("/player/:playerId", asyncHandler(offerController.getByPlayer));
+router.get("/:id", authorizeModule("offers", "read"), asyncHandler(offerController.getById));
+router.get("/player/:playerId", authorizeModule("offers", "read"), asyncHandler(offerController.getByPlayer));
 
 // ── Create ──
 router.post(
   "/",
-  authorize("Admin", "Manager"),
+  authorizeModule("offers", "create"),
   validate(createOfferSchema),
   asyncHandler(offerController.create),
 );
@@ -33,23 +34,23 @@ router.post(
 // ── Update ──
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorizeModule("offers", "update"),
   validate(updateOfferSchema),
   asyncHandler(offerController.update),
 );
 router.patch(
   "/:id/status",
-  authorize("Admin", "Manager"),
+  authorizeModule("offers", "update"),
   validate(updateOfferStatusSchema),
   asyncHandler(offerController.updateStatus),
 );
 
 // ── Delete ──
-router.delete("/:id", authorize("Admin"), asyncHandler(offerController.remove));
+router.delete("/:id", authorizeModule("offers", "delete"), asyncHandler(offerController.remove));
 
 router.post(
   "/:id/convert",
-  authorize("Admin", "Manager"),
+  authorizeModule("offers", "create"),
   asyncHandler(offerController.convertToContract),
 );
 

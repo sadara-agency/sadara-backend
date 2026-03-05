@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createWatchlistSchema,
@@ -19,68 +19,69 @@ const router = Router();
 router.use(authenticate);
 
 // ── Pipeline Summary ──
-router.get("/summary", asyncHandler(ctrl.pipelineSummary));
+router.get("/summary", authorizeModule("scouting", "read"), asyncHandler(ctrl.pipelineSummary));
 
 // ── Watchlist ──
 router.get(
   "/watchlist",
+  authorizeModule("scouting", "read"),
   validate(watchlistQuerySchema, "query"),
   asyncHandler(ctrl.listWatchlist),
 );
-router.get("/watchlist/:id", asyncHandler(ctrl.getWatchlistById));
+router.get("/watchlist/:id", authorizeModule("scouting", "read"), asyncHandler(ctrl.getWatchlistById));
 router.post(
   "/watchlist",
-  authorize("Admin", "Manager", "Analyst"),
+  authorizeModule("scouting", "create"),
   validate(createWatchlistSchema),
   asyncHandler(ctrl.createWatchlist),
 );
 router.patch(
   "/watchlist/:id",
-  authorize("Admin", "Manager", "Analyst"),
+  authorizeModule("scouting", "update"),
   validate(updateWatchlistSchema),
   asyncHandler(ctrl.updateWatchlist),
 );
 router.patch(
   "/watchlist/:id/status",
-  authorize("Admin", "Manager"),
+  authorizeModule("scouting", "update"),
   validate(updateWatchlistStatusSchema),
   asyncHandler(ctrl.updateWatchlistStatus),
 );
 router.delete(
   "/watchlist/:id",
-  authorize("Admin"),
+  authorizeModule("scouting", "delete"),
   asyncHandler(ctrl.deleteWatchlist),
 );
 
 // ── Screening Cases ──
 router.post(
   "/screening",
-  authorize("Admin", "Manager"),
+  authorizeModule("scouting", "create"),
   validate(createScreeningSchema),
   asyncHandler(ctrl.createScreening),
 );
-router.get("/screening/:id", asyncHandler(ctrl.getScreening));
+router.get("/screening/:id", authorizeModule("scouting", "read"), asyncHandler(ctrl.getScreening));
 router.patch(
   "/screening/:id",
-  authorize("Admin", "Manager", "Analyst"),
+  authorizeModule("scouting", "update"),
   validate(updateScreeningSchema),
   asyncHandler(ctrl.updateScreening),
 );
 router.patch(
   "/screening/:id/pack-ready",
-  authorize("Admin", "Manager"),
+  authorizeModule("scouting", "update"),
   validate(markPackReadySchema),
   asyncHandler(ctrl.markPackReady),
 );
-router.get("/screening/:id/pdf", asyncHandler(generatePackPdf));
+router.get("/screening/:id/pdf", authorizeModule("scouting", "read"), asyncHandler(generatePackPdf));
 
 // ── Selection Decisions (immutable — create + read only) ──
 router.post(
   "/decisions",
-  authorize("Admin", "Manager"),
+  authorizeModule("scouting", "create"),
   validate(createDecisionSchema),
   asyncHandler(ctrl.createDecision),
 );
-router.get("/decisions/:id", asyncHandler(ctrl.getDecision));
+router.get("/decisions/:id", authorizeModule("scouting", "read"), asyncHandler(ctrl.getDecision));
 
 export default router;

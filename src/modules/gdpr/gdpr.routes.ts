@@ -1,6 +1,6 @@
 import { Router, Response } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { AuthRequest } from "../../shared/types";
 import { sendSuccess } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
@@ -9,12 +9,12 @@ import * as gdprService from "./gdpr.service";
 
 const router = Router();
 router.use(authenticate);
-router.use(authorize("Admin"));
 
 // ── Right to Access (data export) ──
 
 router.get(
   "/players/:id/export",
+  authorizeModule("settings", "read"),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const data = await gdprService.exportPlayerData(req.params.id);
 
@@ -34,6 +34,7 @@ router.get(
 
 router.post(
   "/players/:id/anonymize",
+  authorizeModule("settings", "delete"),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const result = await gdprService.anonymizePlayerData(req.params.id);
 

@@ -1,6 +1,6 @@
 import { Router, Response } from "express";
 import { asyncHandler, AppError } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { User } from "../Users/user.model";
 import { AuthRequest } from "../../shared/types";
@@ -94,6 +94,7 @@ const SAFE_ATTRS = [
 
 router.get(
   "/profile",
+  authorizeModule("settings", "read"),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     let user = await User.findByPk(req.user!.id, {
       attributes: [...SAFE_ATTRS],
@@ -129,6 +130,7 @@ router.get(
 
 router.patch(
   "/profile",
+  authorizeModule("settings", "update"),
   validate(updateProfileSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const user = await User.findByPk(req.user!.id);
@@ -147,6 +149,7 @@ router.patch(
 
 router.post(
   "/change-password",
+  authorizeModule("settings", "update"),
   validate(changePasswordSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const user = await User.findByPk(req.user!.id);
@@ -177,6 +180,7 @@ router.post(
 
 router.get(
   "/notifications",
+  authorizeModule("settings", "read"),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const user = await User.findByPk(req.user!.id, {
       attributes: ["id", "notificationPreferences"],
@@ -191,6 +195,7 @@ router.get(
 
 router.patch(
   "/notifications",
+  authorizeModule("settings", "update"),
   validate(notificationPrefsSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const user = await User.findByPk(req.user!.id);
@@ -220,7 +225,7 @@ router.patch(
 
 router.get(
   "/team",
-  authorize("Admin", "Manager"),
+  authorizeModule("settings", "read"),
   validate(teamQuerySchema, "query"),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { limit, offset, page } = parsePagination(
@@ -252,7 +257,7 @@ router.get(
 
 router.patch(
   "/team/:id",
-  authorize("Admin"),
+  authorizeModule("settings", "update"),
   validate(updateUserSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const user = await User.findByPk(req.params.id);
@@ -275,7 +280,7 @@ router.patch(
 
 router.get(
   "/task-rules",
-  authorize("Admin"),
+  authorizeModule("settings", "read"),
   asyncHandler(async (_req: AuthRequest, res: Response) => {
     const { getTaskRuleConfig } = await import("../matches/matchAutoTasks");
     sendSuccess(res, getTaskRuleConfig());
@@ -284,7 +289,7 @@ router.get(
 
 router.patch(
   "/task-rules",
-  authorize("Admin"),
+  authorizeModule("settings", "update"),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { updateTaskRuleConfig, saveTaskRuleConfigToDB, getTaskRuleConfig } =
       await import("../matches/matchAutoTasks");
@@ -311,7 +316,7 @@ const testConnectionSchema = z.object({
 
 router.post(
   "/integrations/test-connection",
-  authorize("Admin"),
+  authorizeModule("settings", "create"),
   validate(testConnectionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { getProvider, listProviders } = await import(
