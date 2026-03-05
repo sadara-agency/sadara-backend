@@ -19,10 +19,7 @@ import {
 } from "./contractTemplate.schema";
 import { transitionContract } from "./contract.transition.controller";
 import { generatePdf } from "./contract.pdf.controller";
-import {
-  fieldAccess,
-  CONTRACT_HIDDEN_FIELDS,
-} from "../../middleware/fieldAccess";
+import { dynamicFieldAccess } from "../../middleware/fieldAccess";
 
 const router = Router();
 router.use(authenticate);
@@ -56,7 +53,7 @@ router.get(
   "/",
   authorizeModule("contracts", "read"),
   validate(contractQuerySchema, "query"),
-  fieldAccess(CONTRACT_HIDDEN_FIELDS),
+  dynamicFieldAccess("contracts"),
   cacheRoute("contracts", CacheTTL.MEDIUM),
   asyncHandler(contractController.list),
 );
@@ -88,6 +85,7 @@ router.post(
 router.get(
   "/:id",
   authorizeModule("contracts", "read"),
+  dynamicFieldAccess("contracts"),
   cacheRoute("contracts", CacheTTL.MEDIUM),
   asyncHandler(contractController.getById),
 );

@@ -30,4 +30,20 @@ export const updatePermissionsSchema = z.object({
   }),
 });
 
+export const updateFieldPermissionsSchema = z.object({
+  body: z.object({
+    fieldPermissions: z
+      .array(
+        z.object({
+          role: z.enum(ROLES),
+          module: z.enum(MODULES),
+          field: z.string().min(1).max(100),
+          hidden: z.boolean(),
+        }),
+      )
+      .min(1)
+      .max(1000),
+  }),
+});
+
 export { ROLES, MODULES };

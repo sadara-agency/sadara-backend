@@ -16,10 +16,7 @@ import {
   valuationQuerySchema,
 } from "./finance.schema";
 import * as ctrl from "./finance.controller";
-import {
-  fieldAccess,
-  FINANCE_HIDDEN_FIELDS,
-} from "../../middleware/fieldAccess";
+import { dynamicFieldAccess } from "../../middleware/fieldAccess";
 
 const router = Router();
 router.use(authenticate);
@@ -33,10 +30,10 @@ router.get(
   "/invoices",
   authorizeModule("finance", "read"),
   validate(invoiceQuerySchema, "query"),
-  fieldAccess(FINANCE_HIDDEN_FIELDS),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listInvoices),
 );
-router.get("/invoices/:id", authorizeModule("finance", "read"), asyncHandler(ctrl.getInvoice));
+router.get("/invoices/:id", authorizeModule("finance", "read"), dynamicFieldAccess("finance"), asyncHandler(ctrl.getInvoice));
 router.post(
   "/invoices",
   authorizeModule("finance", "create"),
@@ -66,6 +63,7 @@ router.get(
   "/payments",
   authorizeModule("finance", "read"),
   validate(paymentQuerySchema, "query"),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listPayments),
 );
 router.post(
@@ -86,6 +84,7 @@ router.get(
   "/ledger",
   authorizeModule("finance", "read"),
   validate(ledgerQuerySchema, "query"),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listLedger),
 );
 router.post(

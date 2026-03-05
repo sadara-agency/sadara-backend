@@ -5,10 +5,7 @@ import { validate } from "../../middleware/validate";
 import { cacheRoute } from "../../middleware/cache.middleware";
 import { CacheTTL } from "../../shared/utils/cache";
 import { uploadSingle, verifyFileType } from "../../middleware/upload";
-import {
-  fieldAccess,
-  PLAYER_HIDDEN_FIELDS,
-} from "../../middleware/fieldAccess";
+import { dynamicFieldAccess } from "../../middleware/fieldAccess";
 import {
   createPlayerSchema,
   updatePlayerSchema,
@@ -24,7 +21,7 @@ router.get(
   "/",
   authorizeModule("players", "read"),
   validate(playerQuerySchema, "query"),
-  fieldAccess(PLAYER_HIDDEN_FIELDS),
+  dynamicFieldAccess("players"),
   cacheRoute("players", CacheTTL.MEDIUM),
   asyncHandler(playerController.list),
 );
@@ -32,7 +29,7 @@ router.get("/check-duplicate", authorizeModule("players", "read"), asyncHandler(
 router.get(
   "/:id",
   authorizeModule("players", "read"),
-  fieldAccess(PLAYER_HIDDEN_FIELDS),
+  dynamicFieldAccess("players"),
   cacheRoute("player", CacheTTL.MEDIUM),
   asyncHandler(playerController.getById),
 );
