@@ -10,6 +10,7 @@ import {
   notifyUser,
   cleanupOldNotifications,
 } from "../modules/notifications/notification.service";
+import { generatePreMatchTasks } from "../modules/matches/matchAutoTasks";
 
 // ── Job registry ──
 
@@ -286,10 +287,7 @@ async function checkDocumentExpiry() {
 // ══════════════════════════════════════════════════════════════
 
 async function checkUpcomingMatches() {
-  const twoDaysOut = new Date();
-  twoDaysOut.setDate(twoDaysOut.getDate() + 2);
-  const dateStr = twoDaysOut.toISOString().split("T")[0];
-
+  // Query matches in the next 1–7 days (covers all possible pre-match rule windows)
   const matches: any[] = await sequelize.query(
     `
     SELECT m.id, m.competition, m.match_date,
@@ -298,26 +296,47 @@ async function checkUpcomingMatches() {
     FROM matches m
     LEFT JOIN clubs hc ON hc.id = m.home_club_id
     LEFT JOIN clubs ac ON ac.id = m.away_club_id
-    WHERE m.status = 'Scheduled'
-      AND m.match_date::date = :matchDate
+    WHERE m.status IN ('upcoming', 'Scheduled')
+      AND m.match_date::date BETWEEN CURRENT_DATE + 1 AND CURRENT_DATE + 7
+    ORDER BY m.match_date ASC
   `,
-    { replacements: { matchDate: dateStr }, type: "SELECT" as any },
+    { type: "SELECT" as any },
   );
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  let totalPreMatchTasks = 0;
+
   for (const m of matches) {
-    await notifyByRole(["Admin", "Manager", "Analyst", "Scout", "Coach", "Media"], {
-      type: "match",
-      title: `Match in 2 days: ${m.home_team} vs ${m.away_team}`,
-      titleAr: `مباراة بعد يومين: ${m.home_team_ar || m.home_team} ضد ${m.away_team_ar || m.away_team}`,
-      body: `${m.competition || "Match"} on ${m.match_date}`,
-      link: `/dashboard/matches/${m.id}`,
-      sourceType: "match",
-      sourceId: m.id,
-      priority: "normal",
-    });
+    const matchDate = new Date(m.match_date);
+    matchDate.setHours(0, 0, 0, 0);
+    const daysUntil = Math.round((matchDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Generate pre-match auto-tasks based on days remaining
+    try {
+      const result = await generatePreMatchTasks(m.id, daysUntil);
+      totalPreMatchTasks += result.created;
+    } catch (err: any) {
+      logger.error(`[Cron] Pre-match tasks failed for match ${m.id}: ${err.message}`);
+    }
+
+    // Send notification for matches 2 days out (existing behavior)
+    if (daysUntil === 2) {
+      await notifyByRole(["Admin", "Manager", "Analyst", "Scout", "Coach", "Media"], {
+        type: "match",
+        title: `Match in 2 days: ${m.home_team} vs ${m.away_team}`,
+        titleAr: `مباراة بعد يومين: ${m.home_team_ar || m.home_team} ضد ${m.away_team_ar || m.away_team}`,
+        body: `${m.competition || "Match"} on ${m.match_date}`,
+        link: `/dashboard/matches/${m.id}`,
+        sourceType: "match",
+        sourceId: m.id,
+        priority: "normal",
+      });
+    }
   }
 
-  return { upcomingMatches: matches.length };
+  return { upcomingMatches: matches.length, preMatchTasksCreated: totalPreMatchTasks };
 }
 
 // ══════════════════════════════════════════════════════════════

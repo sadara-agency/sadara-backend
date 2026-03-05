@@ -34,6 +34,7 @@ export interface TaskRuleConfig {
 }
 
 export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
+  // Post-match rules (triggered when match completes / stats uploaded)
   red_card: { enabled: true, dueDays: 1 },
   yellow_cards_accumulated: { enabled: true, dueDays: 2, threshold: 2 },
   critical_performance: { enabled: true, dueDays: 1, threshold: 3.0 },
@@ -41,6 +42,10 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   injury_assessment: { enabled: true, dueDays: 1 },
   highlight_performance: { enabled: true, dueDays: 5, threshold: 8.0 },
   high_fouls: { enabled: true, dueDays: 3, threshold: 4 },
+  // Pre-match rules (triggered by cron X days before match)
+  pre_confirm_availability: { enabled: true, dueDays: 2 },
+  pre_tactical_report: { enabled: true, dueDays: 1 },
+  pre_travel_logistics: { enabled: true, dueDays: 3 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
@@ -422,6 +427,152 @@ export async function generateAutoTasks(
       } as any);
 
       createdRules.push(`injury_assessment:${player.id}`);
+    }
+  }
+
+  return { created: createdRules.length, rules: createdRules };
+}
+
+// ══════════════════════════════════════════════════════════════
+// Pre-Match Auto-Task Rules
+// ══════════════════════════════════════════════════════════════
+
+interface PreMatchRule {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: (ctx: PreMatchContext) => string;
+  descriptionAr: (ctx: PreMatchContext) => string;
+  priority: "low" | "medium" | "high" | "critical";
+}
+
+interface PreMatchContext {
+  playerName: string;
+  playerNameAr: string;
+  matchLabel: string;
+  matchDate: string;
+}
+
+const PRE_MATCH_RULES: PreMatchRule[] = [
+  {
+    id: "pre_confirm_availability",
+    titleEn: "Confirm player availability",
+    titleAr: "تأكيد جاهزية اللاعب",
+    descriptionEn: (ctx) =>
+      `Confirm ${ctx.playerName}'s fitness and availability for ${ctx.matchLabel} on ${ctx.matchDate}. Check with club medical and coaching staff.`,
+    descriptionAr: (ctx) =>
+      `تأكيد لياقة وجاهزية ${ctx.playerNameAr} لمباراة ${ctx.matchLabel} بتاريخ ${ctx.matchDate}. التحقق مع الطاقم الطبي والفني للنادي.`,
+    priority: "high",
+  },
+  {
+    id: "pre_tactical_report",
+    titleEn: "Prepare tactical match report",
+    titleAr: "إعداد التقرير التكتيكي للمباراة",
+    descriptionEn: (ctx) =>
+      `Prepare tactical analysis and match preview for ${ctx.playerName} ahead of ${ctx.matchLabel} on ${ctx.matchDate}.`,
+    descriptionAr: (ctx) =>
+      `إعداد التحليل التكتيكي ومعاينة المباراة لـ ${ctx.playerNameAr} قبل ${ctx.matchLabel} بتاريخ ${ctx.matchDate}.`,
+    priority: "medium",
+  },
+  {
+    id: "pre_travel_logistics",
+    titleEn: "Arrange match day logistics",
+    titleAr: "ترتيب لوجستيات يوم المباراة",
+    descriptionEn: (ctx) =>
+      `Arrange travel, accommodation, and match day logistics for ${ctx.playerName} for ${ctx.matchLabel} on ${ctx.matchDate}.`,
+    descriptionAr: (ctx) =>
+      `ترتيب السفر والإقامة ولوجستيات يوم المباراة لـ ${ctx.playerNameAr} لمباراة ${ctx.matchLabel} بتاريخ ${ctx.matchDate}.`,
+    priority: "medium",
+  },
+];
+
+/**
+ * Generate pre-match tasks for an upcoming match.
+ * Called by the cron scheduler for matches within the next 1-7 days.
+ * Only creates tasks for rules whose `dueDays` matches `daysUntilMatch`.
+ */
+export async function generatePreMatchTasks(
+  matchId: string,
+  daysUntilMatch: number,
+): Promise<{ created: number; rules: string[] }> {
+  // Find which pre-match rules fire at this day count
+  const config = getTaskRuleConfig();
+  const activeRules = PRE_MATCH_RULES.filter((rule) => {
+    const rc = config[rule.id];
+    return rc?.enabled && rc.dueDays === daysUntilMatch;
+  });
+
+  if (activeRules.length === 0) return { created: 0, rules: [] };
+
+  // Load match info
+  const match = await Match.findByPk(matchId, {
+    include: [
+      { model: Club, as: "homeClub", attributes: ["name", "nameAr"] },
+      { model: Club, as: "awayClub", attributes: ["name", "nameAr"] },
+    ],
+  });
+  if (!match) return { created: 0, rules: [] };
+
+  const homeClub = (match as any).homeClub;
+  const awayClub = (match as any).awayClub;
+  const matchLabel = `${homeClub?.name ?? "TBD"} vs ${awayClub?.name ?? "TBD"}`;
+  const matchDate = match.matchDate
+    ? new Date(match.matchDate).toISOString().split("T")[0]
+    : "TBD";
+
+  // Load all players assigned to this match
+  const matchPlayers = await MatchPlayer.findAll({
+    where: { matchId },
+    include: [
+      {
+        model: Player,
+        as: "player",
+        attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr"],
+      },
+    ],
+  });
+
+  const createdRules: string[] = [];
+
+  for (const mp of matchPlayers) {
+    const player = (mp as any).player;
+    if (!player) continue;
+
+    const playerName = `${player.firstName} ${player.lastName}`.trim();
+    const playerNameAr = player.firstNameAr
+      ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
+      : playerName;
+
+    const ctx: PreMatchContext = { playerName, playerNameAr, matchLabel, matchDate };
+
+    for (const rule of activeRules) {
+      // Duplicate prevention
+      const existing = await Task.findOne({
+        where: {
+          matchId,
+          playerId: player.id,
+          triggerRuleId: rule.id,
+          isAutoCreated: true,
+        },
+      });
+      if (existing) continue;
+
+      await Task.create({
+        title: rule.titleEn,
+        titleAr: rule.titleAr,
+        description: rule.descriptionEn(ctx),
+        type: "Match",
+        priority: rule.priority,
+        status: "Open",
+        playerId: player.id,
+        matchId,
+        isAutoCreated: true,
+        triggerRuleId: rule.id,
+        dueDate: matchDate,
+        notes: rule.descriptionAr(ctx),
+      } as any);
+
+      createdRules.push(`${rule.id}:${player.id}`);
     }
   }
 
