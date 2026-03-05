@@ -7,6 +7,7 @@ export type PaymentStatus = "Paid" | "Expected" | "Overdue" | "Cancelled";
 export type PaymentType = "Commission" | "Sponsorship" | "Bonus";
 export type ValuationTrend = "up" | "down" | "stable";
 export type LedgerSide = "Debit" | "Credit";
+export type ExpenseCategory = "Operational" | "Marketing" | "Travel" | "Staff" | "Legal" | "Other";
 
 // ══════════════════════════════════════════
 // INVOICE
@@ -342,5 +343,82 @@ Valuation.init(
     underscored: true,
     timestamps: true,
     updatedAt: false,
+  },
+);
+
+// ══════════════════════════════════════════
+// EXPENSE
+// ══════════════════════════════════════════
+
+export interface ExpenseAttributes {
+  id: string;
+  category: ExpenseCategory;
+  amount: number;
+  currency: string;
+  date: string;
+  description?: string | null;
+  playerId?: string | null;
+  createdBy?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface ExpenseCreation
+  extends Optional<
+    ExpenseAttributes,
+    "id" | "category" | "currency" | "createdAt" | "updatedAt"
+  > {}
+
+export class Expense
+  extends Model<ExpenseAttributes, ExpenseCreation>
+  implements ExpenseAttributes
+{
+  declare id: string;
+  declare category: ExpenseCategory;
+  declare amount: number;
+  declare currency: string;
+  declare date: string;
+  declare description: string | null;
+  declare playerId: string | null;
+  declare createdBy: string | null;
+  declare createdAt: Date;
+  declare updatedAt: Date;
+}
+
+Expense.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    category: {
+      type: DataTypes.ENUM(
+        "Operational",
+        "Marketing",
+        "Travel",
+        "Staff",
+        "Legal",
+        "Other",
+      ),
+      allowNull: false,
+      defaultValue: "Operational",
+    },
+    amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },
+    currency: { type: DataTypes.STRING(3), defaultValue: "SAR" },
+    date: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      defaultValue: DataTypes.NOW,
+    },
+    description: { type: DataTypes.TEXT },
+    playerId: { type: DataTypes.UUID, field: "player_id" },
+    createdBy: { type: DataTypes.UUID, field: "created_by" },
+  },
+  {
+    sequelize,
+    tableName: "expenses",
+    underscored: true,
+    timestamps: true,
   },
 );

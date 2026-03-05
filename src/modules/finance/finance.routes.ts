@@ -14,6 +14,10 @@ import {
   ledgerQuerySchema,
   createValuationSchema,
   valuationQuerySchema,
+  createExpenseSchema,
+  updateExpenseSchema,
+  expenseQuerySchema,
+  dashboardQuerySchema,
 } from "./finance.schema";
 import * as ctrl from "./finance.controller";
 import { dynamicFieldAccess } from "../../middleware/fieldAccess";
@@ -23,7 +27,7 @@ router.use(authenticate);
 
 // ── Summary & Dashboard ──
 router.get("/summary", authorizeModule("finance", "read"), asyncHandler(ctrl.summary));
-router.get("/dashboard", authorizeModule("finance", "read"), asyncHandler(ctrl.dashboard));
+router.get("/dashboard", authorizeModule("finance", "read"), validate(dashboardQuerySchema, "query"), asyncHandler(ctrl.dashboard));
 
 // ── Invoices ──
 router.get(
@@ -106,6 +110,31 @@ router.post(
   authorizeModule("finance", "create"),
   validate(createValuationSchema),
   asyncHandler(ctrl.createValuation),
+);
+
+// ── Expenses ──
+router.get(
+  "/expenses",
+  authorizeModule("finance", "read"),
+  validate(expenseQuerySchema, "query"),
+  asyncHandler(ctrl.listExpenses),
+);
+router.post(
+  "/expenses",
+  authorizeModule("finance", "create"),
+  validate(createExpenseSchema),
+  asyncHandler(ctrl.createExpense),
+);
+router.patch(
+  "/expenses/:id",
+  authorizeModule("finance", "update"),
+  validate(updateExpenseSchema),
+  asyncHandler(ctrl.updateExpense),
+);
+router.delete(
+  "/expenses/:id",
+  authorizeModule("finance", "delete"),
+  asyncHandler(ctrl.deleteExpense),
 );
 
 export default router;
