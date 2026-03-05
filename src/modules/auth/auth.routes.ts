@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
 import { authenticate, authorize } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
-import { authLimiter } from "../../middleware/rateLimiter";
+import { authLimiter, passwordResetLimiter } from "../../middleware/rateLimiter";
 import {
   registerSchema,
   loginSchema,
@@ -31,16 +31,19 @@ router.post(
 );
 router.post(
   "/forgot-password",
-  authLimiter,
+  passwordResetLimiter,
   validate(forgotPasswordSchema),
   asyncHandler(authController.forgotPassword),
 );
 router.post(
   "/reset-password",
-  authLimiter,
+  passwordResetLimiter,
   validate(resetPasswordSchema),
   asyncHandler(authController.resetPassword),
 );
+
+// ── Logout ──
+router.post("/logout", authenticate, asyncHandler(authController.logout));
 
 // ── Protected ──
 router.get("/me", authenticate, asyncHandler(authController.getProfile));

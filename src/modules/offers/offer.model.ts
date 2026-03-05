@@ -194,5 +194,11 @@ Offer.init(
     tableName: "offers",
     underscored: true,
     timestamps: true,
+    indexes: [
+      { fields: ["player_id"] },
+      { fields: ["from_club_id"] },
+      { fields: ["to_club_id"] },
+      { fields: ["status"] },
+    ],
   },
 );

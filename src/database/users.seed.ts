@@ -26,7 +26,7 @@ export async function seedUsers() {
         passwordHash: hash,
         fullName: "Faisal Al-Dosari",
         fullNameAr: "فيصل الدوسري",
-        role: "Agent",
+        role: "Manager",
         isActive: true,
       },
       {
@@ -57,9 +57,54 @@ export async function seedUsers() {
         isActive: true,
         playerId: IDS.players[0],
       },
+      {
+        id: IDS.users.legal,
+        email: "legal@sadara.com",
+        passwordHash: hash,
+        fullName: "Sara Al-Harbi",
+        fullNameAr: "سارة الحربي",
+        role: "Legal",
+        isActive: true,
+      },
+      {
+        id: IDS.users.finance,
+        email: "finance@sadara.com",
+        passwordHash: hash,
+        fullName: "Mohammed Al-Shehri",
+        fullNameAr: "محمد الشهري",
+        role: "Finance",
+        isActive: true,
+      },
+      {
+        id: IDS.users.coach,
+        email: "coach@sadara.com",
+        passwordHash: hash,
+        fullName: "Hassan Al-Mutairi",
+        fullNameAr: "حسن المطيري",
+        role: "Coach",
+        isActive: true,
+      },
+      {
+        id: IDS.users.media,
+        email: "media@sadara.com",
+        passwordHash: hash,
+        fullName: "Reem Al-Qahtani",
+        fullNameAr: "ريم القحطاني",
+        role: "Media",
+        isActive: true,
+      },
+      {
+        id: IDS.users.executive,
+        email: "executive@sadara.com",
+        passwordHash: hash,
+        fullName: "Turki Al-Faisal",
+        fullNameAr: "تركي الفيصل",
+        role: "Executive",
+        isActive: true,
+      },
     ],
     { ignoreDuplicates: true },
   );
 
-  console.log("✅ Users seeded (5 accounts — password: Sadara2025!)");
+  console.log("✅ Users seeded (10 accounts — password: Sadara2025!)");
 }

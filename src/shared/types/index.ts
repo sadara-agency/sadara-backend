@@ -1,7 +1,17 @@
 import { Request } from "express";
 
 // ── User Roles ──
-export type UserRole = "Admin" | "Manager" | "Analyst" | "Scout" | "Player";
+export type UserRole =
+  | "Admin"
+  | "Manager"
+  | "Analyst"
+  | "Scout"
+  | "Player"
+  | "Legal"
+  | "Finance"
+  | "Coach"
+  | "Media"
+  | "Executive";
 
 // ── Authenticated Request ──
 export interface AuthUser {

@@ -18,6 +18,10 @@ export interface MatchAttributes {
   referee?: string | null;
   broadcast?: string | null;
   notes?: string | null;
+  externalMatchId?: string | null;
+  homeTeamName?: string | null;
+  awayTeamName?: string | null;
+  providerSource?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -47,6 +51,10 @@ export class Match
   declare referee: string | null;
   declare broadcast: string | null;
   declare notes: string | null;
+  declare externalMatchId: string | null;
+  declare homeTeamName: string | null;
+  declare awayTeamName: string | null;
+  declare providerSource: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 
@@ -116,11 +124,33 @@ Match.init(
     notes: {
       type: DataTypes.TEXT,
     },
+    externalMatchId: {
+      type: DataTypes.STRING(100),
+      field: "external_match_id",
+    },
+    homeTeamName: {
+      type: DataTypes.STRING(255),
+      field: "home_team_name",
+    },
+    awayTeamName: {
+      type: DataTypes.STRING(255),
+      field: "away_team_name",
+    },
+    providerSource: {
+      type: DataTypes.STRING(50),
+      field: "provider_source",
+    },
   },
   {
     sequelize,
     tableName: "matches",
     underscored: true,
     timestamps: true,
+    indexes: [
+      { fields: ["external_match_id"] },
+      { fields: ["home_club_id"] },
+      { fields: ["away_club_id"] },
+      { fields: ["status"] },
+    ],
   },
 );

@@ -1,23 +1,19 @@
 import { Op } from "sequelize";
-import { Document } from "./document.model";
+import { Document, DocumentEntityType } from "./document.model";
 import { Player } from "../players/player.model";
+import { Contract } from "../contracts/contract.model";
+import { Match } from "../matches/match.model";
+import { Injury } from "../injuries/injury.model";
+import { Club } from "../clubs/club.model";
+import { Offer } from "../offers/offer.model";
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 
-const PLAYER_ATTRS = [
-  "id",
-  "firstName",
-  "lastName",
-  "firstNameAr",
-  "lastNameAr",
-  "photoUrl",
-] as const;
 const USER_ATTRS = ["id", "fullName"] as const;
 
 function docIncludes() {
   return [
-    { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
     { model: User, as: "uploader", attributes: [...USER_ATTRS] },
   ];
 }
@@ -25,6 +21,61 @@ function docIncludes() {
 /** Re-fetch with full includes. */
 async function refetchWithIncludes(id: string) {
   return Document.findByPk(id, { include: docIncludes() });
+}
+
+// ── Entity label resolution ──
+
+type EntityModel = typeof Player | typeof Contract | typeof Match | typeof Injury | typeof Club | typeof Offer;
+
+const ENTITY_MODELS: Record<DocumentEntityType, EntityModel> = {
+  Player: Player,
+  Contract: Contract,
+  Match: Match,
+  Injury: Injury,
+  Club: Club,
+  Offer: Offer,
+};
+
+/** Resolve a human-readable label for the given entity. */
+export async function resolveEntityLabel(
+  entityType: DocumentEntityType,
+  entityId: string,
+): Promise<string | null> {
+  switch (entityType) {
+    case "Player": {
+      const p = await Player.findByPk(entityId, { attributes: ["firstName", "lastName"] });
+      return p ? `${p.getDataValue("firstName")} ${p.getDataValue("lastName")}` : null;
+    }
+    case "Contract": {
+      const c = await Contract.findByPk(entityId, { attributes: ["id", "contractType"] });
+      return c ? `${c.getDataValue("contractType")} #${entityId.slice(0, 8)}` : null;
+    }
+    case "Match": {
+      const m = await Match.findByPk(entityId, { attributes: ["id", "matchDate"] });
+      return m ? `Match ${m.getDataValue("matchDate") || `#${entityId.slice(0, 8)}`}` : null;
+    }
+    case "Injury": {
+      const inj = await Injury.findByPk(entityId, { attributes: ["injuryType", "bodyPart"] });
+      return inj ? `${inj.getDataValue("injuryType")} - ${inj.getDataValue("bodyPart")}` : null;
+    }
+    case "Club": {
+      const cl = await Club.findByPk(entityId, { attributes: ["name"] });
+      return cl ? cl.getDataValue("name") : null;
+    }
+    case "Offer": {
+      const o = await Offer.findByPk(entityId, { attributes: ["id", "offerType"] });
+      return o ? `${o.getDataValue("offerType")} Offer #${entityId.slice(0, 8)}` : null;
+    }
+    default:
+      return null;
+  }
+}
+
+/** Validate that the entity exists. Throws 404 if not found. */
+async function validateEntity(entityType: DocumentEntityType, entityId: string) {
+  const Model = ENTITY_MODELS[entityType];
+  const exists = await (Model as any).findByPk(entityId, { attributes: ["id"] });
+  if (!exists) throw new AppError(`${entityType} not found`, 404);
 }
 
 // ── List ──
@@ -38,14 +89,14 @@ export async function listDocuments(queryParams: any) {
 
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.status) where.status = queryParams.status;
-  if (queryParams.playerId) where.playerId = queryParams.playerId;
+  if (queryParams.entityType) where.entityType = queryParams.entityType;
+  if (queryParams.entityId) where.entityId = queryParams.entityId;
 
   if (search) {
     where[Op.or] = [
       { name: { [Op.iLike]: `%${search}%` } },
       { notes: { [Op.iLike]: `%${search}%` } },
-      { "$player.first_name$": { [Op.iLike]: `%${search}%` } },
-      { "$player.last_name$": { [Op.iLike]: `%${search}%` } },
+      { entityLabel: { [Op.iLike]: `%${search}%` } },
     ];
   }
 
@@ -72,9 +123,13 @@ export async function getDocumentById(id: string) {
 // ── Create (with real file data) ──
 
 export async function createDocument(input: any, userId: string) {
-  if (input.playerId) {
-    const player = await Player.findByPk(input.playerId);
-    if (!player) throw new AppError("Player not found", 404);
+  // Validate linked entity if provided
+  if (input.entityType && input.entityId) {
+    await validateEntity(input.entityType, input.entityId);
+    // Resolve and denormalize the entity label
+    if (!input.entityLabel) {
+      input.entityLabel = await resolveEntityLabel(input.entityType, input.entityId);
+    }
   }
 
   const doc = await Document.create({ ...input, uploadedBy: userId });
@@ -86,6 +141,15 @@ export async function createDocument(input: any, userId: string) {
 export async function updateDocument(id: string, input: any) {
   const doc = await Document.findByPk(id);
   if (!doc) throw new AppError("Document not found", 404);
+
+  // If entity link is being changed, validate and resolve label
+  if (input.entityType && input.entityId) {
+    await validateEntity(input.entityType, input.entityId);
+    if (!input.entityLabel) {
+      input.entityLabel = await resolveEntityLabel(input.entityType, input.entityId);
+    }
+  }
+
   await doc.update(input);
   return refetchWithIncludes(id);
 }

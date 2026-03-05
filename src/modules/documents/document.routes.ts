@@ -24,7 +24,7 @@ router.get("/:id", asyncHandler(ctrl.getById));
 // Upload real file (multipart/form-data) — metadata in form fields
 router.post(
   "/upload",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Legal"),
   (req, res, next) => {
     uploadSingle(req, res, (err: any) => {
       if (err) {
@@ -44,7 +44,7 @@ router.post(
 // Create via JSON (external URL, no file upload)
 router.post(
   "/",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Legal"),
   validate(createDocumentSchema),
   asyncHandler(ctrl.create),
 );
@@ -52,7 +52,7 @@ router.post(
 // Update & delete
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(updateDocumentSchema),
   asyncHandler(ctrl.update),
 );

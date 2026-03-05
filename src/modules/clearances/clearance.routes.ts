@@ -21,18 +21,18 @@ router.use(authenticate);
 // GET    /api/v1/clearances          — List all clearances
 router.get(
   "/",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(clearanceQuerySchema, "query"),
   controller.list,
 );
 
 // GET    /api/v1/clearances/:id      — Get single clearance
-router.get("/:id", authorize("Admin", "Manager"), controller.getById);
+router.get("/:id", authorize("Admin", "Manager", "Legal"), controller.getById);
 
 // POST   /api/v1/clearances          — Create new clearance
 router.post(
   "/",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(createClearanceSchema),
   controller.create,
 );
@@ -40,7 +40,7 @@ router.post(
 // PUT    /api/v1/clearances/:id      — Update clearance
 router.put(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(updateClearanceSchema),
   controller.update,
 );
@@ -48,7 +48,7 @@ router.put(
 // POST   /api/v1/clearances/:id/complete — Sign & complete clearance
 router.post(
   "/:id/complete",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(completeClearanceSchema),
   controller.complete,
 );

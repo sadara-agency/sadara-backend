@@ -43,8 +43,8 @@ export async function upload(req: AuthRequest, res: Response) {
     fileUrl,
     fileSize: file.size,
     mimeType: file.mimetype,
-    playerId: body.playerId || null,
-    contractId: body.contractId || null,
+    entityType: body.entityType || null,
+    entityId: body.entityId || null,
     issueDate: body.issueDate || null,
     expiryDate: body.expiryDate || null,
     tags: body.tags

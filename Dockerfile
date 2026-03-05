@@ -1,6 +1,18 @@
+# ── Stage 1: Builder ──────────────────────────────────────
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+# ── Stage 2: Production ──────────────────────────────────
 FROM node:20-slim
 
-# Install Chrome dependencies + Arabic fonts
+# Install Chrome dependencies + Arabic fonts (for Puppeteer PDF generation)
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -26,29 +38,34 @@ RUN apt-get update && apt-get install -y \
     libxdamage1 \
     libxrandr2 \
     xdg-utils \
+    curl \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Tell Puppeteer to use system Chromium instead of downloading its own
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV NODE_ENV=production
+
+# Non-root user
+RUN groupadd -r sadara && useradd -r -g sadara -m sadara
 
 WORKDIR /app
 
-# Install ALL dependencies (including dev for TypeScript build)
+# Production dependencies only
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --omit=dev
 
-# Copy source & build
-COPY . .
-RUN npm run build
+# Copy compiled output from builder
+COPY --from=builder /app/dist ./dist
 
-# Remove dev dependencies after build
-RUN npm prune --omit=dev
+# Runtime directories
+RUN mkdir -p tmp uploads logs && chown -R sadara:sadara /app
 
-# Create tmp dir for PDF generation
-RUN mkdir -p /app/tmp
+USER sadara
 
 EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/api/health || exit 1
 
 CMD ["node", "dist/index.js"]

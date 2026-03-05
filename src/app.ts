@@ -2,6 +2,8 @@ import express from "express";
 import path from "path";
 import cors from "cors";
 import helmet from "helmet";
+import compression from "compression";
+import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import fs from "fs";
 import { env } from "./config/env";
@@ -9,6 +11,8 @@ import { errorHandler } from "./middleware/errorHandler";
 import { apiLimiter, authLimiter } from "./middleware/rateLimiter";
 import { authenticate } from "./middleware/auth";
 import { setupAssociations } from "./models/associations";
+import { sequelize } from "./config/database";
+import { isRedisConnected, getRedisClient } from "./config/redis";
 
 // Route imports
 import authRoutes from "./modules/auth/auth.routes";
@@ -37,6 +41,8 @@ import splRoutes from "./modules/spl/spl.routes";
 import noteRoutes from "./modules/notes/note.routes";
 import reportRoutes from "./modules/reports/report.routes";
 import approvalRoutes from "./modules/approvals/approval.routes";
+import gdprRoutes from "./modules/gdpr/gdpr.routes";
+import { setupSwagger } from "./config/swagger";
 
 const app = express();
 
@@ -47,6 +53,8 @@ if (env.nodeEnv === "production") {
 
 // ── Global Middleware ──
 app.use(helmet());
+app.use(compression());
+app.use(cookieParser());
 app.use(
   cors({
     origin(origin, callback) {
@@ -75,6 +83,8 @@ app.use(
       callback(new Error(`CORS: origin ${origin} not allowed`));
     },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );
 app.use(express.json({ limit: "1mb" }));
@@ -97,12 +107,35 @@ app.get("/uploads/documents/:filename", authenticate, (req, res) => {
 });
 
 // ── Health Check ──
-app.get("/api/health", (_req, res) => {
-  res.json({
-    status: "ok",
+app.get("/api/health", async (_req, res) => {
+  const checks: Record<string, "ok" | "error"> = {};
+
+  try {
+    await sequelize.authenticate();
+    checks.database = "ok";
+  } catch {
+    checks.database = "error";
+  }
+
+  try {
+    if (isRedisConnected()) {
+      await getRedisClient()!.ping();
+      checks.redis = "ok";
+    } else {
+      checks.redis = "error";
+    }
+  } catch {
+    checks.redis = "error";
+  }
+
+  const allOk = Object.values(checks).every((v) => v === "ok");
+
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? "ok" : "degraded",
     service: "sadara-api",
     version: "1.0.0",
     timestamp: new Date().toISOString(),
+    checks,
   });
 });
 
@@ -138,6 +171,10 @@ app.use("/api/v1/spl", splRoutes);
 app.use("/api/v1/notes", noteRoutes);
 app.use("/api/v1/reports", reportRoutes);
 app.use("/api/v1/approvals", approvalRoutes);
+app.use("/api/v1/gdpr", gdprRoutes);
+
+// ── Swagger UI ──
+setupSwagger(app);
 
 // ── 404 ──
 app.use((_req, res) => {

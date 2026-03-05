@@ -9,7 +9,10 @@
 import { z } from "zod";
 
 // ── Shared constants ──
-const USER_ROLES = ["Admin", "Manager", "Analyst", "Scout"] as const;
+const USER_ROLES = [
+  "Admin", "Manager", "Analyst", "Scout",
+  "Legal", "Finance", "Coach", "Media", "Executive",
+] as const;
 
 // ── Create User (Admin creates a new team member) ──
 export const createUserSchema = z.object({

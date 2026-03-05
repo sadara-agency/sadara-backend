@@ -7,6 +7,7 @@ import {
   notifyByRole,
 } from "../notifications/notification.service";
 import { logger } from "../../config/logger";
+import { AppError } from "../../middleware/errorHandler";
 
 const USER_ATTRS = ["id", "fullName", "role"] as const;
 
@@ -153,9 +154,9 @@ export async function resolveApproval(
   comment?: string,
 ) {
   const approval = await ApprovalRequest.findByPk(id);
-  if (!approval) throw new Error("Approval request not found");
+  if (!approval) throw new AppError("Approval request not found", 404);
   if (approval.status !== "Pending")
-    throw new Error("Approval already resolved");
+    throw new AppError("Approval already resolved", 409);
 
   await approval.update({
     status: decision,

@@ -17,9 +17,6 @@ import { sequelize } from "../config/database";
 import { env } from "../config/env";
 import { User } from "../modules/Users/user.model";
 
-// Schema
-import { createMissingTables, createViews } from "./schema";
-
 // Data seeders
 import { seedUsers } from "./users.seed";
 import { seedClubs } from "./clubs.seed";
@@ -48,9 +45,6 @@ export async function seedDatabase(): Promise<void> {
   }
 
   try {
-    // Ensure schema migrations run on every startup (e.g. new columns)
-    await createMissingTables();
-
     // Check if already seeded
     const existingAdmin = await User.findOne({
       where: { email: "admin@sadara.com" },
@@ -81,9 +75,6 @@ export async function seedDatabase(): Promise<void> {
     await seedPerformances();
     await seedMatchPlayers();
     await seedMatchStats();
-
-    // Views depend on data
-    await createViews();
 
     console.log("");
     console.log("🎉 Development seed complete!");

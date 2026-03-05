@@ -38,19 +38,19 @@ router.get(
 router.get("/invoices/:id", asyncHandler(ctrl.getInvoice));
 router.post(
   "/invoices",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Finance"),
   validate(createInvoiceSchema),
   asyncHandler(ctrl.createInvoice),
 );
 router.patch(
   "/invoices/:id",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Finance"),
   validate(updateInvoiceSchema),
   asyncHandler(ctrl.updateInvoice),
 );
 router.patch(
   "/invoices/:id/status",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Finance"),
   validate(updateInvoiceStatusSchema),
   asyncHandler(ctrl.updateInvoiceStatus),
 );
@@ -68,13 +68,13 @@ router.get(
 );
 router.post(
   "/payments",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Finance"),
   validate(createPaymentSchema),
   asyncHandler(ctrl.createPayment),
 );
 router.patch(
   "/payments/:id/status",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Finance"),
   validate(updatePaymentStatusSchema),
   asyncHandler(ctrl.updatePaymentStatus),
 );
@@ -87,7 +87,7 @@ router.get(
 );
 router.post(
   "/ledger",
-  authorize("Admin"),
+  authorize("Admin", "Finance"),
   validate(createLedgerEntrySchema),
   asyncHandler(ctrl.createLedgerEntry),
 );
@@ -100,7 +100,7 @@ router.get(
 );
 router.post(
   "/valuations",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Finance"),
   validate(createValuationSchema),
   asyncHandler(ctrl.createValuation),
 );

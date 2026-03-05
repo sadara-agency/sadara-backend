@@ -138,13 +138,13 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
 // ────────────────────────────────────────────────────────────
 export async function updateTaskStatus(
   id: string,
-  status: "Open" | "InProgress" | "Completed",
+  status: "Open" | "InProgress" | "Completed" | "Canceled",
 ) {
   const task = await Task.findByPk(id);
   if (!task) throw new AppError("Task not found", 404);
 
   // Auto-set or clear completedAt based on status
-  const completedAt = status === "Completed" ? new Date() : null;
+  const completedAt = (status === "Completed" || status === "Canceled") ? new Date() : null;
   await task.update({ status, completedAt });
 
   return getTaskById(id);

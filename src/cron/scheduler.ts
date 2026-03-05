@@ -83,7 +83,7 @@ async function checkContractExpiry() {
         ? `${c.first_name_ar} ${c.last_name_ar || ""}`.trim()
         : playerName;
 
-      await notifyByRole(["Admin", "Manager"], {
+      await notifyByRole(["Admin", "Manager", "Legal"], {
         type: "contract",
         title: `Contract expiring in ${t.label}: ${playerName}`,
         titleAr: `عقد ينتهي خلال ${t.labelAr}: ${playerNameAr}`,
@@ -133,7 +133,7 @@ async function checkInjuryFollowups() {
       ? `${inj.first_name_ar} ${inj.last_name_ar || ""}`.trim()
       : playerName;
 
-    await notifyByRole(["Admin", "Manager"], {
+    await notifyByRole(["Admin", "Manager", "Coach"], {
       type: "injury",
       title: `Overdue recovery: ${playerName} — ${inj.injury_type}`,
       titleAr: `تأخر تعافي: ${playerNameAr} — ${inj.injury_type}`,
@@ -189,7 +189,7 @@ async function checkPaymentDueDates() {
     const playerName = `${pm.first_name} ${pm.last_name}`.trim();
     const amount = `${Number(pm.amount).toLocaleString()} ${pm.currency}`;
 
-    await notifyByRole(["Admin", "Manager"], {
+    await notifyByRole(["Admin", "Manager", "Finance"], {
       type: "payment",
       title: `Payment due in 7 days: ${amount} — ${playerName}`,
       titleAr: `دفعة مستحقة خلال 7 أيام: ${amount} — ${playerName}`,
@@ -217,7 +217,7 @@ async function checkPaymentDueDates() {
     const playerName = `${pm.first_name} ${pm.last_name}`.trim();
     const amount = `${Number(pm.amount).toLocaleString()} ${pm.currency}`;
 
-    await notifyByRole(["Admin", "Manager"], {
+    await notifyByRole(["Admin", "Manager", "Finance"], {
       type: "payment",
       title: `OVERDUE payment: ${amount} — ${playerName}`,
       titleAr: `دفعة متأخرة: ${amount} — ${playerName}`,
@@ -265,7 +265,7 @@ async function checkDocumentExpiry() {
         : "";
       const context = playerName ? ` (${playerName})` : "";
 
-      await notifyByRole(["Admin", "Manager"], {
+      await notifyByRole(["Admin", "Manager", "Legal"], {
         type: "document",
         title: `Document expiring in ${t.days} days: ${doc.name}${context}`,
         titleAr: `مستند ينتهي خلال ${t.days} يوم: ${doc.name}${context}`,
@@ -305,7 +305,7 @@ async function checkUpcomingMatches() {
   );
 
   for (const m of matches) {
-    await notifyByRole(["Admin", "Manager", "Analyst", "Scout"], {
+    await notifyByRole(["Admin", "Manager", "Analyst", "Scout", "Coach", "Media"], {
       type: "match",
       title: `Match in 2 days: ${m.home_team} vs ${m.away_team}`,
       titleAr: `مباراة بعد يومين: ${m.home_team_ar || m.home_team} ضد ${m.away_team_ar || m.away_team}`,

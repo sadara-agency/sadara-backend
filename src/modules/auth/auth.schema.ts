@@ -20,7 +20,10 @@ export const inviteSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters"),
   fullName: z.string().min(2, "Full name is required"),
   fullNameAr: z.string().optional(),
-  role: z.enum(["Admin", "Manager", "Analyst", "Scout", "Player"]),
+  role: z.enum([
+    "Admin", "Manager", "Analyst", "Scout", "Player",
+    "Legal", "Finance", "Coach", "Media", "Executive",
+  ]),
 });
 
 // ── Profile Update ──

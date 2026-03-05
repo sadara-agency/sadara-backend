@@ -1,0 +1,194 @@
+/// <reference types="jest" />
+
+const mockTournamentFindOrCreate = jest.fn();
+const mockTournamentFindAndCountAll = jest.fn();
+const mockTournamentFindAll = jest.fn();
+const mockTournamentCount = jest.fn();
+
+const mockStandingFindAndCountAll = jest.fn();
+const mockStandingDestroy = jest.fn();
+const mockStandingBulkCreate = jest.fn();
+const mockStandingUpdate = jest.fn();
+const mockStandingCount = jest.fn();
+
+const mockFixtureFindAndCountAll = jest.fn();
+const mockFixtureDestroy = jest.fn();
+const mockFixtureBulkCreate = jest.fn();
+const mockFixtureUpdate = jest.fn();
+const mockFixtureCount = jest.fn();
+
+const mockTeamMapFindAndCountAll = jest.fn();
+const mockTeamMapFindOrCreate = jest.fn();
+const mockTeamMapFindAll = jest.fn();
+const mockTeamMapFindOne = jest.fn();
+const mockTeamMapCount = jest.fn();
+
+const mockClubFindByPk = jest.fn();
+const mockClubFindOrCreate = jest.fn();
+
+jest.mock('../../../src/config/database', () => ({
+  sequelize: { query: jest.fn(), authenticate: jest.fn(), transaction: jest.fn() },
+}));
+
+jest.mock('../../../src/modules/saff/saff.model', () => ({
+  SaffTournament: {
+    findOrCreate: (...a: unknown[]) => mockTournamentFindOrCreate(...a),
+    findAndCountAll: (...a: unknown[]) => mockTournamentFindAndCountAll(...a),
+    findAll: (...a: unknown[]) => mockTournamentFindAll(...a),
+    count: (...a: unknown[]) => mockTournamentCount(...a),
+  },
+  SaffStanding: {
+    findAndCountAll: (...a: unknown[]) => mockStandingFindAndCountAll(...a),
+    destroy: (...a: unknown[]) => mockStandingDestroy(...a),
+    bulkCreate: (...a: unknown[]) => mockStandingBulkCreate(...a),
+    update: (...a: unknown[]) => mockStandingUpdate(...a),
+    count: (...a: unknown[]) => mockStandingCount(...a),
+  },
+  SaffFixture: {
+    findAndCountAll: (...a: unknown[]) => mockFixtureFindAndCountAll(...a),
+    destroy: (...a: unknown[]) => mockFixtureDestroy(...a),
+    bulkCreate: (...a: unknown[]) => mockFixtureBulkCreate(...a),
+    update: (...a: unknown[]) => mockFixtureUpdate(...a),
+    count: (...a: unknown[]) => mockFixtureCount(...a),
+  },
+  SaffTeamMap: {
+    findAndCountAll: (...a: unknown[]) => mockTeamMapFindAndCountAll(...a),
+    findOrCreate: (...a: unknown[]) => mockTeamMapFindOrCreate(...a),
+    findAll: (...a: unknown[]) => mockTeamMapFindAll(...a),
+    findOne: (...a: unknown[]) => mockTeamMapFindOne(...a),
+    count: (...a: unknown[]) => mockTeamMapCount(...a),
+  },
+}));
+
+jest.mock('../../../src/modules/clubs/club.model', () => ({
+  Club: {
+    findByPk: (...a: unknown[]) => mockClubFindByPk(...a),
+    findOrCreate: (...a: unknown[]) => mockClubFindOrCreate(...a),
+    name: 'Club',
+  },
+}));
+jest.mock('../../../src/modules/matches/match.model', () => ({
+  Match: { findOne: jest.fn(), create: jest.fn(), name: 'Match' },
+}));
+jest.mock('../../../src/modules/saff/saff.scraper', () => ({
+  scrapeBatch: jest.fn(),
+  scrapeTeamLogos: jest.fn(),
+}));
+jest.mock('../../../src/config/logger', () => ({
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+}));
+
+import * as saffService from '../../../src/modules/saff/saff.service';
+
+describe('SAFF Service', () => {
+  beforeEach(() => { jest.clearAllMocks(); });
+
+  describe('seedTournaments', () => {
+    it('should seed tournaments', async () => {
+      mockTournamentFindOrCreate.mockResolvedValue([{}, true]);
+      const count = await saffService.seedTournaments();
+      expect(count).toBeGreaterThan(0);
+    });
+
+    it('should skip existing tournaments', async () => {
+      mockTournamentFindOrCreate.mockResolvedValue([{}, false]);
+      const count = await saffService.seedTournaments();
+      expect(count).toBe(0);
+    });
+  });
+
+  describe('listTournaments', () => {
+    it('should return paginated tournaments', async () => {
+      mockTournamentFindAndCountAll.mockResolvedValue({ count: 1, rows: [{ id: 't1', name: 'SPL' }] });
+      const result = await saffService.listTournaments({ page: 1, limit: 10 } as any);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should filter by category', async () => {
+      mockTournamentFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      await saffService.listTournaments({ category: 'pro', page: 1, limit: 10 } as any);
+      expect(mockTournamentFindAndCountAll).toHaveBeenCalled();
+    });
+
+    it('should apply search', async () => {
+      mockTournamentFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      await saffService.listTournaments({ search: 'Roshn', page: 1, limit: 10 } as any);
+      expect(mockTournamentFindAndCountAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('listStandings', () => {
+    it('should return paginated standings', async () => {
+      mockStandingFindAndCountAll.mockResolvedValue({ count: 1, rows: [{ position: 1, teamNameEn: 'Al Hilal' }] });
+      const result = await saffService.listStandings({ page: 1, limit: 20 } as any);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should filter by tournamentId', async () => {
+      mockStandingFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      await saffService.listStandings({ tournamentId: 't1', page: 1, limit: 20 } as any);
+      expect(mockStandingFindAndCountAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('listFixtures', () => {
+    it('should return paginated fixtures', async () => {
+      mockFixtureFindAndCountAll.mockResolvedValue({ count: 1, rows: [{ matchDate: '2024-01-01' }] });
+      const result = await saffService.listFixtures({ page: 1, limit: 20 } as any);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should filter by status', async () => {
+      mockFixtureFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      await saffService.listFixtures({ status: 'completed', page: 1, limit: 20 } as any);
+      expect(mockFixtureFindAndCountAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('listTeamMaps', () => {
+    it('should return team maps', async () => {
+      mockTeamMapFindAndCountAll.mockResolvedValue({ count: 1, rows: [{ saffTeamId: 1 }] });
+      const result = await saffService.listTeamMaps({ page: 1, limit: 20 } as any);
+      expect(result.data).toHaveLength(1);
+    });
+
+    it('should filter unmapped only', async () => {
+      mockTeamMapFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      await saffService.listTeamMaps({ unmappedOnly: true, page: 1, limit: 20 } as any);
+      expect(mockTeamMapFindAndCountAll).toHaveBeenCalled();
+    });
+  });
+
+  describe('mapTeamToClub', () => {
+    it('should map a SAFF team to a Sadara club', async () => {
+      const club = { id: 'club-001', name: 'Al Hilal', nameAr: 'الهلال' };
+      mockClubFindByPk.mockResolvedValue(club);
+      const teamMap = { id: 'tm-001', update: jest.fn().mockResolvedValue({}) };
+      mockTeamMapFindOrCreate.mockResolvedValue([teamMap, false]);
+      mockStandingUpdate.mockResolvedValue([1]);
+      mockFixtureUpdate.mockResolvedValue([1]);
+      const result = await saffService.mapTeamToClub({ saffTeamId: 123, season: '2024-2025', clubId: 'club-001' } as any);
+      expect(teamMap.update).toHaveBeenCalledWith({ clubId: 'club-001' });
+    });
+
+    it('should throw 404 if club not found', async () => {
+      mockClubFindByPk.mockResolvedValue(null);
+      await expect(saffService.mapTeamToClub({ saffTeamId: 123, season: '2024-2025', clubId: 'bad' } as any)).rejects.toThrow('Club not found');
+    });
+  });
+
+  describe('getStats', () => {
+    it('should return stats summary', async () => {
+      mockTournamentCount.mockResolvedValue(10);
+      mockStandingCount.mockResolvedValue(100);
+      mockFixtureCount.mockResolvedValue(200);
+      mockTeamMapCount
+        .mockResolvedValueOnce(50)
+        .mockResolvedValueOnce(5);
+      const result = await saffService.getStats();
+      expect(result).toHaveProperty('tournaments', 10);
+      expect(result).toHaveProperty('standings', 100);
+      expect(result).toHaveProperty('unmappedTeams', 5);
+    });
+  });
+});
