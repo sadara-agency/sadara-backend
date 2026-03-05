@@ -8,7 +8,11 @@ import { AppError } from "../../middleware/errorHandler";
 import * as contractService from "./contract.service";
 
 // ── Asset paths (brand template pages) ──
-const ASSETS_DIR = path.resolve(process.cwd(), "src", "assets", "pdf");
+// In production the compiled JS runs from dist/, so __dirname is dist/modules/contracts.
+// Assets are copied to dist/assets/pdf/ during build. Fall back to src/ for local dev.
+const ASSETS_DIR_DIST = path.resolve(__dirname, "..", "..", "assets", "pdf");
+const ASSETS_DIR_SRC = path.resolve(process.cwd(), "src", "assets", "pdf");
+const ASSETS_DIR = fs.existsSync(ASSETS_DIR_DIST) ? ASSETS_DIR_DIST : ASSETS_DIR_SRC;
 const COVER_PDF = path.join(ASSETS_DIR, "cover_page.pdf");
 const BACK_PDF = path.join(ASSETS_DIR, "back_page.pdf");
 
