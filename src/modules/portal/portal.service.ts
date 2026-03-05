@@ -225,7 +225,7 @@ export async function getMyDocuments(userId: string) {
   const playerId = getPlayerId(player);
 
   const documents = await Document.findAll({
-    where: { playerId },
+    where: { playerId } as any,
     include: [{ model: User, as: "uploader", attributes: ["id", "fullName"] }],
     order: [["createdAt", "DESC"]],
   });

@@ -1,35 +1,89 @@
+// src/index.ts
+
 import app from "./app";
 import { env } from "./config/env";
 import { testConnection, sequelize } from "./config/database";
-import chalk from "chalk";
-import gradient from "gradient-string";
 import { initRedis, closeRedis } from "./config/redis";
 import { seedDatabase } from "./database/seed";
-import { createMissingTables } from "./database/schema";
+import { migrator } from "./config/migrator";
 import { startSaffScheduler } from "./modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "./modules/matches/matchAutoTasks";
+import { registerProvider } from "./modules/integrations/matchAnalysis.service";
+import { WyscoutProvider } from "./modules/integrations/providers/wyscout";
+import chalk from "chalk";
+import gradient from "gradient-string";
+import { logger } from "./config/logger";
+import * as Sentry from "@sentry/node";
 
-async function bootstrap() {
-  try {
-    await testConnection();
-    await initRedis();
+// ── Sentry Error Tracking (opt-in via SENTRY_DSN) ──
+if (env.sentry?.dsn) {
+  Sentry.init({
+    dsn: env.sentry.dsn,
+    environment: env.nodeEnv,
+    tracesSampleRate: env.nodeEnv === "production" ? 0.1 : 1.0,
+  });
+  logger.info("Sentry error tracking initialized");
+}
 
-    // Schema migrations run in ALL environments (adds missing columns/tables)
-    await createMissingTables();
+// ─────────────────────────────────────────────
+// Phase 1 — Infrastructure
+// ─────────────────────────────────────────────
 
-    await seedDatabase();
+async function initInfrastructure(): Promise<void> {
+  await testConnection();
+  await initRedis();
+  await migrator.up();
+}
 
-    // Load configurable task automation rules from DB
-    await loadTaskRuleConfigFromDB();
+// ─────────────────────────────────────────────
+// Phase 2 — Application
+// ─────────────────────────────────────────────
 
-    // Start background jobs after DB/Redis are ready
-    startSaffScheduler();
-    startCronJobs();
+async function initApplication(): Promise<void> {
+  await seedDatabase();
+  await loadTaskRuleConfigFromDB();
+  registerProviders();
+}
 
-    app.listen(env.port, () => {
-      const sadaraGradient = gradient(["#3C3CFA", "#E4E5F3", "#11132B"]);
-      const logo = `
+function registerProviders(): void {
+  if (env.wyscout.apiKey) {
+    registerProvider(
+      new WyscoutProvider(env.wyscout.apiKey, env.wyscout.baseUrl),
+    );
+    logger.info("Wyscout match analysis provider registered");
+  }
+}
+
+// ─────────────────────────────────────────────
+// Phase 3 — Background Jobs
+// ─────────────────────────────────────────────
+
+function startSchedulers(): void {
+  startSaffScheduler();
+  startCronJobs();
+}
+
+// ─────────────────────────────────────────────
+// Phase 4 — HTTP Server
+// ─────────────────────────────────────────────
+
+function startServer(): Promise<void> {
+  return new Promise((resolve) => {
+    const server = app.listen(env.port, () => {
+      printBanner();
+      resolve();
+    });
+    server.timeout = 30000;
+    server.keepAliveTimeout = 65000;
+  });
+}
+
+// ─────────────────────────────────────────────
+// Banner
+// ─────────────────────────────────────────────
+
+const LOGO = `
    ███████╗ █████╗ ██████╗  █████╗ ██████╗  █████╗ 
    ██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔══██╗██╔══██╗
    ███████╗███████║██║  ██║███████║██████╔╝███████║
@@ -37,50 +91,55 @@ async function bootstrap() {
    ███████║██║  ██║██████╔╝██║  ██║██║  ██║██║  ██║
    ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝`;
 
-      console.log(sadaraGradient(logo));
-      console.log(chalk.gray(`  ${"━".repeat(54)}`));
+const sadaraGradient = gradient(["#3C3CFA", "#E4E5F3", "#11132B"]);
+const DIVIDER = chalk.gray(`  ${"━".repeat(54)}`);
 
-      console.log(
-        `  ${chalk.white.bold("🛰️  SYSTEM STATUS:")} ${chalk.greenBright("OPERATIONAL")}`,
-      );
+function printBanner(): void {
+  const isProd = env.nodeEnv === "production";
+  const envColor = isProd ? chalk.redBright.bold : chalk.cyanBright.bold;
+  const envIcon = isProd ? "🔥" : "🛠️";
 
-      console.log(
-        `  ${chalk.white.bold("🌐 NETWORK:")}      ${chalk.blue.underline(`http://localhost:${env.port}`)}`,
-      );
+  console.log(sadaraGradient(LOGO));
+  console.log(DIVIDER);
+  console.log(`  ${chalk.white.bold("🛰️  SYSTEM STATUS:")} ${chalk.greenBright("OPERATIONAL")}`);
+  console.log(`  ${chalk.white.bold("🌐 NETWORK:")}      ${chalk.blue.underline(`http://localhost:${env.port}`)}`);
+  console.log(`  ${chalk.white.bold("🩺 HEALTH:")}       ${chalk.blue.underline(`http://localhost:${env.port}/api/health`)}`);
+  console.log(`  ${chalk.white.bold("🏗️  ENVIRONMENT:")}  ${envColor(env.nodeEnv.toUpperCase())} ${envIcon}`);
 
-      console.log(
-        `  ${chalk.white.bold("🩺 HEALTH:")}       ${chalk.blue.underline(`http://localhost:${env.port}/api/health`)}`,
-      );
+  if (isProd) {
+    console.log(chalk.red("  ⚠️  WARNING: RUNNING IN PRODUCTION MODE"));
+  }
 
-      // Define a color theme based on the environment
-      const isProd = env.nodeEnv === "production";
-      const envColor = isProd ? chalk.redBright.bold : chalk.cyanBright.bold;
-      const statusBullet = isProd ? "🔥" : "🛠️";
+  console.log(DIVIDER);
+  console.log(
+    chalk.gray(`  [${new Date().toLocaleTimeString()}] `) +
+      sadaraGradient("Sadara Engine v1.0.0 is warmed up..."),
+  );
+  console.log("");
+}
 
-      console.log(
-        `  ${chalk.white.bold("🏗️  ENVIRONMENT:")}  ${envColor(env.nodeEnv.toUpperCase())} ${statusBullet}`,
-      );
+// ─────────────────────────────────────────────
+// Entrypoint
+// ─────────────────────────────────────────────
 
-      if (isProd) {
-        console.log(chalk.red("  ⚠️  WARNING: RUNNING IN PRODUCTION MODE"));
-      }
-
-      console.log(chalk.gray(`  ${"━".repeat(54)}`));
-      console.log(
-        chalk.gray(`  [${new Date().toLocaleTimeString()}] `) +
-          sadaraGradient("Sadara Engine v1.0.0 is warmed up..."),
-      );
-      console.log("");
-    });
+async function bootstrap(): Promise<void> {
+  try {
+    await initInfrastructure();
+    await initApplication();
+    startSchedulers();
+    await startServer();
   } catch (err) {
-    console.error("❌ Failed to start    server:", err);
+    logger.error("Failed to start server", { error: err });
     process.exit(1);
   }
 }
 
-// Graceful shutdown
-async function shutdown() {
-  console.log("🛑 Shutting down...");
+// ─────────────────────────────────────────────
+// Graceful Shutdown
+// ─────────────────────────────────────────────
+
+async function shutdown(): Promise<void> {
+  logger.info("Shutting down...");
   await closeRedis();
   await sequelize.close();
   process.exit(0);
@@ -88,5 +147,18 @@ async function shutdown() {
 
 process.on("SIGTERM", shutdown);
 process.on("SIGINT", shutdown);
+
+process.on("unhandledRejection", (reason: unknown) => {
+  logger.error("Unhandled Rejection", {
+    error: reason instanceof Error ? reason.message : String(reason),
+    stack: reason instanceof Error ? reason.stack : undefined,
+  });
+  if (env.nodeEnv === "production") shutdown();
+});
+
+process.on("uncaughtException", (err: Error) => {
+  logger.error("Uncaught Exception", { error: err.message, stack: err.stack });
+  process.exit(1);
+});
 
 bootstrap();

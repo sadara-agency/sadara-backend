@@ -39,7 +39,10 @@ const teamQuerySchema = z.object({
 const updateUserSchema = z.object({
   fullName: z.string().min(1).max(255).optional(),
   fullNameAr: z.string().max(255).optional(),
-  role: z.enum(["Admin", "Manager", "Analyst", "Scout", "Player"]).optional(),
+  role: z.enum([
+    "Admin", "Manager", "Analyst", "Scout", "Player",
+    "Legal", "Finance", "Coach", "Media", "Executive",
+  ]).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -295,6 +298,53 @@ router.patch(
       "Task automation rules updated",
     );
     sendSuccess(res, getTaskRuleConfig(), "Task rules updated");
+  }),
+);
+
+// ══════════════════════════════════════════
+// INTEGRATIONS (test connection — Admin only)
+// ══════════════════════════════════════════
+
+const testConnectionSchema = z.object({
+  provider: z.string().min(1),
+});
+
+router.post(
+  "/integrations/test-connection",
+  authorize("Admin"),
+  validate(testConnectionSchema),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { getProvider, listProviders } = await import(
+      "../integrations/matchAnalysis.service"
+    );
+    const { provider: providerName } = req.body;
+    const provider = getProvider(providerName);
+
+    if (!provider) {
+      sendSuccess(res, {
+        connected: false,
+        provider: providerName,
+        message: `Provider "${providerName}" is not configured. Available: ${listProviders().join(", ") || "none"}`,
+      });
+      return;
+    }
+
+    try {
+      const connected = await provider.testConnection();
+      sendSuccess(res, {
+        connected,
+        provider: providerName,
+        message: connected
+          ? `${providerName} connection successful`
+          : `${providerName} connection failed — check your API key`,
+      });
+    } catch (err: any) {
+      sendSuccess(res, {
+        connected: false,
+        provider: providerName,
+        message: err.message || "Connection test failed",
+      });
+    }
   }),
 );
 

@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { z } from "zod";
+import { logger } from "./logger";
 
 // Load environment-specific .env file
 const nodeEnv = process.env.NODE_ENV || "development";
@@ -58,21 +59,27 @@ const envSchema = z.object({
   ENCRYPTION_KEY: isProduction
     ? z.string().min(32, "ENCRYPTION_KEY must be ≥32 chars in production")
     : z.string().default("sadara-dev-encryption-key-DO-NOT-USE-IN-PROD"),
+
+  // Wyscout Match Analysis (optional)
+  WYSCOUT_API_KEY: z.string().default(""),
+  WYSCOUT_BASE_URL: z.string().default("https://apirest.wyscout.com/v3"),
+
+  // Sentry error tracking (optional)
+  SENTRY_DSN: z.string().url().optional(),
 });
 
 // ── Parse & Validate ──
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error("❌ Invalid environment variables:");
-  for (const issue of parsed.error.issues) {
-    console.error(`   ${issue.path.join(".")}: ${issue.message}`);
-  }
+  logger.error("Invalid environment variables", {
+    issues: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+  });
   // In production, crash immediately — don't start with bad config
   if (isProduction) {
     process.exit(1);
   }
-  console.warn("⚠️  Continuing with defaults in development mode...");
+  logger.warn("Continuing with defaults in development mode");
 }
 
 const validated = parsed.success
@@ -129,6 +136,15 @@ export const env = {
 
   encryption: {
     key: validated.ENCRYPTION_KEY,
+  },
+
+  wyscout: {
+    apiKey: validated.WYSCOUT_API_KEY,
+    baseUrl: validated.WYSCOUT_BASE_URL,
+  },
+
+  sentry: {
+    dsn: validated.SENTRY_DSN,
   },
 
   pagination: {

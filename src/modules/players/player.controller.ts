@@ -131,7 +131,10 @@ export async function removeProvider(req: AuthRequest, res: Response) {
 
 export async function refreshStats(req: AuthRequest, res: Response) {
   const { provider, dateFrom, dateTo } = req.body;
-  const { refreshPlayerStats } =
+  if (!provider) {
+    throw new AppError("provider is required in request body", 400);
+  }
+  const { syncPlayerMatches } =
     await import("../integrations/matchAnalysis.service");
   // Look up external ID from player providers
   const providers = await playerService.getPlayerProviders(req.params.id);
@@ -139,8 +142,9 @@ export async function refreshStats(req: AuthRequest, res: Response) {
   if (!mapping) {
     throw new AppError(`No ${provider} mapping found for this player`, 400);
   }
-  const matches = await refreshPlayerStats(
+  const result = await syncPlayerMatches(
     provider,
+    req.params.id,
     mapping.externalPlayerId,
     dateFrom,
     dateTo,
@@ -150,7 +154,13 @@ export async function refreshStats(req: AuthRequest, res: Response) {
     "players",
     req.params.id,
     buildAuditContext(req.user!, req.ip),
-    `Refreshed stats from ${provider}: ${matches.length} matches imported`,
+    `Synced stats from ${provider}: ${result.imported} new, ${result.updated} updated matches`,
   );
-  sendSuccess(res, { imported: matches.length, matches });
+  await invalidateMultiple([
+    CachePrefix.PLAYERS,
+    CachePrefix.PLAYER,
+    CachePrefix.MATCHES,
+    CachePrefix.DASHBOARD,
+  ]);
+  sendSuccess(res, result);
 }

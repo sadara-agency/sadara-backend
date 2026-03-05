@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import * as Sentry from "@sentry/node";
 import { env } from "../config/env";
 import { logger } from "../config/logger";
 
@@ -43,6 +44,10 @@ export function errorHandler(
     path: req.path,
     method: req.method,
     body: env.nodeEnv === "development" ? req.body : undefined,
+  });
+
+  Sentry.captureException(err, {
+    extra: { path: req.path, method: req.method },
   });
 
   res.status(500).json({

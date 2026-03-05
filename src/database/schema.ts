@@ -188,6 +188,61 @@ export async function createMissingTables() {
     );
   }
 
+  // Add 'Canceled' to tasks status enum if missing
+  const [taskEnumCheck] = await sequelize.query(
+    `SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
+     WHERE t.typname = 'enum_tasks_status' AND e.enumlabel = 'Canceled'`,
+    { type: QueryTypes.SELECT },
+  ).catch(() => [[]]); // table may not exist yet
+  const taskTypeExists = await sequelize.query(
+    `SELECT 1 FROM pg_type WHERE typname = 'enum_tasks_status'`,
+    { type: QueryTypes.SELECT },
+  ).catch(() => []);
+  if (taskTypeExists.length > 0 && !taskEnumCheck) {
+    await sequelize.query(
+      `ALTER TYPE enum_tasks_status ADD VALUE IF NOT EXISTS 'Canceled'`,
+    );
+  }
+
+  // ── Document polymorphic columns migration ──
+  // Add entity_type, entity_id, entity_label columns; backfill from player_id/contract_id
+  const [docTableCheck] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'documents'`,
+    { type: QueryTypes.SELECT },
+  ).catch(() => [[]]);
+
+  if (docTableCheck) {
+    // Add new columns if missing
+    await sequelize.query(`
+      DO $$ BEGIN
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'documents' AND column_name = 'entity_type') THEN
+          ALTER TABLE documents ADD COLUMN entity_type VARCHAR(50);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'documents' AND column_name = 'entity_id') THEN
+          ALTER TABLE documents ADD COLUMN entity_id UUID;
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+          WHERE table_name = 'documents' AND column_name = 'entity_label') THEN
+          ALTER TABLE documents ADD COLUMN entity_label VARCHAR(500);
+        END IF;
+      END $$;
+    `).catch(() => {});
+
+    // Backfill from player_id → entity_type='Player', entity_id=player_id
+    await sequelize.query(`
+      UPDATE documents SET entity_type = 'Player', entity_id = player_id
+      WHERE player_id IS NOT NULL AND entity_type IS NULL
+    `).catch(() => {});
+
+    // Backfill from contract_id → entity_type='Contract', entity_id=contract_id
+    await sequelize.query(`
+      UPDATE documents SET entity_type = 'Contract', entity_id = contract_id
+      WHERE contract_id IS NOT NULL AND entity_type IS NULL
+    `).catch(() => {});
+  }
+
   // ── Notes ──
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS notes (
@@ -302,6 +357,22 @@ export async function createMissingTables() {
         );
     `);
 
+  // ── Add external match mapping columns to matches (Match Analysis Provider integration) ──
+  const matchExtCols = [
+    { col: "external_match_id", type: "VARCHAR(100)" },
+    { col: "home_team_name", type: "VARCHAR(255)" },
+    { col: "away_team_name", type: "VARCHAR(255)" },
+    { col: "provider_source", type: "VARCHAR(50)" },
+  ];
+  for (const { col, type } of matchExtCols) {
+    await sequelize.query(
+      `DO $$ BEGIN
+              ALTER TABLE matches ADD COLUMN ${col} ${type};
+          EXCEPTION WHEN duplicate_column THEN NULL;
+          END $$;`,
+    );
+  }
+
   // ── Performance indexes on frequently queried foreign keys ──
   const indexes = [
     "CREATE INDEX IF NOT EXISTS idx_contracts_player_id ON contracts(player_id)",
@@ -322,7 +393,7 @@ export async function createMissingTables() {
     "CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status)",
     "CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date)",
     "CREATE INDEX IF NOT EXISTS idx_invoices_player_id ON invoices(player_id)",
-    "CREATE INDEX IF NOT EXISTS idx_documents_player_id ON documents(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_documents_entity ON documents(entity_type, entity_id)",
     "CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(user_id, is_read)",
     "CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id)",
@@ -331,6 +402,7 @@ export async function createMissingTables() {
     "CREATE INDEX IF NOT EXISTS idx_player_club_history_player ON player_club_history(player_id)",
     "CREATE INDEX IF NOT EXISTS idx_technical_reports_player ON technical_reports(player_id)",
     "CREATE INDEX IF NOT EXISTS idx_match_analyses_match ON match_analyses(match_id)",
+    "CREATE INDEX IF NOT EXISTS idx_matches_external_match_id ON matches(external_match_id)",
   ];
 
   for (const sql of indexes) {

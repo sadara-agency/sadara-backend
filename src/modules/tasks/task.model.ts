@@ -8,7 +8,7 @@ interface TaskAttributes {
   titleAr: string | null;
   description: string | null;
   type: "Match" | "Contract" | "Health" | "Report" | "Offer" | "General";
-  status: "Open" | "InProgress" | "Completed";
+  status: "Open" | "InProgress" | "Completed" | "Canceled";
   priority: "low" | "medium" | "high" | "critical";
   assignedTo: string | null;
   assignedBy: string | null;
@@ -61,7 +61,7 @@ export class Task
     | "Report"
     | "Offer"
     | "General";
-  declare status: "Open" | "InProgress" | "Completed";
+  declare status: "Open" | "InProgress" | "Completed" | "Canceled";
   declare priority: "low" | "medium" | "high" | "critical";
   declare assignedTo: string | null;
   declare assignedBy: string | null;
@@ -105,7 +105,7 @@ Task.init(
       defaultValue: "General",
     },
     status: {
-      type: DataTypes.ENUM("Open", "InProgress", "Completed"),
+      type: DataTypes.ENUM("Open", "InProgress", "Completed", "Canceled"),
       defaultValue: "Open",
     },
     priority: {
@@ -158,5 +158,11 @@ Task.init(
     tableName: "tasks",
     underscored: true,
     timestamps: true,
+    indexes: [
+      { fields: ["player_id"] },
+      { fields: ["assigned_to"] },
+      { fields: ["status"] },
+      { fields: ["match_id"] },
+    ],
   },
 );

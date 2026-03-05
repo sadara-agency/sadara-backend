@@ -34,7 +34,7 @@ router.get(
 // ── Write ──
 router.post(
   "/",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(createContractSchema),
   asyncHandler(contractController.create),
 );
@@ -43,13 +43,13 @@ router.post(
 router.get("/:id/pdf", asyncHandler(generatePdf));
 router.post(
   "/:id/transition",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(transitionStatusSchema),
   asyncHandler(transitionContract),
 );
 router.post(
   "/:id/terminate",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(terminateContractSchema),
   asyncHandler(contractController.terminate),
 );
@@ -62,7 +62,7 @@ router.get(
 );
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Legal"),
   validate(updateContractSchema),
   asyncHandler(contractController.update),
 );

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { AuthRequest } from "../../shared/types";
 import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { COOKIE_NAME, COOKIE_OPTIONS, CLEAR_COOKIE_OPTIONS } from "../../shared/utils/cookie";
 import * as authService from "./auth.service";
 
 // ── Public Register (no token returned, account inactive) ──
@@ -48,6 +49,10 @@ export async function login(req: Request, res: Response) {
     ip: req.ip,
   });
 
+  // Set httpOnly cookie for browser clients
+  res.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
+
+  // Still return token in body for non-browser clients (mobile, API)
   sendSuccess(res, result, "Login successful");
 }
 
@@ -98,4 +103,20 @@ export async function resetPassword(req: Request, res: Response) {
     req.body.newPassword,
   );
   sendSuccess(res, result);
+}
+
+// ── Logout (clears httpOnly cookie) ──
+export async function logout(req: AuthRequest, res: Response) {
+  res.clearCookie(COOKIE_NAME, CLEAR_COOKIE_OPTIONS);
+
+  if (req.user) {
+    await logAudit("LOGOUT", "users", req.user.id, {
+      userId: req.user.id,
+      userName: req.user.fullName,
+      userRole: req.user.role as any,
+      ip: req.ip,
+    });
+  }
+
+  sendSuccess(res, null, "Logged out successfully");
 }

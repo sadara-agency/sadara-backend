@@ -143,9 +143,7 @@ export function setupAssociations() {
   Valuation.belongsTo(Player, { foreignKey: "playerId", as: "player" });
   Player.hasMany(Valuation, { foreignKey: "playerId", as: "valuations" });
 
-  // Document
-  Document.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  Player.hasMany(Document, { foreignKey: "playerId", as: "documents" });
+  // Document (polymorphic via entityType + entityId — no direct FK associations)
   Document.belongsTo(User, { foreignKey: "uploadedBy", as: "uploader" });
 
   // Clearance

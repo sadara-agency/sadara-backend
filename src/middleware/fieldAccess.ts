@@ -83,26 +83,26 @@ function removeKeys(obj: any, fields: string[]): void {
 
 // ── Pre-built configs for common entities ──
 
-/** Fields hidden from Scout and Player roles on player endpoints */
+/** Fields hidden from roles that should not see player contact info */
 export const PLAYER_HIDDEN_FIELDS: HiddenFieldsConfig = {
-  phone: ["Scout", "Player"],
-  email: ["Scout", "Player"],
-  guardianPhone: ["Scout", "Player"],
-  guardianName: ["Scout", "Player"],
+  phone: ["Scout", "Player", "Finance", "Media", "Executive"],
+  email: ["Scout", "Player", "Finance", "Media", "Executive"],
+  guardianPhone: ["Scout", "Player", "Finance", "Media", "Executive"],
+  guardianName: ["Scout", "Player", "Finance", "Media", "Executive"],
 };
 
-/** Fields hidden from non-Admin/Manager on contract endpoints */
+/** Fields hidden from roles that should not see contract financial details */
 export const CONTRACT_HIDDEN_FIELDS: HiddenFieldsConfig = {
-  baseSalary: ["Scout", "Player", "Analyst"],
-  commissionPct: ["Scout", "Player", "Analyst"],
-  totalCommission: ["Scout", "Player", "Analyst"],
-  signingBonus: ["Scout", "Player", "Analyst"],
-  releaseClause: ["Scout", "Player"],
+  baseSalary: ["Scout", "Player", "Analyst", "Coach", "Media", "Executive"],
+  commissionPct: ["Scout", "Player", "Analyst", "Legal", "Coach", "Media", "Executive"],
+  totalCommission: ["Scout", "Player", "Analyst", "Legal", "Coach", "Media", "Executive"],
+  signingBonus: ["Scout", "Player", "Analyst", "Coach", "Media", "Executive"],
+  releaseClause: ["Scout", "Player", "Coach", "Media"],
 };
 
-/** Fields hidden from non-Admin on finance endpoints */
+/** Fields hidden from roles that should not see invoice/payment amounts */
 export const FINANCE_HIDDEN_FIELDS: HiddenFieldsConfig = {
-  amount: ["Scout", "Player"],
-  taxAmount: ["Scout", "Player"],
-  totalAmount: ["Scout", "Player"],
+  amount: ["Scout", "Player", "Coach", "Media"],
+  taxAmount: ["Scout", "Player", "Coach", "Media"],
+  totalAmount: ["Scout", "Player", "Coach", "Media"],
 };

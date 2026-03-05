@@ -9,10 +9,18 @@ const docTypes = [
   "Other",
 ] as const;
 const docStatuses = ["Active", "Valid", "Pending", "Expired"] as const;
+const entityTypes = [
+  "Player",
+  "Contract",
+  "Match",
+  "Injury",
+  "Club",
+  "Offer",
+] as const;
 
 export const createDocumentSchema = z.object({
-  playerId: z.string().uuid().optional(),
-  contractId: z.string().uuid().optional(),
+  entityType: z.enum(entityTypes).optional(),
+  entityId: z.string().uuid().optional(),
   name: z.string().min(1).max(500),
   type: z.enum(docTypes).default("Other"),
   status: z.enum(docStatuses).default("Active"),
@@ -26,6 +34,8 @@ export const createDocumentSchema = z.object({
 });
 
 export const updateDocumentSchema = z.object({
+  entityType: z.enum(entityTypes).nullable().optional(),
+  entityId: z.string().uuid().nullable().optional(),
   name: z.string().min(1).max(500).optional(),
   type: z.enum(docTypes).optional(),
   status: z.enum(docStatuses).optional(),
@@ -48,7 +58,8 @@ export const documentQuerySchema = z.object({
   search: z.string().optional(),
   type: z.enum(docTypes).optional(),
   status: z.enum(docStatuses).optional(),
-  playerId: z.string().uuid().optional(),
+  entityType: z.enum(entityTypes).optional(),
+  entityId: z.string().uuid().optional(),
 });
 
 export type CreateDocumentInput = z.infer<typeof createDocumentSchema>;

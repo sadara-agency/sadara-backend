@@ -9,11 +9,19 @@ export type DocumentType =
   | "Agreement"
   | "Other";
 export type DocumentStatus = "Active" | "Valid" | "Pending" | "Expired";
+export type DocumentEntityType =
+  | "Player"
+  | "Contract"
+  | "Match"
+  | "Injury"
+  | "Club"
+  | "Offer";
 
 export interface DocumentAttributes {
   id: string;
-  playerId?: string | null;
-  contractId?: string | null;
+  entityType?: DocumentEntityType | null;
+  entityId?: string | null;
+  entityLabel?: string | null;
   name: string;
   type: DocumentType;
   status: DocumentStatus;
@@ -39,8 +47,9 @@ export class Document
   implements DocumentAttributes
 {
   declare id: string;
-  declare playerId: string | null;
-  declare contractId: string | null;
+  declare entityType: DocumentEntityType | null;
+  declare entityId: string | null;
+  declare entityLabel: string | null;
   declare name: string;
   declare type: DocumentType;
   declare status: DocumentStatus;
@@ -63,8 +72,12 @@ Document.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    playerId: { type: DataTypes.UUID, field: "player_id" },
-    contractId: { type: DataTypes.UUID, field: "contract_id" },
+    entityType: {
+      type: DataTypes.ENUM("Player", "Contract", "Match", "Injury", "Club", "Offer"),
+      field: "entity_type",
+    },
+    entityId: { type: DataTypes.UUID, field: "entity_id" },
+    entityLabel: { type: DataTypes.STRING(500), field: "entity_label" },
     name: { type: DataTypes.STRING(500), allowNull: false },
     type: {
       type: DataTypes.ENUM(

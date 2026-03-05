@@ -1,5 +1,6 @@
 import { createClient, RedisClientType } from "redis";
 import { env } from "./env";
+import { logger } from "./logger";
 
 // ═══════════════════════════════════════════════════════════
 // Redis Client — Singleton with Graceful Fallback
@@ -10,8 +11,8 @@ let isConnected = false;
 
 export async function initRedis(): Promise<RedisClientType | null> {
   if (!env.redis.url) {
-    console.warn(
-      "⚠️  REDIS_URL not configured — caching disabled, using in-memory fallback",
+    logger.warn(
+      "REDIS_URL not configured — caching disabled, using in-memory fallback",
     );
     return null;
   }
@@ -27,7 +28,7 @@ export async function initRedis(): Promise<RedisClientType | null> {
         ...(isTLS ? { tls: true as const } : {}),
         reconnectStrategy: (retries) => {
           if (retries > 10) {
-            console.error("❌ Redis max reconnection attempts reached");
+            logger.error("Redis max reconnection attempts reached");
             return new Error("Redis max retries");
           }
           return Math.min(retries * 200, 3000);
@@ -36,29 +37,29 @@ export async function initRedis(): Promise<RedisClientType | null> {
     });
 
     redisClient.on("connect", () => {
-      console.log("🔄 Redis connecting...");
+      logger.info("Redis connecting...");
     });
 
     redisClient.on("ready", () => {
       isConnected = true;
-      console.log("✅ Redis connected and ready");
+      logger.info("Redis connected and ready");
     });
 
     redisClient.on("error", (err) => {
-      console.error("❌ Redis error:", err.message);
+      logger.error("Redis error", { error: err.message });
       isConnected = false;
     });
 
     redisClient.on("end", () => {
       isConnected = false;
-      console.log("🔌 Redis disconnected");
+      logger.info("Redis disconnected");
     });
 
     await redisClient.connect();
     return redisClient;
   } catch (err: any) {
-    console.error("❌ Redis initialization failed:", err.message);
-    console.warn("⚠️  Continuing without Redis — caching disabled");
+    logger.error("Redis initialization failed", { error: err.message });
+    logger.warn("Continuing without Redis — caching disabled");
     redisClient = null;
     return null;
   }
@@ -77,6 +78,6 @@ export async function closeRedis(): Promise<void> {
     await redisClient.quit();
     redisClient = null;
     isConnected = false;
-    console.log("🔌 Redis connection closed");
+    logger.info("Redis connection closed");
   }
 }

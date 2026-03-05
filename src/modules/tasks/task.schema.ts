@@ -17,7 +17,7 @@ const TASK_TYPES = [
   "Offer",
   "General",
 ] as const;
-const TASK_STATUSES = ["Open", "InProgress", "Completed"] as const;
+const TASK_STATUSES = ["Open", "InProgress", "Completed", "Canceled"] as const;
 const TASK_PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
 // ── Create Task ──
@@ -61,7 +61,7 @@ export const updateTaskSchema = z.object({
 export const updateStatusSchema = z.object({
   status: z.enum(TASK_STATUSES, {
     errorMap: () => ({
-      message: "Status must be Open, InProgress, or Completed",
+      message: "Status must be Open, InProgress, Completed, or Canceled",
     }),
   }),
 });

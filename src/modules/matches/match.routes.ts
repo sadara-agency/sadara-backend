@@ -45,25 +45,25 @@ router.get("/", validate(matchQuerySchema, "query"), asyncHandler(ctrl.list));
 router.get("/:id", asyncHandler(ctrl.getById));
 router.post(
   "/",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   validate(createMatchSchema),
   asyncHandler(ctrl.create),
 );
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   validate(updateMatchSchema),
   asyncHandler(ctrl.update),
 );
 router.patch(
   "/:id/score",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Coach"),
   validate(updateScoreSchema),
   asyncHandler(ctrl.updateScore),
 );
 router.patch(
   "/:id/status",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   validate(updateMatchStatusSchema),
   asyncHandler(ctrl.updateStatus),
 );
@@ -73,19 +73,19 @@ router.delete("/:id", authorize("Admin"), asyncHandler(ctrl.remove));
 router.get("/:id/players", asyncHandler(ctrl.getPlayers));
 router.post(
   "/:id/players",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   validate(assignPlayersSchema),
   asyncHandler(ctrl.assignPlayers),
 );
 router.patch(
   "/:id/players/:playerId",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   validate(updateMatchPlayerSchema),
   asyncHandler(ctrl.updatePlayer),
 );
 router.delete(
   "/:id/players/:playerId",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   asyncHandler(ctrl.removePlayer),
 );
 
@@ -93,13 +93,13 @@ router.delete(
 router.get("/:id/stats", asyncHandler(ctrl.getStats));
 router.post(
   "/:id/stats",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Coach"),
   validate(bulkStatsSchema),
   asyncHandler(ctrl.upsertStats),
 );
 router.patch(
   "/:id/stats/:playerId",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Coach"),
   validate(updateStatsSchema),
   asyncHandler(ctrl.updatePlayerStats),
 );
@@ -114,13 +114,13 @@ router.get("/:id/analysis", asyncHandler(ctrl.listAnalyses));
 router.get("/:id/analysis/:analysisId", asyncHandler(ctrl.getAnalysis));
 router.post(
   "/:id/analysis",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Coach"),
   validate(createMatchAnalysisSchema),
   asyncHandler(ctrl.createAnalysis),
 );
 router.patch(
   "/:id/analysis/:analysisId",
-  authorize("Admin", "Manager", "Analyst"),
+  authorize("Admin", "Manager", "Analyst", "Coach"),
   validate(updateMatchAnalysisSchema),
   asyncHandler(ctrl.updateAnalysis),
 );

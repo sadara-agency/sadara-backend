@@ -46,7 +46,7 @@ router.patch(
 
 router.get(
   "/admin/completion-matrix",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   asyncHandler(ctrl.completionMatrix),
 );
 
@@ -65,7 +65,7 @@ router.patch(
 );
 router.delete(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorize("Admin", "Manager", "Coach"),
   asyncHandler(ctrl.deleteCourse),
 );
 

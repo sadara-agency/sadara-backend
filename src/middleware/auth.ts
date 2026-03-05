@@ -3,6 +3,21 @@ import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 import { AuthRequest, AuthUser, UserRole } from "../shared/types";
 import { sendUnauthorized, sendForbidden } from "../shared/utils/apiResponse";
+import { COOKIE_NAME } from "../shared/utils/cookie";
+
+/** Extract token from cookie (browser) or Authorization header (API clients). */
+function extractToken(req: AuthRequest): string | undefined {
+  // 1. httpOnly cookie (browser clients)
+  if (req.cookies?.[COOKIE_NAME]) {
+    return req.cookies[COOKIE_NAME];
+  }
+  // 2. Authorization header (mobile/API clients)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+  return undefined;
+}
 
 // ── Verify JWT Token ──
 export function authenticate(
@@ -10,14 +25,12 @@ export function authenticate(
   res: Response,
   next: NextFunction,
 ): void {
-  const authHeader = req.headers.authorization;
+  const token = extractToken(req);
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  if (!token) {
     sendUnauthorized(res, "No token provided");
     return;
   }
-
-  const token = authHeader.split(" ")[1];
 
   try {
     const decoded = jwt.verify(token, env.jwt.secret) as AuthUser;
@@ -58,11 +71,10 @@ export function optionalAuth(
   _res: Response,
   next: NextFunction,
 ): void {
-  const authHeader = req.headers.authorization;
+  const token = extractToken(req);
 
-  if (authHeader?.startsWith("Bearer ")) {
+  if (token) {
     try {
-      const token = authHeader.split(" ")[1];
       req.user = jwt.verify(token, env.jwt.secret) as AuthUser;
     } catch {
       // Ignore invalid tokens for optional auth

@@ -181,6 +181,11 @@ Player.init(
     tableName: "players",
     underscored: true,
     timestamps: true,
+    indexes: [
+      { fields: ["current_club_id"] },
+      { fields: ["agent_id"] },
+      { fields: ["status"] },
+    ],
   },
 );
 

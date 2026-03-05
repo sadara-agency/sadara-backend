@@ -6,6 +6,7 @@ import { User } from "../Users/user.model";
 import { sequelize } from "../../config/database";
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/errorHandler";
+import { logger } from "../../config/logger";
 import { RegisterInput, LoginInput, InviteInput } from "./auth.schema";
 import {
   sendPasswordResetEmail,
@@ -53,7 +54,7 @@ export async function register(input: RegisterInput) {
 
   // Send welcome email (non-blocking — don't fail registration if email fails)
   sendWelcomeEmail(user.email, user.fullName || user.fullNameAr || "").catch(
-    () => {},
+    (err) => logger.warn("Failed to send welcome email", { email: user.email, error: (err as Error).message }),
   );
 
   return { user: safe };
@@ -298,7 +299,7 @@ export async function changePassword(
     sendPasswordChangedEmail(
       user.email,
       user.fullName || user.fullNameAr || "",
-    ).catch(() => {});
+    ).catch((err) => logger.warn("Failed to send email", { error: (err as Error).message }));
     return { message: "Password changed successfully" };
   }
 
@@ -324,7 +325,7 @@ export async function changePassword(
     { replacements: { hash: newHash, id: userId }, type: QueryTypes.UPDATE },
   );
 
-  sendPasswordChangedEmail(accounts[0].email, "").catch(() => {});
+  sendPasswordChangedEmail(accounts[0].email, "").catch((err) => logger.warn("Failed to send email", { error: (err as Error).message }));
   return { message: "Password changed successfully" };
 }
 
@@ -399,7 +400,7 @@ export async function resetPassword(token: string, newPassword: string) {
   sendPasswordChangedEmail(
     user.email,
     user.fullName || user.fullNameAr || "",
-  ).catch(() => {});
+  ).catch((err) => logger.warn("Failed to send email", { error: (err as Error).message }));
 
   return { message: "Password reset successfully. You can now log in." };
 }

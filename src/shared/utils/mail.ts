@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { env } from "../../config/env";
+import { logger } from "../../config/logger";
 
 function escapeHtml(str: string): string {
   return str
@@ -21,7 +22,7 @@ function getTransporter(): nodemailer.Transporter | null {
 
   // If SMTP is not configured, return null (will fall back to console)
   if (!env.smtp.host || !env.smtp.user) {
-    console.warn("⚠️  SMTP not configured — emails will be logged to console");
+    logger.warn("SMTP not configured — emails will be logged to console");
     return null;
   }
 
@@ -46,9 +47,9 @@ function getTransporter(): nodemailer.Transporter | null {
   // Verify connection on first use
   _transporter
     .verify()
-    .then(() => console.log("✅ SMTP connection verified"))
+    .then(() => logger.info("SMTP connection verified"))
     .catch((err) => {
-      console.error("❌ SMTP connection failed:", err.message);
+      logger.error("SMTP connection failed", { error: err.message });
       _transporter = null;
     });
 
@@ -70,13 +71,12 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
   const transporter = getTransporter();
 
   if (!transporter) {
-    // Fallback: log to console in dev mode
-    console.log("═══════════════════════════════════════════════");
-    console.log("📧 EMAIL (SMTP not configured — logged to console)");
-    console.log(`   To:      ${options.to}`);
-    console.log(`   Subject: ${options.subject}`);
-    if (options.text) console.log(`   Body:    ${options.text}`);
-    console.log("═══════════════════════════════════════════════");
+    // Fallback: log via logger in dev mode
+    logger.info("Email (SMTP not configured)", {
+      to: options.to,
+      subject: options.subject,
+      ...(options.text && { body: options.text }),
+    });
     return false;
   }
 
@@ -89,12 +89,10 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
       text: options.text,
     });
 
-    console.log(
-      `✅ Email sent to ${options.to} — messageId: ${info.messageId}`,
-    );
+    logger.info("Email sent", { to: options.to, messageId: info.messageId });
     return true;
   } catch (err: any) {
-    console.error(`❌ Failed to send email to ${options.to}:`, err.message);
+    logger.error("Failed to send email", { to: options.to, error: err.message });
     return false;
   }
 }

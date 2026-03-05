@@ -330,6 +330,12 @@ Contract.init(
     tableName: "contracts",
     underscored: true,
     timestamps: true,
+    indexes: [
+      { fields: ["player_id"] },
+      { fields: ["club_id"] },
+      { fields: ["status"] },
+      { fields: ["end_date"] },
+    ],
   },
 );
 
