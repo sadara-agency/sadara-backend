@@ -64,6 +64,9 @@ const envSchema = z.object({
   WYSCOUT_API_KEY: z.string().default(""),
   WYSCOUT_BASE_URL: z.string().default("https://apirest.wyscout.com/v3"),
 
+  // Sportmonks Fixtures API (optional)
+  SPORTMONKS_API_TOKEN: z.string().default(""),
+
   // Sentry error tracking (optional)
   SENTRY_DSN: z.string().url().optional(),
 });
@@ -141,6 +144,10 @@ export const env = {
   wyscout: {
     apiKey: validated.WYSCOUT_API_KEY,
     baseUrl: validated.WYSCOUT_BASE_URL,
+  },
+
+  sportmonks: {
+    apiToken: validated.SPORTMONKS_API_TOKEN,
   },
 
   sentry: {

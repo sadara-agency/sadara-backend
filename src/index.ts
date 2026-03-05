@@ -10,6 +10,7 @@ import { startSaffScheduler } from "./modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "./modules/matches/matchAutoTasks";
 import { loadPermissions } from "./modules/permissions/permission.service";
+import { ensureSportmonksColumn } from "./modules/sportmonks/sportmonks.service";
 import { registerProvider } from "./modules/integrations/matchAnalysis.service";
 import { WyscoutProvider } from "./modules/integrations/providers/wyscout";
 import chalk from "chalk";
@@ -47,6 +48,7 @@ async function initApplication(): Promise<void> {
   await seedDatabase();
   await loadPermissions();
   await loadTaskRuleConfigFromDB();
+  await ensureSportmonksColumn();
   registerProviders();
 }
 
