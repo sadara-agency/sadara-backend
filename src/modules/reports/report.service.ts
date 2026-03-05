@@ -540,6 +540,85 @@ export async function getScoutingPipelineReport(filters: ReportFilters) {
   return { summary, prospects };
 }
 
+// ── Upcoming Matches & Tasks Report ──
+export async function getUpcomingMatchesTasksReport(filters: ReportFilters) {
+  const clauses: string[] = [
+    "(m.status = 'upcoming' OR m.match_date >= CURRENT_DATE)",
+  ];
+  const binds: any[] = [];
+  let idx = 1;
+  if (filters.dateFrom) {
+    clauses.push(`m.match_date >= $${idx++}`);
+    binds.push(filters.dateFrom);
+  }
+  if (filters.dateTo) {
+    clauses.push(`m.match_date <= $${idx++}`);
+    binds.push(filters.dateTo);
+  }
+  if (filters.clubId) {
+    clauses.push(`(m.home_club_id = $${idx} OR m.away_club_id = $${idx})`);
+    binds.push(filters.clubId);
+    idx++;
+  }
+  const whereClause = clauses.join(" AND ");
+
+  const matches = await sequelize.query<any>(
+    `SELECT m.id, m.match_date, m.competition, m.venue, m.status,
+            hc.name AS home_club, hc.name_ar AS home_club_ar,
+            ac.name AS away_club, ac.name_ar AS away_club_ar,
+            (SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id = m.id) AS total_tasks,
+            (SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id = m.id AND t.status = 'Completed') AS completed_tasks,
+            (SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id = m.id AND t.status IN ('Open', 'InProgress')) AS open_tasks,
+            (SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id = m.id AND t.status != 'Completed' AND t.status != 'Canceled' AND t.due_date < CURRENT_DATE) AS overdue_tasks,
+            CASE
+              WHEN (SELECT COUNT(*) FROM tasks t WHERE t.match_id = m.id) = 0 THEN 0
+              ELSE ROUND((SELECT COUNT(*)::NUMERIC FROM tasks t WHERE t.match_id = m.id AND t.status = 'Completed') * 100.0 / (SELECT COUNT(*) FROM tasks t WHERE t.match_id = m.id), 1)
+            END AS completion_rate
+     FROM matches m
+     LEFT JOIN clubs hc ON m.home_club_id = hc.id
+     LEFT JOIN clubs ac ON m.away_club_id = ac.id
+     WHERE ${whereClause}
+     ORDER BY m.match_date ASC`,
+    { bind: binds, type: QueryTypes.SELECT },
+  );
+
+  const matchIds = matches.map((m: any) => m.id);
+
+  const tasks = matchIds.length > 0
+    ? await sequelize.query<any>(
+        `SELECT t.title, t.type, t.priority, t.status, t.due_date, t.is_auto_created,
+                u.full_name AS assigned_to_name,
+                COALESCE(p.first_name || ' ' || p.last_name, '') AS player_name,
+                COALESCE(hc.name, m.home_team_name, '') || ' vs ' || COALESCE(ac.name, m.away_team_name, '') || ' (' || TO_CHAR(m.match_date, 'YYYY-MM-DD') || ')' AS match_label
+         FROM tasks t
+         LEFT JOIN users u ON t.assigned_to = u.id
+         LEFT JOIN players p ON t.player_id = p.id
+         LEFT JOIN matches m ON t.match_id = m.id
+         LEFT JOIN clubs hc ON m.home_club_id = hc.id
+         LEFT JOIN clubs ac ON m.away_club_id = ac.id
+         WHERE t.match_id = ANY($1::UUID[])
+         ORDER BY t.due_date ASC NULLS LAST, t.priority DESC`,
+        { bind: [matchIds], type: QueryTypes.SELECT },
+      )
+    : [];
+
+  const [summary] = await sequelize.query<any>(
+    `SELECT
+       (SELECT COUNT(*)::INT FROM matches m WHERE ${whereClause}) AS total_upcoming_matches,
+       COALESCE((SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause})), 0) AS total_tasks,
+       COALESCE((SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause}) AND t.status = 'Completed'), 0) AS completed_tasks,
+       COALESCE((SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause}) AND t.status IN ('Open', 'InProgress')), 0) AS pending_tasks,
+       COALESCE((SELECT COUNT(*)::INT FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause}) AND t.status != 'Completed' AND t.status != 'Canceled' AND t.due_date < CURRENT_DATE), 0) AS overdue_tasks,
+       CASE
+         WHEN (SELECT COUNT(*) FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause})) = 0 THEN 0
+         ELSE ROUND((SELECT COUNT(*)::NUMERIC FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause}) AND t.status = 'Completed') * 100.0 / (SELECT COUNT(*) FROM tasks t WHERE t.match_id IN (SELECT m.id FROM matches m WHERE ${whereClause})), 1)
+       END AS avg_completion_rate`,
+    { bind: binds, type: QueryTypes.SELECT },
+  );
+
+  return { summary, matches, tasks };
+}
+
 // ── Expiring Contracts Report ──
 export async function getExpiringContractsReport(filters: ReportFilters) {
   const window = Math.min(Math.max(Number(filters.expiryWindow) || 90, 1), 365);

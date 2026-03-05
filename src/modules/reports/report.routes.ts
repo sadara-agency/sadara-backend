@@ -14,6 +14,7 @@ router.get("/contract-commission", authorizeModule("reports", "read"), asyncHand
 router.get("/injury-summary", authorizeModule("reports", "read"), asyncHandler(ctrl.injurySummary));
 router.get("/match-tasks", authorizeModule("reports", "read"), asyncHandler(ctrl.matchTasks));
 router.get("/financial-summary", authorizeModule("reports", "read"), asyncHandler(ctrl.financialSummary));
+router.get("/upcoming-matches-tasks", authorizeModule("reports", "read"), asyncHandler(ctrl.upcomingMatchesTasks));
 router.get("/scouting-pipeline", authorizeModule("reports", "read"), asyncHandler(ctrl.scoutingPipeline));
 router.get("/expiring-contracts", authorizeModule("reports", "read"), asyncHandler(ctrl.expiringContracts));
 
