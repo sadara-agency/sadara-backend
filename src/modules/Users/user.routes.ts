@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createUserSchema,
@@ -26,35 +26,35 @@ router.use(authenticate);
 // ── Read ──
 router.get(
   "/",
-  authorize("Admin", "Manager"),
+  authorizeModule("settings", "read"),
   validate(userQuerySchema, "query"),
   asyncHandler(userController.list),
 );
 router.get(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorizeModule("settings", "read"),
   asyncHandler(userController.getById),
 );
 
-// ── Write (Admin only) ──
+// ── Write ──
 router.post(
   "/",
-  authorize("Admin"),
+  authorizeModule("settings", "create"),
   validate(createUserSchema),
   asyncHandler(userController.create),
 );
 router.patch(
   "/:id",
-  authorize("Admin"),
+  authorizeModule("settings", "update"),
   validate(updateUserSchema),
   asyncHandler(userController.update),
 );
 router.post(
   "/:id/reset-password",
-  authorize("Admin"),
+  authorizeModule("settings", "update"),
   validate(resetPasswordSchema),
   asyncHandler(userController.resetPassword),
 );
-router.delete("/:id", authorize("Admin"), asyncHandler(userController.remove));
+router.delete("/:id", authorizeModule("settings", "delete"), asyncHandler(userController.remove));
 
 export default router;

@@ -4,6 +4,7 @@ import { env } from "../config/env";
 import { AuthRequest, AuthUser, UserRole } from "../shared/types";
 import { sendUnauthorized, sendForbidden } from "../shared/utils/apiResponse";
 import { COOKIE_NAME } from "../shared/utils/cookie";
+import { hasPermission, CrudAction } from "../modules/permissions/permission.service";
 
 /** Extract token from cookie (browser) or Authorization header (API clients). */
 function extractToken(req: AuthRequest): string | undefined {
@@ -57,6 +58,31 @@ export function authorize(...allowedRoles: UserRole[]) {
       sendForbidden(
         res,
         `Role '${req.user.role}' does not have access to this resource`,
+      );
+      return;
+    }
+
+    next();
+  };
+}
+
+// ── Dynamic module-level authorization (DB-driven) ──
+export function authorizeModule(module: string, action: CrudAction) {
+  return async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
+    if (!req.user) {
+      sendUnauthorized(res);
+      return;
+    }
+
+    const allowed = await hasPermission(req.user.role, module, action);
+    if (!allowed) {
+      sendForbidden(
+        res,
+        `Role '${req.user.role}' does not have '${action}' access to '${module}'`,
       );
       return;
     }

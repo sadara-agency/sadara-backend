@@ -19,6 +19,9 @@ interface ApprovalRequestAttributes {
   dueDate: string | null;
   resolvedBy: string | null;
   resolvedAt: Date | null;
+  currentStep: number;
+  totalSteps: number;
+  templateId: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -35,6 +38,9 @@ interface ApprovalRequestCreation
     | "dueDate"
     | "resolvedBy"
     | "resolvedAt"
+    | "currentStep"
+    | "totalSteps"
+    | "templateId"
     | "createdAt"
     | "updatedAt"
   > {}
@@ -57,6 +63,9 @@ export class ApprovalRequest
   declare dueDate: string | null;
   declare resolvedBy: string | null;
   declare resolvedAt: Date | null;
+  declare currentStep: number;
+  declare totalSteps: number;
+  declare templateId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -122,6 +131,22 @@ ApprovalRequest.init(
     resolvedAt: {
       type: DataTypes.DATE,
       field: "resolved_at",
+    },
+    currentStep: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      field: "current_step",
+    },
+    totalSteps: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 1,
+      field: "total_steps",
+    },
+    templateId: {
+      type: DataTypes.UUID,
+      field: "template_id",
     },
   },
   {

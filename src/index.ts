@@ -9,12 +9,14 @@ import { migrator } from "./config/migrator";
 import { startSaffScheduler } from "./modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "./modules/matches/matchAutoTasks";
+import { loadPermissions } from "./modules/permissions/permission.service";
 import { registerProvider } from "./modules/integrations/matchAnalysis.service";
 import { WyscoutProvider } from "./modules/integrations/providers/wyscout";
 import chalk from "chalk";
 import gradient from "gradient-string";
 import { logger } from "./config/logger";
 import * as Sentry from "@sentry/node";
+import { initSSESubscriber, closeSSESubscriber } from "./modules/notifications/notification.sse";
 
 // ── Sentry Error Tracking (opt-in via SENTRY_DSN) ──
 if (env.sentry?.dsn) {
@@ -33,6 +35,7 @@ if (env.sentry?.dsn) {
 async function initInfrastructure(): Promise<void> {
   await testConnection();
   await initRedis();
+  await initSSESubscriber();
   await migrator.up();
 }
 
@@ -42,6 +45,7 @@ async function initInfrastructure(): Promise<void> {
 
 async function initApplication(): Promise<void> {
   await seedDatabase();
+  await loadPermissions();
   await loadTaskRuleConfigFromDB();
   registerProviders();
 }
@@ -140,6 +144,7 @@ async function bootstrap(): Promise<void> {
 
 async function shutdown(): Promise<void> {
   logger.info("Shutting down...");
+  await closeSSESubscriber();
   await closeRedis();
   await sequelize.close();
   process.exit(0);

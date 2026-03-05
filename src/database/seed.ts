@@ -37,10 +37,26 @@ import {
   seedReferrals,
   seedScouting,
 } from "./operations.seed";
+import { seedPermissions } from "./permissions.seed";
+import { seedApprovalChains } from "./approvalChains.seed";
 
 export async function seedDatabase(): Promise<void> {
+  // Permissions must always be seeded (all environments)
+  try {
+    await seedPermissions();
+  } catch (err) {
+    console.error("❌ Permissions seed failed:", (err as Error).message);
+  }
+
+  // Approval chain templates must always be seeded (all environments)
+  try {
+    await seedApprovalChains();
+  } catch (err) {
+    console.error("❌ Approval chains seed failed:", (err as Error).message);
+  }
+
   if (env.nodeEnv !== "development") {
-    console.log("⏭️  Skipping seed — not in development mode");
+    console.log("⏭️  Skipping dev seed — not in development mode");
     return;
   }
 

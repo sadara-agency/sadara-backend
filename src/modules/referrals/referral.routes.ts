@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createReferralSchema,
@@ -16,15 +16,16 @@ router.use(authenticate);
 // ── Read ──
 router.get(
   "/",
+  authorizeModule("referrals", "read"),
   validate(referralQuerySchema, "query"),
   asyncHandler(referralController.list),
 );
-router.get("/:id", asyncHandler(referralController.getById));
+router.get("/:id", authorizeModule("referrals", "read"), asyncHandler(referralController.getById));
 
 // ── Create ──
 router.post(
   "/",
-  authorize("Admin", "Manager", "Analyst"),
+  authorizeModule("referrals", "create"),
   validate(createReferralSchema),
   asyncHandler(referralController.create),
 );
@@ -32,13 +33,13 @@ router.post(
 // ── Update ──
 router.patch(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorizeModule("referrals", "update"),
   validate(updateReferralSchema),
   asyncHandler(referralController.update),
 );
 router.patch(
   "/:id/status",
-  authorize("Admin", "Manager", "Analyst"),
+  authorizeModule("referrals", "update"),
   validate(updateReferralStatusSchema),
   asyncHandler(referralController.updateStatus),
 );
@@ -46,7 +47,7 @@ router.patch(
 // ── Delete ──
 router.delete(
   "/:id",
-  authorize("Admin"),
+  authorizeModule("referrals", "delete"),
   asyncHandler(referralController.remove),
 );
 

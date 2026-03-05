@@ -15,7 +15,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createTaskSchema,
@@ -31,24 +31,28 @@ router.use(authenticate);
 // ── Read ──
 router.get(
   "/",
+  authorizeModule("tasks", "read"),
   validate(taskQuerySchema, "query"),
   asyncHandler(taskController.list),
 );
-router.get("/:id", asyncHandler(taskController.getById));
+router.get("/:id", authorizeModule("tasks", "read"), asyncHandler(taskController.getById));
 
 // ── Write ──
 router.post(
   "/",
+  authorizeModule("tasks", "create"),
   validate(createTaskSchema),
   asyncHandler(taskController.create),
 );
 router.patch(
   "/:id",
+  authorizeModule("tasks", "update"),
   validate(updateTaskSchema),
   asyncHandler(taskController.update),
 );
 router.patch(
   "/:id/status",
+  authorizeModule("tasks", "update"),
   validate(updateStatusSchema),
   asyncHandler(taskController.updateStatus),
 );
@@ -56,7 +60,7 @@ router.patch(
 // ── Delete (Admin / Manager only) ──
 router.delete(
   "/:id",
-  authorize("Admin", "Manager"),
+  authorizeModule("tasks", "delete"),
   asyncHandler(taskController.remove),
 );
 

@@ -41,6 +41,11 @@ import { PlayerClubHistory } from "../modules/players/playerClubHistory.model";
 import { TechnicalReport } from "../modules/reports/report.model";
 import { MatchAnalysis } from "../modules/matches/matchAnalysis.model";
 import { ApprovalRequest } from "../modules/approvals/approval.model";
+import {
+  ApprovalChainTemplate,
+  ApprovalChainTemplateStep,
+} from "../modules/approvals/approvalChainTemplate.model";
+import { ApprovalStep } from "../modules/approvals/approvalStep.model";
 
 export function setupAssociations() {
   // Player ↔ Club
@@ -254,4 +259,30 @@ export function setupAssociations() {
   ApprovalRequest.belongsTo(User, { foreignKey: "requestedBy", as: "requester" });
   ApprovalRequest.belongsTo(User, { foreignKey: "assignedTo", as: "assignee" });
   ApprovalRequest.belongsTo(User, { foreignKey: "resolvedBy", as: "resolver" });
+
+  // ── Approval Chain Templates ──
+  ApprovalChainTemplate.hasMany(ApprovalChainTemplateStep, {
+    foreignKey: "templateId",
+    as: "steps",
+  });
+  ApprovalChainTemplateStep.belongsTo(ApprovalChainTemplate, {
+    foreignKey: "templateId",
+    as: "template",
+  });
+
+  // ── Approval Steps (multi-step chains) ──
+  ApprovalRequest.hasMany(ApprovalStep, {
+    foreignKey: "approvalRequestId",
+    as: "steps",
+  });
+  ApprovalRequest.belongsTo(ApprovalChainTemplate, {
+    foreignKey: "templateId",
+    as: "template",
+  });
+  ApprovalStep.belongsTo(ApprovalRequest, {
+    foreignKey: "approvalRequestId",
+    as: "approvalRequest",
+  });
+  ApprovalStep.belongsTo(User, { foreignKey: "resolvedBy", as: "resolver" });
+  ApprovalStep.belongsTo(User, { foreignKey: "approverUserId", as: "approverUser" });
 }

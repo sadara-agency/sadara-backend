@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createDocumentSchema,
@@ -16,15 +16,16 @@ router.use(authenticate);
 // List & detail
 router.get(
   "/",
+  authorizeModule("documents", "read"),
   validate(documentQuerySchema, "query"),
   asyncHandler(ctrl.list),
 );
-router.get("/:id", asyncHandler(ctrl.getById));
+router.get("/:id", authorizeModule("documents", "read"), asyncHandler(ctrl.getById));
 
 // Upload real file (multipart/form-data) — metadata in form fields
 router.post(
   "/upload",
-  authorize("Admin", "Manager", "Analyst", "Legal"),
+  authorizeModule("documents", "create"),
   (req, res, next) => {
     uploadSingle(req, res, (err: any) => {
       if (err) {
@@ -44,7 +45,7 @@ router.post(
 // Create via JSON (external URL, no file upload)
 router.post(
   "/",
-  authorize("Admin", "Manager", "Analyst", "Legal"),
+  authorizeModule("documents", "create"),
   validate(createDocumentSchema),
   asyncHandler(ctrl.create),
 );
@@ -52,10 +53,10 @@ router.post(
 // Update & delete
 router.patch(
   "/:id",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("documents", "update"),
   validate(updateDocumentSchema),
   asyncHandler(ctrl.update),
 );
-router.delete("/:id", authorize("Admin"), asyncHandler(ctrl.remove));
+router.delete("/:id", authorizeModule("documents", "delete"), asyncHandler(ctrl.remove));
 
 export default router;

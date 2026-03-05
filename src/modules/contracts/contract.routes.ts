@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { cacheRoute } from "../../middleware/cache.middleware";
 import { CacheTTL } from "../../shared/utils/cache";
@@ -25,6 +25,7 @@ router.use(authenticate);
 // ── Read (cached) ──
 router.get(
   "/",
+  authorizeModule("contracts", "read"),
   validate(contractQuerySchema, "query"),
   fieldAccess(CONTRACT_HIDDEN_FIELDS),
   cacheRoute("contracts", CacheTTL.MEDIUM),
@@ -34,22 +35,22 @@ router.get(
 // ── Write ──
 router.post(
   "/",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "create"),
   validate(createContractSchema),
   asyncHandler(contractController.create),
 );
 
 // ── Sub-resource routes MUST come before /:id ──
-router.get("/:id/pdf", asyncHandler(generatePdf));
+router.get("/:id/pdf", authorizeModule("contracts", "read"), asyncHandler(generatePdf));
 router.post(
   "/:id/transition",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "create"),
   validate(transitionStatusSchema),
   asyncHandler(transitionContract),
 );
 router.post(
   "/:id/terminate",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "create"),
   validate(terminateContractSchema),
   asyncHandler(contractController.terminate),
 );
@@ -57,18 +58,19 @@ router.post(
 // ── Single resource ──
 router.get(
   "/:id",
+  authorizeModule("contracts", "read"),
   cacheRoute("contracts", CacheTTL.MEDIUM),
   asyncHandler(contractController.getById),
 );
 router.patch(
   "/:id",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "update"),
   validate(updateContractSchema),
   asyncHandler(contractController.update),
 );
 router.delete(
   "/:id",
-  authorize("Admin"),
+  authorizeModule("contracts", "delete"),
   asyncHandler(contractController.remove),
 );
 

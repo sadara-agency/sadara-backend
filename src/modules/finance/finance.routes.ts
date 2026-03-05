@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createInvoiceSchema,
@@ -25,56 +25,58 @@ const router = Router();
 router.use(authenticate);
 
 // ── Summary & Dashboard ──
-router.get("/summary", asyncHandler(ctrl.summary));
-router.get("/dashboard", asyncHandler(ctrl.dashboard));
+router.get("/summary", authorizeModule("finance", "read"), asyncHandler(ctrl.summary));
+router.get("/dashboard", authorizeModule("finance", "read"), asyncHandler(ctrl.dashboard));
 
 // ── Invoices ──
 router.get(
   "/invoices",
+  authorizeModule("finance", "read"),
   validate(invoiceQuerySchema, "query"),
   fieldAccess(FINANCE_HIDDEN_FIELDS),
   asyncHandler(ctrl.listInvoices),
 );
-router.get("/invoices/:id", asyncHandler(ctrl.getInvoice));
+router.get("/invoices/:id", authorizeModule("finance", "read"), asyncHandler(ctrl.getInvoice));
 router.post(
   "/invoices",
-  authorize("Admin", "Manager", "Finance"),
+  authorizeModule("finance", "create"),
   validate(createInvoiceSchema),
   asyncHandler(ctrl.createInvoice),
 );
 router.patch(
   "/invoices/:id",
-  authorize("Admin", "Manager", "Finance"),
+  authorizeModule("finance", "update"),
   validate(updateInvoiceSchema),
   asyncHandler(ctrl.updateInvoice),
 );
 router.patch(
   "/invoices/:id/status",
-  authorize("Admin", "Manager", "Finance"),
+  authorizeModule("finance", "update"),
   validate(updateInvoiceStatusSchema),
   asyncHandler(ctrl.updateInvoiceStatus),
 );
 router.delete(
   "/invoices/:id",
-  authorize("Admin"),
+  authorizeModule("finance", "delete"),
   asyncHandler(ctrl.deleteInvoice),
 );
 
 // ── Payments ──
 router.get(
   "/payments",
+  authorizeModule("finance", "read"),
   validate(paymentQuerySchema, "query"),
   asyncHandler(ctrl.listPayments),
 );
 router.post(
   "/payments",
-  authorize("Admin", "Manager", "Finance"),
+  authorizeModule("finance", "create"),
   validate(createPaymentSchema),
   asyncHandler(ctrl.createPayment),
 );
 router.patch(
   "/payments/:id/status",
-  authorize("Admin", "Manager", "Finance"),
+  authorizeModule("finance", "update"),
   validate(updatePaymentStatusSchema),
   asyncHandler(ctrl.updatePaymentStatus),
 );
@@ -82,12 +84,13 @@ router.patch(
 // ── Ledger ──
 router.get(
   "/ledger",
+  authorizeModule("finance", "read"),
   validate(ledgerQuerySchema, "query"),
   asyncHandler(ctrl.listLedger),
 );
 router.post(
   "/ledger",
-  authorize("Admin", "Finance"),
+  authorizeModule("finance", "create"),
   validate(createLedgerEntrySchema),
   asyncHandler(ctrl.createLedgerEntry),
 );
@@ -95,12 +98,13 @@ router.post(
 // ── Valuations ──
 router.get(
   "/valuations",
+  authorizeModule("finance", "read"),
   validate(valuationQuerySchema, "query"),
   asyncHandler(ctrl.listValuations),
 );
 router.post(
   "/valuations",
-  authorize("Admin", "Manager", "Analyst", "Finance"),
+  authorizeModule("finance", "create"),
   validate(createValuationSchema),
   asyncHandler(ctrl.createValuation),
 );

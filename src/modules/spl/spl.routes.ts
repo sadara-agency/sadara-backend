@@ -4,7 +4,7 @@
 
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   syncPlayerSchema,
@@ -18,25 +18,25 @@ const router = Router();
 router.use(authenticate);
 
 // Read
-router.get("/registry", asyncHandler(c.getRegistry));
-router.get("/sync-status", asyncHandler(c.getStatus));
+router.get("/registry", authorizeModule("spl-sync", "read"), asyncHandler(c.getRegistry));
+router.get("/sync-status", authorizeModule("spl-sync", "read"), asyncHandler(c.getStatus));
 
 // Sync operations
 router.post(
   "/sync/player",
-  authorize("Admin", "Manager"),
+  authorizeModule("spl-sync", "create"),
   validate(syncPlayerSchema),
   asyncHandler(c.syncPlayer),
 );
 router.post(
   "/sync/team",
-  authorize("Admin", "Manager"),
+  authorizeModule("spl-sync", "create"),
   validate(syncTeamSchema),
   asyncHandler(c.syncTeam),
 );
 router.post(
   "/sync/all",
-  authorize("Admin"),
+  authorizeModule("spl-sync", "create"),
   validate(syncAllSchema),
   asyncHandler(c.syncAll),
 );
@@ -44,7 +44,7 @@ router.post(
 // Seed
 router.post(
   "/seed-club-ids",
-  authorize("Admin"),
+  authorizeModule("spl-sync", "create"),
   validate(seedClubIdsSchema),
   asyncHandler(c.seedClubIds),
 );

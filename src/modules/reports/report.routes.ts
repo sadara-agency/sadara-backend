@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { createReportSchema, reportQuerySchema } from "./report.schema";
 import * as ctrl from "./report.controller";
@@ -9,23 +9,23 @@ const router = Router();
 router.use(authenticate);
 
 // Predefined reports (must be before /:id to avoid route conflicts)
-router.get("/player-portfolio", asyncHandler(ctrl.playerPortfolio));
-router.get("/contract-commission", asyncHandler(ctrl.contractCommission));
-router.get("/injury-summary", asyncHandler(ctrl.injurySummary));
-router.get("/match-tasks", asyncHandler(ctrl.matchTasks));
-router.get("/financial-summary", asyncHandler(ctrl.financialSummary));
-router.get("/scouting-pipeline", asyncHandler(ctrl.scoutingPipeline));
-router.get("/expiring-contracts", asyncHandler(ctrl.expiringContracts));
+router.get("/player-portfolio", authorizeModule("reports", "read"), asyncHandler(ctrl.playerPortfolio));
+router.get("/contract-commission", authorizeModule("reports", "read"), asyncHandler(ctrl.contractCommission));
+router.get("/injury-summary", authorizeModule("reports", "read"), asyncHandler(ctrl.injurySummary));
+router.get("/match-tasks", authorizeModule("reports", "read"), asyncHandler(ctrl.matchTasks));
+router.get("/financial-summary", authorizeModule("reports", "read"), asyncHandler(ctrl.financialSummary));
+router.get("/scouting-pipeline", authorizeModule("reports", "read"), asyncHandler(ctrl.scoutingPipeline));
+router.get("/expiring-contracts", authorizeModule("reports", "read"), asyncHandler(ctrl.expiringContracts));
 
 // Export endpoints (must be before /:id to avoid route conflicts)
-router.get("/:type/xlsx", asyncHandler(ctrl.exportXlsx));
-router.get("/:type/pdf", asyncHandler(ctrl.exportPdf));
+router.get("/:type/xlsx", authorizeModule("reports", "read"), asyncHandler(ctrl.exportXlsx));
+router.get("/:type/pdf", authorizeModule("reports", "read"), asyncHandler(ctrl.exportPdf));
 
 // Technical reports CRUD
-router.get("/", validate(reportQuerySchema, "query"), asyncHandler(ctrl.list));
-router.get("/:id", asyncHandler(ctrl.getById));
-router.get("/:id/download", asyncHandler(ctrl.download));
-router.post("/", validate(createReportSchema), asyncHandler(ctrl.create));
-router.delete("/:id", authorize("Admin", "Manager"), asyncHandler(ctrl.remove));
+router.get("/", authorizeModule("reports", "read"), validate(reportQuerySchema, "query"), asyncHandler(ctrl.list));
+router.get("/:id", authorizeModule("reports", "read"), asyncHandler(ctrl.getById));
+router.get("/:id/download", authorizeModule("reports", "read"), asyncHandler(ctrl.download));
+router.post("/", authorizeModule("reports", "create"), validate(createReportSchema), asyncHandler(ctrl.create));
+router.delete("/:id", authorizeModule("reports", "delete"), asyncHandler(ctrl.remove));
 
 export default router;

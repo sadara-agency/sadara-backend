@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
 import * as controller from "./clearance.controller";
-import { authenticate, authorize } from "../../middleware/auth";
+import { authenticate, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import {
   createClearanceSchema,
@@ -21,18 +21,18 @@ router.use(authenticate);
 // GET    /api/v1/clearances          — List all clearances
 router.get(
   "/",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "read"),
   validate(clearanceQuerySchema, "query"),
   controller.list,
 );
 
 // GET    /api/v1/clearances/:id      — Get single clearance
-router.get("/:id", authorize("Admin", "Manager", "Legal"), controller.getById);
+router.get("/:id", authorizeModule("contracts", "read"), controller.getById);
 
 // POST   /api/v1/clearances          — Create new clearance
 router.post(
   "/",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "create"),
   validate(createClearanceSchema),
   controller.create,
 );
@@ -40,7 +40,7 @@ router.post(
 // PUT    /api/v1/clearances/:id      — Update clearance
 router.put(
   "/:id",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "update"),
   validate(updateClearanceSchema),
   controller.update,
 );
@@ -48,12 +48,12 @@ router.put(
 // POST   /api/v1/clearances/:id/complete — Sign & complete clearance
 router.post(
   "/:id/complete",
-  authorize("Admin", "Manager", "Legal"),
+  authorizeModule("contracts", "update"),
   validate(completeClearanceSchema),
   controller.complete,
 );
 
 // DELETE /api/v1/clearances/:id      — Delete clearance (Processing only)
-router.delete("/:id", authorize("Admin"), controller.remove);
+router.delete("/:id", authorizeModule("contracts", "delete"), controller.remove);
 
 export default router;

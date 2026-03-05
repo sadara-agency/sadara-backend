@@ -1,0 +1,33 @@
+import { z } from "zod";
+
+const ROLES = [
+  "Admin", "Manager", "Analyst", "Scout", "Player",
+  "Legal", "Finance", "Coach", "Media", "Executive",
+] as const;
+
+const MODULES = [
+  "dashboard", "matches", "players", "clubs", "scouting", "referrals",
+  "contracts", "offers", "gates", "approvals", "injuries", "training",
+  "finance", "reports", "tasks", "notifications", "documents", "audit",
+  "market-intel", "settings", "saff-data", "spl-sync",
+] as const;
+
+export const updatePermissionsSchema = z.object({
+  body: z.object({
+    permissions: z
+      .array(
+        z.object({
+          role: z.enum(ROLES),
+          module: z.enum(MODULES),
+          canCreate: z.boolean(),
+          canRead: z.boolean(),
+          canUpdate: z.boolean(),
+          canDelete: z.boolean(),
+        }),
+      )
+      .min(1)
+      .max(220), // 10 roles × 22 modules
+  }),
+});
+
+export { ROLES, MODULES };
