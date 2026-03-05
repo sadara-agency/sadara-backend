@@ -206,11 +206,10 @@ export async function seedPermissions(): Promise<void> {
     })),
     {
       updateOnDuplicate: [
-        "can_create",
-        "can_read",
-        "can_update",
-        "can_delete",
-        "updated_at",
+        "canCreate",
+        "canRead",
+        "canUpdate",
+        "canDelete",
       ],
     },
   );
