@@ -46,6 +46,7 @@ import {
   ApprovalChainTemplateStep,
 } from "../modules/approvals/approvalChainTemplate.model";
 import { ApprovalStep } from "../modules/approvals/approvalStep.model";
+import { ContractTemplate } from "../modules/contracts/contractTemplate.model";
 
 export function setupAssociations() {
   // Player ↔ Club
@@ -285,4 +286,7 @@ export function setupAssociations() {
   });
   ApprovalStep.belongsTo(User, { foreignKey: "resolvedBy", as: "resolver" });
   ApprovalStep.belongsTo(User, { foreignKey: "approverUserId", as: "approverUser" });
+
+  // ── Contract Templates ──
+  ContractTemplate.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 }

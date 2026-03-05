@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
+import { authenticate, authorize, authorizeModule } from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { cacheRoute } from "../../middleware/cache.middleware";
 import { CacheTTL } from "../../shared/utils/cache";
@@ -12,6 +12,11 @@ import {
   terminateContractSchema,
 } from "./contract.schema";
 import * as contractController from "./contract.controller";
+import * as templateController from "./contractTemplate.controller";
+import {
+  createContractTemplateSchema,
+  updateContractTemplateSchema,
+} from "./contractTemplate.schema";
 import { transitionContract } from "./contract.transition.controller";
 import { generatePdf } from "./contract.pdf.controller";
 import {
@@ -21,6 +26,30 @@ import {
 
 const router = Router();
 router.use(authenticate);
+
+// ── Contract Templates (must come before /:id routes) ──
+router.get(
+  "/templates",
+  authorizeModule("contracts", "read"),
+  asyncHandler(templateController.listTemplates),
+);
+router.post(
+  "/templates",
+  authorize("Admin"),
+  validate(createContractTemplateSchema),
+  asyncHandler(templateController.createTemplate),
+);
+router.put(
+  "/templates/:id",
+  authorize("Admin"),
+  validate(updateContractTemplateSchema),
+  asyncHandler(templateController.updateTemplate),
+);
+router.delete(
+  "/templates/:id",
+  authorize("Admin"),
+  asyncHandler(templateController.deactivateTemplate),
+);
 
 // ── Read (cached) ──
 router.get(
