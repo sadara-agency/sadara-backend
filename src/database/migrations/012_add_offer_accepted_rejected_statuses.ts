@@ -1,12 +1,29 @@
 import { sequelize } from "../../config/database";
+import { QueryTypes } from "sequelize";
 
 export async function up() {
-  // Add new enum values to offer_status
+  // Discover the actual enum type name for offers.status
+  // (Sequelize may use enum_offers_status, or pg may assign a different name)
+  const [row] = await sequelize.query<{ typname: string }>(
+    `SELECT t.typname FROM pg_type t
+     JOIN pg_attribute a ON a.atttypid = t.oid
+     JOIN pg_class c ON a.attrelid = c.oid
+     WHERE c.relname = 'offers' AND a.attname = 'status' AND t.typtype = 'e'`,
+    { type: QueryTypes.SELECT },
+  );
+
+  if (!row) {
+    // No enum type found — status column may use CHECK or VARCHAR; nothing to alter
+    return;
+  }
+
+  const typeName = row.typname;
+
   await sequelize.query(
-    `ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Accepted'`,
+    `ALTER TYPE "${typeName}" ADD VALUE IF NOT EXISTS 'Accepted'`,
   );
   await sequelize.query(
-    `ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Rejected'`,
+    `ALTER TYPE "${typeName}" ADD VALUE IF NOT EXISTS 'Rejected'`,
   );
 
   // Migrate existing "Closed" offers:
