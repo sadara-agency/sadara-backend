@@ -17,7 +17,10 @@ import chalk from "chalk";
 import gradient from "gradient-string";
 import { logger } from "./config/logger";
 import * as Sentry from "@sentry/node";
-import { initSSESubscriber, closeSSESubscriber } from "./modules/notifications/notification.sse";
+import {
+  initSSESubscriber,
+  closeSSESubscriber,
+} from "./modules/notifications/notification.sse";
 
 // ── Sentry Error Tracking (opt-in via SENTRY_DSN) ──
 if (env.sentry?.dsn) {
@@ -107,10 +110,18 @@ function printBanner(): void {
 
   console.log(sadaraGradient(LOGO));
   console.log(DIVIDER);
-  console.log(`  ${chalk.white.bold("🛰️  SYSTEM STATUS:")} ${chalk.greenBright("OPERATIONAL")}`);
-  console.log(`  ${chalk.white.bold("🌐 NETWORK:")}      ${chalk.blue.underline(`http://localhost:${env.port}`)}`);
-  console.log(`  ${chalk.white.bold("🩺 HEALTH:")}       ${chalk.blue.underline(`http://localhost:${env.port}/api/health`)}`);
-  console.log(`  ${chalk.white.bold("🏗️  ENVIRONMENT:")}  ${envColor(env.nodeEnv.toUpperCase())} ${envIcon}`);
+  console.log(
+    `  ${chalk.white.bold("🛰️  SYSTEM STATUS:")} ${chalk.greenBright("OPERATIONAL")}`,
+  );
+  console.log(
+    `  ${chalk.white.bold("🌐 NETWORK:")}      ${chalk.blue.underline(`http://localhost:${env.port}`)}`,
+  );
+  console.log(
+    `  ${chalk.white.bold("🩺 HEALTH:")}       ${chalk.blue.underline(`http://localhost:${env.port}/api/health`)}`,
+  );
+  console.log(
+    `  ${chalk.white.bold("🏗️  ENVIRONMENT:")}  ${envColor(env.nodeEnv.toUpperCase())} ${envIcon}`,
+  );
 
   if (isProd) {
     console.log(chalk.red("  ⚠️  WARNING: RUNNING IN PRODUCTION MODE"));
@@ -134,8 +145,15 @@ async function bootstrap(): Promise<void> {
     await initApplication();
     startSchedulers();
     await startServer();
-  } catch (err) {
-    logger.error("Failed to start server", { error: err });
+  } catch (err: unknown) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    logger.error("Failed to start server", {
+      error: e.message,
+      stack: e.stack,
+      ...((e as any).original?.message && {
+        dbError: (e as any).original.message,
+      }),
+    });
     process.exit(1);
   }
 }
