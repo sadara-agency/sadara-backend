@@ -9,7 +9,9 @@ import fs from "fs";
 import { env } from "./config/env";
 import { errorHandler } from "./middleware/errorHandler";
 import { apiLimiter, authLimiter } from "./middleware/rateLimiter";
-import { authenticate } from "./middleware/auth";
+import { authenticate, authorizeModule } from "./middleware/auth";
+import { logAudit, buildAuditContext } from "./shared/utils/audit";
+import type { AuthRequest } from "./shared/types";
 import { setupAssociations } from "./models/associations";
 import { sequelize } from "./config/database";
 import { isRedisConnected, getRedisClient } from "./config/redis";
@@ -97,13 +99,18 @@ app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 app.use("/api/v1", apiLimiter);
 app.use("/api/v1/auth", authLimiter);
 
-// ── Serve uploaded files (authenticated, path-traversal safe) ──
+// ── Serve uploaded files (authenticated + role-checked, path-traversal safe) ──
 const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads", "documents");
-app.get("/uploads/documents/:filename", authenticate, (req, res) => {
-  const filename = path.basename(req.params.filename); // strip any traversal
+app.get("/uploads/documents/:filename", authenticate, authorizeModule("documents", "read"), async (req, res) => {
+  const authReq = req as AuthRequest;
+  const filename = path.basename(authReq.params.filename); // strip any traversal
   const filePath = path.join(UPLOADS_ROOT, filename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ success: false, message: "File not found" });
+  }
+  // Audit log (fire-and-forget)
+  if (authReq.user) {
+    logAudit("DOWNLOAD", "documents", null, buildAuditContext(authReq.user, authReq.ip), `Downloaded: ${filename}`);
   }
   res.sendFile(filePath);
 });
