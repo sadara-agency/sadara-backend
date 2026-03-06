@@ -107,4 +107,32 @@ router.post(
   asyncHandler(portalController.generateInvite),
 );
 
+// ── Admin/Manager routes: player account management ──
+router.get(
+  "/accounts",
+  authorize("Admin", "Manager"),
+  asyncHandler(portalController.listPlayerAccounts),
+);
+router.patch(
+  "/accounts/:id",
+  authorize("Admin", "Manager"),
+  validate(
+    z.object({
+      isActive: z.boolean().optional(),
+      password: z.string().min(8).optional(),
+    }),
+  ),
+  asyncHandler(portalController.updatePlayerAccount),
+);
+router.delete(
+  "/accounts/:id",
+  authorize("Admin", "Manager"),
+  asyncHandler(portalController.deletePlayerAccount),
+);
+router.post(
+  "/accounts/:id/resend-invite",
+  authorize("Admin", "Manager"),
+  asyncHandler(portalController.resendInvite),
+);
+
 export default router;

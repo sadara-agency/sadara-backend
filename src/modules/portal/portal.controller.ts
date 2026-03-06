@@ -95,7 +95,10 @@ export async function uploadMyDocument(req: AuthRequest, res: Response) {
 
   const docType = req.body.type;
   if (!docType || !ALLOWED_DOC_TYPES.includes(docType)) {
-    throw new AppError(`Document type must be one of: ${ALLOWED_DOC_TYPES.join(", ")}`, 400);
+    throw new AppError(
+      `Document type must be one of: ${ALLOWED_DOC_TYPES.join(", ")}`,
+      400,
+    );
   }
 
   const doc = await documentService.createDocument(
@@ -149,4 +152,56 @@ export async function completeRegistration(req: AuthRequest, res: Response) {
   const { token, password } = req.body;
   const data = await portalService.completePlayerRegistration(token, password);
   sendSuccess(res, data);
+}
+
+// ── Admin: List Player Accounts ──
+
+export async function listPlayerAccounts(_req: AuthRequest, res: Response) {
+  const data = await portalService.listPlayerAccounts();
+  sendSuccess(res, data);
+}
+
+// ── Admin: Update Player Account ──
+
+export async function updatePlayerAccount(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const data = await portalService.updatePlayerAccount(id, req.body);
+  await logAudit(
+    "UPDATE",
+    "users",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Updated player account: ${data.email}`,
+  );
+  sendSuccess(res, data, "Player account updated");
+}
+
+// ── Admin: Delete Player Account ──
+
+export async function deletePlayerAccount(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const data = await portalService.deletePlayerAccount(id);
+  await logAudit(
+    "DELETE",
+    "users",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    "Deleted player account",
+  );
+  sendSuccess(res, data, "Player account deleted");
+}
+
+// ── Admin: Resend Invite ──
+
+export async function resendInvite(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const data = await portalService.resendPlayerInvite(id);
+  await logAudit(
+    "UPDATE",
+    "users",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Resent player invite to ${data.email}`,
+  );
+  sendSuccess(res, data, "Invite resent");
 }

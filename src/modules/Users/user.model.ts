@@ -39,6 +39,7 @@ interface UserAttributes {
   playerId: string | null;
   inviteToken: string | null;
   inviteTokenExpiry: Date | null;
+  lastActivity: Date | null;
 }
 
 interface UserCreationAttributes extends Optional<
@@ -56,6 +57,7 @@ interface UserCreationAttributes extends Optional<
   | "playerId"
   | "inviteToken"
   | "inviteTokenExpiry"
+  | "lastActivity"
 > {}
 
 export class User
@@ -79,6 +81,7 @@ export class User
   declare playerId: string | null;
   declare inviteToken: string | null;
   declare inviteTokenExpiry: Date | null;
+  declare lastActivity: Date | null;
 }
 
 User.init(
@@ -150,6 +153,12 @@ User.init(
       allowNull: true,
       defaultValue: null,
       field: "invite_token_expiry",
+    },
+    lastActivity: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      field: "last_activity",
     },
   },
   {

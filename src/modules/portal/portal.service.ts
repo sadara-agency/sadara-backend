@@ -745,3 +745,162 @@ export async function getMyInjuries(userId: string) {
     avgRecoveryDays: avgRecovery,
   };
 }
+
+// ══════════════════════════════════════════
+// ADMIN: List all player accounts
+// ══════════════════════════════════════════
+
+const ONLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+export async function listPlayerAccounts() {
+  const accounts = await User.findAll({
+    where: { role: "Player" },
+    attributes: [
+      "id",
+      "email",
+      "fullName",
+      "fullNameAr",
+      "isActive",
+      "lastLogin",
+      "lastActivity",
+      "playerId",
+      "inviteToken",
+      "inviteTokenExpiry",
+      "createdAt",
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  const now = Date.now();
+
+  return accounts.map((a) => {
+    const hasToken = !!a.inviteToken;
+    const tokenExpired = a.inviteTokenExpiry
+      ? new Date(a.inviteTokenExpiry).getTime() < now
+      : false;
+
+    let status: "active" | "pending" | "expired" | "disabled";
+    if (!a.isActive && hasToken && !tokenExpired) status = "pending";
+    else if (!a.isActive && hasToken && tokenExpired) status = "expired";
+    else if (!a.isActive) status = "disabled";
+    else status = "active";
+
+    const lastAct = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+    const isOnline = status === "active" && now - lastAct < ONLINE_THRESHOLD_MS;
+
+    return {
+      id: a.id,
+      email: a.email,
+      fullName: a.fullName,
+      fullNameAr: a.fullNameAr,
+      playerId: a.playerId,
+      status,
+      isOnline,
+      lastLogin: a.lastLogin,
+      lastActivity: a.lastActivity,
+      createdAt: (a as any).createdAt,
+    };
+  });
+}
+
+// ══════════════════════════════════════════
+// ADMIN: Get single player account
+// ══════════════════════════════════════════
+
+export async function getPlayerAccount(accountId: string) {
+  const account = await User.findByPk(accountId, {
+    attributes: [
+      "id",
+      "email",
+      "fullName",
+      "fullNameAr",
+      "isActive",
+      "lastLogin",
+      "lastActivity",
+      "playerId",
+      "inviteToken",
+      "inviteTokenExpiry",
+      "createdAt",
+    ],
+  });
+  if (!account || account.role !== "Player")
+    throw new AppError("Player account not found", 404);
+
+  return account;
+}
+
+// ══════════════════════════════════════════
+// ADMIN: Update player account (toggle active, reset password)
+// ══════════════════════════════════════════
+
+export async function updatePlayerAccount(
+  accountId: string,
+  input: { isActive?: boolean; password?: string },
+) {
+  const account = await User.findByPk(accountId);
+  if (!account || account.role !== "Player")
+    throw new AppError("Player account not found", 404);
+
+  const updates: Record<string, unknown> = {};
+
+  if (input.isActive !== undefined) {
+    updates.isActive = input.isActive;
+  }
+
+  if (input.password) {
+    updates.passwordHash = await bcrypt.hash(
+      input.password,
+      env.bcrypt.saltRounds,
+    );
+    updates.failedLoginAttempts = 0;
+    updates.lockedUntil = null;
+  }
+
+  await account.update(updates);
+  return { id: account.id, email: account.email, isActive: account.isActive };
+}
+
+// ══════════════════════════════════════════
+// ADMIN: Delete player account
+// ══════════════════════════════════════════
+
+export async function deletePlayerAccount(accountId: string) {
+  const account = await User.findByPk(accountId);
+  if (!account || account.role !== "Player")
+    throw new AppError("Player account not found", 404);
+
+  await account.destroy();
+  return { id: accountId };
+}
+
+// ══════════════════════════════════════════
+// ADMIN: Resend invite (regenerate token)
+// ══════════════════════════════════════════
+
+export async function resendPlayerInvite(accountId: string) {
+  const account = await User.findByPk(accountId);
+  if (!account || account.role !== "Player")
+    throw new AppError("Player account not found", 404);
+
+  if (account.isActive)
+    throw new AppError("Account is already active — no invite needed", 400);
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+  await account.update({
+    inviteToken: hashedToken,
+    inviteTokenExpiry: expiry,
+  } as any);
+
+  const inviteLink = `${env.frontend.url}/player/register?token=${token}`;
+
+  return {
+    inviteLink,
+    token,
+    expiresAt: expiry,
+    email: account.email,
+    fullName: account.fullName,
+  };
+}
