@@ -10,6 +10,7 @@ import { Contract } from "./contract.model";
 import { Player } from "../players/player.model";
 import { Club } from "../clubs/club.model";
 import { User } from "../Users/user.model";
+import { AuditLog } from "../audit/AuditLog.model";
 import { sequelize } from "../../config/database";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
@@ -258,4 +259,16 @@ export async function terminateContract(
   await contract.update(updatePayload);
 
   return getContractById(id);
+}
+
+// ────────────────────────────────────────────────────────────
+// Contract History (from audit logs)
+// ────────────────────────────────────────────────────────────
+export async function getContractHistory(contractId: string) {
+  const rows = await AuditLog.findAll({
+    where: { entity: "contracts", entityId: contractId },
+    order: [["loggedAt", "DESC"]],
+    attributes: ["id", "action", "userName", "userRole", "detail", "changes", "loggedAt"],
+  });
+  return rows;
 }

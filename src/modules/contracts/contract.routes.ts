@@ -67,6 +67,7 @@ router.post(
 );
 
 // ── Sub-resource routes MUST come before /:id ──
+router.get("/:id/history", authorizeModule("contracts", "read"), asyncHandler(contractController.getHistory));
 router.get("/:id/pdf", authorizeModule("contracts", "read"), asyncHandler(generatePdf));
 router.post(
   "/:id/transition",

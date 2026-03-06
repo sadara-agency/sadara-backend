@@ -93,3 +93,9 @@ export async function terminate(req: AuthRequest, res: Response) {
 
   sendSuccess(res, contract, "Contract terminated");
 }
+
+// ── Contract History ──
+export async function getHistory(req: AuthRequest, res: Response) {
+  const history = await contractService.getContractHistory(req.params.id);
+  sendSuccess(res, history);
+}
