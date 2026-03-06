@@ -8,6 +8,7 @@ import { mockContract, mockModelInstance, mockPlayer, mockClub } from '../../set
 // ── Mock Sequelize and models ──
 const mockFindAndCountAll = jest.fn();
 const mockFindByPk = jest.fn();
+const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 const mockDestroy = jest.fn();
 
@@ -22,6 +23,7 @@ jest.mock('../../../src/modules/contracts/contract.model', () => ({
   Contract: {
     findAndCountAll: (...args: unknown[]) => mockFindAndCountAll(...args),
     findByPk: (...args: unknown[]) => mockFindByPk(...args),
+    findOne: (...args: unknown[]) => mockFindOne(...args),
     create: (...args: unknown[]) => mockCreate(...args),
   },
 }));
@@ -54,6 +56,7 @@ import * as contractService from '../../../src/modules/contracts/contract.servic
 describe('Contract Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockFindOne.mockResolvedValue(null); // default: no overlap
   });
 
   // ════════════════════════════════════════════════════════

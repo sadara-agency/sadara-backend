@@ -146,6 +146,22 @@ export async function createContract(
     if (player) playerContractType = (player as any).contractType || null;
   }
 
+  // Warn if overlapping active contract exists for this player
+  const overlap = await Contract.findOne({
+    where: {
+      playerId: input.playerId,
+      status: { [Op.in]: ["Active", "Expiring Soon"] },
+      startDate: { [Op.lte]: input.endDate },
+      endDate: { [Op.gte]: input.startDate },
+    },
+  });
+  if (overlap) {
+    throw new AppError(
+      "This player already has an active contract with overlapping dates. Terminate or adjust the existing contract first.",
+      409,
+    );
+  }
+
   const contract = await Contract.create({
     playerId: input.playerId,
     clubId: input.clubId,
@@ -179,6 +195,17 @@ export async function createContract(
 export async function updateContract(id: string, input: UpdateContractInput) {
   const contract = await Contract.findByPk(id);
   if (!contract) throw new AppError("Contract not found", 404);
+
+  // Prevent commission changes on locked contracts (signed/terminated)
+  if (
+    contract.commissionLocked &&
+    (input.commissionPct !== undefined || input.baseSalary !== undefined)
+  ) {
+    throw new AppError(
+      "Commission fields cannot be modified after the contract has been signed",
+      400,
+    );
+  }
 
   const newPct = input.commissionPct ?? contract.commissionPct;
   const newSalary = input.baseSalary ?? contract.baseSalary;
