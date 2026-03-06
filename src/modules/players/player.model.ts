@@ -164,7 +164,16 @@ Player.init(
     defense: { type: DataTypes.INTEGER, defaultValue: 0 },
     fitness: { type: DataTypes.INTEGER, defaultValue: 0 },
     tactical: { type: DataTypes.INTEGER, defaultValue: 0 },
-    email: { type: DataTypes.STRING, validate: { isEmail: true } },
+    email: {
+      type: DataTypes.STRING,
+      allowNull: true,
+      validate: { isEmail: true },
+      set(val: unknown) {
+        // Coerce empty strings to null so isEmail validator is skipped
+        const v = typeof val === "string" ? val.trim() : val;
+        (this as any).setDataValue("email", v || null);
+      },
+    },
     phone: { type: DataTypes.STRING },
     guardianName: { type: DataTypes.STRING, field: "guardian_name" },
     guardianPhone: { type: DataTypes.STRING(255), field: "guardian_phone" },
