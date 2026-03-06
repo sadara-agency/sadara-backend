@@ -9,7 +9,14 @@ interface OfferAttributes {
   fromClubId?: string | null;
   toClubId?: string | null;
   offerType: "Transfer" | "Loan";
-  status: "New" | "Under Review" | "Negotiation" | "Closed" | "Converted";
+  status:
+    | "New"
+    | "Under Review"
+    | "Negotiation"
+    | "Accepted"
+    | "Rejected"
+    | "Closed"
+    | "Converted";
 
   // Financial terms
   transferFee?: number | null;
@@ -61,7 +68,14 @@ export class Offer
   declare fromClubId: string | null;
   declare toClubId: string | null;
   declare offerType: "Transfer" | "Loan";
-  declare status: "New" | "Under Review" | "Negotiation" | "Closed" | "Converted";
+  declare status:
+    | "New"
+    | "Under Review"
+    | "Negotiation"
+    | "Accepted"
+    | "Rejected"
+    | "Closed"
+    | "Converted";
 
   declare transferFee: number | null;
   declare salaryOffered: number | null;
@@ -115,7 +129,15 @@ Offer.init(
       field: "offer_type",
     },
     status: {
-      type: DataTypes.ENUM("New", "Under Review", "Negotiation", "Closed", "Converted"),
+      type: DataTypes.ENUM(
+        "New",
+        "Under Review",
+        "Negotiation",
+        "Accepted",
+        "Rejected",
+        "Closed",
+        "Converted",
+      ),
       defaultValue: "New",
     },
 

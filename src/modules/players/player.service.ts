@@ -110,8 +110,16 @@ async function batchLoadPlayerStats(
        COALESCE(pms_agg.assists, 0) AS assists,
        pms_agg.rating,
        -- Latest performance
-       perf_latest.performance
+       perf_latest.performance,
+       -- Provider linked?
+       COALESCE(epm.has_provider, false) AS has_provider_mapping
      FROM players p
+     LEFT JOIN LATERAL (
+       SELECT true AS has_provider
+       FROM external_provider_mappings epm
+       WHERE epm.player_id = p.id AND epm.is_active = true
+       LIMIT 1
+     ) epm ON true
      LEFT JOIN LATERAL (
        SELECT
          CASE
@@ -242,6 +250,7 @@ export async function listPlayers(queryParams: any) {
       assists: stats.assists ?? 0,
       rating: stats.rating ?? null,
       performance: stats.performance ?? null,
+      has_provider_mapping: stats.has_provider_mapping ?? false,
     };
   });
 

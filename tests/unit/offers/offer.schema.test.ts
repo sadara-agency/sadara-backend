@@ -34,7 +34,7 @@ describe('Offer Schemas', () => {
       expect(updateOfferStatusSchema.safeParse({ status: 'Under Review' }).success).toBe(true);
     });
     it('should reject invalid status', () => {
-      expect(updateOfferStatusSchema.safeParse({ status: 'Rejected' }).success).toBe(false);
+      expect(updateOfferStatusSchema.safeParse({ status: 'Invalid' }).success).toBe(false);
     });
   });
 
