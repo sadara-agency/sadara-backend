@@ -167,9 +167,9 @@ Player.init(
     email: { type: DataTypes.STRING, validate: { isEmail: true } },
     phone: { type: DataTypes.STRING },
     guardianName: { type: DataTypes.STRING, field: "guardian_name" },
-    guardianPhone: { type: DataTypes.STRING(50), field: "guardian_phone" },
+    guardianPhone: { type: DataTypes.STRING(255), field: "guardian_phone" },
     guardianRelation: {
-      type: DataTypes.STRING(50),
+      type: DataTypes.STRING(100),
       field: "guardian_relation",
     },
     notes: { type: DataTypes.TEXT },
