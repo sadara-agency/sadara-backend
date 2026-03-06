@@ -146,9 +146,58 @@ export const valuationQuerySchema = z.object({
   playerId: z.string().uuid().optional(),
 });
 
+// ── Expense ──
+
+const expenseCategories = [
+  "Operational",
+  "Marketing",
+  "Travel",
+  "Staff",
+  "Legal",
+  "Other",
+] as const;
+
+export const createExpenseSchema = z.object({
+  category: z.enum(expenseCategories).default("Operational"),
+  amount: z.number().positive(),
+  currency: z.string().length(3).default("SAR"),
+  date: z.string(),
+  description: z.string().optional(),
+  playerId: z.string().uuid().optional(),
+});
+
+export const updateExpenseSchema = z.object({
+  category: z.enum(expenseCategories).optional(),
+  amount: z.number().positive().optional(),
+  date: z.string().optional(),
+  description: z.string().optional(),
+  playerId: z.string().uuid().optional(),
+});
+
+export const expenseQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(20),
+  sort: z
+    .enum(["date", "created_at", "amount", "category"])
+    .default("date"),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  category: z.enum(expenseCategories).optional(),
+  playerId: z.string().uuid().optional(),
+});
+
+// ── Dashboard Query ──
+
+export const dashboardQuerySchema = z.object({
+  playerContractType: z
+    .enum(["Professional", "Amateur", "Youth"])
+    .optional(),
+  comparisonPeriod: z.enum(["MoM", "QoQ", "YoY"]).default("MoM"),
+});
+
 // ── Types ──
 
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export type CreatePaymentInput = z.infer<typeof createPaymentSchema>;
 export type CreateLedgerInput = z.infer<typeof createLedgerEntrySchema>;
 export type CreateValuationInput = z.infer<typeof createValuationSchema>;
+export type CreateExpenseInput = z.infer<typeof createExpenseSchema>;

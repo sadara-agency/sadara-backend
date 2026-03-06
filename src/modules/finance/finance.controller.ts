@@ -145,5 +145,50 @@ export async function summary(req: AuthRequest, res: Response) {
 
 // ── Financial Dashboard (PRD enhanced) ──
 export async function dashboard(req: AuthRequest, res: Response) {
-  sendSuccess(res, await svc.getFinancialDashboard(req.query.playerContractType as string | undefined));
+  sendSuccess(
+    res,
+    await svc.getFinancialDashboard(
+      req.query.playerContractType as string | undefined,
+      (req.query.comparisonPeriod as "MoM" | "QoQ" | "YoY") || "MoM",
+    ),
+  );
+}
+
+// ── Expenses ──
+export async function listExpenses(req: AuthRequest, res: Response) {
+  const r = await svc.listExpenses(req.query);
+  sendPaginated(res, r.data, r.meta);
+}
+export async function createExpense(req: AuthRequest, res: Response) {
+  const exp = await svc.createExpense(req.body, req.user!.id);
+  await logAudit(
+    "CREATE",
+    "expenses",
+    exp.id,
+    buildAuditContext(req.user!, req.ip),
+    `Expense: ${exp.category} ${exp.amount}`,
+  );
+  sendCreated(res, exp);
+}
+export async function updateExpense(req: AuthRequest, res: Response) {
+  const exp = await svc.updateExpense(req.params.id, req.body);
+  await logAudit(
+    "UPDATE",
+    "expenses",
+    exp.id,
+    buildAuditContext(req.user!, req.ip),
+    "Expense updated",
+  );
+  sendSuccess(res, exp, "Expense updated");
+}
+export async function deleteExpense(req: AuthRequest, res: Response) {
+  const r = await svc.deleteExpense(req.params.id);
+  await logAudit(
+    "DELETE",
+    "expenses",
+    r.id,
+    buildAuditContext(req.user!, req.ip),
+    "Expense deleted",
+  );
+  sendSuccess(res, r, "Expense deleted");
 }

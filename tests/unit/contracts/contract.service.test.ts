@@ -42,6 +42,13 @@ jest.mock('../../../src/modules/Users/user.model', () => ({
   User: { name: 'User' },
 }));
 
+jest.mock('../../../src/modules/audit/AuditLog.model', () => ({
+  AuditLog: {
+    findAndCountAll: jest.fn().mockResolvedValue({ count: 0, rows: [] }),
+    create: jest.fn(),
+  },
+}));
+
 import * as contractService from '../../../src/modules/contracts/contract.service';
 
 describe('Contract Service', () => {

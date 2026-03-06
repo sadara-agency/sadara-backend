@@ -14,29 +14,30 @@ import {
   ledgerQuerySchema,
   createValuationSchema,
   valuationQuerySchema,
+  createExpenseSchema,
+  updateExpenseSchema,
+  expenseQuerySchema,
+  dashboardQuerySchema,
 } from "./finance.schema";
 import * as ctrl from "./finance.controller";
-import {
-  fieldAccess,
-  FINANCE_HIDDEN_FIELDS,
-} from "../../middleware/fieldAccess";
+import { dynamicFieldAccess } from "../../middleware/fieldAccess";
 
 const router = Router();
 router.use(authenticate);
 
 // ── Summary & Dashboard ──
 router.get("/summary", authorizeModule("finance", "read"), asyncHandler(ctrl.summary));
-router.get("/dashboard", authorizeModule("finance", "read"), asyncHandler(ctrl.dashboard));
+router.get("/dashboard", authorizeModule("finance", "read"), validate(dashboardQuerySchema, "query"), asyncHandler(ctrl.dashboard));
 
 // ── Invoices ──
 router.get(
   "/invoices",
   authorizeModule("finance", "read"),
   validate(invoiceQuerySchema, "query"),
-  fieldAccess(FINANCE_HIDDEN_FIELDS),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listInvoices),
 );
-router.get("/invoices/:id", authorizeModule("finance", "read"), asyncHandler(ctrl.getInvoice));
+router.get("/invoices/:id", authorizeModule("finance", "read"), dynamicFieldAccess("finance"), asyncHandler(ctrl.getInvoice));
 router.post(
   "/invoices",
   authorizeModule("finance", "create"),
@@ -66,6 +67,7 @@ router.get(
   "/payments",
   authorizeModule("finance", "read"),
   validate(paymentQuerySchema, "query"),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listPayments),
 );
 router.post(
@@ -86,6 +88,7 @@ router.get(
   "/ledger",
   authorizeModule("finance", "read"),
   validate(ledgerQuerySchema, "query"),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listLedger),
 );
 router.post(
@@ -107,6 +110,31 @@ router.post(
   authorizeModule("finance", "create"),
   validate(createValuationSchema),
   asyncHandler(ctrl.createValuation),
+);
+
+// ── Expenses ──
+router.get(
+  "/expenses",
+  authorizeModule("finance", "read"),
+  validate(expenseQuerySchema, "query"),
+  asyncHandler(ctrl.listExpenses),
+);
+router.post(
+  "/expenses",
+  authorizeModule("finance", "create"),
+  validate(createExpenseSchema),
+  asyncHandler(ctrl.createExpense),
+);
+router.patch(
+  "/expenses/:id",
+  authorizeModule("finance", "update"),
+  validate(updateExpenseSchema),
+  asyncHandler(ctrl.updateExpense),
+);
+router.delete(
+  "/expenses/:id",
+  authorizeModule("finance", "delete"),
+  asyncHandler(ctrl.deleteExpense),
 );
 
 export default router;

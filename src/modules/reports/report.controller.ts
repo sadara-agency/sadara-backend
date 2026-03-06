@@ -95,6 +95,11 @@ export async function matchTasks(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+export async function upcomingMatchesTasks(req: AuthRequest, res: Response) {
+  const data = await svc.getUpcomingMatchesTasksReport(req.query as any);
+  sendSuccess(res, data);
+}
+
 export async function financialSummary(req: AuthRequest, res: Response) {
   const data = await svc.getFinancialSummaryReport(req.query as any);
   sendSuccess(res, data);
@@ -149,6 +154,14 @@ const REPORT_DATA_MAP: Record<string, {
     fetch: svc.getScoutingPipelineReport,
     title: "Scouting Pipeline Report",
     extractSections: (d) => [{ sheetName: "Prospects", rows: d.prospects }],
+  },
+  "upcoming-matches-tasks": {
+    fetch: svc.getUpcomingMatchesTasksReport,
+    title: "Upcoming Matches & Tasks Report",
+    extractSections: (d) => [
+      { sheetName: "Matches", rows: d.matches },
+      { sheetName: "Tasks", rows: d.tasks },
+    ],
   },
   "expiring-contracts": {
     fetch: svc.getExpiringContractsReport,

@@ -6,6 +6,7 @@ import {
   Payment,
   LedgerEntry,
   Valuation,
+  Expense,
   type PaymentStatus,
 } from "./finance.model";
 import { Player } from "../players/player.model";
@@ -262,7 +263,10 @@ export async function createValuation(input: any) {
 // FINANCIAL DASHBOARD (PRD enhanced)
 // ══════════════════════════════════════════
 
-export async function getFinancialDashboard(playerContractType?: string) {
+export async function getFinancialDashboard(
+  playerContractType?: string,
+  comparisonPeriod: "MoM" | "QoQ" | "YoY" = "MoM",
+) {
   // Build optional contract-type filter for player queries
   const typeFilter = playerContractType ? "AND contract_type = $1" : "";
   const typeBind = playerContractType ? { bind: [playerContractType] } : {};
@@ -332,6 +336,97 @@ export async function getFinancialDashboard(playerContractType?: string) {
     { type: QueryTypes.SELECT, ...typeBind },
   );
 
+  // Revenue by club (top 10 clubs by paid invoice revenue)
+  const revenueByClub = await sequelize.query<any>(
+    `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
+            COALESCE(SUM(i.total_amount), 0)::NUMERIC AS total_revenue,
+            COUNT(*)::INT AS invoice_count
+     FROM invoices i
+     JOIN clubs c ON i.club_id = c.id
+     WHERE i.status = 'Paid'
+     GROUP BY c.id, c.name, c.name_ar, c.logo_url
+     ORDER BY total_revenue DESC
+     LIMIT 10`,
+    { type: QueryTypes.SELECT },
+  );
+
+  // Per-player revenue breakdown (top 20 by paid payments)
+  const playerTypeJoin = playerContractType
+    ? "AND p.contract_type = $1"
+    : "";
+  const playerRevenueBreakdown = await sequelize.query<any>(
+    `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
+            c.name AS club_name, c.name_ar AS club_name_ar,
+            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Commission'), 0)::NUMERIC AS commissions,
+            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Sponsorship'), 0)::NUMERIC AS sponsorship,
+            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Bonus'), 0)::NUMERIC AS bonus,
+            COALESCE(SUM(pay.amount), 0)::NUMERIC AS total_revenue
+     FROM payments pay
+     JOIN players p ON pay.player_id = p.id ${playerTypeJoin}
+     LEFT JOIN clubs c ON p.current_club_id = c.id
+     WHERE pay.status = 'Paid'
+     GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url, c.name, c.name_ar
+     ORDER BY total_revenue DESC
+     LIMIT 20`,
+    { type: QueryTypes.SELECT, ...typeBind },
+  );
+
+  // Cash flow timeline (-12 months to +6 months)
+  const cashFlowTimeline = await sequelize.query<any>(
+    `WITH months AS (
+       SELECT TO_CHAR(d, 'YYYY-MM') AS month
+       FROM generate_series(
+         DATE_TRUNC('month', NOW()) - INTERVAL '12 months',
+         DATE_TRUNC('month', NOW()) + INTERVAL '6 months',
+         '1 month'
+       ) d
+     ),
+     expected AS (
+       SELECT TO_CHAR(DATE_TRUNC('month', due_date), 'YYYY-MM') AS month,
+              SUM(amount)::NUMERIC AS amount
+       FROM payments
+       WHERE due_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+         AND due_date <= DATE_TRUNC('month', NOW()) + INTERVAL '6 months'
+       GROUP BY DATE_TRUNC('month', due_date)
+     ),
+     received AS (
+       SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
+              SUM(amount)::NUMERIC AS amount
+       FROM payments
+       WHERE status = 'Paid'
+         AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+       GROUP BY DATE_TRUNC('month', paid_date)
+     )
+     SELECT m.month,
+            COALESCE(e.amount, 0) AS expected,
+            COALESCE(r.amount, 0) AS received
+     FROM months m
+     LEFT JOIN expected e ON m.month = e.month
+     LEFT JOIN received r ON m.month = r.month
+     ORDER BY m.month`,
+    { type: QueryTypes.SELECT },
+  );
+
+  // Period comparison
+  const periodComparison = await computePeriodComparison(comparisonPeriod);
+
+  // Profitability
+  const [revRow] = await sequelize.query<any>(
+    `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
+     FROM payments WHERE status = 'Paid'
+       AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
+    { type: QueryTypes.SELECT },
+  );
+  const [expRow] = await sequelize.query<any>(
+    `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
+     FROM expenses
+     WHERE date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
+    { type: QueryTypes.SELECT },
+  );
+  const totalRevenue = Number(revRow?.total_revenue || 0);
+  const totalExpenses = Number(expRow?.total_expenses || 0);
+  const netProfit = totalRevenue - totalExpenses;
+
   return {
     totalMarketValue: marketValue?.total_market_value || 0,
     totalPlayers: marketValue?.total_players || 0,
@@ -339,6 +434,16 @@ export async function getFinancialDashboard(playerContractType?: string) {
     commissions: commissions || {},
     topPlayers,
     marketValueTrend,
+    revenueByClub,
+    playerRevenueBreakdown,
+    cashFlowTimeline,
+    periodComparison,
+    profitability: {
+      totalRevenue,
+      totalExpenses,
+      netProfit,
+      profitMarginPct: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
+    },
   };
 }
 
@@ -385,4 +490,117 @@ export async function getFinanceSummary(months = 12) {
     revenueByMonth,
     revenueByType,
   };
+}
+
+// ══════════════════════════════════════════
+// PERIOD COMPARISON HELPER
+// ══════════════════════════════════════════
+
+async function computePeriodComparison(period: "MoM" | "QoQ" | "YoY") {
+  const now = new Date();
+  let currentStart: Date;
+  let currentEnd: Date;
+  let prevStart: Date;
+  let prevEnd: Date;
+
+  if (period === "MoM") {
+    currentStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    currentEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    prevStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    prevEnd = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (period === "QoQ") {
+    const q = Math.floor(now.getMonth() / 3);
+    currentStart = new Date(now.getFullYear(), q * 3, 1);
+    currentEnd = new Date(now.getFullYear(), q * 3 + 3, 1);
+    prevStart = new Date(now.getFullYear(), q * 3 - 3, 1);
+    prevEnd = new Date(now.getFullYear(), q * 3, 1);
+  } else {
+    currentStart = new Date(now.getFullYear(), 0, 1);
+    currentEnd = new Date(now.getFullYear() + 1, 0, 1);
+    prevStart = new Date(now.getFullYear() - 1, 0, 1);
+    prevEnd = new Date(now.getFullYear(), 0, 1);
+  }
+
+  const fmt = (d: Date) => d.toISOString().split("T")[0];
+
+  const rows = await sequelize.query<any>(
+    `SELECT
+       COALESCE(SUM(amount) FILTER (WHERE paid_date >= $1 AND paid_date < $2), 0)::NUMERIC AS current_revenue,
+       COALESCE(SUM(amount) FILTER (WHERE paid_date >= $3 AND paid_date < $4), 0)::NUMERIC AS previous_revenue,
+       COALESCE(SUM(amount) FILTER (WHERE paid_date >= $1 AND paid_date < $2 AND payment_type = 'Commission'), 0)::NUMERIC AS current_commissions,
+       COALESCE(SUM(amount) FILTER (WHERE paid_date >= $3 AND paid_date < $4 AND payment_type = 'Commission'), 0)::NUMERIC AS previous_commissions,
+       COUNT(*) FILTER (WHERE paid_date >= $1 AND paid_date < $2)::INT AS current_count,
+       COUNT(*) FILTER (WHERE paid_date >= $3 AND paid_date < $4)::INT AS previous_count
+     FROM payments
+     WHERE status = 'Paid' AND paid_date >= $3`,
+    {
+      type: QueryTypes.SELECT,
+      bind: [fmt(currentStart), fmt(currentEnd), fmt(prevStart), fmt(prevEnd)],
+    },
+  );
+
+  const r = rows[0] || {};
+  const cur = {
+    revenue: Number(r.current_revenue || 0),
+    commissions: Number(r.current_commissions || 0),
+    invoiceCount: Number(r.current_count || 0),
+  };
+  const prev = {
+    revenue: Number(r.previous_revenue || 0),
+    commissions: Number(r.previous_commissions || 0),
+    invoiceCount: Number(r.previous_count || 0),
+  };
+
+  return {
+    period,
+    current: cur,
+    previous: prev,
+    deltas: {
+      revenue: cur.revenue - prev.revenue,
+      commissions: cur.commissions - prev.commissions,
+      invoiceCount: cur.invoiceCount - prev.invoiceCount,
+    },
+  };
+}
+
+// ══════════════════════════════════════════
+// EXPENSES
+// ══════════════════════════════════════════
+
+export async function listExpenses(queryParams: any) {
+  const { limit, offset, page, sort, order } = parsePagination(
+    queryParams,
+    "date",
+  );
+  const where: any = {};
+  if (queryParams.category) where.category = queryParams.category;
+  if (queryParams.playerId) where.playerId = queryParams.playerId;
+
+  const { count, rows } = await Expense.findAndCountAll({
+    where,
+    limit,
+    offset,
+    order: [[sort, order]],
+    include: [
+      { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+    ],
+  });
+  return { data: rows, meta: buildMeta(count, page, limit) };
+}
+
+export async function createExpense(input: any, userId: string) {
+  return Expense.create({ ...input, createdBy: userId });
+}
+
+export async function updateExpense(id: string, input: any) {
+  const exp = await Expense.findByPk(id);
+  if (!exp) throw new AppError("Expense not found", 404);
+  return exp.update(input);
+}
+
+export async function deleteExpense(id: string) {
+  const exp = await Expense.findByPk(id);
+  if (!exp) throw new AppError("Expense not found", 404);
+  await exp.destroy();
+  return { id };
 }

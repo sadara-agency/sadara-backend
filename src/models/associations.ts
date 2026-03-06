@@ -19,6 +19,7 @@ import {
   Payment,
   LedgerEntry,
   Valuation,
+  Expense,
 } from "../modules/finance/finance.model";
 import { Document } from "../modules/documents/document.model";
 import { Clearance } from "../modules/clearances/clearance.model";
@@ -46,6 +47,7 @@ import {
   ApprovalChainTemplateStep,
 } from "../modules/approvals/approvalChainTemplate.model";
 import { ApprovalStep } from "../modules/approvals/approvalStep.model";
+import { ContractTemplate } from "../modules/contracts/contractTemplate.model";
 
 export function setupAssociations() {
   // Player ↔ Club
@@ -147,6 +149,8 @@ export function setupAssociations() {
   LedgerEntry.belongsTo(Player, { foreignKey: "playerId", as: "player" });
   Valuation.belongsTo(Player, { foreignKey: "playerId", as: "player" });
   Player.hasMany(Valuation, { foreignKey: "playerId", as: "valuations" });
+  Expense.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Expense.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 
   // Document (polymorphic via entityType + entityId — no direct FK associations)
   Document.belongsTo(User, { foreignKey: "uploadedBy", as: "uploader" });
@@ -285,4 +289,7 @@ export function setupAssociations() {
   });
   ApprovalStep.belongsTo(User, { foreignKey: "resolvedBy", as: "resolver" });
   ApprovalStep.belongsTo(User, { foreignKey: "approverUserId", as: "approverUser" });
+
+  // ── Contract Templates ──
+  ContractTemplate.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 }

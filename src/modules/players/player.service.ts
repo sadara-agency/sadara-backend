@@ -186,6 +186,7 @@ export async function listPlayers(queryParams: any) {
   if (queryParams.clubId) where.currentClubId = queryParams.clubId;
   if (queryParams.position) where.position = queryParams.position;
   if (queryParams.nationality) where.nationality = queryParams.nationality;
+  if (queryParams.contractType) where.contractType = queryParams.contractType;
 
   if (search) {
     where[Op.or] = [
@@ -369,10 +370,13 @@ export async function checkDuplicate(params: {
   firstName?: string;
   lastName?: string;
   dateOfBirth?: string;
+  dob?: string; // alias — frontend sends "dob"
   nationality?: string;
+  excludeId?: string; // exclude a player by ID (for edit mode)
 }) {
   const conditions: string[] = [];
   const replacements: Record<string, string> = {};
+  const dobValue = params.dateOfBirth || params.dob;
 
   if (params.firstName && params.lastName) {
     conditions.push(
@@ -381,9 +385,17 @@ export async function checkDuplicate(params: {
     replacements.firstName = params.firstName;
     replacements.lastName = params.lastName;
   }
-  if (params.dateOfBirth) {
+  if (dobValue) {
     conditions.push(`date_of_birth = :dob`);
-    replacements.dob = params.dateOfBirth;
+    replacements.dob = dobValue;
+  }
+  if (params.nationality) {
+    conditions.push(`LOWER(nationality) = LOWER(:nationality)`);
+    replacements.nationality = params.nationality;
+  }
+  if (params.excludeId) {
+    conditions.push(`id != :excludeId`);
+    replacements.excludeId = params.excludeId;
   }
 
   if (conditions.length < 2) return []; // Need at least name + DOB to check

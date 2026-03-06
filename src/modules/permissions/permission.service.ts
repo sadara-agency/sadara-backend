@@ -1,4 +1,5 @@
 import { RolePermission } from "./permission.model";
+import { RoleFieldPermission } from "./fieldPermission.model";
 import { cacheGet, cacheSet, cacheDel, CacheTTL } from "../../shared/utils/cache";
 
 // ── Types ──
@@ -82,8 +83,62 @@ export async function hasPermission(
   }
 }
 
-/** Clear both in-memory and Redis caches. */
+/** Clear both in-memory and Redis caches (module + field permissions). */
 export async function invalidatePermissionCache(): Promise<void> {
   memoryCache = null;
+  fieldMemoryCache = null;
   await cacheDel(CACHE_KEY);
+  await cacheDel(FIELD_CACHE_KEY);
+}
+
+// ══════════════════════════════════════════════════════════
+// Field-Level Permissions
+// ══════════════════════════════════════════════════════════
+
+/** role → module → array of hidden field names */
+export type FieldPermissionMap = Record<string, Record<string, string[]>>;
+
+const FIELD_CACHE_KEY = "rbac:field-permissions";
+let fieldMemoryCache: FieldPermissionMap | null = null;
+
+/** Load all field permissions from DB → memory + Redis cache. */
+export async function loadFieldPermissions(): Promise<FieldPermissionMap> {
+  const rows = await RoleFieldPermission.findAll({
+    where: { hidden: true },
+    raw: true,
+  });
+
+  const map: FieldPermissionMap = {};
+  for (const row of rows) {
+    if (!map[row.role]) map[row.role] = {};
+    if (!map[row.role][row.module]) map[row.role][row.module] = [];
+    map[row.role][row.module].push(row.field);
+  }
+
+  fieldMemoryCache = map;
+  await cacheSet(FIELD_CACHE_KEY, map, CacheTTL.HOUR);
+  return map;
+}
+
+/** Get the full field permission map (memory → Redis → DB). */
+export async function getFieldPermissions(): Promise<FieldPermissionMap> {
+  if (fieldMemoryCache) return fieldMemoryCache;
+
+  const cached = await cacheGet<FieldPermissionMap>(FIELD_CACHE_KEY);
+  if (cached) {
+    fieldMemoryCache = cached;
+    return cached;
+  }
+
+  return loadFieldPermissions();
+}
+
+/** Get hidden field names for a specific role + module. Admin sees everything. */
+export async function getHiddenFields(
+  role: string,
+  module: string,
+): Promise<string[]> {
+  if (role === "Admin") return [];
+  const perms = await getFieldPermissions();
+  return perms[role]?.[module] ?? [];
 }

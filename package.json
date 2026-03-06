@@ -14,7 +14,8 @@
     "test:coverage": "jest --coverage",
     "migrate": "ts-node src/database/migrate-cli.ts up",
     "migrate:down": "ts-node src/database/migrate-cli.ts down",
-    "migrate:status": "ts-node src/database/migrate-cli.ts status"
+    "migrate:status": "ts-node src/database/migrate-cli.ts status",
+    "prepare": "husky"
   },
   "dependencies": {
     "@sentry/node": "^10.42.0",
@@ -76,7 +77,9 @@
     "@typescript-eslint/parser": "^8.2.0",
     "cross-env": "^10.1.0",
     "eslint": "^9.9.0",
+    "husky": "^9.1.7",
     "jest": "^29.7.0",
+    "lint-staged": "^16.3.2",
     "nodemon": "^3.1.4",
     "prettier": "^3.3.3",
     "supertest": "^7.2.2",
@@ -85,5 +88,11 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.5.4",
     "typescript-eslint": "^8.56.1"
+  },
+  "lint-staged": {
+    "src/**/*.ts": [
+      "eslint --fix",
+      "prettier --write"
+    ]
   }
 }

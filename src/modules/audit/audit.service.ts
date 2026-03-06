@@ -22,6 +22,16 @@ export async function listAuditLogs(queryParams: any) {
     where.entity = queryParams.entity;
   }
 
+  if (queryParams.dateFrom || queryParams.dateTo) {
+    where.loggedAt = {};
+    if (queryParams.dateFrom) {
+      where.loggedAt[Op.gte] = queryParams.dateFrom;
+    }
+    if (queryParams.dateTo) {
+      where.loggedAt[Op.lte] = queryParams.dateTo + "T23:59:59.999Z";
+    }
+  }
+
   const { count, rows } = await AuditLog.findAndCountAll({
     where,
     limit,

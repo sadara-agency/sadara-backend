@@ -1,5 +1,6 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest, UserRole } from "../shared/types";
+import { getHiddenFields } from "../modules/permissions/permission.service";
 
 /**
  * Field-level access control middleware.
@@ -81,7 +82,37 @@ function removeKeys(obj: any, fields: string[]): void {
   }
 }
 
-// ── Pre-built configs for common entities ──
+/**
+ * Dynamic field access middleware — reads hidden fields from DB/cache.
+ * Replaces the static fieldAccess() for DB-driven field-level permissions.
+ */
+export function dynamicFieldAccess(module: string) {
+  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+    const role = req.user?.role;
+    if (!role || role === "Admin") {
+      next();
+      return;
+    }
+
+    const fieldsToStrip = await getHiddenFields(role, module);
+    if (fieldsToStrip.length === 0) {
+      next();
+      return;
+    }
+
+    const originalJson = res.json.bind(res);
+    res.json = function (body: any) {
+      if (body && typeof body === "object") {
+        stripFields(body, fieldsToStrip);
+      }
+      return originalJson(body);
+    };
+
+    next();
+  };
+}
+
+// ── Pre-built configs for common entities (deprecated — use dynamicFieldAccess) ──
 
 /** Fields hidden from roles that should not see player contact info */
 export const PLAYER_HIDDEN_FIELDS: HiddenFieldsConfig = {

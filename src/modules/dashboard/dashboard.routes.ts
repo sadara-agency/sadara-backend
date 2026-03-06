@@ -8,11 +8,11 @@ import * as dashboardController from "./dashboard.controller";
 const router = Router();
 router.use(authenticate);
 
-// Full aggregated dashboard — short TTL (changes frequently)
+// Full aggregated dashboard — short TTL, per-user (role-filtered matches & tasks)
 router.get(
   "/",
   authorizeModule("dashboard", "read"),
-  cacheRoute("dash", CacheTTL.SHORT),
+  cacheRoute("dash", CacheTTL.SHORT, { perUser: true }),
   asyncHandler(dashboardController.getFullDashboard),
 );
 
@@ -62,13 +62,13 @@ router.get(
 router.get(
   "/matches/upcoming",
   authorizeModule("dashboard", "read"),
-  cacheRoute("dash", CacheTTL.SHORT),
+  cacheRoute("dash", CacheTTL.SHORT, { perUser: true }),
   asyncHandler(dashboardController.getUpcomingMatches),
 );
 router.get(
   "/tasks/urgent",
   authorizeModule("dashboard", "read"),
-  cacheRoute("dash", CacheTTL.SHORT),
+  cacheRoute("dash", CacheTTL.SHORT, { perUser: true }),
   asyncHandler(dashboardController.getUrgentTasks),
 );
 router.get(

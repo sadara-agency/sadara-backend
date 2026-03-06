@@ -1,5 +1,9 @@
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../../config/database";
+import type { UserRole } from "../../shared/types";
+
+/** Roles that see ALL data (no player-level filtering). */
+const UNFILTERED_ROLES: UserRole[] = ["Admin", "Manager", "Executive", "Finance", "Legal", "Media"];
 
 /** Main KPI counters from the dashboard view. */
 export async function getKpis() {
@@ -120,13 +124,13 @@ export async function getContractStatusDistribution() {
   );
 }
 
-/** Active player count grouped by type: Pro vs Youth. */
+/** Active player count grouped by contract type: Professional / Amateur / Youth. */
 export async function getPlayerDistribution() {
   return sequelize.query(
-    `SELECT player_type, COUNT(*)::INT AS count
+    `SELECT contract_type AS player_type, COUNT(*)::INT AS count
      FROM players
      WHERE status = 'active'
-     GROUP BY player_type`,
+     GROUP BY contract_type`,
     { type: QueryTypes.SELECT },
   );
 }
@@ -151,26 +155,114 @@ export async function getRecentOffers(limit = 5) {
   );
 }
 
-/** Upcoming matches with managed player count per match. */
-export async function getUpcomingMatches(limit = 5) {
+/** Upcoming matches with managed player count per match (role-filtered). */
+export async function getUpcomingMatches(limit = 5, userId?: string, userRole?: UserRole, playerId?: string | null) {
+  // Unfiltered roles — see all matches
+  if (!userId || !userRole || UNFILTERED_ROLES.includes(userRole)) {
+    return sequelize.query(
+      `SELECT
+         m.id, m.match_date, m.venue, m.competition, m.status,
+         hc.name AS home_team,
+         ac.name AS away_team,
+         (SELECT COUNT(*) FROM match_players mp WHERE mp.match_id = m.id) AS managed_players
+       FROM matches m
+       LEFT JOIN clubs hc ON m.home_club_id = hc.id
+       LEFT JOIN clubs ac ON m.away_club_id = ac.id
+       WHERE m.status = 'upcoming' AND m.match_date >= NOW()
+       ORDER BY m.match_date ASC
+       LIMIT $1`,
+      { bind: [limit], type: QueryTypes.SELECT },
+    );
+  }
+
+  // Player role — only matches they participate in
+  if (userRole === "Player" && playerId) {
+    return sequelize.query(
+      `SELECT DISTINCT ON (m.id)
+         m.id, m.match_date, m.venue, m.competition, m.status,
+         hc.name AS home_team,
+         ac.name AS away_team,
+         1 AS managed_players
+       FROM matches m
+       LEFT JOIN clubs hc ON m.home_club_id = hc.id
+       LEFT JOIN clubs ac ON m.away_club_id = ac.id
+       INNER JOIN match_players mp ON m.id = mp.match_id
+       WHERE m.status = 'upcoming' AND m.match_date >= NOW()
+         AND mp.player_id = $2
+       ORDER BY m.id, m.match_date ASC
+       LIMIT $1`,
+      { bind: [limit, playerId], type: QueryTypes.SELECT },
+    );
+  }
+
+  // Coach / Analyst / Scout / Agent — matches involving their assigned players
   return sequelize.query(
-    `SELECT
+    `SELECT DISTINCT ON (m.id)
        m.id, m.match_date, m.venue, m.competition, m.status,
        hc.name AS home_team,
        ac.name AS away_team,
-       (SELECT COUNT(*) FROM match_players mp WHERE mp.match_id = m.id) AS managed_players
+       (SELECT COUNT(*) FROM match_players mp2
+        JOIN players p2 ON mp2.player_id = p2.id
+        WHERE mp2.match_id = m.id
+          AND (p2.agent_id = $2 OR p2.coach_id = $2 OR p2.analyst_id = $2)
+       ) AS managed_players
      FROM matches m
      LEFT JOIN clubs hc ON m.home_club_id = hc.id
      LEFT JOIN clubs ac ON m.away_club_id = ac.id
+     INNER JOIN match_players mp ON m.id = mp.match_id
+     INNER JOIN players p ON mp.player_id = p.id
      WHERE m.status = 'upcoming' AND m.match_date >= NOW()
-     ORDER BY m.match_date ASC
+       AND (p.agent_id = $2 OR p.coach_id = $2 OR p.analyst_id = $2)
+     ORDER BY m.id, m.match_date ASC
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT },
+    { bind: [limit, userId], type: QueryTypes.SELECT },
   );
 }
 
-/** Non-completed tasks sorted by priority (critical first). */
-export async function getUrgentTasks(limit = 5) {
+/** Non-completed tasks sorted by priority (critical first, role-filtered). */
+export async function getUrgentTasks(limit = 5, userId?: string, userRole?: UserRole, playerId?: string | null) {
+  // Unfiltered roles — see all tasks
+  if (!userId || !userRole || UNFILTERED_ROLES.includes(userRole)) {
+    return sequelize.query(
+      `SELECT
+         t.id, t.title, t.title_ar, t.type, t.priority, t.status, t.due_date,
+         p.first_name || ' ' || p.last_name AS player_name,
+         u.full_name AS assigned_to_name
+       FROM tasks t
+       LEFT JOIN players p ON t.player_id = p.id
+       LEFT JOIN users u ON t.assigned_to = u.id
+       WHERE t.status != 'Completed'
+       ORDER BY CASE t.priority
+         WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+         WHEN 'medium' THEN 2 ELSE 3 END,
+         t.due_date ASC NULLS LAST
+       LIMIT $1`,
+      { bind: [limit], type: QueryTypes.SELECT },
+    );
+  }
+
+  // Player role — only tasks assigned to them or about their player profile
+  if (userRole === "Player" && playerId) {
+    return sequelize.query(
+      `SELECT
+         t.id, t.title, t.title_ar, t.type, t.priority, t.status, t.due_date,
+         p.first_name || ' ' || p.last_name AS player_name,
+         u.full_name AS assigned_to_name
+       FROM tasks t
+       LEFT JOIN players p ON t.player_id = p.id
+       LEFT JOIN users u ON t.assigned_to = u.id
+       WHERE t.status != 'Completed'
+         AND (t.assigned_to = $2 OR t.player_id = $3)
+       ORDER BY CASE t.priority
+         WHEN 'critical' THEN 0 WHEN 'high' THEN 1
+         WHEN 'medium' THEN 2 ELSE 3 END,
+         t.due_date ASC NULLS LAST
+       LIMIT $1`,
+      { bind: [limit, userId, playerId], type: QueryTypes.SELECT },
+    );
+  }
+
+  // Coach / Analyst / Scout / Agent — tasks for their assigned players or assigned to them
   return sequelize.query(
     `SELECT
        t.id, t.title, t.title_ar, t.type, t.priority, t.status, t.due_date,
@@ -180,12 +272,15 @@ export async function getUrgentTasks(limit = 5) {
      LEFT JOIN players p ON t.player_id = p.id
      LEFT JOIN users u ON t.assigned_to = u.id
      WHERE t.status != 'Completed'
+       AND (t.assigned_to = $2 OR t.player_id IS NULL OR t.player_id IN (
+         SELECT id FROM players WHERE agent_id = $2 OR coach_id = $2 OR analyst_id = $2
+       ))
      ORDER BY CASE t.priority
        WHEN 'critical' THEN 0 WHEN 'high' THEN 1
        WHEN 'medium' THEN 2 ELSE 3 END,
        t.due_date ASC NULLS LAST
      LIMIT $1`,
-    { bind: [limit], type: QueryTypes.SELECT },
+    { bind: [limit, userId], type: QueryTypes.SELECT },
   );
 }
 
@@ -378,7 +473,7 @@ export async function getKpiTrends(months = 6) {
  * Uses Promise.allSettled so a single failing query doesn't crash the entire dashboard.
  * Failed sections return safe defaults and the dashboard renders partially.
  */
-export async function getFullDashboard() {
+export async function getFullDashboard(userId?: string, userRole?: UserRole, playerId?: string | null) {
   const labels = [
     "kpis",
     "alerts",
@@ -432,8 +527,8 @@ export async function getFullDashboard() {
     getContractStatusDistribution(),
     getPlayerDistribution(),
     getRecentOffers(),
-    getUpcomingMatches(),
-    getUrgentTasks(),
+    getUpcomingMatches(5, userId, userRole, playerId),
+    getUrgentTasks(5, userId, userRole, playerId),
     getRevenueChart(),
     getPerformanceAverages(),
     getRecentActivity(),

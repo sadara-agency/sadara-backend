@@ -4,8 +4,9 @@ import { sendSuccess } from "../../shared/utils/apiResponse";
 import * as dashboardService from "./dashboard.service";
 
 // GET /dashboard — full aggregated dashboard
-export async function getFullDashboard(_req: AuthRequest, res: Response) {
-  const data = await dashboardService.getFullDashboard();
+export async function getFullDashboard(req: AuthRequest, res: Response) {
+  const { id, role, playerId } = req.user!;
+  const data = await dashboardService.getFullDashboard(id, role, playerId);
   sendSuccess(res, data);
 }
 
@@ -56,14 +57,16 @@ export async function getRecentOffers(req: AuthRequest, res: Response) {
 // GET /dashboard/matches/upcoming
 export async function getUpcomingMatches(req: AuthRequest, res: Response) {
   const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
-  const data = await dashboardService.getUpcomingMatches(limit);
+  const { id, role, playerId } = req.user!;
+  const data = await dashboardService.getUpcomingMatches(limit, id, role, playerId);
   sendSuccess(res, data);
 }
 
 // GET /dashboard/tasks/urgent
 export async function getUrgentTasks(req: AuthRequest, res: Response) {
   const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
-  const data = await dashboardService.getUrgentTasks(limit);
+  const { id, role, playerId } = req.user!;
+  const data = await dashboardService.getUrgentTasks(limit, id, role, playerId);
   sendSuccess(res, data);
 }
 
