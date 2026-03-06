@@ -87,28 +87,30 @@ function removeKeys(obj: any, fields: string[]): void {
  * Replaces the static fieldAccess() for DB-driven field-level permissions.
  */
 export function dynamicFieldAccess(module: string) {
-  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  return (req: AuthRequest, res: Response, next: NextFunction): void => {
     const role = req.user?.role;
     if (!role || role === "Admin") {
       next();
       return;
     }
 
-    const fieldsToStrip = await getHiddenFields(role, module);
-    if (fieldsToStrip.length === 0) {
-      next();
-      return;
-    }
-
-    const originalJson = res.json.bind(res);
-    res.json = function (body: any) {
-      if (body && typeof body === "object") {
-        stripFields(body, fieldsToStrip);
-      }
-      return originalJson(body);
-    };
-
-    next();
+    getHiddenFields(role, module)
+      .then((fieldsToStrip) => {
+        if (fieldsToStrip.length > 0) {
+          const originalJson = res.json.bind(res);
+          res.json = function (body: any) {
+            if (body && typeof body === "object") {
+              stripFields(body, fieldsToStrip);
+            }
+            return originalJson(body);
+          };
+        }
+        next();
+      })
+      .catch(() => {
+        // If permission lookup fails, allow request through without field stripping
+        next();
+      });
   };
 }
 
@@ -125,8 +127,24 @@ export const PLAYER_HIDDEN_FIELDS: HiddenFieldsConfig = {
 /** Fields hidden from roles that should not see contract financial details */
 export const CONTRACT_HIDDEN_FIELDS: HiddenFieldsConfig = {
   baseSalary: ["Scout", "Player", "Analyst", "Coach", "Media", "Executive"],
-  commissionPct: ["Scout", "Player", "Analyst", "Legal", "Coach", "Media", "Executive"],
-  totalCommission: ["Scout", "Player", "Analyst", "Legal", "Coach", "Media", "Executive"],
+  commissionPct: [
+    "Scout",
+    "Player",
+    "Analyst",
+    "Legal",
+    "Coach",
+    "Media",
+    "Executive",
+  ],
+  totalCommission: [
+    "Scout",
+    "Player",
+    "Analyst",
+    "Legal",
+    "Coach",
+    "Media",
+    "Executive",
+  ],
   signingBonus: ["Scout", "Player", "Analyst", "Coach", "Media", "Executive"],
   releaseClause: ["Scout", "Player", "Coach", "Media"],
 };

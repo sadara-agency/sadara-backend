@@ -108,14 +108,19 @@ export async function getContractById(id: string) {
 
   const enriched = enrichContract(contract);
 
-  const milestones = await sequelize.query(
-    `SELECT ms.*
-     FROM milestones ms
-     JOIN commission_schedules cs ON ms.commission_schedule_id = cs.id
-     WHERE cs.contract_id = $1
-     ORDER BY ms.due_date`,
-    { bind: [id], type: QueryTypes.SELECT },
-  );
+  let milestones: any[] = [];
+  try {
+    milestones = await sequelize.query(
+      `SELECT ms.*
+       FROM milestones ms
+       JOIN commission_schedules cs ON ms.commission_schedule_id = cs.id
+       WHERE cs.contract_id = $1
+       ORDER BY ms.due_date`,
+      { bind: [id], type: QueryTypes.SELECT },
+    );
+  } catch {
+    // milestones/commission_schedules tables may not exist yet
+  }
 
   return { ...enriched, milestones };
 }
@@ -205,7 +210,17 @@ export async function deleteContract(id: string) {
     );
   }
 
-  await contract.destroy();
+  try {
+    await contract.destroy();
+  } catch (err: any) {
+    if (err.name === "SequelizeForeignKeyConstraintError") {
+      throw new AppError(
+        "Cannot delete contract — it has linked records (payments, documents, etc.)",
+        409,
+      );
+    }
+    throw err;
+  }
   return { id };
 }
 
@@ -268,7 +283,15 @@ export async function getContractHistory(contractId: string) {
   const rows = await AuditLog.findAll({
     where: { entity: "contracts", entityId: contractId },
     order: [["loggedAt", "DESC"]],
-    attributes: ["id", "action", "userName", "userRole", "detail", "changes", "loggedAt"],
+    attributes: [
+      "id",
+      "action",
+      "userName",
+      "userRole",
+      "detail",
+      "changes",
+      "loggedAt",
+    ],
   });
   return rows;
 }

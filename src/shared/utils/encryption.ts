@@ -103,10 +103,20 @@ export function decryptFields(fields: string[]) {
       for (const field of fields) {
         const val = instance.getDataValue?.(field) ?? instance[field];
         if (val && typeof val === "string" && isEncrypted(val)) {
-          if (instance.setDataValue) {
-            instance.setDataValue(field, decrypt(val));
-          } else {
-            instance[field] = decrypt(val);
+          try {
+            const decrypted = decrypt(val);
+            if (instance.setDataValue) {
+              instance.setDataValue(field, decrypted);
+            } else {
+              instance[field] = decrypted;
+            }
+          } catch {
+            // Corrupted encrypted data — return null instead of crashing
+            if (instance.setDataValue) {
+              instance.setDataValue(field, null);
+            } else {
+              instance[field] = null;
+            }
           }
         }
       }
