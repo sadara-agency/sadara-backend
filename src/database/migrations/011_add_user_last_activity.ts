@@ -1,11 +1,17 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 export async function up(qi: QueryInterface) {
-  await qi.addColumn("users", "last_activity", {
-    type: DataTypes.DATE,
-    allowNull: true,
-    defaultValue: null,
-  });
+  const tableDesc = (await qi.describeTable("users")) as Record<
+    string,
+    unknown
+  >;
+  if (!tableDesc.last_activity) {
+    await qi.addColumn("users", "last_activity", {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+    });
+  }
 }
 
 export async function down(qi: QueryInterface) {
