@@ -181,7 +181,7 @@ describe('Portal Service', () => {
       const contract = { id: 'c-001', playerId: 'player-001', status: 'AwaitingPlayer', update: jest.fn().mockResolvedValue({}) };
       mockContractFindByPk.mockResolvedValue(contract);
       const result = await portalService.signMyContract('user-001', 'c-001', 'sign_digital', 'sig-data');
-      expect(contract.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Active', signingMethod: 'digital' }), expect.any(Object));
+      expect(contract.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Active', signingMethod: 'digital', commissionLocked: true }), expect.any(Object));
     });
 
     it('should throw 403 if contract not owned', async () => {

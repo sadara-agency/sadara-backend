@@ -517,9 +517,28 @@ export async function signMyContract(
       );
     }
 
+    // ── Prevent overlapping active contracts for the same player ──
+    const overlap = await Contract.findOne({
+      where: {
+        playerId,
+        id: { [Op.ne]: contractId },
+        status: { [Op.in]: ["Active", "Expiring Soon"] },
+        startDate: { [Op.lte]: contract.endDate },
+        endDate: { [Op.gte]: contract.startDate },
+      },
+      transaction: t,
+    });
+    if (overlap) {
+      throw new AppError(
+        "Cannot activate — this player already has an active contract with overlapping dates",
+        409,
+      );
+    }
+
     const updatePayload: Record<string, unknown> = {
       status: "Active",
       signedAt: new Date(),
+      commissionLocked: true, // Lock commission once both parties have signed
     };
 
     if (action === "sign_digital") {
