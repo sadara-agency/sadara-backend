@@ -15,7 +15,7 @@
     "migrate": "ts-node src/database/migrate-cli.ts up",
     "migrate:down": "ts-node src/database/migrate-cli.ts down",
     "migrate:status": "ts-node src/database/migrate-cli.ts status",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@sentry/node": "^10.42.0",
