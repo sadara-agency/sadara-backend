@@ -2,7 +2,7 @@ import { sequelize } from "../../config/database";
 
 export async function up() {
   await sequelize.query(`
-    ALTER TYPE enum_players_player_type ADD VALUE IF NOT EXISTS 'Amateur';
+    ALTER TYPE player_type ADD VALUE IF NOT EXISTS 'Amateur';
   `);
 }
 
