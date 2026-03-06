@@ -44,7 +44,16 @@ export async function transitionContract(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const { action, signatureData, signedDocumentUrl, notes } = req.body;
 
-  const contract = await Contract.findByPk(id);
+  if (!action || typeof action !== "string") {
+    throw new AppError("action is required", 400);
+  }
+
+  let contract: Contract | null;
+  try {
+    contract = await Contract.findByPk(id);
+  } catch {
+    throw new AppError("Invalid contract ID", 400);
+  }
   if (!contract) throw new AppError("Contract not found", 404);
 
   const currentStatus = contract.status;
@@ -102,7 +111,14 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       : `[${timestamp}] ${action}: ${notes}`;
   }
 
-  await contract.update(updatePayload);
+  try {
+    await contract.update(updatePayload);
+  } catch (err: any) {
+    throw new AppError(
+      `Failed to update contract status: ${err.message || "database error"}`,
+      500,
+    );
+  }
 
   // Audit log
   await logAudit(
