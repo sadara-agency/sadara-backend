@@ -296,7 +296,7 @@ export async function getFinancialDashboard(
     : "";
   const [commissions] = await sequelize.query<any>(
     `SELECT
-       COALESCE(SUM(c.total_commission), 0)::NUMERIC AS expected_commissions,
+       COALESCE(SUM(CASE WHEN c.total_commission ~ '^[0-9.]+$' THEN c.total_commission::NUMERIC ELSE 0 END), 0) AS expected_commissions,
        (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
         ${commissionPayJoin}
         WHERE pay.status = 'Paid' AND pay.payment_type = 'Commission') AS collected_commissions,
@@ -351,9 +351,7 @@ export async function getFinancialDashboard(
   );
 
   // Per-player revenue breakdown (top 20 by paid payments)
-  const playerTypeJoin = playerContractType
-    ? "AND p.contract_type = $1"
-    : "";
+  const playerTypeJoin = playerContractType ? "AND p.contract_type = $1" : "";
   const playerRevenueBreakdown = await sequelize.query<any>(
     `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
             c.name AS club_name, c.name_ar AS club_name_ar,
@@ -581,9 +579,7 @@ export async function listExpenses(queryParams: any) {
     limit,
     offset,
     order: [[sort, order]],
-    include: [
-      { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
-    ],
+    include: [{ model: Player, as: "player", attributes: [...PLAYER_ATTRS] }],
   });
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
