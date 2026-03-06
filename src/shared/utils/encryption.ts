@@ -85,8 +85,11 @@ export function encryptFields(fields: string[]) {
     if (!instance) return;
     for (const field of fields) {
       const val = instance.getDataValue?.(field);
-      if (val && typeof val === "string" && !isEncrypted(val)) {
-        instance.setDataValue(field, encrypt(val));
+      if (val == null) continue;
+      // Convert numbers to strings so they can be encrypted
+      const strVal = typeof val === "number" ? String(val) : val;
+      if (typeof strVal === "string" && !isEncrypted(strVal)) {
+        instance.setDataValue(field, encrypt(strVal));
       }
     }
   };

@@ -224,7 +224,7 @@ Contract.init(
       field: "end_date",
     },
     baseSalary: {
-      type: DataTypes.DECIMAL(15, 2),
+      type: DataTypes.TEXT,
       field: "base_salary",
     },
     salaryCurrency: {
@@ -247,11 +247,11 @@ Contract.init(
       field: "performance_bonus",
     },
     commissionPct: {
-      type: DataTypes.DECIMAL(5, 2),
+      type: DataTypes.TEXT,
       field: "commission_pct",
     },
     totalCommission: {
-      type: DataTypes.DECIMAL(15, 2),
+      type: DataTypes.TEXT,
       field: "total_commission",
     },
     commissionLocked: {
