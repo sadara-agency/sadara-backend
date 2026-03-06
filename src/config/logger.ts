@@ -12,8 +12,26 @@ const devFormat = combine(
   }),
 );
 
+// Strip circular refs and massive Sequelize internals from error objects
+const safeErrors = winston.format((info) => {
+  if (
+    info.error &&
+    typeof info.error === "object" &&
+    !(typeof info.error === "string")
+  ) {
+    const e = info.error as any;
+    info.error = {
+      message: e.message,
+      stack: e.stack,
+      ...(e.original?.message && { dbError: e.original.message }),
+      ...(e.code && { code: e.code }),
+    };
+  }
+  return info;
+})();
+
 // JSON format for production (structured, parseable by log aggregators)
-const prodFormat = combine(timestamp(), json());
+const prodFormat = combine(timestamp(), safeErrors, json());
 
 const isProduction = process.env.NODE_ENV === "production";
 
