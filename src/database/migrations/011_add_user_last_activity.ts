@@ -1,19 +1,16 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { sequelize } from "../../config/database";
 
-export async function up(qi: QueryInterface) {
-  const tableDesc = (await qi.describeTable("users")) as Record<
-    string,
-    unknown
-  >;
-  if (!tableDesc.last_activity) {
-    await qi.addColumn("users", "last_activity", {
-      type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: null,
-    });
-  }
+export async function up() {
+  await sequelize.query(`
+    DO $$ BEGIN
+      ALTER TABLE users ADD COLUMN last_activity TIMESTAMPTZ;
+    EXCEPTION WHEN duplicate_column THEN NULL;
+    END $$;
+  `);
 }
 
-export async function down(qi: QueryInterface) {
-  await qi.removeColumn("users", "last_activity");
+export async function down() {
+  await sequelize.query(`
+    ALTER TABLE users DROP COLUMN IF EXISTS last_activity;
+  `);
 }

@@ -1,7 +1,6 @@
-import { QueryInterface } from "sequelize";
 import { sequelize } from "../../config/database";
 
-export async function up(qi: QueryInterface) {
+export async function up() {
   // Add new enum values to offer_status
   await sequelize.query(
     `ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Accepted'`,
@@ -19,7 +18,7 @@ export async function up(qi: QueryInterface) {
   `);
 }
 
-export async function down(qi: QueryInterface) {
+export async function down() {
   // Revert Accepted/Rejected back to Closed
   await sequelize.query(
     `UPDATE offers SET status = 'Closed' WHERE status IN ('Accepted', 'Rejected')`,
