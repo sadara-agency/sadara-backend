@@ -591,22 +591,79 @@ export async function generatePlayerInvite(
   if (!email)
     throw new AppError("Player must have an email to generate an invite", 400);
 
+  // ── Check for existing User account ──
   const existingUser = await User.findOne({
     where: { [Op.or]: [{ email }, { playerId }] } as any,
   });
-  if (existingUser)
-    throw new AppError("A user account already exists for this player", 409);
 
+  if (existingUser) {
+    // If the user is inactive with an expired/missing token, regenerate the invite
+    const tokenExpired =
+      !existingUser.inviteToken ||
+      (existingUser.inviteTokenExpiry &&
+        new Date(existingUser.inviteTokenExpiry).getTime() < Date.now());
+
+    if (!existingUser.isActive && tokenExpired) {
+      const token = crypto.randomBytes(32).toString("hex");
+      const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+      const hashedToken = crypto
+        .createHash("sha256")
+        .update(token)
+        .digest("hex");
+
+      await existingUser.update({
+        inviteToken: hashedToken,
+        inviteTokenExpiry: expiry,
+        playerId: player.id,
+      } as any);
+
+      const inviteLink = `${env.frontend.url}/player/register?token=${token}`;
+      return {
+        inviteLink,
+        token,
+        expiresAt: expiry,
+        playerName: `${player.firstName} ${player.lastName}`,
+        playerEmail: email,
+      };
+    }
+
+    if (existingUser.isActive) {
+      throw new AppError(
+        "A user account already exists and is active for this player",
+        409,
+      );
+    }
+
+    // User exists, inactive but token not expired — still pending
+    throw new AppError(
+      "An invite is already pending for this player. Use resend if needed.",
+      409,
+    );
+  }
+
+  // ── Auto-create player_accounts row if missing ──
   const existingAccount = await sequelize.query<{ id: string }>(
-    `SELECT id FROM player_accounts WHERE player_id = :playerId OR email = :email LIMIT 1`,
-    {
-      replacements: { playerId, email },
-      type: QueryTypes.SELECT,
-    },
+    `SELECT id FROM player_accounts WHERE player_id = :playerId LIMIT 1`,
+    { replacements: { playerId }, type: QueryTypes.SELECT },
   );
-  if (existingAccount[0])
-    throw new AppError("A player account already exists for this player", 409);
 
+  if (!existingAccount[0]) {
+    const paId = crypto.randomUUID();
+    const placeholderHash = await bcrypt.hash(
+      crypto.randomBytes(32).toString("hex"),
+      env.bcrypt.saltRounds,
+    );
+    await sequelize.query(
+      `INSERT INTO player_accounts (id, player_id, email, password_hash, status, created_at, updated_at)
+       VALUES (:id, :playerId, :email, :hash, 'pending', NOW(), NOW())`,
+      {
+        replacements: { id: paId, playerId, email, hash: placeholderHash },
+        type: QueryTypes.INSERT,
+      },
+    );
+  }
+
+  // ── Create User record with invite token ──
   const token = crypto.randomBytes(32).toString("hex");
   const expiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -671,6 +728,19 @@ export async function completePlayerRegistration(
     inviteToken: null,
     inviteTokenExpiry: null,
   });
+
+  // Activate the player_accounts row if one exists
+  const userPlayerId = (user as any).playerId;
+  if (userPlayerId) {
+    await sequelize.query(
+      `UPDATE player_accounts SET status = 'active', password_hash = :hash, updated_at = NOW()
+       WHERE player_id = :playerId AND status != 'active'`,
+      {
+        replacements: { hash: hashedPassword, playerId: userPlayerId },
+        type: QueryTypes.UPDATE,
+      },
+    );
+  }
 
   return {
     message: "Registration complete. You can now log in.",
