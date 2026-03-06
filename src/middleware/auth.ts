@@ -1,10 +1,31 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
+import { sequelize } from "../config/database";
 import { AuthRequest, AuthUser, UserRole } from "../shared/types";
 import { sendUnauthorized, sendForbidden } from "../shared/utils/apiResponse";
 import { COOKIE_NAME } from "../shared/utils/cookie";
-import { hasPermission, CrudAction } from "../modules/permissions/permission.service";
+import {
+  hasPermission,
+  CrudAction,
+} from "../modules/permissions/permission.service";
+
+// Throttle activity updates — at most once per 5 minutes per user
+const activityCache = new Map<string, number>();
+const ACTIVITY_THROTTLE_MS = 5 * 60 * 1000;
+
+function trackActivity(userId: string) {
+  const now = Date.now();
+  const last = activityCache.get(userId) || 0;
+  if (now - last < ACTIVITY_THROTTLE_MS) return;
+  activityCache.set(userId, now);
+  // Fire-and-forget — don't block the request
+  sequelize
+    .query("UPDATE users SET last_activity = NOW() WHERE id = :id", {
+      replacements: { id: userId },
+    })
+    .catch(() => {});
+}
 
 /** Extract token from cookie (browser) or Authorization header (API clients). */
 function extractToken(req: AuthRequest): string | undefined {
@@ -36,6 +57,7 @@ export function authenticate(
   try {
     const decoded = jwt.verify(token, env.jwt.secret) as AuthUser;
     req.user = decoded;
+    trackActivity(decoded.id);
     next();
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
