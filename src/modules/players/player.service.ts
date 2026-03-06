@@ -299,6 +299,11 @@ export async function updatePlayer(id: string, input: any) {
   const player = await Player.findByPk(id);
   if (!player) throw new AppError("Player not found", 404);
 
+  // Sanitize email — empty string → null
+  if ("email" in input) {
+    input.email = input.email?.trim() || null;
+  }
+
   // Auto-track club history when currentClubId changes
   if (
     input.currentClubId &&
