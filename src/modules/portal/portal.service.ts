@@ -579,8 +579,28 @@ export async function generatePlayerInvite(
   const player = await Player.findByPk(playerId);
   if (!player) throw new AppError("Player not found", 404);
 
-  // Ensure email is decrypted — afterFind hook may silently fail
+  // Try the model value first (afterFind hook should have decrypted it)
   let email = player.email;
+
+  // If afterFind silently nulled the email (decryption failure), read the raw value
+  if (!email) {
+    const [raw] = await sequelize.query<{ email: string }>(
+      `SELECT email FROM players WHERE id = :playerId LIMIT 1`,
+      { replacements: { playerId }, type: QueryTypes.SELECT },
+    );
+    const rawEmail = raw?.email;
+    if (rawEmail && isEncrypted(rawEmail)) {
+      try {
+        email = decrypt(rawEmail);
+      } catch {
+        email = null;
+      }
+    } else {
+      email = rawEmail || null;
+    }
+  }
+
+  // Also handle the case where afterFind returned an encrypted string
   if (email && isEncrypted(email)) {
     try {
       email = decrypt(email);
@@ -588,6 +608,7 @@ export async function generatePlayerInvite(
       email = null;
     }
   }
+
   if (!email)
     throw new AppError("Player must have an email to generate an invite", 400);
 
