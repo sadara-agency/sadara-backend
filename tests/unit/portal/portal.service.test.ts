@@ -16,7 +16,11 @@ const mockInjuryFindAll = jest.fn();
 const mockSequelizeQuery = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { query: (...a: unknown[]) => mockSequelizeQuery(...a), authenticate: jest.fn() },
+  sequelize: {
+    query: (...a: unknown[]) => mockSequelizeQuery(...a),
+    authenticate: jest.fn(),
+    transaction: (cb: (t: any) => Promise<any>) => cb({ LOCK: { UPDATE: 'UPDATE' } }),
+  },
 }));
 
 jest.mock('../../../src/modules/players/player.model', () => ({
@@ -177,7 +181,7 @@ describe('Portal Service', () => {
       const contract = { id: 'c-001', playerId: 'player-001', status: 'AwaitingPlayer', update: jest.fn().mockResolvedValue({}) };
       mockContractFindByPk.mockResolvedValue(contract);
       const result = await portalService.signMyContract('user-001', 'c-001', 'sign_digital', 'sig-data');
-      expect(contract.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Active', signingMethod: 'digital' }));
+      expect(contract.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Active', signingMethod: 'digital' }), expect.any(Object));
     });
 
     it('should throw 403 if contract not owned', async () => {
