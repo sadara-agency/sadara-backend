@@ -227,9 +227,9 @@ describe('Portal Service', () => {
       await expect(portalService.generatePlayerInvite('player-001', 'user-001')).rejects.toThrow('email');
     });
 
-    it('should throw 409 if user account exists', async () => {
+    it('should throw 409 if user account exists and is active', async () => {
       mockPlayerFindByPk.mockResolvedValue(mockPlayerInst());
-      mockUserFindOne.mockResolvedValue({ id: 'existing' });
+      mockUserFindOne.mockResolvedValue({ id: 'existing', isActive: true });
       await expect(portalService.generatePlayerInvite('player-001', 'user-001')).rejects.toThrow('already exists');
     });
   });
