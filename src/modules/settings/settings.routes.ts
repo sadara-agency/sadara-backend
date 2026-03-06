@@ -39,10 +39,20 @@ const teamQuerySchema = z.object({
 const updateUserSchema = z.object({
   fullName: z.string().min(1).max(255).optional(),
   fullNameAr: z.string().max(255).optional(),
-  role: z.enum([
-    "Admin", "Manager", "Analyst", "Scout", "Player",
-    "Legal", "Finance", "Coach", "Media", "Executive",
-  ]).optional(),
+  role: z
+    .enum([
+      "Admin",
+      "Manager",
+      "Analyst",
+      "Scout",
+      "Player",
+      "Legal",
+      "Finance",
+      "Coach",
+      "Media",
+      "Executive",
+    ])
+    .optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -319,9 +329,8 @@ router.post(
   authorizeModule("settings", "create"),
   validate(testConnectionSchema),
   asyncHandler(async (req: AuthRequest, res: Response) => {
-    const { getProvider, listProviders } = await import(
-      "../integrations/matchAnalysis.service"
-    );
+    const { getProvider, listProviders } =
+      await import("../integrations/matchAnalysis.service");
     const { provider: providerName } = req.body;
     const provider = getProvider(providerName);
 
@@ -347,6 +356,215 @@ router.post(
       sendSuccess(res, {
         connected: false,
         provider: providerName,
+        message: err.message || "Connection test failed",
+      });
+    }
+  }),
+);
+
+// ══════════════════════════════════════════
+// SMTP SETTINGS (Admin only)
+// ══════════════════════════════════════════
+
+const smtpSettingsSchema = z.object({
+  host: z.string().min(1).optional(),
+  port: z.coerce.number().min(1).max(65535).optional(),
+  username: z.string().optional(),
+  password: z.string().optional(),
+  fromEmail: z.string().email().optional(),
+  fromName: z.string().optional(),
+  secure: z.boolean().optional(),
+});
+
+async function getAppSetting(key: string): Promise<any> {
+  const [row] = (await sequelize.query(
+    `SELECT value FROM app_settings WHERE key = $1 LIMIT 1`,
+    { bind: [key], type: QueryTypes.SELECT },
+  )) as any[];
+  return row?.value ?? null;
+}
+
+async function setAppSetting(key: string, value: any): Promise<void> {
+  await sequelize.query(
+    `INSERT INTO app_settings (key, value, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+    { bind: [key, JSON.stringify(value)] },
+  );
+}
+
+router.get(
+  "/smtp",
+  authorizeModule("settings", "read"),
+  asyncHandler(async (_req: AuthRequest, res: Response) => {
+    const settings = await getAppSetting("smtp_config");
+    // Mask password in response
+    if (settings?.password) {
+      settings.password = "••••••••";
+    }
+    sendSuccess(
+      res,
+      settings || {
+        host: "",
+        port: 587,
+        username: "",
+        password: "",
+        fromEmail: "",
+        fromName: "",
+        secure: true,
+      },
+    );
+  }),
+);
+
+router.patch(
+  "/smtp",
+  authorizeModule("settings", "update"),
+  validate(smtpSettingsSchema),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const current = (await getAppSetting("smtp_config")) || {};
+    const updated = { ...current, ...req.body };
+    // If password is masked, keep the old one
+    if (req.body.password === "••••••••") {
+      updated.password = current.password;
+    }
+    await setAppSetting("smtp_config", updated);
+    await logAudit(
+      "UPDATE",
+      "settings",
+      "smtp",
+      buildAuditContext(req.user!, req.ip),
+      "SMTP settings updated",
+    );
+    // Return with masked password
+    const response = {
+      ...updated,
+      password: updated.password ? "••••••••" : "",
+    };
+    sendSuccess(res, response, "SMTP settings updated");
+  }),
+);
+
+router.post(
+  "/smtp/test",
+  authorizeModule("settings", "create"),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const settings = await getAppSetting("smtp_config");
+    if (!settings?.host) {
+      sendSuccess(res, { success: false, message: "SMTP not configured" });
+      return;
+    }
+    try {
+      const nodemailer = require("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: settings.host,
+        port: settings.port || 587,
+        secure: settings.secure ?? true,
+        auth: { user: settings.username, pass: settings.password },
+      });
+      await transporter.verify();
+      sendSuccess(res, {
+        success: true,
+        message: "SMTP connection successful",
+      });
+    } catch (err: any) {
+      sendSuccess(res, {
+        success: false,
+        message: err.message || "Connection failed",
+      });
+    }
+  }),
+);
+
+// ══════════════════════════════════════════
+// MATCH ANALYSIS PROVIDER SETTINGS (Admin only)
+// ══════════════════════════════════════════
+
+const matchAnalysisSettingsSchema = z.object({
+  provider: z.string().optional(),
+  apiKey: z.string().optional(),
+  baseUrl: z.string().optional(),
+  enabled: z.boolean().optional(),
+});
+
+router.get(
+  "/match-analysis",
+  authorizeModule("settings", "read"),
+  asyncHandler(async (_req: AuthRequest, res: Response) => {
+    const settings = await getAppSetting("match_analysis_config");
+    // Mask API key
+    if (settings?.apiKey) {
+      settings.apiKey = settings.apiKey.substring(0, 4) + "••••••••";
+    }
+    sendSuccess(
+      res,
+      settings || {
+        provider: "Wyscout",
+        apiKey: "",
+        baseUrl: "",
+        enabled: false,
+      },
+    );
+  }),
+);
+
+router.patch(
+  "/match-analysis",
+  authorizeModule("settings", "update"),
+  validate(matchAnalysisSettingsSchema),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const current = (await getAppSetting("match_analysis_config")) || {};
+    const updated = { ...current, ...req.body };
+    // If apiKey is masked, keep the old one
+    if (req.body.apiKey && req.body.apiKey.includes("••••••••")) {
+      updated.apiKey = current.apiKey;
+    }
+    await setAppSetting("match_analysis_config", updated);
+    await logAudit(
+      "UPDATE",
+      "settings",
+      "match-analysis",
+      buildAuditContext(req.user!, req.ip),
+      "Match analysis settings updated",
+    );
+    const response = { ...updated };
+    if (response.apiKey)
+      response.apiKey = response.apiKey.substring(0, 4) + "••••••••";
+    sendSuccess(res, response, "Match analysis settings updated");
+  }),
+);
+
+router.post(
+  "/match-analysis/test",
+  authorizeModule("settings", "create"),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const settings = await getAppSetting("match_analysis_config");
+    if (!settings?.apiKey || !settings?.provider) {
+      sendSuccess(res, {
+        connected: false,
+        message: "Provider not configured",
+      });
+      return;
+    }
+    const { getProvider } =
+      await import("../integrations/matchAnalysis.service");
+    const provider = getProvider(settings.provider);
+    if (!provider) {
+      sendSuccess(res, {
+        connected: false,
+        message: `Provider "${settings.provider}" not available`,
+      });
+      return;
+    }
+    try {
+      const connected = await provider.testConnection();
+      sendSuccess(res, {
+        connected,
+        message: connected ? "Connection successful" : "Connection failed",
+      });
+    } catch (err: any) {
+      sendSuccess(res, {
+        connected: false,
         message: err.message || "Connection test failed",
       });
     }

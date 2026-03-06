@@ -27,7 +27,14 @@ export const updateOfferSchema = createOfferSchema.partial();
 // ── Update Offer Status ──
 
 export const updateOfferStatusSchema = z.object({
-  status: z.enum(["New", "Under Review", "Negotiation", "Closed"]),
+  status: z.enum([
+    "New",
+    "Under Review",
+    "Negotiation",
+    "Accepted",
+    "Rejected",
+    "Closed",
+  ]),
   counterOffer: z.record(z.unknown()).optional(),
   notes: z.string().optional(),
 });
@@ -49,7 +56,16 @@ export const offerQuerySchema = z.object({
     .default("created_at"),
   order: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
-  status: z.enum(["New", "Under Review", "Negotiation", "Closed"]).optional(),
+  status: z
+    .enum([
+      "New",
+      "Under Review",
+      "Negotiation",
+      "Accepted",
+      "Rejected",
+      "Closed",
+    ])
+    .optional(),
   offerType: z.enum(["Transfer", "Loan"]).optional(),
   playerId: z.string().uuid().optional(),
   fromClubId: z.string().uuid().optional(),

@@ -161,9 +161,9 @@ export async function updateOffer(id: string, input: any) {
   const offer = await Offer.findByPk(id);
   if (!offer) throw new AppError("Offer not found", 404);
 
-  // Prevent updates on closed offers
-  if (offer.status === "Closed") {
-    throw new AppError("Cannot update a closed offer", 400);
+  // Prevent updates on terminal offers
+  if (["Accepted", "Rejected", "Closed", "Converted"].includes(offer.status)) {
+    throw new AppError("Cannot update a closed/accepted/rejected offer", 400);
   }
 
   return await offer.update(input);
@@ -187,7 +187,11 @@ export async function updateOfferStatus(
   if (input.status === "Under Review" || input.status === "Negotiation") {
     updateData.respondedAt = new Date();
   }
-  if (input.status === "Closed") {
+  if (
+    input.status === "Accepted" ||
+    input.status === "Rejected" ||
+    input.status === "Closed"
+  ) {
     updateData.closedAt = new Date();
   }
 
@@ -241,9 +245,9 @@ export async function convertOfferToContract(
     });
 
     if (!offer) throw new AppError("Offer not found", 404);
-    if (offer.status !== "Closed") {
+    if (offer.status !== "Accepted" && offer.status !== "Closed") {
       throw new AppError(
-        "Only closed offers can be converted to contracts",
+        "Only accepted/closed offers can be converted to contracts",
         400,
       );
     }
