@@ -41,13 +41,13 @@ const CLUB_AGGREGATES = [
   ],
   [
     Sequelize.literal(
-      `(SELECT COALESCE(SUM(ct.base_salary), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
+      `(SELECT COALESCE(SUM(CASE WHEN ct.base_salary ~ '^[0-9.]+$' THEN ct.base_salary::NUMERIC ELSE 0 END), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
     ),
     "total_contract_value",
   ],
   [
     Sequelize.literal(
-      `(SELECT COALESCE(SUM(ct.total_commission), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
+      `(SELECT COALESCE(SUM(CASE WHEN ct.total_commission ~ '^[0-9.]+$' THEN ct.total_commission::NUMERIC ELSE 0 END), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
     ),
     "total_commission",
   ],

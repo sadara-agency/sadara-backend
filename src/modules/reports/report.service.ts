@@ -129,7 +129,10 @@ export async function gatherReportData(
   const matchBinds = [playerId, ...matchDate.binds];
 
   // For injuries, rebuild with i.injury_date instead of m.match_date
-  const injuryDateClause = matchDate.clause.replace(/m\.match_date/g, "i.injury_date");
+  const injuryDateClause = matchDate.clause.replace(
+    /m\.match_date/g,
+    "i.injury_date",
+  );
 
   // ── Player profile ──
   const [profile] = await sequelize.query<any>(
@@ -285,11 +288,11 @@ export async function getPlayerPortfolioReport(filters: ReportFilters) {
 
 // ── Contract & Commission Report ──
 export async function getContractCommissionReport(filters: ReportFilters) {
-  const { clause: extra, binds, nextIdx } = buildSafeWhere(
-    filters,
-    "c.start_date",
-    "c",
-  );
+  const {
+    clause: extra,
+    binds,
+    nextIdx,
+  } = buildSafeWhere(filters, "c.start_date", "c");
   let idx = nextIdx;
   let pctFilter = "";
   if (filters.playerContractType) {
@@ -314,8 +317,8 @@ export async function getContractCommissionReport(filters: ReportFilters) {
   const [summary] = await sequelize.query<any>(
     `SELECT
        COUNT(*)::INT AS active_contracts,
-       COALESCE(SUM(total_commission), 0)::NUMERIC AS total_expected_commission,
-       COALESCE(SUM(base_salary), 0)::NUMERIC AS total_base_salary
+       COALESCE(SUM(CASE WHEN total_commission ~ '^[0-9.]+$' THEN total_commission::NUMERIC ELSE 0 END), 0) AS total_expected_commission,
+       COALESCE(SUM(CASE WHEN base_salary ~ '^[0-9.]+$' THEN base_salary::NUMERIC ELSE 0 END), 0) AS total_base_salary
      FROM contracts
      WHERE status IN ('Active', 'Expiring Soon')`,
     { type: QueryTypes.SELECT },
@@ -436,7 +439,7 @@ export async function getFinancialSummaryReport(filters: ReportFilters) {
   const [overview] = await sequelize.query<any>(
     `SELECT
        COALESCE(SUM(p.market_value), 0)::NUMERIC AS total_market_value,
-       (SELECT COALESCE(SUM(total_commission), 0)::NUMERIC FROM contracts WHERE status IN ('Active', 'Expiring Soon')) AS expected_commissions,
+       (SELECT COALESCE(SUM(CASE WHEN total_commission ~ '^[0-9.]+$' THEN total_commission::NUMERIC ELSE 0 END), 0) FROM contracts WHERE status IN ('Active', 'Expiring Soon')) AS expected_commissions,
        (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments WHERE status = 'Paid') AS collected_revenue,
        (SELECT COALESCE(SUM(amount), 0)::NUMERIC FROM payments WHERE status IN ('Expected', 'Overdue')) AS outstanding_revenue
      FROM players p
@@ -584,9 +587,10 @@ export async function getUpcomingMatchesTasksReport(filters: ReportFilters) {
 
   const matchIds = matches.map((m: any) => m.id);
 
-  const tasks = matchIds.length > 0
-    ? await sequelize.query<any>(
-        `SELECT t.title, t.type, t.priority, t.status, t.due_date, t.is_auto_created,
+  const tasks =
+    matchIds.length > 0
+      ? await sequelize.query<any>(
+          `SELECT t.title, t.type, t.priority, t.status, t.due_date, t.is_auto_created,
                 u.full_name AS assigned_to_name,
                 COALESCE(p.first_name || ' ' || p.last_name, '') AS player_name,
                 COALESCE(hc.name, m.home_team_name, '') || ' vs ' || COALESCE(ac.name, m.away_team_name, '') || ' (' || TO_CHAR(m.match_date, 'YYYY-MM-DD') || ')' AS match_label
@@ -598,9 +602,9 @@ export async function getUpcomingMatchesTasksReport(filters: ReportFilters) {
          LEFT JOIN clubs ac ON m.away_club_id = ac.id
          WHERE t.match_id = ANY($1::UUID[])
          ORDER BY t.due_date ASC NULLS LAST, t.priority DESC`,
-        { bind: [matchIds], type: QueryTypes.SELECT },
-      )
-    : [];
+          { bind: [matchIds], type: QueryTypes.SELECT },
+        )
+      : [];
 
   const [summary] = await sequelize.query<any>(
     `SELECT
@@ -662,7 +666,7 @@ export async function getExpiringContractsReport(filters: ReportFilters) {
        COUNT(*) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days')::INT AS expiring_30,
        COUNT(*) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '60 days')::INT AS expiring_60,
        COUNT(*) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '90 days')::INT AS expiring_90,
-       COALESCE(SUM(c.base_salary) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${window} days'), 0)::NUMERIC AS salary_at_risk
+       COALESCE(SUM(CASE WHEN c.base_salary ~ '^[0-9.]+$' THEN c.base_salary::NUMERIC ELSE 0 END) FILTER (WHERE c.end_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '${window} days'), 0) AS salary_at_risk
      FROM contracts c
      WHERE c.status IN ('Active', 'Expiring Soon')
        AND c.end_date >= CURRENT_DATE`,
