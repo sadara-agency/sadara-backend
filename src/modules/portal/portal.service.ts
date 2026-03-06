@@ -494,46 +494,58 @@ export async function signMyContract(
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
 
-  const contract = await Contract.findByPk(contractId);
-  if (!contract) throw new AppError("Contract not found", 404);
+  // Wrap in transaction with row-level lock to prevent race conditions
+  const result = await sequelize.transaction(async (t) => {
+    // SELECT ... FOR UPDATE — prevents concurrent signing attempts
+    const contract = await Contract.findByPk(contractId, {
+      lock: t.LOCK.UPDATE,
+      transaction: t,
+    });
+    if (!contract) throw new AppError("Contract not found", 404);
 
-  // Ensure this contract belongs to the player
-  if (contract.playerId !== playerId) {
-    throw new AppError("You are not authorized to sign this contract", 403);
-  }
+    // Ensure this contract belongs to the player
+    if (contract.playerId !== playerId) {
+      throw new AppError("You are not authorized to sign this contract", 403);
+    }
 
-  // ── FIX: Player signs when status is 'AwaitingPlayer' ──
-  if (contract.status !== "AwaitingPlayer") {
-    throw new AppError(
-      "This contract is not awaiting your signature. Current status: " +
-        contract.status,
-      400,
-    );
-  }
-
-  const updatePayload: Record<string, unknown> = {
-    status: "Active",
-    signedAt: new Date(),
-  };
-
-  if (action === "sign_digital") {
-    if (!signatureData)
-      throw new AppError("Signature data is required for digital signing", 400);
-    updatePayload.signedDocumentUrl = signatureData;
-    updatePayload.signingMethod = "digital";
-  } else {
-    if (!signedDocumentUrl)
+    // ── Player signs when status is 'AwaitingPlayer' ──
+    if (contract.status !== "AwaitingPlayer") {
       throw new AppError(
-        "Signed document URL is required for upload signing",
+        "This contract is not awaiting your signature. Current status: " +
+          contract.status,
         400,
       );
-    updatePayload.signedDocumentUrl = signedDocumentUrl;
-    updatePayload.signingMethod = "upload";
-  }
+    }
 
-  await contract.update(updatePayload);
+    const updatePayload: Record<string, unknown> = {
+      status: "Active",
+      signedAt: new Date(),
+    };
 
-  return contract;
+    if (action === "sign_digital") {
+      if (!signatureData)
+        throw new AppError(
+          "Signature data is required for digital signing",
+          400,
+        );
+      updatePayload.signedDocumentUrl = signatureData;
+      updatePayload.signingMethod = "digital";
+    } else {
+      if (!signedDocumentUrl)
+        throw new AppError(
+          "Signed document URL is required for upload signing",
+          400,
+        );
+      updatePayload.signedDocumentUrl = signedDocumentUrl;
+      updatePayload.signingMethod = "upload";
+    }
+
+    await contract.update(updatePayload, { transaction: t });
+
+    return contract;
+  });
+
+  return result;
 }
 
 // ══════════════════════════════════════════
@@ -700,8 +712,10 @@ export async function getMyInjuries(userId: string) {
   const avgRecovery =
     recovered.length > 0
       ? Math.round(
-          recovered.reduce((s: number, i: any) => s + (i.actualDaysOut || 0), 0) /
-            recovered.length,
+          recovered.reduce(
+            (s: number, i: any) => s + (i.actualDaysOut || 0),
+            0,
+          ) / recovered.length,
         )
       : 0;
 

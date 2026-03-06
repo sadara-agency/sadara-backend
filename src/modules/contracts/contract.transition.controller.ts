@@ -13,6 +13,7 @@ import { sendSuccess } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import { AppError } from "../../middleware/errorHandler";
 import { Contract } from "./contract.model";
+import { transaction } from "../../config/database";
 import {
   createApprovalRequest,
   resolveApprovalByEntity,
@@ -48,79 +49,86 @@ export async function transitionContract(req: AuthRequest, res: Response) {
     throw new AppError("action is required", 400);
   }
 
-  let contract: Contract | null;
-  try {
-    contract = await Contract.findByPk(id);
-  } catch {
-    throw new AppError("Invalid contract ID", 400);
-  }
-  if (!contract) throw new AppError("Contract not found", 404);
+  // Wrap in transaction with row-level lock to prevent race conditions
+  const { contract, currentStatus, nextStatus } = await transaction(
+    async (t) => {
+      // SELECT ... FOR UPDATE — blocks concurrent transitions on the same row
+      const locked = await Contract.findByPk(id, {
+        lock: t.LOCK.UPDATE,
+        transaction: t,
+      });
 
-  const currentStatus = contract.status;
-  const allowedActions = TRANSITION_MAP[currentStatus];
+      if (!locked) throw new AppError("Contract not found", 404);
 
-  if (!allowedActions) {
-    throw new AppError(
-      `Contract in status '${currentStatus}' cannot be transitioned`,
-      400,
-    );
-  }
+      const curStatus = locked.status;
+      const allowedActions = TRANSITION_MAP[curStatus];
 
-  const nextStatus = allowedActions[action];
-  if (!nextStatus) {
-    throw new AppError(
-      `Action '${action}' is not valid for status '${currentStatus}'. Allowed: ${Object.keys(allowedActions).join(", ")}`,
-      400,
-    );
-  }
+      if (!allowedActions) {
+        throw new AppError(
+          `Contract in status '${curStatus}' cannot be transitioned`,
+          400,
+        );
+      }
 
-  // Build update payload
-  const updatePayload: Record<string, unknown> = {
-    status: nextStatus,
-  };
+      const nxtStatus = allowedActions[action];
+      if (!nxtStatus) {
+        throw new AppError(
+          `Action '${action}' is not valid for status '${curStatus}'. Allowed: ${Object.keys(allowedActions).join(", ")}`,
+          400,
+        );
+      }
 
-  // ── Agent digital signature → stored in agent fields ──
-  if (action === "agent_sign_digital") {
-    if (!signatureData) {
-      throw new AppError("signatureData is required for digital signing", 400);
-    }
-    updatePayload.agentSignatureData = signatureData; // base64 image
-    updatePayload.agentSignedAt = new Date();
-    updatePayload.agentSigningMethod = "digital";
-  }
+      // Build update payload
+      const updatePayload: Record<string, unknown> = {
+        status: nxtStatus,
+      };
 
-  // ── Agent upload signature → stored in agent fields ──
-  if (action === "agent_sign_upload") {
-    if (!signedDocumentUrl) {
-      throw new AppError(
-        "signedDocumentUrl is required for upload signing",
-        400,
-      );
-    }
-    updatePayload.agentSignatureData = signedDocumentUrl;
-    updatePayload.agentSignedAt = new Date();
-    updatePayload.agentSigningMethod = "upload";
-  }
+      // ── Agent digital signature → stored in agent fields ──
+      if (action === "agent_sign_digital") {
+        if (!signatureData) {
+          throw new AppError(
+            "signatureData is required for digital signing",
+            400,
+          );
+        }
+        updatePayload.agentSignatureData = signatureData; // base64 image
+        updatePayload.agentSignedAt = new Date();
+        updatePayload.agentSigningMethod = "digital";
+      }
 
-  // Add notes if provided
-  if (notes) {
-    const existing = contract.notes || "";
-    const timestamp = new Date().toISOString().split("T")[0];
-    updatePayload.notes = existing
-      ? `${existing}\n[${timestamp}] ${action}: ${notes}`
-      : `[${timestamp}] ${action}: ${notes}`;
-  }
+      // ── Agent upload signature → stored in agent fields ──
+      if (action === "agent_sign_upload") {
+        if (!signedDocumentUrl) {
+          throw new AppError(
+            "signedDocumentUrl is required for upload signing",
+            400,
+          );
+        }
+        updatePayload.agentSignatureData = signedDocumentUrl;
+        updatePayload.agentSignedAt = new Date();
+        updatePayload.agentSigningMethod = "upload";
+      }
 
-  try {
-    await contract.update(updatePayload);
-  } catch (err: any) {
-    throw new AppError(
-      `Failed to update contract status: ${err.message || "database error"}`,
-      500,
-    );
-  }
+      // Add notes if provided
+      if (notes) {
+        const existing = locked.notes || "";
+        const timestamp = new Date().toISOString().split("T")[0];
+        updatePayload.notes = existing
+          ? `${existing}\n[${timestamp}] ${action}: ${notes}`
+          : `[${timestamp}] ${action}: ${notes}`;
+      }
 
-  // Audit log
+      await locked.update(updatePayload, { transaction: t });
+
+      return {
+        contract: locked,
+        currentStatus: curStatus,
+        nextStatus: nxtStatus,
+      };
+    },
+  );
+
+  // Audit log (outside transaction — non-critical)
   await logAudit(
     "UPDATE",
     "contracts",
@@ -129,7 +137,7 @@ export async function transitionContract(req: AuthRequest, res: Response) {
     `Contract transitioned: ${currentStatus} → ${nextStatus} (action: ${action})`,
   );
 
-  // ── Approval hooks ──
+  // ── Approval hooks (fire-and-forget, outside transaction) ──
   if (action === "submit_review") {
     const due = new Date();
     due.setDate(due.getDate() + 3);

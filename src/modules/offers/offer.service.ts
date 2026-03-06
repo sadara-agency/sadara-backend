@@ -261,19 +261,22 @@ export async function convertOfferToContract(
     const endDate = new Date(today);
     endDate.setFullYear(endDate.getFullYear() + (offer.contractYears || 1));
 
+    // Map offer type → contract type
+    const contractType = offer.offerType === "Loan" ? "Loan" : "Transfer";
+
     const contract = await Contract.create(
       {
         playerId: offer.playerId,
         clubId: offer.toClubId || offer.fromClubId,
-        contractType: "Professional",
-        status: "Active",
+        contractType,
+        status: "Draft",
         startDate: today.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
         baseSalary: offer.salaryOffered || 0,
         salaryCurrency: offer.feeCurrency || "SAR",
         signingBonus: offer.transferFee || 0,
         commissionPct: offer.agentFee ? Number(offer.agentFee) : 10,
-        notes: `Auto-created from offer #${offerId}`,
+        notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
         createdBy,
       } as any,
       { transaction: t },
