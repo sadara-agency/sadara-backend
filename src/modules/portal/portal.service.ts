@@ -6,6 +6,7 @@ import { env } from "../../config/env";
 import { Player } from "../players/player.model";
 import { Club } from "../clubs/club.model";
 import { User } from "../Users/user.model";
+import { isEncrypted, decrypt } from "../../shared/utils/encryption";
 import { Contract } from "../contracts/contract.model";
 import { Match } from "../matches/match.model";
 import { Document } from "../documents/document.model";
@@ -577,11 +578,21 @@ export async function generatePlayerInvite(
 ) {
   const player = await Player.findByPk(playerId);
   if (!player) throw new AppError("Player not found", 404);
-  if (!player.email)
+
+  // Ensure email is decrypted — afterFind hook may silently fail
+  let email = player.email;
+  if (email && isEncrypted(email)) {
+    try {
+      email = decrypt(email);
+    } catch {
+      email = null;
+    }
+  }
+  if (!email)
     throw new AppError("Player must have an email to generate an invite", 400);
 
   const existingUser = await User.findOne({
-    where: { [Op.or]: [{ email: player.email }, { playerId }] } as any,
+    where: { [Op.or]: [{ email }, { playerId }] } as any,
   });
   if (existingUser)
     throw new AppError("A user account already exists for this player", 409);
@@ -589,7 +600,7 @@ export async function generatePlayerInvite(
   const existingAccount = await sequelize.query<{ id: string }>(
     `SELECT id FROM player_accounts WHERE player_id = :playerId OR email = :email LIMIT 1`,
     {
-      replacements: { playerId, email: player.email },
+      replacements: { playerId, email },
       type: QueryTypes.SELECT,
     },
   );
@@ -608,7 +619,7 @@ export async function generatePlayerInvite(
   const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
 
   await User.create({
-    email: player.email,
+    email,
     passwordHash,
     fullName: `${player.firstName} ${player.lastName}`,
     fullNameAr:
@@ -629,7 +640,7 @@ export async function generatePlayerInvite(
     token,
     expiresAt: expiry,
     playerName: `${player.firstName} ${player.lastName}`,
-    playerEmail: player.email,
+    playerEmail: email,
   };
 }
 
