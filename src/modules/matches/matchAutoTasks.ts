@@ -23,6 +23,7 @@ import { Match } from "./match.model";
 import { Club } from "../clubs/club.model";
 import { sequelize } from "../../config/database";
 import { Op } from "sequelize";
+import { notifyUser } from "../notifications/notification.service";
 
 // ── Configurable thresholds ──
 // Defaults can be overridden via the settings API (GET/PATCH /settings/task-rules)
@@ -253,6 +254,21 @@ const RULES: AutoTaskRule[] = [
   },
 ];
 
+// ── Rule → player role field mapping (determines task assignee) ──
+
+const RULE_ASSIGNEE_FIELD: Record<string, "agentId" | "coachId" | "analystId"> = {
+  red_card: "agentId",
+  yellow_cards_accumulated: "agentId",
+  critical_performance: "coachId",
+  low_performance: "coachId",
+  injury_assessment: "agentId",
+  highlight_performance: "agentId",
+  high_fouls: "coachId",
+  pre_confirm_availability: "coachId",
+  pre_tactical_report: "analystId",
+  pre_travel_logistics: "agentId",
+};
+
 // ── Helper: format due date ──
 
 function dueDate(days: number): string {
@@ -293,6 +309,9 @@ export async function generateAutoTasks(
           "lastName",
           "firstNameAr",
           "lastNameAr",
+          "agentId",
+          "coachId",
+          "analystId",
         ],
       },
     ],
@@ -341,7 +360,8 @@ export async function generateAutoTasks(
 
       if (existing) continue;
 
-      // Create the task
+      // Create the task — assign to the player's agent/coach/analyst based on rule
+      const assignee = player[RULE_ASSIGNEE_FIELD[rule.id]] || null;
       await Task.create({
         title: rule.titleEn,
         titleAr: rule.titleAr,
@@ -351,12 +371,27 @@ export async function generateAutoTasks(
         status: "Open",
         playerId: player.id,
         matchId,
+        assignedTo: assignee,
         assignedBy: triggeredBy,
         isAutoCreated: true,
         triggerRuleId: rule.id,
         dueDate: dueDate(rule.dueDays),
         notes: rule.descriptionAr(ctx),
       } as any);
+
+      // Notify assignee (fire-and-forget)
+      if (assignee) {
+        notifyUser(assignee, {
+          type: "task",
+          title: rule.titleEn,
+          titleAr: rule.titleAr,
+          body: rule.descriptionEn(ctx),
+          bodyAr: rule.descriptionAr(ctx),
+          link: "/dashboard/tasks",
+          sourceType: "task",
+          priority: rule.priority === "critical" ? "critical" : "normal",
+        }).catch(() => {});
+      }
 
       createdRules.push(`${rule.id}:${player.id}`);
     }
@@ -372,7 +407,7 @@ export async function generateAutoTasks(
 
     // Load player info
     const player = await Player.findByPk(mp.playerId, {
-      attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr"],
+      attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr", "agentId", "coachId", "analystId"],
     });
     if (!player) continue;
 
@@ -410,6 +445,7 @@ export async function generateAutoTasks(
         availability: "injured",
       };
 
+      const injuryAssignee = player[RULE_ASSIGNEE_FIELD["injury_assessment"]] || null;
       await Task.create({
         title: injuryRule.titleEn,
         titleAr: injuryRule.titleAr,
@@ -419,12 +455,26 @@ export async function generateAutoTasks(
         status: "Open",
         playerId: player.id,
         matchId,
+        assignedTo: injuryAssignee,
         assignedBy: triggeredBy,
         isAutoCreated: true,
         triggerRuleId: "injury_assessment",
         dueDate: dueDate(1),
         notes: injuryRule.descriptionAr(ctx),
       } as any);
+
+      if (injuryAssignee) {
+        notifyUser(injuryAssignee, {
+          type: "task",
+          title: injuryRule.titleEn,
+          titleAr: injuryRule.titleAr,
+          body: injuryRule.descriptionEn(ctx),
+          bodyAr: injuryRule.descriptionAr(ctx),
+          link: "/dashboard/tasks",
+          sourceType: "task",
+          priority: "critical",
+        }).catch(() => {});
+      }
 
       createdRules.push(`injury_assessment:${player.id}`);
     }
@@ -527,7 +577,7 @@ export async function generatePreMatchTasks(
       {
         model: Player,
         as: "player",
-        attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr"],
+        attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr", "agentId", "coachId", "analystId"],
       },
     ],
   });
@@ -557,6 +607,7 @@ export async function generatePreMatchTasks(
       });
       if (existing) continue;
 
+      const preAssignee = player[RULE_ASSIGNEE_FIELD[rule.id]] || null;
       await Task.create({
         title: rule.titleEn,
         titleAr: rule.titleAr,
@@ -566,11 +617,25 @@ export async function generatePreMatchTasks(
         status: "Open",
         playerId: player.id,
         matchId,
+        assignedTo: preAssignee,
         isAutoCreated: true,
         triggerRuleId: rule.id,
         dueDate: matchDate,
         notes: rule.descriptionAr(ctx),
       } as any);
+
+      if (preAssignee) {
+        notifyUser(preAssignee, {
+          type: "task",
+          title: rule.titleEn,
+          titleAr: rule.titleAr,
+          body: rule.descriptionEn(ctx),
+          bodyAr: rule.descriptionAr(ctx),
+          link: "/dashboard/tasks",
+          sourceType: "task",
+          priority: rule.priority === "critical" ? "critical" : "normal",
+        }).catch(() => {});
+      }
 
       createdRules.push(`${rule.id}:${player.id}`);
     }
