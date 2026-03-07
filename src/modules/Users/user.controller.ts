@@ -29,7 +29,7 @@ export async function getById(req: AuthRequest, res: Response) {
 
 // ── Create User ──
 export async function create(req: AuthRequest, res: Response) {
-  const user = await userService.createUser(req.body);
+  const user = await userService.createUser(req.body, req.user!.id);
 
   await logAudit(
     "CREATE",

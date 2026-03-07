@@ -8,7 +8,7 @@ interface PlayerAttributes {
   lastName: string;
   firstNameAr?: string | null;
   lastNameAr?: string | null;
-  dateOfBirth: string;
+  dateOfBirth: string | null;
   nationality?: string | null;
   secondaryNationality?: string | null;
   playerType: "Pro" | "Youth" | "Amateur";
@@ -47,6 +47,7 @@ interface PlayerAttributes {
 interface PlayerCreationAttributes extends Optional<
   PlayerAttributes,
   | "id"
+  | "dateOfBirth"
   | "playerType"
   | "contractType"
   | "marketValueCurrency"
@@ -64,7 +65,7 @@ export class Player
   public lastName!: string;
   public firstNameAr!: string | null;
   public lastNameAr!: string | null;
-  public dateOfBirth!: string;
+  public dateOfBirth!: string | null;
   public nationality!: string | null;
   public secondaryNationality!: string | null;
   public playerType!: "Pro" | "Youth" | "Amateur";
@@ -106,7 +107,8 @@ export class Player
     return `${this.firstNameAr} ${this.lastNameAr}`;
   }
 
-  get age(): number {
+  get age(): number | null {
+    if (!this.dateOfBirth) return null;
     const today = new Date();
     const birthDate = new Date(this.dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();
@@ -127,7 +129,7 @@ Player.init(
     lastName: { type: DataTypes.STRING, allowNull: false },
     firstNameAr: { type: DataTypes.STRING },
     lastNameAr: { type: DataTypes.STRING },
-    dateOfBirth: { type: DataTypes.DATEONLY, allowNull: false },
+    dateOfBirth: { type: DataTypes.DATEONLY, allowNull: true },
     nationality: { type: DataTypes.STRING },
     secondaryNationality: { type: DataTypes.STRING },
     playerType: {
