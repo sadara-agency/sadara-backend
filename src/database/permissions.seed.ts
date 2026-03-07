@@ -15,8 +15,17 @@ interface Perm {
 }
 
 const ALL_ROLES = [
-  "Admin", "Manager", "Analyst", "Scout", "Player",
-  "Legal", "Finance", "Coach", "Media", "Executive",
+  "Admin",
+  "Manager",
+  "Analyst",
+  "Scout",
+  "Player",
+  "Legal",
+  "Finance",
+  "Coach",
+  "Media",
+  "Executive",
+  "GymCoach",
 ];
 
 /** Shorthand: give every role specific flags for a module. */
@@ -66,33 +75,63 @@ const RAW: Perm[] = [
 
   // ── players: GET=any, POST/PATCH=Admin+Manager, DELETE=Admin ──
   ...allRoles("players", { canRead: true }),
-  ...forRoles("players", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("players", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("players", ["Manager"], { canCreate: true, canUpdate: true }),
 
   // ── clubs: GET=any, POST/PATCH=Admin+Manager, DELETE=Admin ──
   ...allRoles("clubs", { canRead: true }),
-  ...forRoles("clubs", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("clubs", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("clubs", ["Manager"], { canCreate: true, canUpdate: true }),
 
   // ── matches: GET=any, POST/PATCH=Admin+Manager+Coach, score/stats PATCH=+Analyst, DELETE=Admin ──
   ...allRoles("matches", { canRead: true }),
-  ...forRoles("matches", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
-  ...forRoles("matches", ["Manager", "Coach"], { canCreate: true, canUpdate: true }),
+  ...forRoles("matches", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("matches", ["Manager", "Coach"], {
+    canCreate: true,
+    canUpdate: true,
+  }),
   ...forRoles("matches", ["Analyst"], { canUpdate: true }),
 
   // ── contracts: GET=any, POST/PATCH/transition=Admin+Manager+Legal, DELETE=Admin ──
   ...allRoles("contracts", { canRead: true }),
-  ...forRoles("contracts", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
-  ...forRoles("contracts", ["Manager", "Legal"], { canCreate: true, canUpdate: true }),
+  ...forRoles("contracts", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("contracts", ["Manager", "Legal"], {
+    canCreate: true,
+    canUpdate: true,
+  }),
 
   // ── offers: GET=any, POST/PATCH=Admin+Manager, DELETE=Admin ──
   ...allRoles("offers", { canRead: true }),
-  ...forRoles("offers", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("offers", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("offers", ["Manager"], { canCreate: true, canUpdate: true }),
 
   // ── gates: GET=any, POST/PATCH=Admin+Manager, checklist toggle=+Analyst, DELETE=Admin ──
   ...allRoles("gates", { canRead: true }),
-  ...forRoles("gates", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("gates", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("gates", ["Manager"], { canCreate: true, canUpdate: true }),
   ...forRoles("gates", ["Analyst"], { canUpdate: true }),
 
@@ -102,13 +141,21 @@ const RAW: Perm[] = [
 
   // ── scouting: GET=any, watchlist POST=Admin+Manager+Analyst, screening/decisions POST=Admin+Manager, DELETE=Admin ──
   ...allRoles("scouting", { canRead: true }),
-  ...forRoles("scouting", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("scouting", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("scouting", ["Manager"], { canCreate: true, canUpdate: true }),
   ...forRoles("scouting", ["Analyst"], { canCreate: true, canUpdate: true }),
 
   // ── referrals: GET=any, POST=Admin+Manager+Analyst, PATCH=Admin+Manager(+Analyst status), DELETE=Admin ──
   ...allRoles("referrals", { canRead: true }),
-  ...forRoles("referrals", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("referrals", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("referrals", ["Manager"], { canCreate: true, canUpdate: true }),
   ...forRoles("referrals", ["Analyst"], { canCreate: true, canUpdate: true }),
 
@@ -122,8 +169,15 @@ const RAW: Perm[] = [
 
   // ── finance: GET=any, POST/PATCH=Admin+Manager+Finance, valuations POST=+Analyst, DELETE=Admin ──
   ...allRoles("finance", { canRead: true }),
-  ...forRoles("finance", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
-  ...forRoles("finance", ["Manager", "Finance"], { canCreate: true, canUpdate: true }),
+  ...forRoles("finance", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("finance", ["Manager", "Finance"], {
+    canCreate: true,
+    canUpdate: true,
+  }),
   ...forRoles("finance", ["Analyst"], { canCreate: true }),
 
   // ── reports: GET/POST=any authenticated, DELETE=Admin+Manager ──
@@ -135,19 +189,32 @@ const RAW: Perm[] = [
   ...forRoles("tasks", ["Admin", "Manager"], { canDelete: true }),
 
   // ── notifications: all CRUD for all (personal) ──
-  ...allRoles("notifications", { canRead: true, canUpdate: true, canDelete: true }),
+  ...allRoles("notifications", {
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
 
   // ── documents: GET=any, POST=Admin+Manager+Analyst+Legal, PATCH=Admin+Manager+Legal, DELETE=Admin ──
   ...allRoles("documents", { canRead: true }),
-  ...forRoles("documents", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
-  ...forRoles("documents", ["Manager", "Legal"], { canCreate: true, canUpdate: true }),
+  ...forRoles("documents", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("documents", ["Manager", "Legal"], {
+    canCreate: true,
+    canUpdate: true,
+  }),
   ...forRoles("documents", ["Analyst"], { canCreate: true }),
 
   // ── audit: GET=Admin+Manager only ──
   ...forRoles("audit", ["Admin", "Manager"], { canRead: true }),
 
   // ── market-intel: read for Admin+Manager+Analyst (matches nav config) ──
-  ...forRoles("market-intel", ["Admin", "Manager", "Analyst"], { canRead: true }),
+  ...forRoles("market-intel", ["Admin", "Manager", "Analyst"], {
+    canRead: true,
+  }),
 
   // ── settings: read/update for all, create/delete for Admin ──
   ...allRoles("settings", { canRead: true, canUpdate: true }),
@@ -160,8 +227,39 @@ const RAW: Perm[] = [
 
   // ── spl-sync: GET=any, POST=Admin+Manager, admin-only ops=Admin ──
   ...allRoles("spl-sync", { canRead: true }),
-  ...forRoles("spl-sync", ["Admin"], { canCreate: true, canUpdate: true, canDelete: true }),
+  ...forRoles("spl-sync", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("spl-sync", ["Manager"], { canCreate: true }),
+
+  // ── gym: GymCoach has full CRUD, Admin/Manager/Coach can read ──
+  ...forRoles("gym", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("gym", ["Manager", "Coach"], { canRead: true }),
+  ...forRoles("gym", ["GymCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+
+  // ── GymCoach access to existing modules ──
+  ...forRoles("dashboard", ["GymCoach"], { canRead: true }),
+  ...forRoles("players", ["GymCoach"], { canRead: true }),
+  ...forRoles("injuries", ["GymCoach"], { canRead: true }),
+  ...forRoles("training", ["GymCoach"], { canRead: true }),
+  ...forRoles("notifications", ["GymCoach"], {
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("settings", ["GymCoach"], { canRead: true, canUpdate: true }),
 ];
 
 // ─────────────────────────────────────────────────────────────
@@ -205,12 +303,7 @@ export async function seedPermissions(): Promise<void> {
       canDelete: p.canDelete,
     })),
     {
-      updateOnDuplicate: [
-        "canCreate",
-        "canRead",
-        "canUpdate",
-        "canDelete",
-      ],
+      updateOnDuplicate: ["canCreate", "canRead", "canUpdate", "canDelete"],
     },
   );
 

@@ -1,15 +1,43 @@
 import { z } from "zod";
 
 const ROLES = [
-  "Admin", "Manager", "Analyst", "Scout", "Player",
-  "Legal", "Finance", "Coach", "Media", "Executive",
+  "Admin",
+  "Manager",
+  "Analyst",
+  "Scout",
+  "Player",
+  "Legal",
+  "Finance",
+  "Coach",
+  "Media",
+  "Executive",
+  "GymCoach",
 ] as const;
 
 const MODULES = [
-  "dashboard", "matches", "players", "clubs", "scouting", "referrals",
-  "contracts", "offers", "gates", "approvals", "injuries", "training",
-  "finance", "reports", "tasks", "notifications", "documents", "audit",
-  "market-intel", "settings", "saff-data", "spl-sync",
+  "dashboard",
+  "matches",
+  "players",
+  "clubs",
+  "scouting",
+  "referrals",
+  "contracts",
+  "offers",
+  "gates",
+  "approvals",
+  "injuries",
+  "training",
+  "finance",
+  "reports",
+  "tasks",
+  "notifications",
+  "documents",
+  "audit",
+  "market-intel",
+  "settings",
+  "saff-data",
+  "spl-sync",
+  "gym",
 ] as const;
 
 export const updatePermissionsSchema = z.object({
@@ -26,7 +54,7 @@ export const updatePermissionsSchema = z.object({
         }),
       )
       .min(1)
-      .max(220), // 10 roles × 22 modules
+      .max(253), // 11 roles × 23 modules
   }),
 });
 

@@ -11,7 +11,8 @@ export type UserRole =
   | "Finance"
   | "Coach"
   | "Media"
-  | "Executive";
+  | "Executive"
+  | "GymCoach";
 
 // ── Authenticated Request ──
 export interface AuthUser {
