@@ -855,7 +855,10 @@ export async function getMyInjuries(userId: string) {
 const ONLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
 
 export async function listPlayerAccounts() {
-  const accounts = await User.findAll({
+  const now = Date.now();
+
+  // ── Source 1: Users table (invite-based player accounts) ──
+  const userAccounts = await User.findAll({
     where: { role: "Player" },
     attributes: [
       "id",
@@ -873,9 +876,7 @@ export async function listPlayerAccounts() {
     order: [["createdAt", "DESC"]],
   });
 
-  const now = Date.now();
-
-  return accounts.map((a) => {
+  const fromUsers = userAccounts.map((a) => {
     const hasToken = !!a.inviteToken;
     const tokenExpired = a.inviteTokenExpiry
       ? new Date(a.inviteTokenExpiry).getTime() < now
@@ -903,6 +904,64 @@ export async function listPlayerAccounts() {
       createdAt: (a as any).createdAt,
     };
   });
+
+  // ── Source 2: player_accounts table (direct player login) ──
+  // Exclude any that already have a matching user in the users table
+  const userPlayerIds = userAccounts
+    .map((u) => u.playerId)
+    .filter(Boolean) as string[];
+
+  const paRows = await sequelize.query<{
+    id: string;
+    player_id: string;
+    email: string;
+    status: string;
+    last_login: string | null;
+    created_at: string;
+    first_name: string | null;
+    last_name: string | null;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+  }>(
+    `SELECT pa.id, pa.player_id, pa.email, pa.status, pa.last_login, pa.created_at,
+            p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
+     FROM player_accounts pa
+     LEFT JOIN players p ON pa.player_id = p.id
+     ${userPlayerIds.length > 0 ? "WHERE pa.player_id NOT IN (:excludeIds)" : ""}
+     ORDER BY pa.created_at DESC`,
+    {
+      replacements:
+        userPlayerIds.length > 0 ? { excludeIds: userPlayerIds } : undefined,
+      type: QueryTypes.SELECT,
+    },
+  );
+
+  const fromPlayerAccounts = paRows.map((pa) => {
+    const paStatus = pa.status as "active" | "pending" | "expired" | "disabled";
+    const lastLogin = pa.last_login ? new Date(pa.last_login).getTime() : 0;
+    const isOnline =
+      paStatus === "active" && now - lastLogin < ONLINE_THRESHOLD_MS;
+
+    const fullName =
+      [pa.first_name, pa.last_name].filter(Boolean).join(" ") || pa.email;
+    const fullNameAr =
+      [pa.first_name_ar, pa.last_name_ar].filter(Boolean).join(" ") || null;
+
+    return {
+      id: pa.id,
+      email: pa.email,
+      fullName,
+      fullNameAr,
+      playerId: pa.player_id,
+      status: paStatus,
+      isOnline,
+      lastLogin: pa.last_login,
+      lastActivity: pa.last_login, // player_accounts doesn't track lastActivity separately
+      createdAt: pa.created_at,
+    };
+  });
+
+  return [...fromUsers, ...fromPlayerAccounts];
 }
 
 // ══════════════════════════════════════════

@@ -21,8 +21,17 @@ export const inviteSchema = z.object({
   fullName: z.string().min(2, "Full name is required"),
   fullNameAr: z.string().optional(),
   role: z.enum([
-    "Admin", "Manager", "Analyst", "Scout", "Player",
-    "Legal", "Finance", "Coach", "Media", "Executive",
+    "Admin",
+    "Manager",
+    "Analyst",
+    "Scout",
+    "Player",
+    "Legal",
+    "Finance",
+    "Coach",
+    "Media",
+    "Executive",
+    "GymCoach",
   ]),
 });
 
