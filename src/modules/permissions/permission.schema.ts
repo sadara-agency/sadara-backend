@@ -54,7 +54,7 @@ export const updatePermissionsSchema = z.object({
         }),
       )
       .min(1)
-      .max(253), // 11 roles × 23 modules
+      .max(500), // 11 roles × up to ~25 modules
   }),
 });
 
