@@ -9,6 +9,8 @@
 import { Op, Sequelize } from "sequelize";
 import bcrypt from "bcryptjs";
 import { User } from "./user.model";
+import { Player } from "../players/player.model";
+import { sequelize } from "../../config/database";
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
@@ -68,13 +70,60 @@ export async function getUserById(id: string) {
 // ────────────────────────────────────────────────────────────
 // Create User (Admin creates a team member)
 // ────────────────────────────────────────────────────────────
-export async function createUser(input: CreateUserInput) {
+export async function createUser(input: CreateUserInput, createdBy?: string) {
   // Check for duplicate email
   const existing = await User.findOne({ where: { email: input.email } });
   if (existing) throw new AppError("Email already registered", 409);
 
   // Hash the password
   const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
+
+  // If role is Player, auto-create a linked player record
+  if (input.role === "Player" && createdBy) {
+    return await sequelize.transaction(async (t) => {
+      // Split fullName into firstName/lastName
+      const nameParts = input.fullName.trim().split(/\s+/);
+      const firstName = nameParts[0];
+      const lastName = nameParts.slice(1).join(" ") || firstName;
+
+      let firstNameAr: string | undefined;
+      let lastNameAr: string | undefined;
+      if (input.fullNameAr) {
+        const arParts = input.fullNameAr.trim().split(/\s+/);
+        firstNameAr = arParts[0];
+        lastNameAr = arParts.slice(1).join(" ") || firstNameAr;
+      }
+
+      const player = await Player.create(
+        {
+          firstName,
+          lastName,
+          firstNameAr,
+          lastNameAr,
+          email: input.email,
+          createdBy,
+        },
+        { transaction: t },
+      );
+
+      const user = await User.create(
+        {
+          email: input.email,
+          passwordHash,
+          fullName: input.fullName,
+          fullNameAr: input.fullNameAr,
+          role: input.role as any,
+          avatarUrl: input.avatarUrl,
+          isActive: input.isActive,
+          playerId: player.id,
+        },
+        { transaction: t },
+      );
+
+      const { passwordHash: _, ...safeUser } = user.get({ plain: true });
+      return safeUser;
+    });
+  }
 
   const user = await User.create({
     email: input.email,

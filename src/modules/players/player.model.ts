@@ -8,7 +8,7 @@ interface PlayerAttributes {
   lastName: string;
   firstNameAr?: string | null;
   lastNameAr?: string | null;
-  dateOfBirth: string;
+  dateOfBirth: string | null;
   nationality?: string | null;
   secondaryNationality?: string | null;
   playerType: "Pro" | "Youth" | "Amateur";
@@ -47,6 +47,7 @@ interface PlayerAttributes {
 interface PlayerCreationAttributes extends Optional<
   PlayerAttributes,
   | "id"
+  | "dateOfBirth"
   | "playerType"
   | "contractType"
   | "marketValueCurrency"
@@ -64,7 +65,7 @@ export class Player
   public lastName!: string;
   public firstNameAr!: string | null;
   public lastNameAr!: string | null;
-  public dateOfBirth!: string;
+  public dateOfBirth!: string | null;
   public nationality!: string | null;
   public secondaryNationality!: string | null;
   public playerType!: "Pro" | "Youth" | "Amateur";
@@ -127,7 +128,7 @@ Player.init(
     lastName: { type: DataTypes.STRING, allowNull: false },
     firstNameAr: { type: DataTypes.STRING },
     lastNameAr: { type: DataTypes.STRING },
-    dateOfBirth: { type: DataTypes.DATEONLY, allowNull: false },
+    dateOfBirth: { type: DataTypes.DATEONLY, allowNull: true },
     nationality: { type: DataTypes.STRING },
     secondaryNationality: { type: DataTypes.STRING },
     playerType: {
