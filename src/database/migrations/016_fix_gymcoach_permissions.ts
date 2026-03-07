@@ -30,35 +30,35 @@ export async function up() {
   // gym: full CRUD
   await sequelize.query(
     `UPDATE role_permissions
-     SET "canCreate" = true, "canRead" = true, "canUpdate" = true, "canDelete" = true
+     SET can_create = true, can_read = true, can_update = true, can_delete = true
      WHERE role = 'GymCoach' AND module = 'gym'`,
   );
 
   // dashboard, players, injuries, training: read only
   await sequelize.query(
     `UPDATE role_permissions
-     SET "canCreate" = false, "canRead" = true, "canUpdate" = false, "canDelete" = false
+     SET can_create = false, can_read = true, can_update = false, can_delete = false
      WHERE role = 'GymCoach' AND module IN ('dashboard', 'players', 'injuries', 'training')`,
   );
 
   // notifications: read, update, delete (personal)
   await sequelize.query(
     `UPDATE role_permissions
-     SET "canCreate" = false, "canRead" = true, "canUpdate" = true, "canDelete" = true
+     SET can_create = false, can_read = true, can_update = true, can_delete = true
      WHERE role = 'GymCoach' AND module = 'notifications'`,
   );
 
   // settings: read, update
   await sequelize.query(
     `UPDATE role_permissions
-     SET "canCreate" = false, "canRead" = true, "canUpdate" = true, "canDelete" = false
+     SET can_create = false, can_read = true, can_update = true, can_delete = false
      WHERE role = 'GymCoach' AND module = 'settings'`,
   );
 
   // tasks: read, create, update (like other roles)
   await sequelize.query(
     `UPDATE role_permissions
-     SET "canCreate" = true, "canRead" = true, "canUpdate" = true, "canDelete" = false
+     SET can_create = true, can_read = true, can_update = true, can_delete = false
      WHERE role = 'GymCoach' AND module = 'tasks'`,
   );
 }
@@ -93,9 +93,9 @@ export async function down() {
 
   for (const mod of ALL_MODULES) {
     await sequelize.query(
-      `INSERT INTO role_permissions (role, module, "canCreate", "canRead", "canUpdate", "canDelete", "createdAt", "updatedAt")
+      `INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete, created_at, updated_at)
        VALUES ('GymCoach', :mod, false, true, false, false, NOW(), NOW())
-       ON CONFLICT (role, module) DO UPDATE SET "canRead" = true`,
+       ON CONFLICT (role, module) DO UPDATE SET can_read = true`,
       { replacements: { mod } },
     );
   }
