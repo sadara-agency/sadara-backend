@@ -571,4 +571,41 @@ router.post(
   }),
 );
 
+// ══════════════════════════════════════════════════════════
+// Sidebar Configuration (Admin controls which nav items appear)
+// ══════════════════════════════════════════════════════════
+
+const sidebarConfigSchema = z.object({
+  hiddenItems: z.array(z.string()),
+});
+
+router.get(
+  "/sidebar",
+  authorizeModule("settings", "read"),
+  asyncHandler(async (_req: AuthRequest, res: Response) => {
+    const config = await getAppSetting("sidebar_config");
+    sendSuccess(res, config ?? { hiddenItems: [] });
+  }),
+);
+
+router.patch(
+  "/sidebar",
+  authorizeModule("settings", "update"),
+  validate(sidebarConfigSchema),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const config = req.body;
+    await setAppSetting("sidebar_config", config);
+
+    await logAudit(
+      "UPDATE",
+      "settings",
+      "sidebar_config",
+      buildAuditContext(req.user!, req.ip),
+      "Updated sidebar navigation configuration",
+    );
+
+    sendSuccess(res, config, "Sidebar configuration updated");
+  }),
+);
+
 export default router;

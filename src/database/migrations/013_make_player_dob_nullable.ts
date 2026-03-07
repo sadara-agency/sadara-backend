@@ -1,15 +1,15 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { sequelize } from "../../config/database";
 
-export async function up(queryInterface: QueryInterface) {
-  await queryInterface.changeColumn("players", "date_of_birth", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
+export async function up() {
+  await sequelize.query(`
+    ALTER TABLE players
+      ALTER COLUMN date_of_birth DROP NOT NULL;
+  `);
 }
 
-export async function down(queryInterface: QueryInterface) {
-  await queryInterface.changeColumn("players", "date_of_birth", {
-    type: DataTypes.DATEONLY,
-    allowNull: false,
-  });
+export async function down() {
+  await sequelize.query(`
+    ALTER TABLE players
+      ALTER COLUMN date_of_birth SET NOT NULL;
+  `);
 }
