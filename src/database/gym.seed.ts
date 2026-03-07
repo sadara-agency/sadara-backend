@@ -482,10 +482,10 @@ export async function seedExerciseLibrary(): Promise<void> {
 
   await ExerciseLibrary.bulkCreate(exercises as any, {
     updateOnDuplicate: [
-      "name_ar",
-      "muscle_group",
+      "nameAr",
+      "muscleGroup",
       "equipment",
-      "movement_type",
+      "movementType",
       "difficulty",
     ],
   });
@@ -1012,12 +1012,12 @@ export async function seedFoodDatabase(): Promise<void> {
 
   await FoodItem.bulkCreate(foods as any, {
     updateOnDuplicate: [
-      "name_ar",
+      "nameAr",
       "category",
-      "calories_per_100g",
-      "protein_per_100g",
-      "carbs_per_100g",
-      "fat_per_100g",
+      "caloriesPer100g",
+      "proteinPer100g",
+      "carbsPer100g",
+      "fatPer100g",
     ],
   });
   console.log(`  ✅ Seeded ${foods.length} food items`);

@@ -507,11 +507,13 @@ export async function logWorkoutSession(
   const totalSessions = await WorkoutSession.count({
     where: { planId: assignment.planId },
   });
-  const completedSessions = await WorkoutLog.count({
-    where: { assignmentId },
-    col: "sessionId",
-    distinct: true,
-  } as any);
+  const completedSessions = Number(
+    await WorkoutLog.count({
+      where: { assignmentId },
+      col: "sessionId",
+      distinct: true,
+    } as any),
+  );
 
   const pct =
     totalSessions > 0
