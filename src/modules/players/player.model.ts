@@ -107,7 +107,8 @@ export class Player
     return `${this.firstNameAr} ${this.lastNameAr}`;
   }
 
-  get age(): number {
+  get age(): number | null {
+    if (!this.dateOfBirth) return null;
     const today = new Date();
     const birthDate = new Date(this.dateOfBirth);
     let age = today.getFullYear() - birthDate.getFullYear();

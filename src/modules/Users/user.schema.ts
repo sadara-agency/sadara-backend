@@ -10,8 +10,16 @@ import { z } from "zod";
 
 // ── Shared constants ──
 const USER_ROLES = [
-  "Admin", "Manager", "Analyst", "Scout",
-  "Legal", "Finance", "Coach", "Media", "Executive",
+  "Admin",
+  "Manager",
+  "Analyst",
+  "Scout",
+  "Player",
+  "Legal",
+  "Finance",
+  "Coach",
+  "Media",
+  "Executive",
 ] as const;
 
 // ── Create User (Admin creates a new team member) ──
