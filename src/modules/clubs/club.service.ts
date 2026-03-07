@@ -142,7 +142,7 @@ export async function getClubById(id: string) {
               ct.base_salary AS total_value,
               ct.commission_pct AS commission_rate,
               COALESCE(ct.total_commission,
-                ROUND(ct.base_salary * ct.commission_pct / 100, 2)
+                ROUND(ct.base_salary::NUMERIC * ct.commission_pct::NUMERIC / 100, 2)::TEXT
               ) AS commission_value,
               CONCAT(p.first_name, ' ', p.last_name) AS player_name
        FROM contracts ct
