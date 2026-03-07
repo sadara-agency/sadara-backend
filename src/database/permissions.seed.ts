@@ -14,6 +14,8 @@ interface Perm {
   canDelete: boolean;
 }
 
+/** Base roles for general module access. GymCoach is excluded here
+ *  and gets explicit permissions at the bottom of the matrix. */
 const ALL_ROLES = [
   "Admin",
   "Manager",
@@ -25,7 +27,6 @@ const ALL_ROLES = [
   "Coach",
   "Media",
   "Executive",
-  "GymCoach",
 ];
 
 /** Shorthand: give every role specific flags for a module. */
