@@ -92,46 +92,31 @@ function startServer(): Promise<void> {
 // Banner
 // ─────────────────────────────────────────────
 
-const LOGO = `
-   ███████╗ █████╗ ██████╗  █████╗ ██████╗  █████╗ 
-   ██╔════╝██╔══██╗██╔══██╗██╔══██╗██╔══██╗██╔══██╗
-   ███████╗███████║██║  ██║███████║██████╔╝███████║
-   ╚════██║██╔══██║██║  ██║██╔══██║██╔══██╗██╔══██║
-   ███████║██║  ██║██████╔╝██║  ██║██║  ██║██║  ██║
-   ╚══════╝╚═╝  ╚═╝╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝`;
-
-const sadaraGradient = gradient(["#3C3CFA", "#E4E5F3", "#11132B"]);
-const DIVIDER = chalk.gray(`  ${"━".repeat(54)}`);
-
 function printBanner(): void {
   const isProd = env.nodeEnv === "production";
-  const envColor = isProd ? chalk.redBright.bold : chalk.cyanBright.bold;
-  const envIcon = isProd ? "🔥" : "🛠️";
+  const envColor = isProd ? chalk.redBright : chalk.cyanBright;
 
-  console.log(sadaraGradient(LOGO));
-  console.log(DIVIDER);
+  console.log("");
+  console.log(chalk.bold.blue("🚀 Sadara Engine"));
+  console.log(chalk.gray("────────────────────────────────"));
+
   console.log(
-    `  ${chalk.white.bold("🛰️  SYSTEM STATUS:")} ${chalk.greenBright("OPERATIONAL")}`,
-  );
-  console.log(
-    `  ${chalk.white.bold("🌐 NETWORK:")}      ${chalk.blue.underline(`http://localhost:${env.port}`)}`,
-  );
-  console.log(
-    `  ${chalk.white.bold("🩺 HEALTH:")}       ${chalk.blue.underline(`http://localhost:${env.port}/api/health`)}`,
-  );
-  console.log(
-    `  ${chalk.white.bold("🏗️  ENVIRONMENT:")}  ${envColor(env.nodeEnv.toUpperCase())} ${envIcon}`,
+    `${chalk.white("Server:")} ${chalk.blue(`http://localhost:${env.port}`)}`,
   );
 
-  if (isProd) {
-    console.log(chalk.red("  ⚠️  WARNING: RUNNING IN PRODUCTION MODE"));
-  }
-
-  console.log(DIVIDER);
   console.log(
-    chalk.gray(`  [${new Date().toLocaleTimeString()}] `) +
-      sadaraGradient("Sadara Engine v1.0.0 is warmed up..."),
+    `${chalk.white("Health:")} ${chalk.blue(`http://localhost:${env.port}/api/health`)}`,
   );
+
+  console.log(
+    `${chalk.white("Environment:")} ${envColor(env.nodeEnv.toUpperCase())}`,
+  );
+
+  console.log(
+    chalk.gray(`[${new Date().toLocaleTimeString()}] Sadara is ready.`),
+  );
+
+  console.log(chalk.gray("────────────────────────────────"));
   console.log("");
 }
 

@@ -19,7 +19,7 @@ export interface AuthUser {
   email: string;
   fullName: string;
   role: UserRole;
-  playerId?: string | null; // For player users linked to a Player entity
+  playerId?: string | null;
 }
 
 export interface AuthRequest extends Request {
