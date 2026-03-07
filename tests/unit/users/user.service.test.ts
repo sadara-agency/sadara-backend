@@ -7,7 +7,19 @@ const mockFindOne = jest.fn();
 const mockUserCreate = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { query: jest.fn(), authenticate: jest.fn() },
+  sequelize: {
+    query: jest.fn(),
+    authenticate: jest.fn(),
+    transaction: jest.fn((fn: Function) => fn({})),
+  },
+}));
+
+jest.mock('../../../src/modules/players/player.model', () => ({
+  Player: {
+    create: jest.fn(),
+    init: jest.fn(),
+    addHook: jest.fn(),
+  },
 }));
 
 jest.mock('../../../src/modules/Users/user.model', () => ({
