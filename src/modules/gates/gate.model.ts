@@ -103,6 +103,7 @@ export interface GateChecklistAttributes {
   id: string;
   gateId: string;
   item: string;
+  itemAr?: string | null;
   isCompleted: boolean;
   isMandatory: boolean;
   assignedTo?: string | null;
@@ -126,6 +127,7 @@ export class GateChecklist
   declare id: string;
   declare gateId: string;
   declare item: string;
+  declare itemAr: string | null;
   declare isCompleted: boolean;
   declare isMandatory: boolean;
   declare assignedTo: string | null;
@@ -152,6 +154,10 @@ GateChecklist.init(
     item: {
       type: DataTypes.STRING(500),
       allowNull: false,
+    },
+    itemAr: {
+      type: DataTypes.STRING(500),
+      field: "item_ar",
     },
     isCompleted: {
       type: DataTypes.BOOLEAN,

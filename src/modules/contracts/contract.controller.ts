@@ -5,7 +5,12 @@ import {
   sendCreated,
   sendPaginated,
 } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext, buildChanges } from "../../shared/utils/audit";
+import {
+  logAudit,
+  buildAuditContext,
+  buildChanges,
+} from "../../shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
 import * as contractService from "./contract.service";
 
 // ── List Contracts ──
@@ -23,6 +28,8 @@ export async function getById(req: AuthRequest, res: Response) {
 // ── Create Contract ──
 export async function create(req: AuthRequest, res: Response) {
   const contract = await contractService.createContract(req.body, req.user!.id);
+
+  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
   await logAudit(
     "CREATE",
@@ -44,9 +51,13 @@ export async function update(req: AuthRequest, res: Response) {
   );
 
   const changes = buildChanges(
-    oldContract instanceof Object ? (oldContract as any).get?.({ plain: true }) ?? oldContract : oldContract,
+    oldContract instanceof Object
+      ? ((oldContract as any).get?.({ plain: true }) ?? oldContract)
+      : oldContract,
     req.body,
   );
+
+  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
   await logAudit(
     "UPDATE",
@@ -63,6 +74,8 @@ export async function update(req: AuthRequest, res: Response) {
 // ── Delete Contract ──
 export async function remove(req: AuthRequest, res: Response) {
   const result = await contractService.deleteContract(req.params.id);
+
+  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
   await logAudit(
     "DELETE",
@@ -82,6 +95,8 @@ export async function terminate(req: AuthRequest, res: Response) {
     req.body,
     req.user!.id,
   );
+
+  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
   await logAudit(
     "UPDATE",
