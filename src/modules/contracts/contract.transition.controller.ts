@@ -19,6 +19,7 @@ import {
   createApprovalRequest,
   resolveApprovalByEntity,
 } from "../approvals/approval.service";
+import { regenerateSignedPdf } from "./contract.signing.service";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {
@@ -131,6 +132,20 @@ export async function transitionContract(req: AuthRequest, res: Response) {
 
   // Invalidate cached contract data + dashboard KPIs
   await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
+
+  // ── Regenerate signed PDF with agent signature embedded ──
+  if (action === "agent_sign_digital" || action === "agent_sign_upload") {
+    try {
+      const signedPdfUrl = await regenerateSignedPdf(id);
+      await Contract.update({ documentUrl: signedPdfUrl }, { where: { id } });
+    } catch (err: any) {
+      console.error(
+        "Failed to generate signed PDF after agent signing:",
+        err.message,
+      );
+      // Non-blocking — contract transition already succeeded
+    }
+  }
 
   // Audit log (outside transaction — non-critical)
   await logAudit(

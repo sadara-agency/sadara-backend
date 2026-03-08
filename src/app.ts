@@ -129,6 +129,38 @@ app.get(
   },
 );
 
+// ── Serve signed contract PDFs (authenticated, contracts read permission) ──
+const SIGNED_CONTRACTS_ROOT = path.resolve(
+  process.cwd(),
+  "uploads",
+  "signed-contracts",
+);
+app.get(
+  "/uploads/signed-contracts/:filename",
+  authenticate,
+  authorizeModule("contracts", "read"),
+  async (req, res) => {
+    const authReq = req as AuthRequest;
+    const filename = path.basename(authReq.params.filename);
+    const filePath = path.join(SIGNED_CONTRACTS_ROOT, filename);
+    if (!fs.existsSync(filePath)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "File not found" });
+    }
+    if (authReq.user) {
+      logAudit(
+        "DOWNLOAD",
+        "contracts",
+        null,
+        buildAuditContext(authReq.user, authReq.ip),
+        `Downloaded signed contract: ${filename}`,
+      );
+    }
+    res.sendFile(filePath);
+  },
+);
+
 // ── Health Check ──
 app.get("/api/health", async (_req, res) => {
   const checks: Record<string, "ok" | "error"> = {};

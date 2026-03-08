@@ -109,6 +109,43 @@ async function checkContractExpiry() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// JOB 1b: Contract Status Transitions (Active → Expiring Soon → Expired)
+// ══════════════════════════════════════════════════════════════
+
+async function updateContractStatuses() {
+  const today = new Date().toISOString().split("T")[0];
+
+  // 1. Expired: contracts past their end date that are still Active or Expiring Soon
+  const [, expiredCount] = await sequelize.query(
+    `UPDATE contracts
+     SET status = 'Expired', updated_at = NOW()
+     WHERE status IN ('Active', 'Expiring Soon')
+       AND end_date < :today`,
+    { replacements: { today } },
+  );
+
+  // 2. Expiring Soon: active contracts within 30 days of end date
+  const thirtyDaysOut = new Date();
+  thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
+  const thirtyStr = thirtyDaysOut.toISOString().split("T")[0];
+
+  const [, expiringSoonCount] = await sequelize.query(
+    `UPDATE contracts
+     SET status = 'Expiring Soon', updated_at = NOW()
+     WHERE status = 'Active'
+       AND end_date >= :today
+       AND end_date <= :threshold`,
+    { replacements: { today, threshold: thirtyStr } },
+  );
+
+  return {
+    expired: (expiredCount as any)?.rowCount ?? expiredCount ?? 0,
+    expiringSoon:
+      (expiringSoonCount as any)?.rowCount ?? expiringSoonCount ?? 0,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
 // JOB 2: Injury Follow-up Reminders
 // ══════════════════════════════════════════════════════════════
 
@@ -311,32 +348,42 @@ async function checkUpcomingMatches() {
   for (const m of matches) {
     const matchDate = new Date(m.match_date);
     matchDate.setHours(0, 0, 0, 0);
-    const daysUntil = Math.round((matchDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntil = Math.round(
+      (matchDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+    );
 
     // Generate pre-match auto-tasks based on days remaining
     try {
       const result = await generatePreMatchTasks(m.id, daysUntil);
       totalPreMatchTasks += result.created;
     } catch (err: any) {
-      logger.error(`[Cron] Pre-match tasks failed for match ${m.id}: ${err.message}`);
+      logger.error(
+        `[Cron] Pre-match tasks failed for match ${m.id}: ${err.message}`,
+      );
     }
 
     // Send notification for matches 2 days out (existing behavior)
     if (daysUntil === 2) {
-      await notifyByRole(["Admin", "Manager", "Analyst", "Scout", "Coach", "Media"], {
-        type: "match",
-        title: `Match in 2 days: ${m.home_team} vs ${m.away_team}`,
-        titleAr: `مباراة بعد يومين: ${m.home_team_ar || m.home_team} ضد ${m.away_team_ar || m.away_team}`,
-        body: `${m.competition || "Match"} on ${m.match_date}`,
-        link: `/dashboard/matches/${m.id}`,
-        sourceType: "match",
-        sourceId: m.id,
-        priority: "normal",
-      });
+      await notifyByRole(
+        ["Admin", "Manager", "Analyst", "Scout", "Coach", "Media"],
+        {
+          type: "match",
+          title: `Match in 2 days: ${m.home_team} vs ${m.away_team}`,
+          titleAr: `مباراة بعد يومين: ${m.home_team_ar || m.home_team} ضد ${m.away_team_ar || m.away_team}`,
+          body: `${m.competition || "Match"} on ${m.match_date}`,
+          link: `/dashboard/matches/${m.id}`,
+          sourceType: "match",
+          sourceId: m.id,
+          priority: "normal",
+        },
+      );
     }
   }
 
-  return { upcomingMatches: matches.length, preMatchTasksCreated: totalPreMatchTasks };
+  return {
+    upcomingMatches: matches.length,
+    preMatchTasksCreated: totalPreMatchTasks,
+  };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -353,6 +400,7 @@ async function cleanup() {
 // ══════════════════════════════════════════════════════════════
 
 registerJob("upcoming-matches", checkUpcomingMatches);
+registerJob("contract-status", updateContractStatuses);
 registerJob("contract-expiry", checkContractExpiry);
 registerJob("injury-followups", checkInjuryFollowups);
 registerJob("payment-reminders", checkPaymentDueDates);
@@ -406,11 +454,12 @@ export function startCronJobs() {
   logger.info("[CRON] Initializing cron scheduler...");
 
   cron.schedule("0 7 * * *", safeJob("upcoming-matches")); // 7:00 AM
+  cron.schedule("0 7,19 * * *", safeJob("contract-status")); // 7:00 AM & 7:00 PM
   cron.schedule("0 8 * * *", safeJob("contract-expiry")); // 8:00 AM
   cron.schedule("30 8 * * *", safeJob("injury-followups")); // 8:30 AM
   cron.schedule("0 9 * * *", safeJob("payment-reminders")); // 9:00 AM
   cron.schedule("30 9 * * *", safeJob("document-expiry")); // 9:30 AM
   cron.schedule("0 3 * * *", safeJob("cleanup")); // 3:00 AM
 
-  logger.info("[CRON] 6 jobs scheduled ✓");
+  logger.info("[CRON] 7 jobs scheduled ✓");
 }

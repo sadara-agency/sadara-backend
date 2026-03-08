@@ -14,6 +14,7 @@ import { Gate, GateChecklist } from "../gates/gate.model";
 import { Task } from "../tasks/task.model";
 import { Injury, InjuryUpdate } from "../injuries/injury.model";
 import { AppError } from "../../middleware/errorHandler";
+import { regenerateSignedPdf } from "../contracts/contract.signing.service";
 
 // ══════════════════════════════════════════
 // RESOLVE: User → Player
@@ -567,6 +568,21 @@ export async function signMyContract(
 
     return contract;
   });
+
+  // ── Regenerate signed PDF with both signatures embedded ──
+  try {
+    const signedPdfUrl = await regenerateSignedPdf(contractId);
+    await Contract.update(
+      { documentUrl: signedPdfUrl },
+      { where: { id: contractId } },
+    );
+  } catch (err: any) {
+    console.error(
+      "Failed to generate signed PDF after player signing:",
+      err.message,
+    );
+    // Non-blocking — contract activation already succeeded
+  }
 
   return result;
 }

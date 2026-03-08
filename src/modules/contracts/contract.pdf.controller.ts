@@ -12,7 +12,9 @@ import * as contractService from "./contract.service";
 // Assets are copied to dist/assets/pdf/ during build. Fall back to src/ for local dev.
 const ASSETS_DIR_DIST = path.resolve(__dirname, "..", "..", "assets", "pdf");
 const ASSETS_DIR_SRC = path.resolve(process.cwd(), "src", "assets", "pdf");
-const ASSETS_DIR = fs.existsSync(ASSETS_DIR_DIST) ? ASSETS_DIR_DIST : ASSETS_DIR_SRC;
+const ASSETS_DIR = fs.existsSync(ASSETS_DIR_DIST)
+  ? ASSETS_DIR_DIST
+  : ASSETS_DIR_SRC;
 const COVER_PDF = path.join(ASSETS_DIR, "cover_page.pdf");
 const BACK_PDF = path.join(ASSETS_DIR, "back_page.pdf");
 
@@ -58,8 +60,15 @@ function getData(c: any) {
     sd: c.startDate ? new Date(c.startDate).toISOString().split("T")[0] : "",
     ed: c.endDate ? new Date(c.endDate).toISOString().split("T")[0] : "",
     cpct: Number(c.commissionPct) || 10,
+    // Player signature
     sigImg: c.signingMethod === "digital" ? c.signedDocumentUrl || "" : "",
     sigDt: c.signedAt ? new Date(c.signedAt).toISOString().split("T")[0] : "",
+    // Agent signature
+    agentSigImg:
+      c.agentSigningMethod === "digital" ? c.agentSignatureData || "" : "",
+    agentSigDt: c.agentSignedAt
+      ? new Date(c.agentSignedAt).toISOString().split("T")[0]
+      : "",
   };
 }
 
@@ -138,12 +147,23 @@ function pg2(d: any) {
 
 function pg3(d: any) {
   const sd = fmtDate(d.sd);
-  const sig = d.sigImg
+
+  // Agent signature (First Party — right side in RTL)
+  const agentSig = d.agentSigImg
+    ? `<img src="${d.agentSigImg}" style="height:40px;margin-top:3px" />`
+    : '<span class="sf"></span>';
+  const agentSigDate = d.agentSigDt
+    ? `<span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${fmtDate(d.agentSigDt)}</span>`
+    : '<span class="sf"></span>';
+
+  // Player signature (Second Party — left side in RTL)
+  const playerSig = d.sigImg
     ? `<img src="${d.sigImg}" style="height:40px;margin-top:3px" />`
     : '<span class="sf"></span>';
-  const sdt = d.sigDt
+  const playerSigDate = d.sigDt
     ? `<span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${fmtDate(d.sigDt)}</span>`
     : '<span class="sf"></span>';
+
   return wrap(`<div class="pg">${HD}<div class="ct">
 <div class="st">المادة (6): التزامات الطرف الثاني (اللاعب)</div>
 <div class="ni"><span class="nc">1</span><span>الالتزام بالحصرية وعدم التعامل أو التفاوض مع أي وسيط آخر</span></div>
@@ -173,8 +193,8 @@ function pg3(d: any) {
 <div class="ni"><span class="nc">2</span><span>إذا أصبح أي بند غير قابل للتطبيق يتم استبداله بما يحقق الغرض دون إبطال العقد</span></div>
 <div class="ni"><span class="nc">3</span><span>يُحرّر العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها</span></div>
 <div class="ss">
-<div class="sb" style="text-align:right"><p style="font-size:9.5pt"><strong>التوقيعات</strong></p><p>الطرف الأول / شركة صدارة المواهب الرياضية</p><p>يمثلها/ خالد بن علي الشهري</p><p>الصفة/ المدير العام</p><p>من تاريخ: <span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${sd}</span></p><p style="margin-top:5px">التوقيع:_________________________</p><p style="direction:ltr;text-align:left;font-size:9pt">Ahmed Osman Hadoug</p></div>
-<div class="sb" style="text-align:right"><p>&nbsp;</p><p><strong>الطرف الثاني: اللاعب</strong></p><p style="color:#3C3CFA;font-weight:700">${d.pn}</p><p>التاريخ ${sdt}</p><p style="margin-top:5px">التوقيع ${sig}</p></div>
+<div class="sb" style="text-align:right"><p style="font-size:9.5pt"><strong>التوقيعات</strong></p><p>الطرف الأول / شركة صدارة المواهب الرياضية</p><p>يمثلها/ خالد بن علي الشهري</p><p>الصفة/ المدير العام</p><p>التاريخ ${agentSigDate}</p><p style="margin-top:5px">التوقيع ${agentSig}</p><p style="direction:ltr;text-align:left;font-size:9pt">Ahmed Osman Hadoug</p></div>
+<div class="sb" style="text-align:right"><p>&nbsp;</p><p><strong>الطرف الثاني: اللاعب</strong></p><p style="color:#3C3CFA;font-weight:700">${d.pn}</p><p>التاريخ ${playerSigDate}</p><p style="margin-top:5px">التوقيع ${playerSig}</p></div>
 </div>
 <div class="gu"><p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p><p style="font-size:8pt">أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p><table class="gt"><tr><td>الاسم</td><td style="min-width:90px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table></div>
 </div></div>`);
@@ -196,13 +216,17 @@ async function renderHtmlPage(page: any, html: string): Promise<Uint8Array> {
   });
 }
 
-// ─── Main Endpoint ──────────────────────────────────────────
+// ─── Reusable: generate full contract PDF as Buffer ─────────
 
-export async function generatePdf(req: AuthRequest, res: Response) {
-  const contract = await contractService.getContractById(req.params.id);
+export async function generateContractPdfBuffer(
+  contractOrId: any,
+): Promise<{ buffer: Buffer; playerName: string }> {
+  const contract =
+    typeof contractOrId === "string"
+      ? await contractService.getContractById(contractOrId)
+      : contractOrId;
   if (!contract) throw new AppError("Contract not found", 404);
 
-  // Validate brand assets exist
   if (!fs.existsSync(COVER_PDF)) {
     throw new AppError(
       "Brand asset cover_page.pdf not found. Place it in src/assets/pdf/",
@@ -220,11 +244,9 @@ export async function generatePdf(req: AuthRequest, res: Response) {
   let browser: any = null;
 
   try {
-    // ── 1. Load brand cover & back pages ──
     const coverBytes = fs.readFileSync(COVER_PDF);
     const backBytes = fs.readFileSync(BACK_PDF);
 
-    // ── 2. Render content pages 2 & 3 with Puppeteer ──
     browser = await puppeteer.launch({
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
@@ -247,37 +269,24 @@ export async function generatePdf(req: AuthRequest, res: Response) {
     await browser.close();
     browser = null;
 
-    // ── 3. Merge: Cover + Page2 + Page3 + Back ──
     const merged = await PDFDocument.create();
 
-    // Cover (page 1) — from brand template
     const coverDoc = await PDFDocument.load(coverBytes);
     const [coverPage] = await merged.copyPages(coverDoc, [0]);
     merged.addPage(coverPage);
 
-    // Content pages (2 & 3) — from Puppeteer
     for (const buf of contentBuffers) {
       const doc = await PDFDocument.load(buf);
       const pages = await merged.copyPages(doc, doc.getPageIndices());
       pages.forEach((p) => merged.addPage(p));
     }
 
-    // Back (page 4) — from brand template
     const backDoc = await PDFDocument.load(backBytes);
     const [backPage] = await merged.copyPages(backDoc, [0]);
     merged.addPage(backPage);
 
-    // ── 4. Finalize & send ──
     const final = await merged.save();
-    const name = `عقد_تمثيل_${d.pn}.pdf`;
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Length", final.length);
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
-    );
-    res.end(Buffer.from(final));
+    return { buffer: Buffer.from(final), playerName: d.pn };
   } catch (err: any) {
     if (browser)
       try {
@@ -289,4 +298,19 @@ export async function generatePdf(req: AuthRequest, res: Response) {
       500,
     );
   }
+}
+
+// ─── Main Endpoint ──────────────────────────────────────────
+
+export async function generatePdf(req: AuthRequest, res: Response) {
+  const { buffer, playerName } = await generateContractPdfBuffer(req.params.id);
+  const name = `عقد_تمثيل_${playerName}.pdf`;
+
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Length", buffer.length);
+  res.setHeader(
+    "Content-Disposition",
+    `attachment; filename*=UTF-8''${encodeURIComponent(name)}`,
+  );
+  res.end(buffer);
 }
