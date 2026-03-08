@@ -11,6 +11,7 @@ import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
 import { sendSuccess } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
 import { AppError } from "../../middleware/errorHandler";
 import { Contract } from "./contract.model";
 import { transaction } from "../../config/database";
@@ -127,6 +128,9 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       };
     },
   );
+
+  // Invalidate cached contract data + dashboard KPIs
+  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
   // Audit log (outside transaction — non-critical)
   await logAudit(
