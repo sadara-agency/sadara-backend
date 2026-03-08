@@ -139,7 +139,7 @@ export async function getMyProfile(userId: string) {
   const [stats] = await sequelize.query<any>(
     `SELECT
       COALESCE((SELECT COUNT(*) FROM contracts WHERE player_id = :id AND status = 'Active'), 0) AS "activeContracts",
-      COALESCE((SELECT COUNT(*) FROM documents WHERE player_id = :id), 0) AS "totalDocuments",
+      COALESCE((SELECT COUNT(*) FROM documents WHERE entity_type = 'Player' AND entity_id = :id), 0) AS "totalDocuments",
       COALESCE((SELECT COUNT(*) FROM tasks WHERE player_id = :id AND status != 'Completed'), 0) AS "openTasks",
       COALESCE((SELECT MAX(gate_number::text::integer) FROM gates WHERE player_id = :id AND status = 'Completed'), -1) AS "currentGate"
     `,
@@ -226,7 +226,7 @@ export async function getMyDocuments(userId: string) {
   const playerId = getPlayerId(player);
 
   const documents = await Document.findAll({
-    where: { playerId } as any,
+    where: { entityType: "Player", entityId: playerId } as any,
     include: [{ model: User, as: "uploader", attributes: ["id", "fullName"] }],
     order: [["createdAt", "DESC"]],
   });
@@ -411,7 +411,10 @@ export async function getMyStats(userId: string) {
     ORDER BY m.match_date DESC
     LIMIT 10`,
     {
-      replacements: { playerId, clubId: player.currentClubId || "" },
+      replacements: {
+        playerId,
+        clubId: player.currentClubId || "00000000-0000-0000-0000-000000000000",
+      },
       type: QueryTypes.SELECT,
     },
   );
