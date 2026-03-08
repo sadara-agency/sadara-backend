@@ -66,6 +66,9 @@ jest.mock('../../../src/modules/injuries/injury.model', () => ({
 jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: { name: 'Club' },
 }));
+jest.mock('../../../src/modules/contracts/contract.signing.service', () => ({
+  regenerateSignedPdf: jest.fn(),
+}));
 jest.mock('../../../src/config/env', () => ({
   env: { bcrypt: { saltRounds: 10 }, frontend: { url: 'http://localhost:3000' } },
 }));
