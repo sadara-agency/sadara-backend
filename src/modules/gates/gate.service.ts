@@ -34,36 +34,42 @@ const CHECKLIST_ORDER: [string, string][] = [
  */
 export const GATE_CHECKLIST_TEMPLATES: Record<
   string,
-  { item: string; isMandatory: boolean; sortOrder: number }[]
+  { item: string; itemAr: string; isMandatory: boolean; sortOrder: number }[]
 > = {
   "0": [
     {
       item: "Collect player identification documents (ID / Passport)",
+      itemAr: "جمع وثائق هوية اللاعب (هوية / جواز سفر)",
       isMandatory: true,
       sortOrder: 0,
     },
     {
       item: "Obtain signed representation agreement",
+      itemAr: "الحصول على اتفاقية التمثيل الموقعة",
       isMandatory: true,
       sortOrder: 1,
     },
     {
       item: "Complete medical examination & fitness assessment",
+      itemAr: "إكمال الفحص الطبي وتقييم اللياقة البدنية",
       isMandatory: true,
       sortOrder: 2,
     },
     {
       item: "Verify player registration with federation",
+      itemAr: "التحقق من تسجيل اللاعب لدى الاتحاد",
       isMandatory: true,
       sortOrder: 3,
     },
     {
       item: "Upload player photo & profile data",
+      itemAr: "رفع صورة اللاعب وبيانات الملف الشخصي",
       isMandatory: false,
       sortOrder: 4,
     },
     {
       item: "Guardian consent form (if youth player)",
+      itemAr: "نموذج موافقة ولي الأمر (إذا كان لاعب ناشئ)",
       isMandatory: false,
       sortOrder: 5,
     },
@@ -71,59 +77,98 @@ export const GATE_CHECKLIST_TEMPLATES: Record<
   "1": [
     {
       item: "Complete initial performance assessment",
+      itemAr: "إكمال تقييم الأداء الأولي",
       isMandatory: true,
       sortOrder: 0,
     },
     {
       item: "Create Individual Development Plan (IDP)",
+      itemAr: "إنشاء خطة التطوير الفردية",
       isMandatory: true,
       sortOrder: 1,
     },
     {
       item: "Set short-term performance goals",
+      itemAr: "تحديد أهداف الأداء قصيرة المدى",
       isMandatory: true,
       sortOrder: 2,
     },
     {
       item: "Assign development coach / mentor",
+      itemAr: "تعيين مدرب تطوير / مرشد",
       isMandatory: false,
       sortOrder: 3,
     },
-    { item: "Record baseline statistics", isMandatory: false, sortOrder: 4 },
+    {
+      item: "Record baseline statistics",
+      itemAr: "تسجيل الإحصائيات الأساسية",
+      isMandatory: false,
+      sortOrder: 4,
+    },
   ],
   "2": [
-    { item: "Mid-season performance review", isMandatory: true, sortOrder: 0 },
-    { item: "Update market valuation", isMandatory: true, sortOrder: 1 },
+    {
+      item: "Mid-season performance review",
+      itemAr: "مراجعة أداء منتصف الموسم",
+      isMandatory: true,
+      sortOrder: 0,
+    },
+    {
+      item: "Update market valuation",
+      itemAr: "تحديث التقييم السوقي",
+      isMandatory: true,
+      sortOrder: 1,
+    },
     {
       item: "Review IDP progress & adjust goals",
+      itemAr: "مراجعة تقدم خطة التطوير وتعديل الأهداف",
       isMandatory: true,
       sortOrder: 2,
     },
     {
       item: "Collect performance data & match statistics",
+      itemAr: "جمع بيانات الأداء وإحصائيات المباريات",
       isMandatory: false,
       sortOrder: 3,
     },
-    { item: "Stakeholder feedback report", isMandatory: false, sortOrder: 4 },
+    {
+      item: "Stakeholder feedback report",
+      itemAr: "تقرير ملاحظات أصحاب المصلحة",
+      isMandatory: false,
+      sortOrder: 4,
+    },
   ],
   "3": [
     {
       item: "End-of-season comprehensive review",
+      itemAr: "المراجعة الشاملة لنهاية الموسم",
       isMandatory: true,
       sortOrder: 0,
     },
     {
       item: "Contract renewal recommendation",
+      itemAr: "توصية تجديد العقد",
       isMandatory: true,
       sortOrder: 1,
     },
-    { item: "Final market valuation update", isMandatory: true, sortOrder: 2 },
+    {
+      item: "Final market valuation update",
+      itemAr: "التحديث النهائي للتقييم السوقي",
+      isMandatory: true,
+      sortOrder: 2,
+    },
     {
       item: "Transfer window strategy assessment",
+      itemAr: "تقييم استراتيجية نافذة الانتقالات",
       isMandatory: false,
       sortOrder: 3,
     },
-    { item: "Player satisfaction interview", isMandatory: false, sortOrder: 4 },
+    {
+      item: "Player satisfaction interview",
+      itemAr: "مقابلة رضا اللاعب",
+      isMandatory: false,
+      sortOrder: 4,
+    },
   ],
 };
 
@@ -307,11 +352,12 @@ export async function initializeGate(
   const template = GATE_CHECKLIST_TEMPLATES[gateNumber] || [];
   if (template.length > 0) {
     await GateChecklist.bulkCreate(
-      template.map((item) => ({
+      template.map((t) => ({
         gateId: gate.id,
-        item: item.item,
-        isMandatory: item.isMandatory,
-        sortOrder: item.sortOrder,
+        item: t.item,
+        itemAr: t.itemAr,
+        isMandatory: t.isMandatory,
+        sortOrder: t.sortOrder,
       })),
     );
   }
@@ -442,7 +488,39 @@ export async function toggleChecklistItem(
     updateData.evidenceUrl = input.evidenceUrl;
   if (input.notes !== undefined) updateData.notes = input.notes;
 
-  return await item.update(updateData);
+  await item.update(updateData);
+
+  // Auto-complete gate when all mandatory checklist items are done
+  if (input.isCompleted && gate && gate.status === "InProgress") {
+    const allItems = await GateChecklist.findAll({
+      where: { gateId: gate.id },
+    });
+    const mandatoryIncomplete = allItems.filter(
+      (c) => c.isMandatory && !c.isCompleted,
+    );
+    if (mandatoryIncomplete.length === 0) {
+      await gate.update({
+        status: "Completed" as GateStatus,
+        completedAt: new Date(),
+        approvedBy: userId,
+      });
+
+      // Auto-initialize next gate if it doesn't exist yet
+      const nextGateNum = String(parseInt(gate.gateNumber, 10) + 1);
+      if (["1", "2", "3"].includes(nextGateNum)) {
+        const existing = await Gate.findOne({
+          where: { playerId: gate.playerId, gateNumber: nextGateNum },
+        });
+        if (!existing) {
+          await initializeGate(gate.playerId, nextGateNum as GateNumber, {
+            autoStart: true,
+          });
+        }
+      }
+    }
+  }
+
+  return item;
 }
 
 // ── Delete Checklist Item ──
