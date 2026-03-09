@@ -1,6 +1,10 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize, authorizeModule } from "../../middleware/auth";
+import {
+  authenticate,
+  authorize,
+  authorizeModule,
+} from "../../middleware/auth";
 import { validate } from "../../middleware/validate";
 import { cacheRoute } from "../../middleware/cache.middleware";
 import { CacheTTL } from "../../shared/utils/cache";
@@ -13,6 +17,7 @@ import {
 } from "./contract.schema";
 import * as contractController from "./contract.controller";
 import * as templateController from "./contractTemplate.controller";
+import { getByContract as getClearancesByContract } from "../clearances/clearance.controller";
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
@@ -67,8 +72,21 @@ router.post(
 );
 
 // ── Sub-resource routes MUST come before /:id ──
-router.get("/:id/history", authorizeModule("contracts", "read"), asyncHandler(contractController.getHistory));
-router.get("/:id/pdf", authorizeModule("contracts", "read"), asyncHandler(generatePdf));
+router.get(
+  "/:contractId/clearances",
+  authorizeModule("contracts", "read"),
+  asyncHandler(getClearancesByContract),
+);
+router.get(
+  "/:id/history",
+  authorizeModule("contracts", "read"),
+  asyncHandler(contractController.getHistory),
+);
+router.get(
+  "/:id/pdf",
+  authorizeModule("contracts", "read"),
+  asyncHandler(generatePdf),
+);
 router.post(
   "/:id/transition",
   authorizeModule("contracts", "create"),
