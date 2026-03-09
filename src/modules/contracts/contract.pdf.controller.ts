@@ -51,7 +51,6 @@ function calcDur(a: string, b: string): string {
 function ensureDataUri(val: string): string {
   if (!val) return "";
   if (val.startsWith("data:")) return val;
-  // Raw base64 without prefix — assume PNG
   return `data:image/png;base64,${val}`;
 }
 
@@ -61,13 +60,11 @@ function getData(c: any) {
     p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null;
   const en = p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : "";
 
-  // Player signature: stored in signedDocumentUrl for digital signing
   let sigImg = "";
   if (c.signedDocumentUrl && c.signingMethod === "digital") {
     sigImg = ensureDataUri(c.signedDocumentUrl);
   }
 
-  // Agent signature: stored in agentSignatureData for digital signing
   let agentSigImg = "";
   if (c.agentSignatureData && c.agentSigningMethod === "digital") {
     agentSigImg = ensureDataUri(c.agentSignatureData);
@@ -90,35 +87,49 @@ function getData(c: any) {
   };
 }
 
-// ─── CSS (system fonts only — zero network) ─────────────────
+// ─── Brand logo (4-pointed star SVG inline) ─────────────────
+
+const LOGO_SVG = `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M50 0C50 0 62 38 100 50C62 62 50 100 50 100C50 100 38 62 0 50C38 38 50 0 50 0Z" fill="#000"/></svg>`;
+
+// ─── CSS — compact to fit all content on exactly 2 pages ────
 
 const CSS = `*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#000;background:#fff;width:595px;height:842px;overflow:hidden;font-size:8.8pt;line-height:1.5}
+body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#000;background:#fff;width:595px;height:842px;overflow:hidden;font-size:7.8pt;line-height:1.4}
 .pg{width:595px;height:842px;position:relative}
-.hd{display:flex;justify-content:space-between;align-items:flex-start;padding:18px 35px 12px;border-bottom:2px solid #000}
-.hd-r{text-align:right}.lt{font-size:14pt;font-weight:700}.ls{font-size:7.5pt;font-weight:500;letter-spacing:1px}
-.hd-l{text-align:left;direction:ltr;font-size:7.5pt;line-height:1.5}.nn{font-weight:700}
-.ct{padding:10px 35px}.tt{text-align:center;font-size:22pt;font-weight:700;margin:12px 0 16px;letter-spacing:2px}
-.st{font-weight:700;font-size:9pt;background:#000;color:#fff;display:inline-block;padding:1px 8px;margin:6px 0 3px}
-.at{font-weight:700;font-size:9pt;text-decoration:underline;margin:8px 0 2px}
-p{margin-bottom:2px}
-.pts{display:flex;justify-content:space-between;gap:15px;margin-top:5px}
-.pr{flex:1;text-align:right;font-size:8.5pt;line-height:1.6}.pl{width:170px}
-.pl table{border-collapse:collapse;width:100%}.pl td{border:1px solid #000;padding:2px 6px;font-size:8pt}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 30px 10px;border-bottom:2px solid #000}
+.hd-r{display:flex;align-items:center;gap:8px}.hd-r-txt{text-align:right}
+.lt{font-size:13pt;font-weight:700}.ls{font-size:7pt;font-weight:500;letter-spacing:1px}
+.hd-l{text-align:left;direction:ltr;font-size:7pt;line-height:1.5}.nn{font-weight:700}
+.ct{padding:6px 30px 8px}
+.tt{text-align:center;font-size:16pt;font-weight:700;margin:8px 0 6px;letter-spacing:2px}
+.st{font-weight:700;font-size:8pt;background:#3C3CFA;color:#fff;display:inline-block;padding:1px 8px;margin:5px 0 2px}
+.stb{font-weight:700;font-size:8pt;background:#000;color:#fff;display:inline-block;padding:1px 8px;margin:5px 0 2px}
+.at{font-weight:700;font-size:8pt;text-decoration:underline;margin:5px 0 1px}
+p{margin-bottom:1px}
+.pts{display:flex;justify-content:space-between;gap:10px;margin-top:3px}
+.pr{flex:1;text-align:right;font-size:7.5pt;line-height:1.5}
+.pl{width:155px}
+.pl table{border-collapse:collapse;width:100%}.pl td{border:1px solid #000;padding:1px 5px;font-size:7pt}
 .vl{color:#3C3CFA;font-weight:600}
-.ni{display:flex;align-items:flex-start;gap:4px;font-size:8.5pt}
-.nc{min-width:14px;height:14px;border-radius:50%;background:#3C3CFA;color:#fff;font-size:6.5pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:2px}
-.db{display:flex;align-items:center;gap:6px;margin:3px 0}
-.dx{border:1px solid #000;padding:2px 10px;font-size:8.5pt;text-align:center;direction:ltr}
-.dl{font-weight:700;font-size:8.5pt;background:#3C3CFA;color:#fff;padding:2px 8px}
-.ss{display:flex;justify-content:space-between;margin-top:10px;gap:20px}.sb{flex:1;font-size:8.5pt}
-.sf{border-bottom:1px solid #000;display:inline-block;min-width:130px;height:14px}
-.gu{margin-top:8px;padding-top:4px;border-top:1px solid #ccc;font-size:8pt}
-.gt{border-collapse:collapse;width:170px;margin-top:3px}.gt td{border:1px solid #000;padding:2px 6px;font-size:8pt}`;
+.ni{display:flex;align-items:flex-start;gap:3px;font-size:7.8pt;margin:0}
+.nc{min-width:13px;height:13px;border-radius:50%;background:#3C3CFA;color:#fff;font-size:6pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0}
+.db{display:flex;align-items:center;gap:5px;margin:2px 0}
+.dx{border:1px solid #000;padding:1px 8px;font-size:7.5pt;text-align:center;direction:ltr}
+.dl{font-weight:700;font-size:7.5pt;background:#3C3CFA;color:#fff;padding:1px 8px}
+.ss{display:flex;justify-content:space-between;margin-top:6px;gap:15px}
+.sb{flex:1;font-size:7.5pt;line-height:1.4}
+.sf{border-bottom:1px solid #000;display:inline-block;min-width:120px;height:12px}
+.gu{margin-top:5px;padding-top:3px;border-top:1px solid #ccc;font-size:7pt}
+.gt{border-collapse:collapse;margin-top:2px}.gt td{border:1px solid #000;padding:1px 5px;font-size:7pt}`;
 
-const HD = `<div class="hd"><div class="hd-r"><div class="lt">شـركــة صـــدارة الـريـاضـيـة</div><div class="ls">SADARA SPORTS COMPANY</div></div><div class="hd-l"><div class="nn">N.N/ 7052143646</div><div>Prince Meshaal Ibn Abd AlAziz, Irqah, Riyadh 12534</div><div style="border-top:1px solid #000;margin-top:3px;padding-top:3px">P - +966533919155 &nbsp; W - www.sadarasport.sa<br>M - info@sadarasport.sa</div></div></div>`;
+// ─── Header (with logo) ─────────────────────────────────────
 
-// ─── Page Builders (pages 2 & 3 only — cover/back from assets) ──
+const HD = `<div class="hd">
+<div class="hd-r">${LOGO_SVG}<div class="hd-r-txt"><div class="lt">شـركـة صــدارة الـريـاضـيـة</div><div class="ls">SADARA SPORTS COMPANY</div></div></div>
+<div class="hd-l"><div class="nn">N.N/ 7052143646</div><div>Prince Meshaal Ibn Abd AlAziz, 'Irqah, Riyadh 12534</div><div style="margin-top:2px">P - +966533919155 &nbsp;&nbsp; W - www.sadarasport.sa<br>M - info@sadarasport.sa</div></div>
+</div>`;
+
+// ─── Page Builders ──────────────────────────────────────────
 
 const wrap = (body: string) =>
   `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${CSS}</style></head><body>${body}</body></html>`;
@@ -128,31 +139,31 @@ function pg2(d: any) {
     ed = fmtDate(d.ed),
     dur = calcDur(d.sd, d.ed);
   return wrap(`<div class="pg">${HD}<div class="ct">
-<div class="tt">عـقـد تـمـثـيـل ريـاضـي حـصـري</div>
-<div class="st">التمهيــد</div>
-<p style="font-size:9pt">حيث إن شركة صدارة المواهب الرياضية المحدودة (الطرف الأول) تعمل في المجال الرياضي وفي أنشطة إدارة وتمثيل لاعبي كرة القدم والتفاوض بشأن عقودهم الرياضية والتجارية داخل المملكة العربية السعودية وخارجها، وفق الأنظمة واللوائح المعمول بها؛</p>
-<p style="font-size:9pt">وحيث إن الطرف الأول يمارس نشاطه من خلال وكيل معتمد ومرخّص من الاتحاد الدولي لكرة القدم (فيفا) يعمل تحت مظلة الشركة؛</p>
-<p style="font-size:9pt">وحيث إن الطرف الثاني (اللاعب) يرغب في الاستعانة بخدمات الطرف الأول لتمثيله تمثيلاً حصرياً؛</p>
-<p style="font-size:9pt">فقد اتفق الطرفين وهما بكامل أهليتهما الشرعية والنظامية على ما يلي، ويعدّ التمهيد جزءاً لا يتجزأ من العقد:</p>
-<div class="at">المادة (1): بيانات الأطراف</div>
+<div class="tt">عقد تمثيل رياضي حصري</div>
+<div class="stb">التمهيــد</div>
+<p>حيث إن شركة صدارة المواهب الرياضية المحدودة (الطرف الأول) تعمل في المجال الرياضي وفي أنشطة إدارة وتمثيل لاعبي كرة القدم والتفاوض بشأن عقودهم الرياضية والتجارية داخل المملكة العربية السعودية وخارجها، وفق الأنظمة واللوائح المعمول بها؛</p>
+<p>وحيث إن الطرف الأول يمارس نشاطه من خلال وكيل معتمد ومرخّص من الاتحاد الدولي لكرة القدم (فيفا) يعمل تحت مظلة الشركة؛</p>
+<p>وحيث إن الطرف الثاني (اللاعب) يرغب في الاستعانة بخدمات الطرف الأول لتمثيله تمثيلاً حصرياً؛</p>
+<p>فقد اتفق الطرفين وهما بكامل أهليتهما الشرعية والنظامية على ما يلي، ويعدّ التمهيد جزءاً لا يتجزأ من العقد:</p>
+<div class="st">المادة (1): بيانات الأطراف</div>
 <div class="pts"><div class="pr"><strong>الطرف الأول/</strong> شركة صدارة المواهب الرياضية المحدودة<br><strong>المقر/</strong> السعودية، الرياض، حي عرقة، طريق الأمير مشعل ص.ب 12534<br><strong>الرقم الموحد/</strong>7052143646<br><strong>يمثلها/</strong> خالد بن علي الشهري<br><strong>جوال رقم/</strong> 0533919155<br><strong>البريد الإلكتروني</strong> khaled@sadarasport.sa</div>
 <div class="pl"><table><tr><td colspan="2" style="font-weight:700;text-align:center;background:#f5f5f5">الطرف الثاني: اللاعب</td></tr><tr><td class="vl">${d.pn}</td><td></td></tr><tr><td class="vl">${d.pid}</td><td>هوية رقم</td></tr><tr><td class="vl">${d.nat}</td><td>الجنسية</td></tr><tr><td class="vl">${d.ph}</td><td>جوال رقم</td></tr></table></div></div>
-<div class="at">المادة (2): نطاق التمثيل (موضوع العقد)</div>
+<div class="st">المادة (2): نطاق التمثيل (موضوع العقد)</div>
 <p>يمنح اللاعب الشركة حق التمثيل الحصري الكامل داخل المملكة وخارجها في الآتي:</p>
 <div class="ni"><span class="nc">1</span><span>التفاوض مع الأندية بشأن توقيع أو تجديد أو فسخ أو إعارة أو تعديل أي عقد رياضي يخص اللاعب</span></div>
 <div class="ni"><span class="nc">2</span><span>التفاوض بشأن أي عقود تجارية أو رعائية أو دعائية تتعلق باللاعب، بعد موافقته</span></div>
 <div class="ni"><span class="nc">3</span><span>متابعة الإجراءات القانونية والإدارية المتعلقة بالعقود</span></div>
 <div class="ni"><span class="nc">4</span><span>توثيق العقود في الأنظمة الرسمية (TMS أو ما يستحدث)</span></div>
 <div class="ni"><span class="nc">5</span><span>يقر اللاعب بأن هذه الحصرية سارية طوال مدة العقد ولا يجوز له تفويض أي جهة أخرى في هذه الأعمال</span></div>
-<div class="at">المادة (3): وجود وكيل مرخّص</div>
+<div class="st">المادة (3): وجود وكيل مرخّص</div>
 <p>يقر الطرف الأول بأن جميع أعمال التمثيل المنصوص عليها في العقد تُدار من خلال وكيل معتمد ومرخّص من الاتحاد الدولي لكرة القدم (فيفا)، وفق البيانات التالية:</p>
 <p style="text-align:center">الاسم: Ahmed Osman Hadoug<br>رقم رخصة فيفا FIFA AGENT LICENSE No (202411-8478)<br>جهة الترخيص: الاتحاد الدولي لكرة القدم - (FIFA)</p>
 <p>ويعمل الوكيل تحت مظلة شركة صدارة، وتبقى العلاقة التعاقدية في هذا العقد بين اللاعب والشركة مباشرة</p>
-<div class="at">المادة (4): مدة العقد</div>
+<div class="st">المادة (4): مدة العقد</div>
 <p>مدة هذا العقد ${dur} تبدأ من:</p>
 <div class="db"><span class="dl">من تاريخ</span><span class="dx">${sd}</span></div>
 <div class="db"><span class="dl" style="background:#000">إلى تاريخ:</span><span class="dx">${ed}</span></div>
-<div class="at">المادة (5): التزامات الطرف الأول (الشركة)</div>
+<div class="st">المادة (5): التزامات الطرف الأول (الشركة)</div>
 <div class="ni"><span class="nc">1</span><span>بذل العناية اللازمة للحصول على أفضل العروض الرياضية والتجارية</span></div>
 <div class="ni"><span class="nc">2</span><span>التفاوض نيابة عن اللاعب وفق الأنظمة واللوائح المعمول بها</span></div>
 <div class="ni"><span class="nc">3</span><span>مراجعة وصياغة العقود وتوضيح آثارها للاعب قبل توقيعها</span></div>
@@ -164,23 +175,19 @@ function pg2(d: any) {
 }
 
 function pg3(d: any) {
-  const sd = fmtDate(d.sd);
-
   // Agent signature (First Party — right side in RTL)
   const agentSig = d.agentSigImg
-    ? `<img src="${d.agentSigImg}" style="height:40px;margin-top:3px" />`
-    : '<span class="sf"></span>';
+    ? `<img src="${d.agentSigImg}" style="height:35px;margin-top:2px" />`
+    : "_________________________";
   const agentSigDate = d.agentSigDt
-    ? `<span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${fmtDate(d.agentSigDt)}</span>`
-    : '<span class="sf"></span>';
+    ? `<span class="dx">${fmtDate(d.agentSigDt)}</span>`
+    : `<span class="dx">&nbsp; &nbsp; / &nbsp; &nbsp; / 202 &nbsp;</span>`;
 
   // Player signature (Second Party — left side in RTL)
   const playerSig = d.sigImg
-    ? `<img src="${d.sigImg}" style="height:40px;margin-top:3px" />`
-    : '<span class="sf"></span>';
-  const playerSigDate = d.sigDt
-    ? `<span style="border:1px solid #000;padding:1px 8px;font-size:8.5pt">${fmtDate(d.sigDt)}</span>`
-    : '<span class="sf"></span>';
+    ? `<img src="${d.sigImg}" style="height:35px;margin-top:2px" />`
+    : "";
+  const playerSigDate = d.sigDt ? fmtDate(d.sigDt) : "";
 
   return wrap(`<div class="pg">${HD}<div class="ct">
 <div class="st">المادة (6): التزامات الطرف الثاني (اللاعب)</div>
@@ -213,10 +220,24 @@ function pg3(d: any) {
 <div class="ni"><span class="nc">2</span><span>إذا أصبح أي بند غير قابل للتطبيق يتم استبداله بما يحقق الغرض دون إبطال العقد</span></div>
 <div class="ni"><span class="nc">3</span><span>يُحرّر العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها</span></div>
 <div class="ss">
-<div class="sb" style="text-align:right"><p style="font-size:9.5pt"><strong>التوقيعات</strong></p><p>الطرف الأول / شركة صدارة المواهب الرياضية</p><p>يمثلها/ خالد بن علي الشهري</p><p>الصفة/ المدير العام</p><p>من تاريخ ${agentSigDate}</p><p style="margin-top:5px">التوقيع:${agentSig}</p><p style="direction:ltr;text-align:left;font-size:9pt">Ahmed Osman Hadoug</p></div>
-<div class="sb" style="text-align:right"><table class="gt" style="width:100%;margin-top:18px"><tr><td colspan="2" style="font-weight:700;text-align:center;background:#f5f5f5">الطرف الثاني: اللاعب</td></tr><tr><td>${playerSigDate}</td><td>التاريخ</td></tr><tr><td>${playerSig}</td><td>التوقيع</td></tr></table></div>
+<div class="sb" style="text-align:right">
+<p style="font-size:8.5pt"><strong>التوقيعات</strong></p>
+<p>الطرف الأول / شركة صدارة المواهب الرياضية</p>
+<p>يمثلها/ خالد بن علي الشهري</p>
+<p>الصفة/ المدير العام</p>
+<p>من تاريخ &nbsp; ${agentSigDate}</p>
+<p style="margin-top:3px">التوقيع:${agentSig}</p>
+<p style="direction:ltr;text-align:left;font-size:8pt">Ahmed Osman Hadoug</p>
 </div>
-<div class="gu"><p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p><p style="font-size:8pt">أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p><table class="gt"><tr><td>الاسم</td><td style="min-width:90px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table></div>
+<div class="sb" style="text-align:right">
+<table class="gt" style="width:100%;margin-top:16px"><tr><td colspan="2" style="font-weight:700;text-align:center;background:#f5f5f5">الطرف الثاني: اللاعب</td></tr><tr><td style="min-width:80px">${playerSigDate}</td><td>التاريخ</td></tr><tr><td>${playerSig}</td><td>التوقيع</td></tr></table>
+</div>
+</div>
+<div class="gu">
+<p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p>
+<p>أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p>
+<table class="gt" style="width:160px"><tr><td>الاسم</td><td style="min-width:70px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table>
+</div>
 </div></div>`);
 }
 
