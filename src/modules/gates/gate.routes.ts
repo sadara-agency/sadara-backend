@@ -31,9 +31,17 @@ router.post(
   validate(initializeGateSchema),
   asyncHandler(gateController.initialize),
 );
-router.get("/player/:playerId", authorizeModule("gates", "read"), asyncHandler(gateController.getPlayerGates));
+router.get(
+  "/player/:playerId",
+  authorizeModule("gates", "read"),
+  asyncHandler(gateController.getPlayerGates),
+);
 
-router.get("/:id", authorizeModule("gates", "read"), asyncHandler(gateController.getById));
+router.get(
+  "/:id",
+  authorizeModule("gates", "read"),
+  asyncHandler(gateController.getById),
+);
 router.post(
   "/",
   authorizeModule("gates", "create"),
@@ -52,7 +60,23 @@ router.patch(
   validate(advanceGateSchema),
   asyncHandler(gateController.advance),
 );
-router.delete("/:id", authorizeModule("gates", "delete"), asyncHandler(gateController.remove));
+router.delete(
+  "/:id",
+  authorizeModule("gates", "delete"),
+  asyncHandler(gateController.remove),
+);
+
+// ── Verification ──
+router.get(
+  "/:id/verify",
+  authorizeModule("gates", "read"),
+  asyncHandler(gateController.verifyGate),
+);
+router.post(
+  "/checklist/:itemId/verify",
+  authorizeModule("gates", "read"),
+  asyncHandler(gateController.verifyItem),
+);
 
 // ── Checklist Items ──
 router.post(

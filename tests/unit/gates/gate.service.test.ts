@@ -240,7 +240,7 @@ describe('Gate Service', () => {
       const item = mockModelInstance(mockGateChecklist({ gateId: 'gate-001' }));
       mockChecklistFindByPk.mockResolvedValue(item);
       mockGateFindByPk.mockResolvedValue(mockModelInstance(mockGate({ status: 'InProgress' })));
-      await gateService.toggleChecklistItem('chk-001', { isCompleted: true }, 'user-001');
+      await gateService.toggleChecklistItem('chk-001', { isCompleted: true }, 'user-001', 'Admin');
       expect(item.update).toHaveBeenCalledWith(expect.objectContaining({ isCompleted: true, completedBy: 'user-001' }));
     });
 
@@ -248,7 +248,7 @@ describe('Gate Service', () => {
       const item = mockModelInstance(mockGateChecklist({ gateId: 'gate-001' }));
       mockChecklistFindByPk.mockResolvedValue(item);
       mockGateFindByPk.mockResolvedValue(mockModelInstance(mockGate({ status: 'InProgress' })));
-      await gateService.toggleChecklistItem('chk-001', { isCompleted: false }, 'user-001');
+      await gateService.toggleChecklistItem('chk-001', { isCompleted: false }, 'user-001', 'Admin');
       expect(item.update).toHaveBeenCalledWith(expect.objectContaining({ isCompleted: false, completedAt: null, completedBy: null }));
     });
 
@@ -256,12 +256,12 @@ describe('Gate Service', () => {
       const item = mockModelInstance(mockGateChecklist({ gateId: 'gate-001' }));
       mockChecklistFindByPk.mockResolvedValue(item);
       mockGateFindByPk.mockResolvedValue(mockModelInstance(mockGate({ status: 'Completed' })));
-      await expect(gateService.toggleChecklistItem('chk-001', { isCompleted: true }, 'user-001')).rejects.toThrow('Cannot modify checklist');
+      await expect(gateService.toggleChecklistItem('chk-001', { isCompleted: true }, 'user-001', 'Admin')).rejects.toThrow('Cannot modify checklist');
     });
 
     it('should throw 404 if item not found', async () => {
       mockChecklistFindByPk.mockResolvedValue(null);
-      await expect(gateService.toggleChecklistItem('bad', { isCompleted: true }, 'user-001')).rejects.toThrow('Checklist item not found');
+      await expect(gateService.toggleChecklistItem('bad', { isCompleted: true }, 'user-001', 'Admin')).rejects.toThrow('Checklist item not found');
     });
   });
 

@@ -5,6 +5,7 @@ import { sequelize } from "../../config/database";
 
 export type GateNumber = "0" | "1" | "2" | "3";
 export type GateStatus = "Pending" | "InProgress" | "Completed";
+export type VerificationType = "manual" | "auto" | "auto_with_override";
 
 // ══════════════════════════════════════════
 // GATE MODEL
@@ -112,12 +113,25 @@ export interface GateChecklistAttributes {
   evidenceUrl?: string | null;
   notes?: string | null;
   sortOrder: number;
+  verificationType: VerificationType;
+  verificationRule?: object | null;
+  autoVerified: boolean;
+  autoVerifiedDetails?: object | null;
+  lastVerifiedAt?: Date | null;
+  overriddenBy?: string | null;
+  overriddenAt?: Date | null;
   createdAt?: Date;
 }
 
 interface GateChecklistCreationAttributes extends Optional<
   GateChecklistAttributes,
-  "id" | "isCompleted" | "isMandatory" | "sortOrder" | "createdAt"
+  | "id"
+  | "isCompleted"
+  | "isMandatory"
+  | "sortOrder"
+  | "createdAt"
+  | "verificationType"
+  | "autoVerified"
 > {}
 
 export class GateChecklist
@@ -136,6 +150,13 @@ export class GateChecklist
   declare evidenceUrl: string | null;
   declare notes: string | null;
   declare sortOrder: number;
+  declare verificationType: VerificationType;
+  declare verificationRule: object | null;
+  declare autoVerified: boolean;
+  declare autoVerifiedDetails: object | null;
+  declare lastVerifiedAt: Date | null;
+  declare overriddenBy: string | null;
+  declare overriddenAt: Date | null;
   declare createdAt: Date;
 }
 
@@ -192,6 +213,38 @@ GateChecklist.init(
       type: DataTypes.INTEGER,
       defaultValue: 0,
       field: "sort_order",
+    },
+    verificationType: {
+      type: DataTypes.ENUM("manual", "auto", "auto_with_override"),
+      defaultValue: "manual",
+      allowNull: false,
+      field: "verification_type",
+    },
+    verificationRule: {
+      type: DataTypes.JSONB,
+      field: "verification_rule",
+    },
+    autoVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      allowNull: false,
+      field: "auto_verified",
+    },
+    autoVerifiedDetails: {
+      type: DataTypes.JSONB,
+      field: "auto_verified_details",
+    },
+    lastVerifiedAt: {
+      type: DataTypes.DATE,
+      field: "last_verified_at",
+    },
+    overriddenBy: {
+      type: DataTypes.UUID,
+      field: "overridden_by",
+    },
+    overriddenAt: {
+      type: DataTypes.DATE,
+      field: "overridden_at",
     },
   },
   {

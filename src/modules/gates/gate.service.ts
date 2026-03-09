@@ -5,6 +5,7 @@ import {
   type GateAttributes,
   type GateNumber,
   type GateStatus,
+  type VerificationType,
 } from "./gate.model";
 import { Player } from "../players/player.model";
 import { User } from "../Users/user.model";
@@ -32,46 +33,97 @@ const CHECKLIST_ORDER: [string, string][] = [
  * Default checklist items auto-seeded when a gate is initialized.
  * Adjust items as needed for your agency's workflow.
  */
-export const GATE_CHECKLIST_TEMPLATES: Record<
-  string,
-  { item: string; itemAr: string; isMandatory: boolean; sortOrder: number }[]
-> = {
+interface ChecklistTemplate {
+  item: string;
+  itemAr: string;
+  isMandatory: boolean;
+  sortOrder: number;
+  verificationType: VerificationType;
+  verificationRule: object | null;
+}
+
+export const GATE_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplate[]> = {
   "0": [
     {
       item: "Collect player identification documents (ID / Passport)",
       itemAr: "جمع وثائق هوية اللاعب (هوية / جواز سفر)",
       isMandatory: true,
       sortOrder: 0,
+      verificationType: "auto",
+      verificationRule: {
+        check: "has_document",
+        entityType: "Player",
+        docType: ["ID", "Passport"],
+        status: ["Active", "Valid"],
+      },
     },
     {
       item: "Obtain signed representation agreement",
       itemAr: "الحصول على اتفاقية التمثيل الموقعة",
       isMandatory: true,
       sortOrder: 1,
+      verificationType: "auto",
+      verificationRule: {
+        check: "has_contract",
+        contractType: "Representation",
+        requireSignature: true,
+      },
     },
     {
       item: "Complete medical examination & fitness assessment",
       itemAr: "إكمال الفحص الطبي وتقييم اللياقة البدنية",
       isMandatory: true,
       sortOrder: 2,
+      verificationType: "auto",
+      verificationRule: {
+        check: "has_document",
+        entityType: "Player",
+        docType: ["Medical"],
+        status: ["Active", "Valid"],
+      },
     },
     {
       item: "Verify player registration with federation",
       itemAr: "التحقق من تسجيل اللاعب لدى الاتحاد",
       isMandatory: true,
       sortOrder: 3,
+      verificationType: "auto",
+      verificationRule: {
+        check: "player_field",
+        field: "currentClubId",
+        condition: "not_null",
+      },
     },
     {
       item: "Upload player photo & profile data",
       itemAr: "رفع صورة اللاعب وبيانات الملف الشخصي",
       isMandatory: false,
       sortOrder: 4,
+      verificationType: "auto",
+      verificationRule: {
+        check: "player_fields_filled",
+        fields: ["photoUrl", "nationality", "position", "dateOfBirth"],
+      },
     },
     {
       item: "Guardian consent form (if youth player)",
       itemAr: "نموذج موافقة ولي الأمر (إذا كان لاعب ناشئ)",
       isMandatory: false,
       sortOrder: 5,
+      verificationType: "auto",
+      verificationRule: {
+        check: "conditional",
+        condition: {
+          check: "player_field",
+          field: "playerType",
+          value: "Youth",
+        },
+        then: {
+          check: "player_fields_filled",
+          fields: ["guardianName", "guardianPhone"],
+        },
+        else: "skip",
+      },
     },
   ],
   "1": [
@@ -80,30 +132,58 @@ export const GATE_CHECKLIST_TEMPLATES: Record<
       itemAr: "إكمال تقييم الأداء الأولي",
       isMandatory: true,
       sortOrder: 0,
+      verificationType: "auto",
+      verificationRule: {
+        check: "player_fields_filled",
+        fields: [
+          "speed",
+          "passing",
+          "shooting",
+          "defense",
+          "fitness",
+          "tactical",
+        ],
+      },
     },
     {
       item: "Create Individual Development Plan (IDP)",
       itemAr: "إنشاء خطة التطوير الفردية",
       isMandatory: true,
       sortOrder: 1,
+      verificationType: "auto_with_override",
+      verificationRule: {
+        check: "has_note",
+        ownerType: "Player",
+        contentContains: "development plan",
+      },
     },
     {
       item: "Set short-term performance goals",
       itemAr: "تحديد أهداف الأداء قصيرة المدى",
       isMandatory: true,
       sortOrder: 2,
+      verificationType: "manual",
+      verificationRule: null,
     },
     {
       item: "Assign development coach / mentor",
       itemAr: "تعيين مدرب تطوير / مرشد",
       isMandatory: false,
       sortOrder: 3,
+      verificationType: "auto",
+      verificationRule: {
+        check: "player_field",
+        field: "coachId",
+        condition: "not_null",
+      },
     },
     {
       item: "Record baseline statistics",
       itemAr: "تسجيل الإحصائيات الأساسية",
       isMandatory: false,
       sortOrder: 4,
+      verificationType: "auto",
+      verificationRule: { check: "has_scouting_stats" },
     },
   ],
   "2": [
@@ -112,30 +192,44 @@ export const GATE_CHECKLIST_TEMPLATES: Record<
       itemAr: "مراجعة أداء منتصف الموسم",
       isMandatory: true,
       sortOrder: 0,
+      verificationType: "auto_with_override",
+      verificationRule: {
+        check: "has_note",
+        ownerType: "Player",
+        afterGateStart: true,
+      },
     },
     {
       item: "Update market valuation",
       itemAr: "تحديث التقييم السوقي",
       isMandatory: true,
       sortOrder: 1,
+      verificationType: "auto",
+      verificationRule: { check: "has_valuation", afterGateStart: true },
     },
     {
       item: "Review IDP progress & adjust goals",
       itemAr: "مراجعة تقدم خطة التطوير وتعديل الأهداف",
       isMandatory: true,
       sortOrder: 2,
+      verificationType: "manual",
+      verificationRule: null,
     },
     {
       item: "Collect performance data & match statistics",
       itemAr: "جمع بيانات الأداء وإحصائيات المباريات",
       isMandatory: false,
       sortOrder: 3,
+      verificationType: "auto",
+      verificationRule: { check: "player_stats_updated", afterGateStart: true },
     },
     {
       item: "Stakeholder feedback report",
       itemAr: "تقرير ملاحظات أصحاب المصلحة",
       isMandatory: false,
       sortOrder: 4,
+      verificationType: "manual",
+      verificationRule: null,
     },
   ],
   "3": [
@@ -144,30 +238,49 @@ export const GATE_CHECKLIST_TEMPLATES: Record<
       itemAr: "المراجعة الشاملة لنهاية الموسم",
       isMandatory: true,
       sortOrder: 0,
+      verificationType: "auto_with_override",
+      verificationRule: {
+        check: "has_note",
+        ownerType: "Player",
+        afterGateStart: true,
+      },
     },
     {
       item: "Contract renewal recommendation",
       itemAr: "توصية تجديد العقد",
       isMandatory: true,
       sortOrder: 1,
+      verificationType: "auto_with_override",
+      verificationRule: {
+        check: "has_note",
+        ownerType: "Player",
+        contentContains: "renewal",
+        afterGateStart: true,
+      },
     },
     {
       item: "Final market valuation update",
       itemAr: "التحديث النهائي للتقييم السوقي",
       isMandatory: true,
       sortOrder: 2,
+      verificationType: "auto",
+      verificationRule: { check: "has_valuation", afterGateStart: true },
     },
     {
       item: "Transfer window strategy assessment",
       itemAr: "تقييم استراتيجية نافذة الانتقالات",
       isMandatory: false,
       sortOrder: 3,
+      verificationType: "manual",
+      verificationRule: null,
     },
     {
       item: "Player satisfaction interview",
       itemAr: "مقابلة رضا اللاعب",
       isMandatory: false,
       sortOrder: 4,
+      verificationType: "manual",
+      verificationRule: null,
     },
   ],
 };
@@ -189,7 +302,9 @@ function gateIncludes() {
 
 function computeProgress(checklist: GateChecklist[]): number {
   if (checklist.length === 0) return 0;
-  const done = checklist.filter((c) => c.isCompleted).length;
+  const done = checklist.filter(
+    (c) => c.isCompleted || (c.verificationType !== "manual" && c.autoVerified),
+  ).length;
   return Math.round((done / checklist.length) * 100);
 }
 
@@ -358,6 +473,8 @@ export async function initializeGate(
         itemAr: t.itemAr,
         isMandatory: t.isMandatory,
         sortOrder: t.sortOrder,
+        verificationType: t.verificationType,
+        verificationRule: t.verificationRule,
       })),
     );
   }
@@ -393,24 +510,42 @@ export async function advanceGate(
     if (gate.status !== "InProgress")
       throw new AppError("Gate must be InProgress to complete", 400);
 
-    // Check all mandatory items are completed
+    // Check all mandatory items are satisfied (completed manually OR auto-verified)
     const checklist = (gate as any).checklist || [];
-    const mandatoryIncomplete = checklist.filter(
-      (c: GateChecklist) => c.isMandatory && !c.isCompleted,
+    const mandatoryUnsatisfied = checklist.filter(
+      (c: GateChecklist) =>
+        c.isMandatory &&
+        !c.isCompleted &&
+        !(c.verificationType !== "manual" && c.autoVerified),
     );
-    if (mandatoryIncomplete.length > 0) {
+    if (mandatoryUnsatisfied.length > 0) {
       throw new AppError(
-        `Cannot complete gate: ${mandatoryIncomplete.length} mandatory checklist item(s) are incomplete`,
+        `Cannot complete gate: ${mandatoryUnsatisfied.length} mandatory checklist item(s) are not satisfied`,
         400,
       );
     }
 
-    return await gate.update({
+    await gate.update({
       status: "Completed" as GateStatus,
       completedAt: new Date(),
       approvedBy: userId,
       notes: notes || gate.notes,
     });
+
+    // Auto-initialize next gate if it doesn't exist yet
+    const nextGateNum = String(parseInt(gate.gateNumber, 10) + 1);
+    if (["1", "2", "3"].includes(nextGateNum)) {
+      const existing = await Gate.findOne({
+        where: { playerId: gate.playerId, gateNumber: nextGateNum },
+      });
+      if (!existing) {
+        await initializeGate(gate.playerId, nextGateNum as GateNumber, {
+          autoStart: true,
+        });
+      }
+    }
+
+    return gate;
   }
 
   throw new AppError("Invalid action", 400);
@@ -463,10 +598,17 @@ export async function addChecklistItem(gateId: string, input: any) {
 
 // ── Toggle Checklist Item ──
 
+/**
+ * Override-allowed roles for auto-verified items.
+ * Only Admin and Manager (General Manager) can manually override auto checks.
+ */
+const OVERRIDE_ROLES = ["Admin", "Manager"];
+
 export async function toggleChecklistItem(
   itemId: string,
   input: any,
   userId: string,
+  userRole: string,
 ) {
   const item = await GateChecklist.findByPk(itemId);
   if (!item) throw new AppError("Checklist item not found", 404);
@@ -476,49 +618,41 @@ export async function toggleChecklistItem(
   if (gate?.status === "Completed")
     throw new AppError("Cannot modify checklist of a completed gate", 400);
 
+  // Override policy: auto items can only be manually toggled by Admin/Manager
+  if (
+    item.verificationType === "auto" &&
+    input.isCompleted &&
+    !item.autoVerified
+  ) {
+    if (!OVERRIDE_ROLES.includes(userRole)) {
+      throw new AppError(
+        "Only Admin or Manager can override auto-verified items",
+        403,
+      );
+    }
+  }
+
   const updateData: any = { isCompleted: input.isCompleted };
   if (input.isCompleted) {
     updateData.completedAt = new Date();
     updateData.completedBy = userId;
+
+    // Track override for auto items that aren't auto-verified
+    if (item.verificationType !== "manual" && !item.autoVerified) {
+      updateData.overriddenBy = userId;
+      updateData.overriddenAt = new Date();
+    }
   } else {
     updateData.completedAt = null;
     updateData.completedBy = null;
+    updateData.overriddenBy = null;
+    updateData.overriddenAt = null;
   }
   if (input.evidenceUrl !== undefined)
     updateData.evidenceUrl = input.evidenceUrl;
   if (input.notes !== undefined) updateData.notes = input.notes;
 
   await item.update(updateData);
-
-  // Auto-complete gate when all mandatory checklist items are done
-  if (input.isCompleted && gate && gate.status === "InProgress") {
-    const allItems = await GateChecklist.findAll({
-      where: { gateId: gate.id },
-    });
-    const mandatoryIncomplete = allItems.filter(
-      (c) => c.isMandatory && !c.isCompleted,
-    );
-    if (mandatoryIncomplete.length === 0) {
-      await gate.update({
-        status: "Completed" as GateStatus,
-        completedAt: new Date(),
-        approvedBy: userId,
-      });
-
-      // Auto-initialize next gate if it doesn't exist yet
-      const nextGateNum = String(parseInt(gate.gateNumber, 10) + 1);
-      if (["1", "2", "3"].includes(nextGateNum)) {
-        const existing = await Gate.findOne({
-          where: { playerId: gate.playerId, gateNumber: nextGateNum },
-        });
-        if (!existing) {
-          await initializeGate(gate.playerId, nextGateNum as GateNumber, {
-            autoStart: true,
-          });
-        }
-      }
-    }
-  }
 
   return item;
 }
