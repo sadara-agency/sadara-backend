@@ -7,6 +7,7 @@ import {
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import * as gateService from "./gate.service";
+import * as gateVerifier from "./gate-verifier.service";
 
 // ── List Gates ──
 
@@ -152,6 +153,7 @@ export async function toggleChecklistItem(req: AuthRequest, res: Response) {
     req.params.itemId,
     req.body,
     req.user!.id,
+    req.user!.role,
   );
 
   await logAudit(
@@ -183,4 +185,31 @@ export async function deleteChecklistItem(req: AuthRequest, res: Response) {
   );
 
   sendSuccess(res, result, "Checklist item deleted");
+}
+
+// ══════════════════════════════════════════
+// VERIFICATION OPERATIONS
+// ══════════════════════════════════════════
+
+// ── Verify all items in a gate ──
+
+export async function verifyGate(req: AuthRequest, res: Response) {
+  const result = await gateVerifier.verifyGate(req.params.id);
+
+  await logAudit(
+    "UPDATE",
+    "gates",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    `Gate verification run — ${result.items.filter((i) => i.verified).length}/${result.items.length} verified`,
+  );
+
+  sendSuccess(res, result, "Gate verified");
+}
+
+// ── Verify a single checklist item ──
+
+export async function verifyItem(req: AuthRequest, res: Response) {
+  const result = await gateVerifier.verifyItem(req.params.itemId);
+  sendSuccess(res, result);
 }
