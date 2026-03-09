@@ -47,25 +47,43 @@ function calcDur(a: string, b: string): string {
   }
 }
 
+/** Ensure a base64 value has the data URI prefix so <img src=""> works */
+function ensureDataUri(val: string): string {
+  if (!val) return "";
+  if (val.startsWith("data:")) return val;
+  // Raw base64 without prefix — assume PNG
+  return `data:image/png;base64,${val}`;
+}
+
 function getData(c: any) {
   const p = c.player || {};
   const ar =
     p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null;
   const en = p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : "";
+
+  // Player signature: stored in signedDocumentUrl for digital signing
+  let sigImg = "";
+  if (c.signedDocumentUrl && c.signingMethod === "digital") {
+    sigImg = ensureDataUri(c.signedDocumentUrl);
+  }
+
+  // Agent signature: stored in agentSignatureData for digital signing
+  let agentSigImg = "";
+  if (c.agentSignatureData && c.agentSigningMethod === "digital") {
+    agentSigImg = ensureDataUri(c.agentSignatureData);
+  }
+
   return {
     pn: ar || en || "غير محدد",
     nat: p.nationality || "",
-    pid: p.nationalId || p.idNumber || "",
+    pid: p.nationalId || "",
     ph: p.phone || "",
     sd: c.startDate ? new Date(c.startDate).toISOString().split("T")[0] : "",
     ed: c.endDate ? new Date(c.endDate).toISOString().split("T")[0] : "",
     cpct: Number(c.commissionPct) || 10,
-    // Player signature
-    sigImg: c.signingMethod === "digital" ? c.signedDocumentUrl || "" : "",
+    sigImg,
     sigDt: c.signedAt ? new Date(c.signedAt).toISOString().split("T")[0] : "",
-    // Agent signature
-    agentSigImg:
-      c.agentSigningMethod === "digital" ? c.agentSignatureData || "" : "",
+    agentSigImg,
     agentSigDt: c.agentSignedAt
       ? new Date(c.agentSignedAt).toISOString().split("T")[0]
       : "",
@@ -127,9 +145,9 @@ function pg2(d: any) {
 <div class="ni"><span class="nc">4</span><span>توثيق العقود في الأنظمة الرسمية (TMS أو ما يستحدث)</span></div>
 <div class="ni"><span class="nc">5</span><span>يقر اللاعب بأن هذه الحصرية سارية طوال مدة العقد ولا يجوز له تفويض أي جهة أخرى في هذه الأعمال</span></div>
 <div class="at">المادة (3): وجود وكيل مرخّص</div>
-<p>يقر الطرف الأول بأن جميع أعمال التمثيل تُدار من خلال وكيل معتمد ومرخّص من فيفا:</p>
+<p>يقر الطرف الأول بأن جميع أعمال التمثيل المنصوص عليها في العقد تُدار من خلال وكيل معتمد ومرخّص من الاتحاد الدولي لكرة القدم (فيفا)، وفق البيانات التالية:</p>
 <p style="text-align:center">الاسم: Ahmed Osman Hadoug<br>رقم رخصة فيفا FIFA AGENT LICENSE No (202411-8478)<br>جهة الترخيص: الاتحاد الدولي لكرة القدم - (FIFA)</p>
-<p>ويعمل الوكيل تحت مظلة شركة صدارة، وتبقى العلاقة التعاقدية بين اللاعب والشركة مباشرة</p>
+<p>ويعمل الوكيل تحت مظلة شركة صدارة، وتبقى العلاقة التعاقدية في هذا العقد بين اللاعب والشركة مباشرة</p>
 <div class="at">المادة (4): مدة العقد</div>
 <p>مدة هذا العقد ${dur} تبدأ من:</p>
 <div class="db"><span class="dl">من تاريخ</span><span class="dx">${sd}</span></div>
@@ -173,28 +191,30 @@ function pg3(d: any) {
 <div class="ni"><span class="nc">5</span><span>دفع العمولة المستحقة للطرف الأول في وقتها المحدد</span></div>
 <div class="st">المادة (7): العمولة</div>
 <p><strong>أولاً: العقود الرياضية</strong></p>
-<p>يستحق الطرف الأول عمولة بنسبة (${d.cpct}٪) من إجمالي قيمة العقد الرياضي</p>
+<p>يستحق الطرف الأول عمولة بنسبة (${d.cpct}٪) من إجمالي قيمة العقد الرياضي الذي يتم إبرامه أو تجديده من خلال الشركة</p>
 <p><strong>ثانياً: العقود التجارية والإعلانية</strong></p>
-<p><strong>السداد:</strong> تفويض النادي بالسداد مباشرة للشركة إن أمكن، أو يقوم اللاعب بالسداد خلال (14) يوماً من استلام المبالغ</p>
+<p><strong>السداد:</strong></p>
+<p>تفويض النادي بالسداد مباشرة للشركة إن أمكن</p>
+<p>أو يقوم اللاعب بالسداد خلال (14) يوماً من استلام المبالغ من الجهة المتعاقدة</p>
 <div class="st">المادة (8): السرية</div>
 <p>يلتزم الطرفان بسرية جميع البيانات والمعلومات والمراسلات ولا يجوز الإفصاح عنها إلا بما يتطلبه النظام أو الاتفاق</p>
 <div class="st">المادة (9): إنهاء العقد</div>
 <p>يجوز إنهاء العقد في الحالات التالية:</p>
-<div class="ni"><span class="nc">1</span><span>الإخلال الجوهري بأي بند وعدم معالجته خلال (30) يوماً</span></div>
+<div class="ni"><span class="nc">1</span><span>الإخلال الجوهري بأي بند من بنوده وعدم معالجته خلال (30) يوماً</span></div>
 <div class="ni"><span class="nc">2</span><span>فقدان الشركة حق مزاولة النشاط دون تعيين وكيل مرخص بديل</span></div>
 <div class="ni"><span class="nc">3</span><span>صدور قرار رسمي يمنع اللاعب من ممارسة كرة القدم لأكثر من (6) أشهر</span></div>
 <p>ولا يؤثر الإنهاء على حقوق الشركة في العمولات المستحقة عن العقود التي تمت خلال مدة السريان</p>
 <div class="st">المادة (10): تسوية المنازعات</div>
 <div class="ni"><span class="nc">1</span><span>تُحل النزاعات ودياً أولاً خلال (30) يوماً</span></div>
-<div class="ni"><span class="nc">2</span><span>عند التعذر، تُحال إلى الجهة المختصة في الاتحاد السعودي لكرة القدم</span></div>
-<p>وفي حال النزاعات المتعلقة بلوائح فيفا يتم الرجوع إلى غرفة وكلاء فيفا أو محكمة CAS</p>
+<div class="ni"><span class="nc">2</span><span>عند التعذر، تُحال المنازعات إلى الجهة المختصة في الاتحاد السعودي لكرة القدم</span></div>
+<p>وفي حال النزاعات المتعلقة بلوائح فيفا يتم الرجوع إلى اللجان الدولية المختصة مثل غرفة وكلاء فيفا أو محكمة CAS</p>
 <div class="st">المادة (11): أحكام عامة</div>
-<div class="ni"><span class="nc">1</span><span>أي تعديل يجب أن يكون مكتوباً وموقعاً من الطرفين</span></div>
+<div class="ni"><span class="nc">1</span><span>أي تعديل على العقد يجب أن يكون مكتوباً وموقعاً من الطرفين</span></div>
 <div class="ni"><span class="nc">2</span><span>إذا أصبح أي بند غير قابل للتطبيق يتم استبداله بما يحقق الغرض دون إبطال العقد</span></div>
 <div class="ni"><span class="nc">3</span><span>يُحرّر العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها</span></div>
 <div class="ss">
-<div class="sb" style="text-align:right"><p style="font-size:9.5pt"><strong>التوقيعات</strong></p><p>الطرف الأول / شركة صدارة المواهب الرياضية</p><p>يمثلها/ خالد بن علي الشهري</p><p>الصفة/ المدير العام</p><p>التاريخ ${agentSigDate}</p><p style="margin-top:5px">التوقيع ${agentSig}</p><p style="direction:ltr;text-align:left;font-size:9pt">Ahmed Osman Hadoug</p></div>
-<div class="sb" style="text-align:right"><p>&nbsp;</p><p><strong>الطرف الثاني: اللاعب</strong></p><p style="color:#3C3CFA;font-weight:700">${d.pn}</p><p>التاريخ ${playerSigDate}</p><p style="margin-top:5px">التوقيع ${playerSig}</p></div>
+<div class="sb" style="text-align:right"><p style="font-size:9.5pt"><strong>التوقيعات</strong></p><p>الطرف الأول / شركة صدارة المواهب الرياضية</p><p>يمثلها/ خالد بن علي الشهري</p><p>الصفة/ المدير العام</p><p>من تاريخ ${agentSigDate}</p><p style="margin-top:5px">التوقيع:${agentSig}</p><p style="direction:ltr;text-align:left;font-size:9pt">Ahmed Osman Hadoug</p></div>
+<div class="sb" style="text-align:right"><table class="gt" style="width:100%;margin-top:18px"><tr><td colspan="2" style="font-weight:700;text-align:center;background:#f5f5f5">الطرف الثاني: اللاعب</td></tr><tr><td>${playerSigDate}</td><td>التاريخ</td></tr><tr><td>${playerSig}</td><td>التوقيع</td></tr></table></div>
 </div>
 <div class="gu"><p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p><p style="font-size:8pt">أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p><table class="gt"><tr><td>الاسم</td><td style="min-width:90px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table></div>
 </div></div>`);

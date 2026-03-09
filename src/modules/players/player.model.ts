@@ -32,6 +32,7 @@ interface PlayerAttributes {
   defense?: number | null;
   fitness?: number | null;
   tactical?: number | null;
+  nationalId?: string | null;
   email?: string | null;
   phone?: string | null;
   guardianName?: string | null;
@@ -89,6 +90,7 @@ export class Player
   public defense!: number | null;
   public fitness!: number | null;
   public tactical!: number | null;
+  public nationalId!: string | null;
   public email!: string | null;
   public phone!: string | null;
   public guardianName!: string | null;
@@ -166,6 +168,7 @@ Player.init(
     defense: { type: DataTypes.INTEGER, defaultValue: 0 },
     fitness: { type: DataTypes.INTEGER, defaultValue: 0 },
     tactical: { type: DataTypes.INTEGER, defaultValue: 0 },
+    nationalId: { type: DataTypes.STRING, field: "national_id" },
     email: {
       type: DataTypes.STRING,
       allowNull: true,
