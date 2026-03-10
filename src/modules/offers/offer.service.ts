@@ -139,13 +139,15 @@ export async function createOffer(input: any, createdBy: string) {
   const offer = await Offer.create({ ...input, createdBy });
 
   // Notify Admin/Manager about new offer
-  const playerName = player.firstName
-    ? `${player.firstName} ${player.lastName || ""}`.trim()
-    : "Unknown";
+  const playerName =
+    [player.firstName, player.lastName].filter(Boolean).join(" ") || "Unknown";
+  const playerNameAr = player.firstNameAr
+    ? [player.firstNameAr, player.lastNameAr].filter(Boolean).join(" ")
+    : playerName;
   notifyByRole(["Admin", "Manager"], {
     type: "contract",
     title: `New offer: ${playerName}`,
-    titleAr: `عرض جديد: ${playerName}`,
+    titleAr: `عرض جديد: ${playerNameAr}`,
     link: `/dashboard/offers/${offer.id}`,
     sourceType: "offer",
     sourceId: offer.id,
@@ -198,10 +200,18 @@ export async function updateOfferStatus(
   await offer.update(updateData);
 
   // Notify Admin/Manager about status change
+  const statusAr: Record<string, string> = {
+    Pending: "معلق",
+    Negotiating: "قيد التفاوض",
+    Accepted: "مقبول",
+    Rejected: "مرفوض",
+    Closed: "مغلق",
+    Converted: "محوّل",
+  };
   notifyByRole(["Admin", "Manager"], {
     type: "contract",
     title: `Offer status → ${input.status}`,
-    titleAr: `حالة العرض → ${input.status}`,
+    titleAr: `حالة العرض → ${statusAr[input.status] || input.status}`,
     link: `/dashboard/offers/${id}`,
     sourceType: "offer",
     sourceId: id,
@@ -231,55 +241,74 @@ export async function convertOfferToContract(
   offerId: string,
   createdBy: string,
 ) {
+  // Pre-validate outside the transaction to avoid aborted-transaction cascading errors
+  const offer = await Offer.findByPk(offerId, {
+    include: [
+      {
+        model: Player,
+        as: "player",
+        attributes: ["id", "firstName", "lastName", "currentClubId"],
+      },
+      { model: Club, as: "fromClub", attributes: ["id", "name"] },
+      { model: Club, as: "toClub", attributes: ["id", "name"] },
+    ],
+  });
+
+  if (!offer) throw new AppError("Offer not found", 404);
+  if (offer.status !== "Accepted" && offer.status !== "Closed") {
+    throw new AppError(
+      "Only accepted/closed offers can be converted to contracts",
+      400,
+    );
+  }
+  if (offer.convertedContractId) {
+    throw new AppError(
+      "This offer has already been converted to a contract",
+      400,
+    );
+  }
+
+  const clubId =
+    offer.toClubId || offer.fromClubId || (offer as any).player?.currentClubId;
+  if (!clubId) {
+    throw new AppError(
+      "Cannot convert: no club assigned to this offer (set From Club or To Club first)",
+      400,
+    );
+  }
+
+  // Build contract dates
+  const today = new Date();
+  const endDate = new Date(today);
+  endDate.setFullYear(endDate.getFullYear() + (offer.contractYears || 1));
+
+  // Map offer type → contract type
+  const contractType = offer.offerType === "Loan" ? "Loan" : "Transfer";
+
   return transaction(async (t) => {
-    const offer = await Offer.findByPk(offerId, {
-      include: [
-        {
-          model: Player,
-          as: "player",
-          attributes: ["id", "firstName", "lastName", "currentClubId"],
-        },
-      ],
+    // Re-check inside transaction with lock
+    const locked = await Offer.findByPk(offerId, {
       lock: t.LOCK.UPDATE,
       transaction: t,
     });
-
-    if (!offer) throw new AppError("Offer not found", 404);
-    if (offer.status !== "Accepted" && offer.status !== "Closed") {
-      throw new AppError(
-        "Only accepted/closed offers can be converted to contracts",
-        400,
-      );
+    if (!locked) throw new AppError("Offer not found", 404);
+    if (locked.convertedContractId) {
+      throw new AppError("This offer has already been converted", 400);
     }
-
-    // Check if already converted
-    if (offer.convertedContractId) {
-      throw new AppError(
-        "This offer has already been converted to a contract",
-        400,
-      );
-    }
-
-    // Build contract dates
-    const today = new Date();
-    const endDate = new Date(today);
-    endDate.setFullYear(endDate.getFullYear() + (offer.contractYears || 1));
-
-    // Map offer type → contract type
-    const contractType = offer.offerType === "Loan" ? "Loan" : "Transfer";
 
     const contract = await Contract.create(
       {
         playerId: offer.playerId,
-        clubId: offer.toClubId || offer.fromClubId,
+        clubId,
         contractType,
         status: "Draft",
         startDate: today.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
-        baseSalary: offer.salaryOffered || 0,
+        baseSalary:
+          offer.salaryOffered != null ? String(offer.salaryOffered) : "0",
         salaryCurrency: offer.feeCurrency || "SAR",
         signingBonus: offer.transferFee || 0,
-        commissionPct: offer.agentFee ? Number(offer.agentFee) : 10,
+        commissionPct: offer.agentFee != null ? String(offer.agentFee) : "10",
         notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
         createdBy,
       } as any,
@@ -287,7 +316,7 @@ export async function convertOfferToContract(
     );
 
     // Link offer to contract and mark as Converted
-    await offer.update(
+    await locked.update(
       {
         status: "Converted",
         convertedContractId: contract.id,
@@ -310,9 +339,6 @@ export async function convertOfferToContract(
       priority: "high",
     }).catch(() => {});
 
-    return {
-      offer: await Offer.findByPk(offerId, { transaction: t }),
-      contract,
-    };
+    return { offer: locked, contract };
   });
 }

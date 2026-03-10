@@ -32,7 +32,7 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     createApprovalRequest({
       entityType: "payment",
       entityId: inv.id,
-      entityTitle: `Invoice: ${inv.invoiceNumber || inv.id} (${amount.toLocaleString()})`,
+      entityTitle: `Invoice: ${inv.invoiceNumber || `#${inv.id.slice(0, 8)}`} (${amount.toLocaleString()})`,
       action: "approve_payment",
       requestedBy: req.user!.id,
       assignedRole: "Admin",

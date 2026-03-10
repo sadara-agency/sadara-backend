@@ -19,7 +19,41 @@ export async function listAuditLogs(queryParams: any) {
   }
 
   if (queryParams.entity) {
-    where.entity = queryParams.entity;
+    // Frontend sends singular keys like "contract", but DB stores plural
+    // table names like "contracts", "contract_templates", etc.
+    // Map filter keys to the DB entity patterns they should match.
+    const entityMap: Record<string, string[]> = {
+      player: ["players"],
+      contract: ["contracts", "contract_templates"],
+      offer: ["offers"],
+      match: ["matches"],
+      finance: [
+        "invoices",
+        "payments",
+        "ledger_entries",
+        "valuations",
+        "expenses",
+      ],
+      scouting: ["watchlists", "screening_cases", "selection_decisions"],
+      task: ["tasks"],
+      system: [
+        "users",
+        "approval_requests",
+        "gates",
+        "gate_checklists",
+        "gym",
+        "documents",
+        "notes",
+        "clubs",
+        "referrals",
+      ],
+    };
+    const mapped = entityMap[queryParams.entity];
+    if (mapped) {
+      where.entity = { [Op.in]: mapped };
+    } else {
+      where.entity = queryParams.entity;
+    }
   }
 
   if (queryParams.dateFrom || queryParams.dateTo) {

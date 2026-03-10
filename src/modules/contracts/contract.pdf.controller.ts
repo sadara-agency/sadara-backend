@@ -60,11 +60,27 @@ function getData(c: any) {
     p.firstNameAr && p.lastNameAr ? `${p.firstNameAr} ${p.lastNameAr}` : null;
   const en = p.firstName && p.lastName ? `${p.firstName} ${p.lastName}` : "";
 
+  // ── Player signature ──
   let sigImg = "";
-  if (c.signedDocumentUrl && c.signingMethod === "digital") {
-    sigImg = ensureDataUri(c.signedDocumentUrl);
+  const rawPlayerSig = c.signedDocumentUrl;
+  const playerMethod = c.signingMethod;
+
+  console.log("[PDF getData] Player signature debug:", {
+    hasSignedDocumentUrl: !!rawPlayerSig,
+    signedDocumentUrlLength: rawPlayerSig ? rawPlayerSig.length : 0,
+    signedDocumentUrlPrefix: rawPlayerSig
+      ? rawPlayerSig.substring(0, 40)
+      : "(empty)",
+    signingMethod: playerMethod || "(empty)",
+    signedAt: c.signedAt || "(empty)",
+    status: c.status || "(unknown)",
+  });
+
+  if (rawPlayerSig && playerMethod === "digital") {
+    sigImg = ensureDataUri(rawPlayerSig);
   }
 
+  // ── Agent signature ──
   let agentSigImg = "";
   if (c.agentSignatureData && c.agentSigningMethod === "digital") {
     agentSigImg = ensureDataUri(c.agentSignatureData);
@@ -72,6 +88,7 @@ function getData(c: any) {
 
   return {
     pn: ar || en || "غير محدد",
+    pnEn: en || "",
     nat: p.nationality || "",
     pid: p.nationalId || "",
     ph: p.phone || "",
@@ -185,9 +202,11 @@ function pg3(d: any) {
 
   // Player signature (Second Party — left side in RTL)
   const playerSig = d.sigImg
-    ? `<img src="${d.sigImg}" style="height:35px;margin-top:2px" />`
+    ? `<img src="${d.sigImg}" style="max-height:40px;max-width:120px;margin-top:2px;display:block" />`
     : "";
-  const playerSigDate = d.sigDt ? fmtDate(d.sigDt) : "";
+  const playerSigDate = d.sigDt
+    ? `<span class="dx">${fmtDate(d.sigDt)}</span>`
+    : "";
 
   return wrap(`<div class="pg">${HD}<div class="ct">
 <div class="st">المادة (6): التزامات الطرف الثاني (اللاعب)</div>
@@ -230,7 +249,11 @@ function pg3(d: any) {
 <p style="direction:ltr;text-align:left;font-size:8pt">Ahmed Osman Hadoug</p>
 </div>
 <div class="sb" style="text-align:right">
-<table class="gt" style="width:100%;margin-top:16px"><tr><td colspan="2" style="font-weight:700;text-align:center;background:#f5f5f5">الطرف الثاني: اللاعب</td></tr><tr><td style="min-width:80px">${playerSigDate}</td><td>التاريخ</td></tr><tr><td>${playerSig}</td><td>التوقيع</td></tr></table>
+<p style="font-size:8.5pt;margin-top:16px"><strong>الطرف الثاني / اللاعب</strong></p>
+<p>${d.pn}</p>
+<p>من تاريخ &nbsp; ${playerSigDate}</p>
+<p style="margin-top:3px">التوقيع:${playerSig || "_________________________"}</p>
+${d.pnEn ? `<p style="direction:ltr;text-align:left;font-size:8pt">${d.pnEn}</p>` : ""}
 </div>
 </div>
 <div class="gu">
@@ -245,10 +268,21 @@ function pg3(d: any) {
 
 async function renderHtmlPage(page: any, html: string): Promise<Uint8Array> {
   await page.setContent(html, {
-    waitUntil: "domcontentloaded",
-    timeout: 10000,
+    waitUntil: "networkidle0",
+    timeout: 15000,
   });
-  await page.evaluate(() => new Promise((r) => setTimeout(r, 200)));
+  // Wait for all images (including base64 data-URI) to fully decode
+  await page.evaluate(`
+    Promise.all(
+      Array.from(document.querySelectorAll('img')).map(img =>
+        img.complete
+          ? Promise.resolve()
+          : new Promise(r => { img.onload = r; img.onerror = r; })
+      )
+    )
+  `);
+  // Extra safety margin for rendering
+  await page.evaluate(`new Promise(r => setTimeout(r, 300))`);
   return page.pdf({
     width: "595px",
     height: "842px",

@@ -11,6 +11,7 @@ import {
   createApprovalRequest,
   resolveApprovalByEntity,
 } from "../approvals/approval.service";
+import { Player } from "../players/player.model";
 
 // ── List Offers ──
 
@@ -80,10 +81,16 @@ export async function updateStatus(req: AuthRequest, res: Response) {
 
   // Approval hooks
   if (req.body.status === "Under Review") {
+    const player = await Player.findByPk(offer.playerId, {
+      attributes: ["firstName", "lastName"],
+    });
+    const playerName = player
+      ? [player.firstName, player.lastName].filter(Boolean).join(" ")
+      : `#${offer.id.slice(0, 8)}`;
     createApprovalRequest({
       entityType: "offer",
       entityId: offer.id,
-      entityTitle: `Offer: ${offer.id}`,
+      entityTitle: `${offer.offerType} Offer: ${playerName}`,
       action: "review_offer",
       requestedBy: req.user!.id,
       assignedRole: "Manager",

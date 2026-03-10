@@ -123,9 +123,10 @@ export async function createInjury(
   await player.update({ status: "injured" });
 
   // ── Push notification (non-blocking — won't crash the endpoint) ──
-  const playerName = `${player.firstName} ${player.lastName}`.trim();
-  const playerNameAr = (player as any).firstNameAr
-    ? `${(player as any).firstNameAr} ${(player as any).lastNameAr || ""}`.trim()
+  const playerName =
+    [player.firstName, player.lastName].filter(Boolean).join(" ") || "Unknown";
+  const playerNameAr = player.firstNameAr
+    ? [player.firstNameAr, player.lastNameAr].filter(Boolean).join(" ")
     : playerName;
 
   notifyByRole(["Admin", "Manager"], {
