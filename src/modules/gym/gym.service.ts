@@ -1,4 +1,4 @@
-import { Op, Sequelize } from "sequelize";
+import { Op, Sequelize, Model, ModelStatic } from "sequelize";
 import {
   ExerciseLibrary,
   BodyMetric,
@@ -42,6 +42,10 @@ import type {
   LogAdherenceInput,
 } from "./gym.schema";
 
+// ═══════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════
+
 const PLAYER_ATTRS = [
   "id",
   "firstName",
@@ -52,6 +56,47 @@ const PLAYER_ATTRS = [
   "photoUrl",
 ] as const;
 
+async function findOrThrow<T extends Model>(
+  model: ModelStatic<T>,
+  id: string,
+  label: string,
+): Promise<T> {
+  const record = await model.findByPk(id);
+  if (!record) throw new AppError(`${label} not found`, 404);
+  return record;
+}
+
+async function destroyById<T extends Model>(
+  model: ModelStatic<T>,
+  id: string,
+  label: string,
+): Promise<{ id: string }> {
+  const record = await findOrThrow(model, id, label);
+  await record.destroy();
+  return { id };
+}
+
+function bilingualSearch(search: string | undefined) {
+  if (!search) return {};
+  return {
+    [Op.or]: [
+      { nameEn: { [Op.iLike]: `%${search}%` } },
+      { nameAr: { [Op.iLike]: `%${search}%` } },
+    ],
+  };
+}
+
+function pickDefined<T extends Record<string, unknown>>(
+  source: T,
+  keys: (keyof T)[],
+): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key of keys) {
+    if (source[key] !== undefined) result[key] = source[key];
+  }
+  return result;
+}
+
 // ═══════════════════════════════════════════
 // EXERCISE LIBRARY
 // ═══════════════════════════════════════════
@@ -61,17 +106,11 @@ export async function listExercises(queryParams: any) {
     queryParams,
     "nameEn",
   );
-  const where: any = {};
 
-  if (queryParams.muscleGroup) where.muscleGroup = queryParams.muscleGroup;
-  if (queryParams.equipment) where.equipment = queryParams.equipment;
-  if (queryParams.difficulty) where.difficulty = queryParams.difficulty;
-  if (search) {
-    where[Op.or] = [
-      { nameEn: { [Op.iLike]: `%${search}%` } },
-      { nameAr: { [Op.iLike]: `%${search}%` } },
-    ];
-  }
+  const where = {
+    ...pickDefined(queryParams, ["muscleGroup", "equipment", "difficulty"]),
+    ...bilingualSearch(search),
+  };
 
   const { count, rows } = await ExerciseLibrary.findAndCountAll({
     where,
@@ -83,43 +122,47 @@ export async function listExercises(queryParams: any) {
 }
 
 export async function getExercise(id: string) {
-  const ex = await ExerciseLibrary.findByPk(id);
-  if (!ex) throw new AppError("Exercise not found", 404);
-  return ex;
+  return findOrThrow(ExerciseLibrary, id, "Exercise");
 }
 
 export async function createExercise(
   input: CreateExerciseInput,
   createdBy: string,
 ) {
-  return ExerciseLibrary.create({ ...input, isCustom: true, createdBy } as any);
+  return ExerciseLibrary.create({ ...input, isCustom: true, createdBy });
 }
 
 export async function updateExercise(id: string, input: UpdateExerciseInput) {
-  const ex = await ExerciseLibrary.findByPk(id);
-  if (!ex) throw new AppError("Exercise not found", 404);
-  return ex.update(input as any);
+  const exercise = await findOrThrow(ExerciseLibrary, id, "Exercise");
+  return exercise.update(input);
 }
 
 export async function deleteExercise(id: string) {
-  const ex = await ExerciseLibrary.findByPk(id);
-  if (!ex) throw new AppError("Exercise not found", 404);
-  await ex.destroy();
-  return { id };
+  return destroyById(ExerciseLibrary, id, "Exercise");
 }
 
 // ═══════════════════════════════════════════
 // BODY METRICS
 // ═══════════════════════════════════════════
 
+function buildDateRange(from?: string, to?: string) {
+  const range: Record<symbol, string> = {};
+  if (from) range[Op.gte] = from;
+  if (to) range[Op.lte] = to;
+  return Object.getOwnPropertySymbols(range).length > 0 ? range : undefined;
+}
+
+function calculateBmi(weight: number, heightCm: number): number {
+  const heightM = heightCm / 100;
+  return parseFloat((weight / (heightM * heightM)).toFixed(1));
+}
+
 export async function listBodyMetrics(playerId: string, queryParams: any) {
   const { limit, offset, page } = parsePagination(queryParams, "date");
-  const where: any = { playerId };
 
-  if (queryParams.from)
-    where.date = { ...where.date, [Op.gte]: queryParams.from };
-  if (queryParams.to)
-    where.date = { ...(where.date || {}), [Op.lte]: queryParams.to };
+  const dateRange = buildDateRange(queryParams.from, queryParams.to);
+  const where: any = { playerId };
+  if (dateRange) where.date = dateRange;
 
   const { count, rows } = await BodyMetric.findAndCountAll({
     where,
@@ -134,29 +177,29 @@ export async function createBodyMetric(
   input: CreateBodyMetricInput,
   recordedBy: string,
 ) {
-  // Auto-calculate BMI if weight and height provided
-  const data: any = { ...input, recordedBy };
-  if (input.weight && input.height) {
-    const heightM = input.height / 100;
-    data.bmi = parseFloat((input.weight / (heightM * heightM)).toFixed(1));
-  }
-  return BodyMetric.create(data);
+  const bmi =
+    input.weight && input.height
+      ? calculateBmi(input.weight, input.height)
+      : undefined;
+
+  return BodyMetric.create({
+    ...input,
+    date: input.date || new Date().toISOString().split("T")[0],
+    recordedBy,
+    ...(bmi !== undefined && { bmi }),
+  });
 }
 
 export async function updateBodyMetric(
   id: string,
   input: UpdateBodyMetricInput,
 ) {
-  const metric = await BodyMetric.findByPk(id);
-  if (!metric) throw new AppError("Body metric not found", 404);
-  return metric.update(input as any);
+  const metric = await findOrThrow(BodyMetric, id, "Body metric");
+  return metric.update(input);
 }
 
 export async function deleteBodyMetric(id: string) {
-  const metric = await BodyMetric.findByPk(id);
-  if (!metric) throw new AppError("Body metric not found", 404);
-  await metric.destroy();
-  return { id };
+  return destroyById(BodyMetric, id, "Body metric");
 }
 
 export async function getLatestBodyMetric(playerId: string) {
@@ -181,69 +224,83 @@ export async function createMetricTarget(
   input: CreateMetricTargetInput,
   setBy: string,
 ) {
-  // Deactivate existing active target
   await MetricTarget.update(
     { status: "cancelled" },
     { where: { playerId: input.playerId, status: "active" } },
   );
-  return MetricTarget.create({ ...input, setBy } as any);
+  return MetricTarget.create({ ...input, setBy });
 }
 
 export async function updateMetricTarget(
   id: string,
   input: UpdateMetricTargetInput,
 ) {
-  const target = await MetricTarget.findByPk(id);
-  if (!target) throw new AppError("Metric target not found", 404);
-  return target.update(input as any);
+  const target = await findOrThrow(MetricTarget, id, "Metric target");
+  return target.update(input);
 }
 
 // ═══════════════════════════════════════════
 // BMR CALCULATOR
 // ═══════════════════════════════════════════
 
+const ACTIVITY_MULTIPLIERS: Record<string, number> = {
+  sedentary: 1.2,
+  light: 1.375,
+  moderate: 1.55,
+  active: 1.725,
+  extra_active: 1.9,
+} as const;
+
+const GOAL_CALORIE_ADJUSTMENTS: Record<string, number> = {
+  cut: -500,
+  maintain: 0,
+  bulk: 300,
+} as const;
+
+const MACRO_RATIOS = {
+  protein: 0.3,
+  fat: 0.25,
+} as const;
+
+const CALORIES_PER_GRAM = { protein: 4, fat: 9, carbs: 4 } as const;
+
+function computeBmrMetrics(input: CalculateBmrInput) {
+  const genderOffset = input.gender === "male" ? 5 : -161;
+  const bmr =
+    10 * input.weight + 6.25 * input.height - 5 * input.age + genderOffset;
+
+  const tdee =
+    bmr *
+    (ACTIVITY_MULTIPLIERS[input.activityLevel] ??
+      ACTIVITY_MULTIPLIERS.moderate);
+  const targetCalories = tdee + (GOAL_CALORIE_ADJUSTMENTS[input.goal] ?? 0);
+
+  const proteinG =
+    (targetCalories * MACRO_RATIOS.protein) / CALORIES_PER_GRAM.protein;
+  const fatG = (targetCalories * MACRO_RATIOS.fat) / CALORIES_PER_GRAM.fat;
+  const carbsG =
+    (targetCalories -
+      proteinG * CALORIES_PER_GRAM.protein -
+      fatG * CALORIES_PER_GRAM.fat) /
+    CALORIES_PER_GRAM.carbs;
+
+  const round = (n: number) => parseFloat(n.toFixed(1));
+  return {
+    bmr: round(bmr),
+    tdee: round(tdee),
+    targetCalories: round(targetCalories),
+    proteinG: round(proteinG),
+    carbsG: round(carbsG),
+    fatG: round(fatG),
+  };
+}
+
 export async function calculateAndSaveBmr(
   input: CalculateBmrInput,
   calculatedBy: string,
 ) {
-  // Mifflin-St Jeor equation
-  let bmr: number;
-  if (input.gender === "male") {
-    bmr = 10 * input.weight + 6.25 * input.height - 5 * input.age + 5;
-  } else {
-    bmr = 10 * input.weight + 6.25 * input.height - 5 * input.age - 161;
-  }
-
-  // Activity multiplier
-  const multipliers: Record<string, number> = {
-    sedentary: 1.2,
-    light: 1.375,
-    moderate: 1.55,
-    active: 1.725,
-    extra_active: 1.9,
-  };
-  const tdee = bmr * (multipliers[input.activityLevel] || 1.55);
-
-  // Goal adjustment
-  let targetCalories = tdee;
-  if (input.goal === "cut") targetCalories = tdee - 500;
-  if (input.goal === "bulk") targetCalories = tdee + 300;
-
-  // Macro split
-  const proteinG = (targetCalories * 0.3) / 4;
-  const fatG = (targetCalories * 0.25) / 9;
-  const carbsG = (targetCalories - proteinG * 4 - fatG * 9) / 4;
-
-  return BmrCalculation.create({
-    ...input,
-    calculatedBy,
-    bmr: parseFloat(bmr.toFixed(1)),
-    tdee: parseFloat(tdee.toFixed(1)),
-    targetCalories: parseFloat(targetCalories.toFixed(1)),
-    proteinG: parseFloat(proteinG.toFixed(1)),
-    carbsG: parseFloat(carbsG.toFixed(1)),
-    fatG: parseFloat(fatG.toFixed(1)),
-  } as any);
+  const metrics = computeBmrMetrics(input);
+  return BmrCalculation.create({ ...input, calculatedBy, ...metrics });
 }
 
 export async function getBmrHistory(playerId: string) {
@@ -263,16 +320,11 @@ export async function listWorkoutPlans(queryParams: any) {
     queryParams,
     "createdAt",
   );
-  const where: any = {};
 
-  if (queryParams.status) where.status = queryParams.status;
-  if (queryParams.type) where.type = queryParams.type;
-  if (search) {
-    where[Op.or] = [
-      { nameEn: { [Op.iLike]: `%${search}%` } },
-      { nameAr: { [Op.iLike]: `%${search}%` } },
-    ];
-  }
+  const where = {
+    ...pickDefined(queryParams, ["status", "type"]),
+    ...bilingualSearch(search),
+  };
 
   const { count, rows } = await WorkoutPlan.findAndCountAll({
     where,
@@ -294,33 +346,33 @@ export async function listWorkoutPlans(queryParams: any) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function getWorkoutPlan(id: string) {
-  const plan = await WorkoutPlan.findByPk(id, {
+const WORKOUT_PLAN_INCLUDE = [
+  {
+    model: WorkoutSession,
+    as: "sessions",
     include: [
       {
-        model: WorkoutSession,
-        as: "sessions",
-        include: [
-          {
-            model: WorkoutExercise,
-            as: "exercises",
-            include: [{ model: ExerciseLibrary, as: "exercise" }],
-            order: [["sortOrder", "ASC"]],
-          },
-        ],
-        order: [
-          ["weekNumber", "ASC"],
-          ["dayNumber", "ASC"],
-        ],
-      },
-      {
-        model: WorkoutAssignment,
-        as: "assignments",
-        include: [
-          { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
-        ],
+        model: WorkoutExercise,
+        as: "exercises",
+        include: [{ model: ExerciseLibrary, as: "exercise" }],
+        order: [["sortOrder", "ASC"]],
       },
     ],
+    order: [
+      ["weekNumber", "ASC"],
+      ["dayNumber", "ASC"],
+    ],
+  },
+  {
+    model: WorkoutAssignment,
+    as: "assignments",
+    include: [{ model: Player, as: "player", attributes: [...PLAYER_ATTRS] }],
+  },
+];
+
+export async function getWorkoutPlan(id: string) {
+  const plan = await WorkoutPlan.findByPk(id, {
+    include: WORKOUT_PLAN_INCLUDE as any,
   });
   if (!plan) throw new AppError("Workout plan not found", 404);
   return plan;
@@ -330,27 +382,24 @@ export async function createWorkoutPlan(
   input: CreateWorkoutPlanInput,
   createdBy: string,
 ) {
-  return WorkoutPlan.create({ ...input, createdBy } as any);
+  return WorkoutPlan.create({ ...input, createdBy });
 }
 
 export async function updateWorkoutPlan(
   id: string,
   input: UpdateWorkoutPlanInput,
 ) {
-  const plan = await WorkoutPlan.findByPk(id);
-  if (!plan) throw new AppError("Workout plan not found", 404);
-  return plan.update(input as any);
+  const plan = await findOrThrow(WorkoutPlan, id, "Workout plan");
+  return plan.update(input);
 }
 
 export async function deleteWorkoutPlan(id: string) {
-  const plan = await WorkoutPlan.findByPk(id);
-  if (!plan) throw new AppError("Workout plan not found", 404);
-  await plan.destroy();
-  return { id };
+  return destroyById(WorkoutPlan, id, "Workout plan");
 }
 
 export async function duplicateWorkoutPlan(id: string, createdBy: string) {
   const original = await getWorkoutPlan(id);
+
   const plan = await WorkoutPlan.create({
     nameEn: `${original.nameEn} (Copy)`,
     nameAr: original.nameAr ? `${original.nameAr} (نسخة)` : null,
@@ -361,10 +410,9 @@ export async function duplicateWorkoutPlan(id: string, createdBy: string) {
     type: original.type,
     status: "draft",
     createdBy,
-  } as any);
+  });
 
-  // Copy sessions and exercises
-  if (original.sessions) {
+  if (original.sessions?.length) {
     for (const session of original.sessions) {
       const newSession = await WorkoutSession.create({
         planId: plan.id,
@@ -373,11 +421,11 @@ export async function duplicateWorkoutPlan(id: string, createdBy: string) {
         sessionName: session.sessionName,
         sessionNameAr: session.sessionNameAr,
         notes: session.notes,
-      } as any);
+      });
 
-      if (session.exercises) {
-        for (const ex of session.exercises) {
-          await WorkoutExercise.create({
+      if (session.exercises?.length) {
+        await WorkoutExercise.bulkCreate(
+          session.exercises.map((ex) => ({
             sessionId: newSession.id,
             exerciseId: ex.exerciseId,
             customName: ex.customName,
@@ -388,8 +436,8 @@ export async function duplicateWorkoutPlan(id: string, createdBy: string) {
             tempo: ex.tempo,
             sortOrder: ex.sortOrder,
             notes: ex.notes,
-          } as any);
-        }
+          })),
+        );
       }
     }
   }
@@ -400,25 +448,20 @@ export async function duplicateWorkoutPlan(id: string, createdBy: string) {
 // ── Sessions ──
 
 export async function addSession(planId: string, input: CreateSessionInput) {
-  const plan = await WorkoutPlan.findByPk(planId);
-  if (!plan) throw new AppError("Workout plan not found", 404);
-  return WorkoutSession.create({ ...input, planId } as any);
+  await findOrThrow(WorkoutPlan, planId, "Workout plan");
+  return WorkoutSession.create({ ...input, planId });
 }
 
 export async function updateSession(
   sessionId: string,
   input: UpdateSessionInput,
 ) {
-  const session = await WorkoutSession.findByPk(sessionId);
-  if (!session) throw new AppError("Session not found", 404);
-  return session.update(input as any);
+  const session = await findOrThrow(WorkoutSession, sessionId, "Session");
+  return session.update(input);
 }
 
 export async function deleteSession(sessionId: string) {
-  const session = await WorkoutSession.findByPk(sessionId);
-  if (!session) throw new AppError("Session not found", 404);
-  await session.destroy();
-  return { id: sessionId };
+  return destroyById(WorkoutSession, sessionId, "Session");
 }
 
 // ── Session Exercises ──
@@ -427,22 +470,17 @@ export async function addExerciseToSession(
   sessionId: string,
   input: CreateWorkoutExerciseInput,
 ) {
-  const session = await WorkoutSession.findByPk(sessionId);
-  if (!session) throw new AppError("Session not found", 404);
-  return WorkoutExercise.create({ ...input, sessionId } as any);
+  await findOrThrow(WorkoutSession, sessionId, "Session");
+  return WorkoutExercise.create({ ...input, sessionId });
 }
 
 export async function updateWorkoutExercise(exerciseId: string, input: any) {
-  const ex = await WorkoutExercise.findByPk(exerciseId);
-  if (!ex) throw new AppError("Exercise not found", 404);
-  return ex.update(input);
+  const exercise = await findOrThrow(WorkoutExercise, exerciseId, "Exercise");
+  return exercise.update(input);
 }
 
 export async function deleteWorkoutExercise(exerciseId: string) {
-  const ex = await WorkoutExercise.findByPk(exerciseId);
-  if (!ex) throw new AppError("Exercise not found", 404);
-  await ex.destroy();
-  return { id: exerciseId };
+  return destroyById(WorkoutExercise, exerciseId, "Exercise");
 }
 
 // ── Assignments ──
@@ -452,8 +490,7 @@ export async function assignWorkout(
   input: AssignWorkoutInput,
   assignedBy: string,
 ) {
-  const plan = await WorkoutPlan.findByPk(planId);
-  if (!plan) throw new AppError("Workout plan not found", 404);
+  await findOrThrow(WorkoutPlan, planId, "Workout plan");
 
   const records = input.playerIds.map((playerId) => ({
     planId,
@@ -478,10 +515,7 @@ export async function assignWorkout(
 }
 
 export async function removeAssignment(assignmentId: string) {
-  const assignment = await WorkoutAssignment.findByPk(assignmentId);
-  if (!assignment) throw new AppError("Assignment not found", 404);
-  await assignment.destroy();
-  return { id: assignmentId };
+  return destroyById(WorkoutAssignment, assignmentId, "Assignment");
 }
 
 // ── Workout Logs (Player) ──
@@ -491,8 +525,11 @@ export async function logWorkoutSession(
   playerId: string,
   input: LogWorkoutInput,
 ) {
-  const assignment = await WorkoutAssignment.findByPk(assignmentId);
-  if (!assignment) throw new AppError("Assignment not found", 404);
+  const assignment = await findOrThrow(
+    WorkoutAssignment,
+    assignmentId,
+    "Assignment",
+  );
   if (assignment.playerId !== playerId) throw new AppError("Forbidden", 403);
 
   const log = await WorkoutLog.create({
@@ -501,26 +538,28 @@ export async function logWorkoutSession(
     playerId,
     actualData: input.actualData ?? null,
     notes: input.notes,
-  } as any);
+  });
 
   // Update completion percentage
-  const totalSessions = await WorkoutSession.count({
-    where: { planId: assignment.planId },
-  });
-  const completedSessions = Number(
-    await WorkoutLog.count({
+  const [totalSessions, completedSessions] = await Promise.all([
+    WorkoutSession.count({ where: { planId: assignment.planId } }),
+    WorkoutLog.count({
       where: { assignmentId },
       col: "sessionId",
       distinct: true,
     } as any),
-  );
+  ]);
 
   const pct =
     totalSessions > 0
-      ? Math.round((completedSessions / totalSessions) * 100)
+      ? Math.min(
+          Math.round((Number(completedSessions) / totalSessions) * 100),
+          100,
+        )
       : 0;
+
   await assignment.update({
-    completionPct: Math.min(pct, 100),
+    completionPct: pct,
     status: pct >= 100 ? "completed" : "active",
   });
 
@@ -569,15 +608,11 @@ export async function listFoods(queryParams: any) {
     queryParams,
     "nameEn",
   );
-  const where: any = {};
 
-  if (queryParams.category) where.category = queryParams.category;
-  if (search) {
-    where[Op.or] = [
-      { nameEn: { [Op.iLike]: `%${search}%` } },
-      { nameAr: { [Op.iLike]: `%${search}%` } },
-    ];
-  }
+  const where = {
+    ...pickDefined(queryParams, ["category"]),
+    ...bilingualSearch(search),
+  };
 
   const { count, rows } = await FoodItem.findAndCountAll({
     where,
@@ -589,26 +624,20 @@ export async function listFoods(queryParams: any) {
 }
 
 export async function getFood(id: string) {
-  const food = await FoodItem.findByPk(id);
-  if (!food) throw new AppError("Food item not found", 404);
-  return food;
+  return findOrThrow(FoodItem, id, "Food item");
 }
 
 export async function createFood(input: CreateFoodInput, createdBy: string) {
-  return FoodItem.create({ ...input, isCustom: true, createdBy } as any);
+  return FoodItem.create({ ...input, isCustom: true, createdBy });
 }
 
 export async function updateFood(id: string, input: UpdateFoodInput) {
-  const food = await FoodItem.findByPk(id);
-  if (!food) throw new AppError("Food item not found", 404);
-  return food.update(input as any);
+  const food = await findOrThrow(FoodItem, id, "Food item");
+  return food.update(input);
 }
 
 export async function deleteFood(id: string) {
-  const food = await FoodItem.findByPk(id);
-  if (!food) throw new AppError("Food item not found", 404);
-  await food.destroy();
-  return { id };
+  return destroyById(FoodItem, id, "Food item");
 }
 
 // ═══════════════════════════════════════════
@@ -620,17 +649,12 @@ export async function listDietPlans(queryParams: any) {
     queryParams,
     "createdAt",
   );
-  const where: any = {};
 
-  if (queryParams.status) where.status = queryParams.status;
+  const where: any = {
+    ...pickDefined(queryParams, ["status", "playerId"]),
+    ...bilingualSearch(search),
+  };
   if (queryParams.isTemplate === "true") where.isTemplate = true;
-  if (queryParams.playerId) where.playerId = queryParams.playerId;
-  if (search) {
-    where[Op.or] = [
-      { nameEn: { [Op.iLike]: `%${search}%` } },
-      { nameAr: { [Op.iLike]: `%${search}%` } },
-    ];
-  }
 
   const { count, rows } = await DietPlan.findAndCountAll({
     where,
@@ -670,20 +694,16 @@ export async function createDietPlan(
   input: CreateDietPlanInput,
   createdBy: string,
 ) {
-  return DietPlan.create({ ...input, createdBy } as any);
+  return DietPlan.create({ ...input, createdBy });
 }
 
 export async function updateDietPlan(id: string, input: UpdateDietPlanInput) {
-  const plan = await DietPlan.findByPk(id);
-  if (!plan) throw new AppError("Diet plan not found", 404);
-  return plan.update(input as any);
+  const plan = await findOrThrow(DietPlan, id, "Diet plan");
+  return plan.update(input);
 }
 
 export async function deleteDietPlan(id: string) {
-  const plan = await DietPlan.findByPk(id);
-  if (!plan) throw new AppError("Diet plan not found", 404);
-  await plan.destroy();
-  return { id };
+  return destroyById(DietPlan, id, "Diet plan");
 }
 
 // ── Diet Meals ──
@@ -692,44 +712,35 @@ export async function addMealToPlan(
   planId: string,
   input: CreateDietMealInput,
 ) {
-  const plan = await DietPlan.findByPk(planId);
-  if (!plan) throw new AppError("Diet plan not found", 404);
+  await findOrThrow(DietPlan, planId, "Diet plan");
 
   const meal = await DietMeal.create({
     planId,
     dayNumber: input.dayNumber,
     mealType: input.mealType,
     sortOrder: input.sortOrder,
-  } as any);
+  });
 
-  // Add items if provided
   if (input.items?.length) {
-    for (const item of input.items) {
-      await DietMealItem.create({ ...item, mealId: meal.id } as any);
-    }
+    await DietMealItem.bulkCreate(
+      input.items.map((item) => ({ ...item, mealId: meal.id })),
+    );
   }
 
   return getDietPlan(planId);
 }
 
 export async function deleteMeal(mealId: string) {
-  const meal = await DietMeal.findByPk(mealId);
-  if (!meal) throw new AppError("Meal not found", 404);
-  await meal.destroy();
-  return { id: mealId };
+  return destroyById(DietMeal, mealId, "Meal");
 }
 
 export async function addItemToMeal(mealId: string, input: any) {
-  const meal = await DietMeal.findByPk(mealId);
-  if (!meal) throw new AppError("Meal not found", 404);
-  return DietMealItem.create({ ...input, mealId } as any);
+  await findOrThrow(DietMeal, mealId, "Meal");
+  return DietMealItem.create({ ...input, mealId });
 }
 
 export async function deleteItemFromMeal(itemId: string) {
-  const item = await DietMealItem.findByPk(itemId);
-  if (!item) throw new AppError("Meal item not found", 404);
-  await item.destroy();
-  return { id: itemId };
+  return destroyById(DietMealItem, itemId, "Meal item");
 }
 
 // ── Diet Adherence (Player) ──
@@ -746,18 +757,17 @@ export async function logDietAdherence(
     date: input.date || new Date().toISOString().split("T")[0],
     status: input.status,
     notes: input.notes,
-  } as any);
+  });
 }
 
 export async function getPlayerDietAdherence(
   playerId: string,
   queryParams: any,
 ) {
+  const dateRange = buildDateRange(queryParams.from, queryParams.to);
   const where: any = { playerId };
   if (queryParams.planId) where.planId = queryParams.planId;
-  if (queryParams.from) where.date = { [Op.gte]: queryParams.from };
-  if (queryParams.to)
-    where.date = { ...(where.date || {}), [Op.lte]: queryParams.to };
+  if (dateRange) where.date = dateRange;
 
   return DietAdherence.findAll({
     where,
@@ -771,21 +781,27 @@ export async function getPlayerDietAdherence(
 // ═══════════════════════════════════════════
 
 export async function getCoachDashboard(coachId: string) {
-  // Get all players with active workout or diet assignments
-  const activeAssignments = await WorkoutAssignment.findAll({
-    where: { status: "active", assignedBy: coachId },
-    include: [
-      { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
-      {
-        model: WorkoutPlan,
-        as: "plan",
-        attributes: ["id", "nameEn", "nameAr"],
-      },
-    ],
-  });
+  const [activeAssignments, alerts] = await Promise.all([
+    WorkoutAssignment.findAll({
+      where: { status: "active", assignedBy: coachId },
+      include: [
+        { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+        {
+          model: WorkoutPlan,
+          as: "plan",
+          attributes: ["id", "nameEn", "nameAr"],
+        },
+      ],
+    }),
+    CoachAlert.findAll({
+      where: { coachId, isRead: false },
+      order: [["triggeredAt", "DESC"]],
+      limit: 20,
+    }),
+  ]);
 
-  // Get latest metrics for assigned players
   const playerIds = [...new Set(activeAssignments.map((a) => a.playerId))];
+
   const latestMetrics = playerIds.length
     ? await BodyMetric.findAll({
         where: {
@@ -798,13 +814,6 @@ export async function getCoachDashboard(coachId: string) {
       })
     : [];
 
-  // Get unread alerts
-  const alerts = await CoachAlert.findAll({
-    where: { coachId, isRead: false },
-    order: [["triggeredAt", "DESC"]],
-    limit: 20,
-  });
-
   return {
     activeAssignments,
     latestMetrics,
@@ -816,8 +825,7 @@ export async function getCoachDashboard(coachId: string) {
 }
 
 export async function markAlertRead(alertId: string, coachId: string) {
-  const alert = await CoachAlert.findByPk(alertId);
-  if (!alert) throw new AppError("Alert not found", 404);
+  const alert = await findOrThrow(CoachAlert, alertId, "Alert");
   if (alert.coachId !== coachId) throw new AppError("Forbidden", 403);
   return alert.update({ isRead: true });
 }
