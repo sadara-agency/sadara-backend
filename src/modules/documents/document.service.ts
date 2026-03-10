@@ -9,13 +9,12 @@ import { Offer } from "../offers/offer.model";
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
 
 const USER_ATTRS = ["id", "fullName"] as const;
 
 function docIncludes() {
-  return [
-    { model: User, as: "uploader", attributes: [...USER_ATTRS] },
-  ];
+  return [{ model: User, as: "uploader", attributes: [...USER_ATTRS] }];
 }
 
 /** Re-fetch with full includes. */
@@ -25,7 +24,13 @@ async function refetchWithIncludes(id: string) {
 
 // ── Entity label resolution ──
 
-type EntityModel = typeof Player | typeof Contract | typeof Match | typeof Injury | typeof Club | typeof Offer;
+type EntityModel =
+  | typeof Player
+  | typeof Contract
+  | typeof Match
+  | typeof Injury
+  | typeof Club
+  | typeof Offer;
 
 const ENTITY_MODELS: Record<DocumentEntityType, EntityModel> = {
   Player: Player,
@@ -43,28 +48,48 @@ export async function resolveEntityLabel(
 ): Promise<string | null> {
   switch (entityType) {
     case "Player": {
-      const p = await Player.findByPk(entityId, { attributes: ["firstName", "lastName"] });
-      return p ? `${p.getDataValue("firstName")} ${p.getDataValue("lastName")}` : null;
+      const p = await Player.findByPk(entityId, {
+        attributes: ["firstName", "lastName"],
+      });
+      return p
+        ? `${p.getDataValue("firstName")} ${p.getDataValue("lastName")}`
+        : null;
     }
     case "Contract": {
-      const c = await Contract.findByPk(entityId, { attributes: ["id", "contractType"] });
-      return c ? `${c.getDataValue("contractType")} #${entityId.slice(0, 8)}` : null;
+      const c = await Contract.findByPk(entityId, {
+        attributes: ["id", "contractType"],
+      });
+      return c
+        ? `${c.getDataValue("contractType")} #${entityId.slice(0, 8)}`
+        : null;
     }
     case "Match": {
-      const m = await Match.findByPk(entityId, { attributes: ["id", "matchDate"] });
-      return m ? `Match ${m.getDataValue("matchDate") || `#${entityId.slice(0, 8)}`}` : null;
+      const m = await Match.findByPk(entityId, {
+        attributes: ["id", "matchDate"],
+      });
+      return m
+        ? `Match ${m.getDataValue("matchDate") || `#${entityId.slice(0, 8)}`}`
+        : null;
     }
     case "Injury": {
-      const inj = await Injury.findByPk(entityId, { attributes: ["injuryType", "bodyPart"] });
-      return inj ? `${inj.getDataValue("injuryType")} - ${inj.getDataValue("bodyPart")}` : null;
+      const inj = await Injury.findByPk(entityId, {
+        attributes: ["injuryType", "bodyPart"],
+      });
+      return inj
+        ? `${inj.getDataValue("injuryType")} - ${inj.getDataValue("bodyPart")}`
+        : null;
     }
     case "Club": {
       const cl = await Club.findByPk(entityId, { attributes: ["name"] });
       return cl ? cl.getDataValue("name") : null;
     }
     case "Offer": {
-      const o = await Offer.findByPk(entityId, { attributes: ["id", "offerType"] });
-      return o ? `${o.getDataValue("offerType")} Offer #${entityId.slice(0, 8)}` : null;
+      const o = await Offer.findByPk(entityId, {
+        attributes: ["id", "offerType"],
+      });
+      return o
+        ? `${o.getDataValue("offerType")} Offer #${entityId.slice(0, 8)}`
+        : null;
     }
     default:
       return null;
@@ -72,9 +97,14 @@ export async function resolveEntityLabel(
 }
 
 /** Validate that the entity exists. Throws 404 if not found. */
-async function validateEntity(entityType: DocumentEntityType, entityId: string) {
+async function validateEntity(
+  entityType: DocumentEntityType,
+  entityId: string,
+) {
   const Model = ENTITY_MODELS[entityType];
-  const exists = await (Model as any).findByPk(entityId, { attributes: ["id"] });
+  const exists = await (Model as any).findByPk(entityId, {
+    attributes: ["id"],
+  });
   if (!exists) throw new AppError(`${entityType} not found`, 404);
 }
 
@@ -128,7 +158,10 @@ export async function createDocument(input: any, userId: string) {
     await validateEntity(input.entityType, input.entityId);
     // Resolve and denormalize the entity label
     if (!input.entityLabel) {
-      input.entityLabel = await resolveEntityLabel(input.entityType, input.entityId);
+      input.entityLabel = await resolveEntityLabel(
+        input.entityType,
+        input.entityId,
+      );
     }
   }
 
@@ -139,14 +172,16 @@ export async function createDocument(input: any, userId: string) {
 // ── Update ──
 
 export async function updateDocument(id: string, input: any) {
-  const doc = await Document.findByPk(id);
-  if (!doc) throw new AppError("Document not found", 404);
+  const doc = await findOrThrow(Document, id, "Document");
 
   // If entity link is being changed, validate and resolve label
   if (input.entityType && input.entityId) {
     await validateEntity(input.entityType, input.entityId);
     if (!input.entityLabel) {
-      input.entityLabel = await resolveEntityLabel(input.entityType, input.entityId);
+      input.entityLabel = await resolveEntityLabel(
+        input.entityType,
+        input.entityId,
+      );
     }
   }
 
@@ -157,8 +192,5 @@ export async function updateDocument(id: string, input: any) {
 // ── Delete ──
 
 export async function deleteDocument(id: string) {
-  const doc = await Document.findByPk(id);
-  if (!doc) throw new AppError("Document not found", 404);
-  await doc.destroy();
-  return { id };
+  return destroyById(Document, id, "Document");
 }

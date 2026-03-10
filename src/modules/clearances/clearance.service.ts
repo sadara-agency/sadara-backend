@@ -8,6 +8,8 @@ import { Contract } from "../contracts/contract.model";
 import { Player } from "../players/player.model";
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
+import { transaction } from "../../config/database";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 
 // ── Associations ──
 
@@ -85,8 +87,7 @@ export async function getClearanceById(id: string) {
 // ── Create clearance ──
 export async function createClearance(data: any, userId: string) {
   // Validate contract exists and is active
-  const contract = await Contract.findByPk(data.contractId);
-  if (!contract) throw new AppError("Contract not found", 404);
+  const contract = await findOrThrow(Contract, data.contractId, "Contract");
 
   // Check contract is in a terminable state
   const terminableStatuses = ["Active", "Expiring Soon", "Review", "Signing"];
@@ -119,8 +120,7 @@ export async function createClearance(data: any, userId: string) {
 
 // ── Update clearance ──
 export async function updateClearance(id: string, data: any) {
-  const clearance = await Clearance.findByPk(id);
-  if (!clearance) throw new AppError("Clearance not found", 404);
+  const clearance = await findOrThrow(Clearance, id, "Clearance");
   if (clearance.status === "Completed") {
     throw new AppError("Cannot update a completed clearance", 400);
   }
@@ -131,8 +131,7 @@ export async function updateClearance(id: string, data: any) {
 
 // ── Complete clearance (sign + terminate contract) ──
 export async function completeClearance(id: string, data: any) {
-  const clearance = await Clearance.findByPk(id);
-  if (!clearance) throw new AppError("Clearance not found", 404);
+  const clearance = await findOrThrow(Clearance, id, "Clearance");
   if (clearance.status === "Completed") {
     throw new AppError("Clearance is already completed", 400);
   }
@@ -158,24 +157,26 @@ export async function completeClearance(id: string, data: any) {
     updateData.signingMethod = "upload";
   }
 
-  await clearance.update(updateData);
+  // Atomic: clearance completion + contract termination
+  await transaction(async (t) => {
+    await clearance.update(updateData, { transaction: t });
 
-  // ── Auto-terminate the parent contract ──
-  await Contract.update(
-    {
-      status: "Terminated" as any,
-      terminatedByClearanceId: clearance.id,
-    } as any,
-    { where: { id: clearance.contractId } },
-  );
+    // Auto-terminate the parent contract
+    await Contract.update(
+      {
+        status: "Terminated" as any,
+        terminatedByClearanceId: clearance.id,
+      } as any,
+      { where: { id: clearance.contractId }, transaction: t },
+    );
+  });
 
   return getClearanceById(id);
 }
 
 // ── Delete clearance (only if Processing) ──
 export async function deleteClearance(id: string) {
-  const clearance = await Clearance.findByPk(id);
-  if (!clearance) throw new AppError("Clearance not found", 404);
+  const clearance = await findOrThrow(Clearance, id, "Clearance");
   if (clearance.status === "Completed") {
     throw new AppError("Cannot delete a completed clearance", 400);
   }

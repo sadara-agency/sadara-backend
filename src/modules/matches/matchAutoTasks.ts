@@ -24,6 +24,7 @@ import { Club } from "../clubs/club.model";
 import { sequelize } from "../../config/database";
 import { Op } from "sequelize";
 import { notifyUser } from "../notifications/notification.service";
+import { logger } from "../../config/logger";
 
 // ── Configurable thresholds ──
 // Defaults can be overridden via the settings API (GET/PATCH /settings/task-rules)
@@ -256,18 +257,19 @@ const RULES: AutoTaskRule[] = [
 
 // ── Rule → player role field mapping (determines task assignee) ──
 
-const RULE_ASSIGNEE_FIELD: Record<string, "agentId" | "coachId" | "analystId"> = {
-  red_card: "agentId",
-  yellow_cards_accumulated: "agentId",
-  critical_performance: "coachId",
-  low_performance: "coachId",
-  injury_assessment: "agentId",
-  highlight_performance: "agentId",
-  high_fouls: "coachId",
-  pre_confirm_availability: "coachId",
-  pre_tactical_report: "analystId",
-  pre_travel_logistics: "agentId",
-};
+const RULE_ASSIGNEE_FIELD: Record<string, "agentId" | "coachId" | "analystId"> =
+  {
+    red_card: "agentId",
+    yellow_cards_accumulated: "agentId",
+    critical_performance: "coachId",
+    low_performance: "coachId",
+    injury_assessment: "agentId",
+    highlight_performance: "agentId",
+    high_fouls: "coachId",
+    pre_confirm_availability: "coachId",
+    pre_tactical_report: "analystId",
+    pre_travel_logistics: "agentId",
+  };
 
 // ── Helper: format due date ──
 
@@ -390,7 +392,11 @@ export async function generateAutoTasks(
           link: "/dashboard/tasks",
           sourceType: "task",
           priority: rule.priority === "critical" ? "critical" : "normal",
-        }).catch(() => {});
+        }).catch((err) =>
+          logger.warn("Auto-task notification failed", {
+            error: (err as Error).message,
+          }),
+        );
       }
 
       createdRules.push(`${rule.id}:${player.id}`);
@@ -407,7 +413,16 @@ export async function generateAutoTasks(
 
     // Load player info
     const player = await Player.findByPk(mp.playerId, {
-      attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr", "agentId", "coachId", "analystId"],
+      attributes: [
+        "id",
+        "firstName",
+        "lastName",
+        "firstNameAr",
+        "lastNameAr",
+        "agentId",
+        "coachId",
+        "analystId",
+      ],
     });
     if (!player) continue;
 
@@ -445,7 +460,8 @@ export async function generateAutoTasks(
         availability: "injured",
       };
 
-      const injuryAssignee = player[RULE_ASSIGNEE_FIELD["injury_assessment"]] || null;
+      const injuryAssignee =
+        player[RULE_ASSIGNEE_FIELD["injury_assessment"]] || null;
       await Task.create({
         title: injuryRule.titleEn,
         titleAr: injuryRule.titleAr,
@@ -473,7 +489,11 @@ export async function generateAutoTasks(
           link: "/dashboard/tasks",
           sourceType: "task",
           priority: "critical",
-        }).catch(() => {});
+        }).catch((err) =>
+          logger.warn("Auto-task notification failed", {
+            error: (err as Error).message,
+          }),
+        );
       }
 
       createdRules.push(`injury_assessment:${player.id}`);
@@ -577,7 +597,16 @@ export async function generatePreMatchTasks(
       {
         model: Player,
         as: "player",
-        attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr", "agentId", "coachId", "analystId"],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+          "agentId",
+          "coachId",
+          "analystId",
+        ],
       },
     ],
   });
@@ -593,7 +622,12 @@ export async function generatePreMatchTasks(
       ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
       : playerName;
 
-    const ctx: PreMatchContext = { playerName, playerNameAr, matchLabel, matchDate };
+    const ctx: PreMatchContext = {
+      playerName,
+      playerNameAr,
+      matchLabel,
+      matchDate,
+    };
 
     for (const rule of activeRules) {
       // Duplicate prevention
@@ -634,7 +668,11 @@ export async function generatePreMatchTasks(
           link: "/dashboard/tasks",
           sourceType: "task",
           priority: rule.priority === "critical" ? "critical" : "normal",
-        }).catch(() => {});
+        }).catch((err) =>
+          logger.warn("Auto-task notification failed", {
+            error: (err as Error).message,
+          }),
+        );
       }
 
       createdRules.push(`${rule.id}:${player.id}`);

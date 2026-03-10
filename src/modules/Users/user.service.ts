@@ -14,6 +14,7 @@ import { sequelize } from "../../config/database";
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import { CreateUserInput, UpdateUserInput } from "./user.schema";
 
 // ── Attributes to exclude from every response ──
@@ -144,8 +145,7 @@ export async function createUser(input: CreateUserInput, createdBy?: string) {
 // Update User
 // ────────────────────────────────────────────────────────────
 export async function updateUser(id: string, input: UpdateUserInput) {
-  const user = await User.findByPk(id);
-  if (!user) throw new AppError("User not found", 404);
+  const user = await findOrThrow(User, id, "User");
 
   // If email is being changed, check for duplicates
   if (input.email && input.email !== user.email) {
@@ -164,8 +164,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
 // Reset Password (Admin force-resets another user's password)
 // ────────────────────────────────────────────────────────────
 export async function resetPassword(id: string, newPassword: string) {
-  const user = await User.findByPk(id);
-  if (!user) throw new AppError("User not found", 404);
+  const user = await findOrThrow(User, id, "User");
 
   const passwordHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
   await user.update({ passwordHash });
@@ -182,8 +181,7 @@ export async function deleteUser(id: string, requesterId: string) {
     throw new AppError("Cannot delete your own account", 400);
   }
 
-  const user = await User.findByPk(id);
-  if (!user) throw new AppError("User not found", 404);
+  const user = await findOrThrow(User, id, "User");
 
   await user.destroy();
   return { id };

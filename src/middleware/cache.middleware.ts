@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { cacheGet, cacheSet, CacheTTL } from "../shared/utils/cache";
 import { isRedisConnected } from "../config/redis";
 import { AuthRequest } from "../shared/types";
+import { logger } from "../config/logger";
 
 interface CacheRouteOptions {
   /** Include user ID in cache key for per-user caching (default: false) */
@@ -81,7 +82,12 @@ export function cacheRoute(
           cacheKey,
           { body, statusCode: res.statusCode },
           ttlSeconds,
-        ).catch(() => {});
+        ).catch((err) =>
+          logger.warn("Cache write failed", {
+            key: cacheKey,
+            error: (err as Error).message,
+          }),
+        );
       }
       return originalJson(body);
     }) as any;

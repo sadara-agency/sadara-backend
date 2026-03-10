@@ -1,4 +1,5 @@
 import { getRedisClient, isRedisConnected } from "../../config/redis";
+import { logger } from "../../config/logger";
 
 // Default TTL values (in seconds)
 export const CacheTTL = {
@@ -40,7 +41,7 @@ export async function cacheGet<T = any>(key: string): Promise<T | null> {
     const data = await client.get(key);
     return data ? JSON.parse(data) : null;
   } catch (err: any) {
-    console.warn(`⚠️  Cache GET failed [${key}]:`, err.message);
+    logger.warn(`Cache GET failed [${key}]`, { error: err.message });
     return null;
   }
 }
@@ -60,7 +61,7 @@ export async function cacheSet(
     await client.setEx(key, ttlSeconds, JSON.stringify(value));
     return true;
   } catch (err: any) {
-    console.warn(`⚠️  Cache SET failed [${key}]:`, err.message);
+    logger.warn(`Cache SET failed [${key}]`, { error: err.message });
     return false;
   }
 }
@@ -76,7 +77,7 @@ export async function cacheDel(key: string): Promise<boolean> {
     await client.del(key);
     return true;
   } catch (err: any) {
-    console.warn(`⚠️  Cache DEL failed [${key}]:`, err.message);
+    logger.warn(`Cache DEL failed [${key}]`, { error: err.message });
     return false;
   }
 }
@@ -110,13 +111,15 @@ export async function invalidateByPrefix(prefix: string): Promise<number> {
     } while (cursor !== "0");
 
     if (deletedCount > 0) {
-      console.log(
-        `🗑️  Cache invalidated: ${deletedCount} keys matching "${prefix}:*"`,
+      logger.info(
+        `Cache invalidated: ${deletedCount} keys matching "${prefix}:*"`,
       );
     }
     return deletedCount;
   } catch (err: any) {
-    console.warn(`⚠️  Cache invalidation failed [${prefix}:*]:`, err.message);
+    logger.warn(`Cache invalidation failed [${prefix}:*]`, {
+      error: err.message,
+    });
     return 0;
   }
 }
@@ -184,7 +187,12 @@ export async function cacheOrFetch<T>(
   const data = await fetchFn();
 
   // Store in cache (fire-and-forget, don't await)
-  cacheSet(key, data, ttlSeconds).catch(() => {});
+  cacheSet(key, data, ttlSeconds).catch((err) =>
+    logger.warn("cacheOrFetch write failed", {
+      key,
+      error: (err as Error).message,
+    }),
+  );
 
   return data;
 }

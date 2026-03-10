@@ -53,6 +53,7 @@ const mockDietMealCreate = jest.fn();
 
 const mockDietMealItemFindByPk = jest.fn();
 const mockDietMealItemCreate = jest.fn();
+const mockDietMealItemBulkCreate = jest.fn();
 
 const mockDietAdherenceCreate = jest.fn();
 const mockDietAdherenceFindAll = jest.fn();
@@ -130,6 +131,7 @@ jest.mock('../../../src/modules/gym/gym.model', () => ({
   DietMealItem: {
     findByPk: (...a: unknown[]) => mockDietMealItemFindByPk(...a),
     create: (...a: unknown[]) => mockDietMealItemCreate(...a),
+    bulkCreate: (...a: unknown[]) => mockDietMealItemBulkCreate(...a),
   },
   DietAdherence: {
     create: (...a: unknown[]) => mockDietAdherenceCreate(...a),
@@ -864,14 +866,14 @@ describe('Gym Service', () => {
     it('should add meal with items', async () => {
       mockDietPlanFindByPk.mockResolvedValue(mockModelInstance(mockDietPlan()));
       mockDietMealCreate.mockResolvedValue(mockModelInstance({ id: 'meal-001' }));
-      mockDietMealItemCreate.mockResolvedValue(mockModelInstance({ id: 'item-001' }));
+      mockDietMealItemBulkCreate.mockResolvedValue([mockModelInstance({ id: 'item-001' })]);
       // getDietPlan refetch
       mockDietPlanFindByPk.mockResolvedValue(mockModelInstance(mockDietPlan()));
       await svc.addMealToPlan('diet-001', {
         dayNumber: 1, mealType: 'lunch',
         items: [{ foodId: 'food-001', servingSize: 200, servingUnit: 'g' }],
       } as any);
-      expect(mockDietMealItemCreate).toHaveBeenCalled();
+      expect(mockDietMealItemBulkCreate).toHaveBeenCalled();
     });
 
     it('should throw 404 if plan not found', async () => {

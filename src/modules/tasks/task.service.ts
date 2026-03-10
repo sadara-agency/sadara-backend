@@ -15,6 +15,7 @@ import { Player } from "../players/player.model";
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
 import { CreateTaskInput, UpdateTaskInput } from "./task.schema";
 
 // ── Shared includes for player + assignee names ──
@@ -124,8 +125,7 @@ export async function createTask(input: CreateTaskInput, assignedBy: string) {
 // Update Task
 // ────────────────────────────────────────────────────────────
 export async function updateTask(id: string, input: UpdateTaskInput) {
-  const task = await Task.findByPk(id);
-  if (!task) throw new AppError("Task not found", 404);
+  const task = await findOrThrow(Task, id, "Task");
 
   await task.update(input);
 
@@ -140,11 +140,11 @@ export async function updateTaskStatus(
   id: string,
   status: "Open" | "InProgress" | "Completed" | "Canceled",
 ) {
-  const task = await Task.findByPk(id);
-  if (!task) throw new AppError("Task not found", 404);
+  const task = await findOrThrow(Task, id, "Task");
 
   // Auto-set or clear completedAt based on status
-  const completedAt = (status === "Completed" || status === "Canceled") ? new Date() : null;
+  const completedAt =
+    status === "Completed" || status === "Canceled" ? new Date() : null;
   await task.update({ status, completedAt });
 
   return getTaskById(id);
@@ -154,9 +154,5 @@ export async function updateTaskStatus(
 // Delete Task
 // ────────────────────────────────────────────────────────────
 export async function deleteTask(id: string) {
-  const task = await Task.findByPk(id);
-  if (!task) throw new AppError("Task not found", 404);
-
-  await task.destroy();
-  return { id };
+  return destroyById(Task, id, "Task");
 }

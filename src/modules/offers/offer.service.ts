@@ -12,6 +12,8 @@ import {
   createApprovalRequest,
   resolveApprovalByEntity,
 } from "../approvals/approval.service";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
+import { logger } from "../../config/logger";
 
 // ── List Offers ──
 
@@ -122,19 +124,12 @@ export async function getOffersByPlayer(playerId: string) {
 // ── Create Offer ──
 
 export async function createOffer(input: any, createdBy: string) {
-  // Verify player exists
-  const player = await Player.findByPk(input.playerId);
-  if (!player) throw new AppError("Player not found", 404);
-
-  // Verify clubs exist (if provided)
-  if (input.fromClubId) {
-    const club = await Club.findByPk(input.fromClubId);
-    if (!club) throw new AppError("From-club not found", 404);
-  }
-  if (input.toClubId) {
-    const club = await Club.findByPk(input.toClubId);
-    if (!club) throw new AppError("To-club not found", 404);
-  }
+  // Verify player and clubs exist (parallel lookups)
+  const [player] = await Promise.all([
+    findOrThrow(Player, input.playerId, "Player"),
+    input.fromClubId ? findOrThrow(Club, input.fromClubId, "From-club") : null,
+    input.toClubId ? findOrThrow(Club, input.toClubId, "To-club") : null,
+  ]);
 
   const offer = await Offer.create({ ...input, createdBy });
 
@@ -152,7 +147,9 @@ export async function createOffer(input: any, createdBy: string) {
     sourceType: "offer",
     sourceId: offer.id,
     priority: "normal",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Offer notification failed", { error: (err as Error).message }),
+  );
 
   return offer;
 }
@@ -160,8 +157,7 @@ export async function createOffer(input: any, createdBy: string) {
 // ── Update Offer ──
 
 export async function updateOffer(id: string, input: any) {
-  const offer = await Offer.findByPk(id);
-  if (!offer) throw new AppError("Offer not found", 404);
+  const offer = await findOrThrow(Offer, id, "Offer");
 
   // Prevent updates on terminal offers
   if (["Accepted", "Rejected", "Closed", "Converted"].includes(offer.status)) {
@@ -177,8 +173,7 @@ export async function updateOfferStatus(
   id: string,
   input: { status: string; counterOffer?: object; notes?: string },
 ) {
-  const offer = await Offer.findByPk(id);
-  if (!offer) throw new AppError("Offer not found", 404);
+  const offer = await findOrThrow(Offer, id, "Offer");
 
   const updateData: any = { status: input.status };
 
@@ -216,7 +211,9 @@ export async function updateOfferStatus(
     sourceType: "offer",
     sourceId: id,
     priority: "high",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Offer notification failed", { error: (err as Error).message }),
+  );
 
   return offer;
 }
@@ -224,8 +221,7 @@ export async function updateOfferStatus(
 // ── Delete Offer ──
 
 export async function deleteOffer(id: string) {
-  const offer = await Offer.findByPk(id);
-  if (!offer) throw new AppError("Offer not found", 404);
+  const offer = await findOrThrow(Offer, id, "Offer");
 
   // Only allow deleting New or Draft offers
   if (offer.status !== "New") {
@@ -337,7 +333,11 @@ export async function convertOfferToContract(
       sourceType: "contract",
       sourceId: contract.id,
       priority: "high",
-    }).catch(() => {});
+    }).catch((err) =>
+      logger.warn("Offer notification failed", {
+        error: (err as Error).message,
+      }),
+    );
 
     return { offer: locked, contract };
   });

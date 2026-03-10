@@ -2,6 +2,7 @@ import { Op, WhereOptions } from "sequelize";
 import { Competition, ClubCompetition } from "./competition.model";
 import { Club } from "../clubs/club.model";
 import { AppError } from "../../middleware/errorHandler";
+import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
 import type {
   CreateCompetitionInput,
   UpdateCompetitionInput,
@@ -64,9 +65,7 @@ export async function listCompetitions(query: CompetitionQuery) {
 // ── Get by ID ──
 
 export async function getCompetitionById(id: string) {
-  const competition = await Competition.findByPk(id);
-  if (!competition) throw new AppError("Competition not found", 404);
-  return competition;
+  return findOrThrow(Competition, id, "Competition");
 }
 
 // ── Create ──
@@ -81,8 +80,7 @@ export async function updateCompetition(
   id: string,
   input: UpdateCompetitionInput,
 ) {
-  const competition = await Competition.findByPk(id);
-  if (!competition) throw new AppError("Competition not found", 404);
+  const competition = await findOrThrow(Competition, id, "Competition");
   await competition.update(input as any);
   return competition;
 }
@@ -90,17 +88,13 @@ export async function updateCompetition(
 // ── Delete ──
 
 export async function deleteCompetition(id: string) {
-  const competition = await Competition.findByPk(id);
-  if (!competition) throw new AppError("Competition not found", 404);
-  await competition.destroy();
-  return { id };
+  return destroyById(Competition, id, "Competition");
 }
 
 // ── Clubs in Competition ──
 
 export async function getCompetitionClubs(id: string, season?: string) {
-  const competition = await Competition.findByPk(id);
-  if (!competition) throw new AppError("Competition not found", 404);
+  await findOrThrow(Competition, id, "Competition");
 
   const where: WhereOptions = { competitionId: id };
   if (season) where.season = season;
@@ -118,11 +112,8 @@ export async function addClubToCompetition(
   competitionId: string,
   input: AddClubInput,
 ) {
-  const competition = await Competition.findByPk(competitionId);
-  if (!competition) throw new AppError("Competition not found", 404);
-
-  const club = await Club.findByPk(input.clubId);
-  if (!club) throw new AppError("Club not found", 404);
+  await findOrThrow(Competition, competitionId, "Competition");
+  await findOrThrow(Club, input.clubId, "Club");
 
   const [entry, created] = await ClubCompetition.findOrCreate({
     where: {

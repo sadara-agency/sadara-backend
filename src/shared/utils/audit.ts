@@ -1,5 +1,5 @@
 import { AuditLog } from "../../modules/audit/AuditLog.model";
-import { AuditContext } from "../types";
+import { AuditContext, UserRole } from "../types";
 import { logger } from "../../config/logger";
 
 export async function logAudit(
@@ -35,13 +35,13 @@ export async function logAudit(
 }
 
 export function buildAuditContext(
-  user: { id: string; fullName: string; role: string },
+  user: { id: string; fullName: string; role: UserRole | string },
   ip?: string,
 ): AuditContext {
   return {
     userId: user.id,
     userName: user.fullName,
-    userRole: user.role as any,
+    userRole: user.role as UserRole,
     ip,
   };
 }

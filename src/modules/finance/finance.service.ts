@@ -14,6 +14,7 @@ import { Club } from "../clubs/club.model";
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
 
 const PLAYER_ATTRS = [
   "id",
@@ -83,16 +84,14 @@ export async function createInvoice(input: any, userId: string) {
 }
 
 export async function updateInvoice(id: string, input: any) {
-  const inv = await Invoice.findByPk(id);
-  if (!inv) throw new AppError("Invoice not found", 404);
+  const inv = await findOrThrow(Invoice, id, "Invoice");
   if (inv.status === "Paid")
     throw new AppError("Cannot modify a paid invoice", 400);
   return await inv.update(input);
 }
 
 export async function updateInvoiceStatus(id: string, input: any) {
-  const inv = await Invoice.findByPk(id);
-  if (!inv) throw new AppError("Invoice not found", 404);
+  const inv = await findOrThrow(Invoice, id, "Invoice");
   const data: any = { status: input.status };
   if (input.status === "Paid")
     data.paidDate = input.paidDate || new Date().toISOString().split("T")[0];
@@ -100,8 +99,7 @@ export async function updateInvoiceStatus(id: string, input: any) {
 }
 
 export async function deleteInvoice(id: string) {
-  const inv = await Invoice.findByPk(id);
-  if (!inv) throw new AppError("Invoice not found", 404);
+  const inv = await findOrThrow(Invoice, id, "Invoice");
   if (inv.status === "Paid")
     throw new AppError("Cannot delete a paid invoice", 400);
   await inv.destroy();
@@ -136,8 +134,7 @@ export async function createPayment(input: any) {
 }
 
 export async function updatePaymentStatus(id: string, input: any) {
-  const pay = await Payment.findByPk(id);
-  if (!pay) throw new AppError("Payment not found", 404);
+  const pay = await findOrThrow(Payment, id, "Payment");
   const data: any = { status: input.status };
   if (input.status === "Paid")
     data.paidDate = input.paidDate || new Date().toISOString().split("T")[0];
@@ -230,8 +227,7 @@ export async function listValuations(queryParams: any) {
 }
 
 export async function createValuation(input: any) {
-  const player = await Player.findByPk(input.playerId);
-  if (!player) throw new AppError("Player not found", 404);
+  await findOrThrow(Player, input.playerId, "Player");
 
   // Auto-compute trend from previous valuation
   const prev = await Valuation.findOne({
@@ -589,14 +585,10 @@ export async function createExpense(input: any, userId: string) {
 }
 
 export async function updateExpense(id: string, input: any) {
-  const exp = await Expense.findByPk(id);
-  if (!exp) throw new AppError("Expense not found", 404);
+  const exp = await findOrThrow(Expense, id, "Expense");
   return exp.update(input);
 }
 
 export async function deleteExpense(id: string) {
-  const exp = await Expense.findByPk(id);
-  if (!exp) throw new AppError("Expense not found", 404);
-  await exp.destroy();
-  return { id };
+  return destroyById(Expense, id, "Expense");
 }

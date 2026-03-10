@@ -8,6 +8,7 @@
 
 import { Op } from "sequelize";
 import { sequelize } from "../../config/database";
+import { logger } from "../../config/logger";
 import { Match } from "../matches/match.model";
 import { PlayerMatchStats } from "../matches/playerMatchStats.model";
 import { Club } from "../clubs/club.model";
@@ -230,7 +231,7 @@ export async function syncPlayerMatches(
         );
       } catch (statsErr) {
         // Non-fatal: log and continue with basic stats from match list
-        console.warn(
+        logger.warn(
           `[MatchSync] Could not fetch detailed stats for match ${ext.externalId}: ${(statsErr as Error).message}`,
         );
       }
@@ -259,17 +260,14 @@ export async function syncPlayerMatches(
         statsRecord.interceptions = detailedStats.interceptions || null;
         statsRecord.duelsWon = detailedStats.duelsWon || null;
         statsRecord.duelsTotal = detailedStats.duelsTotal || null;
-        statsRecord.dribblesCompleted =
-          detailedStats.dribblesCompleted || null;
-        statsRecord.dribblesAttempted =
-          detailedStats.dribblesAttempted || null;
+        statsRecord.dribblesCompleted = detailedStats.dribblesCompleted || null;
+        statsRecord.dribblesAttempted = detailedStats.dribblesAttempted || null;
         statsRecord.foulsCommitted = detailedStats.foulsCommitted || null;
         statsRecord.foulsDrawn = detailedStats.foulsDrawn || null;
         statsRecord.yellowCards = detailedStats.yellowCards ?? 0;
         statsRecord.redCards = detailedStats.redCards ?? 0;
         statsRecord.keyPasses = detailedStats.keyPasses || null;
-        statsRecord.positionInMatch =
-          detailedStats.positionInMatch || null;
+        statsRecord.positionInMatch = detailedStats.positionInMatch || null;
       }
 
       await PlayerMatchStats.upsert(statsRecord, { transaction: t });

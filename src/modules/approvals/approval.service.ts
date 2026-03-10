@@ -9,6 +9,7 @@ import {
 } from "../notifications/notification.service";
 import { logger } from "../../config/logger";
 import { AppError } from "../../middleware/errorHandler";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import {
   findActiveTemplate,
   createStepsForApproval,
@@ -69,12 +70,23 @@ export async function createApprovalRequest(input: CreateApprovalInput) {
 
     if (input.assignedTo) {
       createNotification({ ...notifPayload, userId: input.assignedTo }).catch(
-        () => {},
+        (err) =>
+          logger.warn("Approval notification failed", {
+            error: (err as Error).message,
+          }),
       );
     } else if (input.assignedRole) {
-      notifyByRole([input.assignedRole], notifPayload).catch(() => {});
+      notifyByRole([input.assignedRole], notifPayload).catch((err) =>
+        logger.warn("Approval role notification failed", {
+          error: (err as Error).message,
+        }),
+      );
     } else {
-      notifyByRole(["Admin", "Manager"], notifPayload).catch(() => {});
+      notifyByRole(["Admin", "Manager"], notifPayload).catch((err) =>
+        logger.warn("Approval notification failed", {
+          error: (err as Error).message,
+        }),
+      );
     }
   }
 
@@ -171,8 +183,7 @@ export async function resolveApproval(
   comment?: string,
   userRole?: string,
 ) {
-  const approval = await ApprovalRequest.findByPk(id);
-  if (!approval) throw new AppError("Approval request not found", 404);
+  const approval = await findOrThrow(ApprovalRequest, id, "Approval request");
   if (approval.status !== "Pending")
     throw new AppError("Approval already resolved", 409);
 
@@ -204,7 +215,11 @@ export async function resolveApproval(
     sourceType: "approval",
     sourceId: approval.id,
     priority: "normal",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Approval resolution notification failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return approval;
 }

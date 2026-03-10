@@ -3,9 +3,15 @@ import { Injury, InjuryUpdate } from "./injury.model";
 import { Player } from "../players/player.model";
 import { Match } from "../matches/match.model";
 import { AppError } from "../../middleware/errorHandler";
+import { transaction } from "../../config/database";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { notifyByRole } from "../notifications/notification.service";
 import { logger } from "../../config/logger";
+import {
+  findOrThrow,
+  destroyById,
+  buildDateRange,
+} from "../../shared/utils/serviceHelpers";
 import type {
   CreateInjuryInput,
   UpdateInjuryInput,
@@ -35,11 +41,8 @@ export async function listInjuries(queryParams: any) {
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.severity) where.severity = queryParams.severity;
 
-  if (queryParams.from || queryParams.to) {
-    where.injuryDate = {};
-    if (queryParams.from) where.injuryDate[Op.gte] = queryParams.from;
-    if (queryParams.to) where.injuryDate[Op.lte] = queryParams.to;
-  }
+  const dateRange = buildDateRange(queryParams.from, queryParams.to);
+  if (dateRange) where.injuryDate = dateRange;
 
   if (search) {
     where[Op.or] = [
@@ -109,18 +112,22 @@ export async function createInjury(
   input: CreateInjuryInput,
   createdBy: string,
 ) {
-  const player = await Player.findByPk(input.playerId);
-  if (!player) throw new AppError("Player not found", 404);
+  const player = await findOrThrow(Player, input.playerId, "Player");
 
   if (input.matchId) {
-    const match = await Match.findByPk(input.matchId);
-    if (!match) throw new AppError("Match not found", 404);
+    await findOrThrow(Match, input.matchId, "Match");
   }
 
-  const injury = await Injury.create({ ...input, createdBy } as any);
+  const injury = await transaction(async (t) => {
+    const inj = await Injury.create({ ...input, createdBy } as any, {
+      transaction: t,
+    });
 
-  // Update player status to injured
-  await player.update({ status: "injured" });
+    // Update player status to injured (atomic with injury creation)
+    await player.update({ status: "injured" }, { transaction: t });
+
+    return inj;
+  });
 
   // ── Push notification (non-blocking — won't crash the endpoint) ──
   const playerName =
@@ -150,8 +157,7 @@ export async function createInjury(
 // ── Update ──
 
 export async function updateInjury(id: string, input: UpdateInjuryInput) {
-  const injury = await Injury.findByPk(id);
-  if (!injury) throw new AppError("Injury not found", 404);
+  const injury = await findOrThrow(Injury, id, "Injury");
 
   const updated = await injury.update(input as any);
 
@@ -182,51 +188,54 @@ export async function addInjuryUpdate(
   input: AddInjuryUpdateInput,
   userId: string,
 ) {
-  const injury = await Injury.findByPk(injuryId);
-  if (!injury) throw new AppError("Injury not found", 404);
+  const injury = await findOrThrow(Injury, injuryId, "Injury");
 
-  const update = await InjuryUpdate.create({
-    injuryId,
-    updateDate: new Date().toISOString().split("T")[0],
-    status: input.status || null,
-    notes: input.notes,
-    notesAr: input.notesAr || null,
-    updatedBy: userId,
-  } as any);
+  return transaction(async (t) => {
+    const update = await InjuryUpdate.create(
+      {
+        injuryId,
+        updateDate: new Date().toISOString().split("T")[0],
+        status: input.status || null,
+        notes: input.notes,
+        notesAr: input.notesAr || null,
+        updatedBy: userId,
+      } as any,
+      { transaction: t },
+    );
 
-  if (input.status && input.status !== injury.status) {
-    await injury.update({ status: input.status });
+    if (input.status && input.status !== injury.status) {
+      const statusUpdate: Record<string, unknown> = { status: input.status };
+      if (input.status === "Recovered") {
+        statusUpdate.actualReturnDate = new Date().toISOString().split("T")[0];
+      }
+      await injury.update(statusUpdate, { transaction: t });
 
-    if (input.status === "Recovered") {
-      await injury.update({
-        actualReturnDate: new Date().toISOString().split("T")[0],
-      });
-      const activeCount = await Injury.count({
-        where: {
-          playerId: injury.playerId,
-          status: { [Op.in]: ["UnderTreatment", "Relapsed"] },
-          id: { [Op.ne]: injuryId },
-        },
-      });
-      if (activeCount === 0) {
-        await Player.update(
-          { status: "active" },
-          { where: { id: injury.playerId } },
-        );
+      if (input.status === "Recovered") {
+        const activeCount = await Injury.count({
+          where: {
+            playerId: injury.playerId,
+            status: { [Op.in]: ["UnderTreatment", "Relapsed"] },
+            id: { [Op.ne]: injuryId },
+          },
+          transaction: t,
+        });
+        if (activeCount === 0) {
+          await Player.update(
+            { status: "active" },
+            { where: { id: injury.playerId }, transaction: t },
+          );
+        }
       }
     }
-  }
 
-  return update;
+    return update;
+  });
 }
 
 // ── Delete ──
 
 export async function deleteInjury(id: string) {
-  const injury = await Injury.findByPk(id);
-  if (!injury) throw new AppError("Injury not found", 404);
-  await injury.destroy();
-  return { id };
+  return destroyById(Injury, id, "Injury");
 }
 
 // ── Stats ──

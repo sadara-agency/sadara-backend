@@ -3,6 +3,7 @@ import { Note, NoteOwnerType } from "./note.model";
 import { sequelize } from "../../config/database";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 
 export async function listNotes(queryParams: any) {
   const { limit, offset, page } = parsePagination(queryParams, "createdAt");
@@ -49,8 +50,7 @@ export async function createNote(
 }
 
 export async function updateNote(id: string, content: string, userId: string) {
-  const note = await Note.findByPk(id);
-  if (!note) throw new AppError("Note not found", 404);
+  const note = await findOrThrow(Note, id, "Note");
   if (note.createdBy !== userId)
     throw new AppError("You can only edit your own notes", 403);
   await note.update({ content });
@@ -58,8 +58,7 @@ export async function updateNote(id: string, content: string, userId: string) {
 }
 
 export async function deleteNote(id: string, userId: string, userRole: string) {
-  const note = await Note.findByPk(id);
-  if (!note) throw new AppError("Note not found", 404);
+  const note = await findOrThrow(Note, id, "Note");
   // Admin can delete any note; others only their own
   if (userRole !== "Admin" && note.createdBy !== userId) {
     throw new AppError("You can only delete your own notes", 403);

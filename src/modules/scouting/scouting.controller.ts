@@ -6,6 +6,7 @@ import {
   sendPaginated,
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { logger } from "../../config/logger";
 import * as scoutingService from "./scouting.service";
 
 // ══════════════════════════════════════════
@@ -123,7 +124,7 @@ export async function markPackReady(req: AuthRequest, res: Response) {
 // ══════════════════════════════════════════
 
 export async function createDecision(req: AuthRequest, res: Response) {
-  console.log("📦 Decision body:", JSON.stringify(req.body));
+  logger.debug("Decision body", { body: req.body });
   const d = await scoutingService.createDecision(req.body, req.user!.id);
   await logAudit(
     "CREATE",

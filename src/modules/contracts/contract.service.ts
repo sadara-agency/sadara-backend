@@ -14,6 +14,7 @@ import { AuditLog } from "../audit/AuditLog.model";
 import { sequelize } from "../../config/database";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import { CreateContractInput, UpdateContractInput } from "./contract.schema";
 
 // ── Shared includes for player + club ──
@@ -196,8 +197,7 @@ export async function createContract(
 // Update Contract
 // ────────────────────────────────────────────────────────────
 export async function updateContract(id: string, input: UpdateContractInput) {
-  const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError("Contract not found", 404);
+  const contract = await findOrThrow(Contract, id, "Contract");
 
   // Prevent commission changes on locked contracts (signed/terminated)
   if (
@@ -229,8 +229,7 @@ export async function updateContract(id: string, input: UpdateContractInput) {
 // Delete Contract
 // ────────────────────────────────────────────────────────────
 export async function deleteContract(id: string) {
-  const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError("Contract not found", 404);
+  const contract = await findOrThrow(Contract, id, "Contract");
 
   // Prevent deletion of active/signed contracts
   if (["Active", "Expiring Soon"].includes(contract.status)) {
@@ -268,8 +267,7 @@ export async function terminateContract(
   input: TerminateContractInput,
   terminatedBy: string,
 ) {
-  const contract = await Contract.findByPk(id);
-  if (!contract) throw new AppError("Contract not found", 404);
+  const contract = await findOrThrow(Contract, id, "Contract");
 
   // Only active/expiring contracts can be terminated
   const terminatable = ["Active", "Expiring Soon", "AwaitingPlayer", "Signing"];

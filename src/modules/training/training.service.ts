@@ -11,6 +11,7 @@ import {
 import { Player } from "../players/player.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
 import type {
   CreateCourseInput,
   UpdateCourseInput,
@@ -114,16 +115,12 @@ export async function createCourse(
 }
 
 export async function updateCourse(id: string, input: UpdateCourseInput) {
-  const course = await TrainingCourse.findByPk(id);
-  if (!course) throw new AppError("Course not found", 404);
+  const course = await findOrThrow(TrainingCourse, id, "Course");
   return course.update(input as any);
 }
 
 export async function deleteCourse(id: string) {
-  const course = await TrainingCourse.findByPk(id);
-  if (!course) throw new AppError("Course not found", 404);
-  await course.destroy();
-  return { id };
+  return destroyById(TrainingCourse, id, "Course");
 }
 
 // ══════════════════════════════════════════
@@ -135,8 +132,7 @@ export async function enrollPlayers(
   playerIds: string[],
   assignedBy: string,
 ) {
-  const course = await TrainingCourse.findByPk(courseId);
-  if (!course) throw new AppError("Course not found", 404);
+  await findOrThrow(TrainingCourse, courseId, "Course");
 
   const existing = await Player.findAll({
     where: { id: { [Op.in]: playerIds } },
@@ -163,8 +159,11 @@ export async function updateEnrollment(
   enrollmentId: string,
   input: UpdateEnrollmentInput,
 ) {
-  const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError("Enrollment not found", 404);
+  const enrollment = await findOrThrow(
+    TrainingEnrollment,
+    enrollmentId,
+    "Enrollment",
+  );
 
   const updates: any = { ...input };
 
@@ -180,10 +179,7 @@ export async function updateEnrollment(
 }
 
 export async function removeEnrollment(enrollmentId: string) {
-  const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError("Enrollment not found", 404);
-  await enrollment.destroy();
-  return { id: enrollmentId };
+  return destroyById(TrainingEnrollment, enrollmentId, "Enrollment");
 }
 
 export async function getPlayerEnrollments(playerId: string) {
@@ -247,8 +243,11 @@ export async function trackActivity(
   playerId: string,
   input: TrackActivityInput,
 ) {
-  const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError("Enrollment not found", 404);
+  const enrollment = await findOrThrow(
+    TrainingEnrollment,
+    enrollmentId,
+    "Enrollment",
+  );
 
   // Security: player can only track their own enrollments
   if (enrollment.playerId !== playerId) {
@@ -301,8 +300,11 @@ export async function selfUpdateProgress(
   playerId: string,
   input: SelfUpdateProgressInput,
 ) {
-  const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
-  if (!enrollment) throw new AppError("Enrollment not found", 404);
+  const enrollment = await findOrThrow(
+    TrainingEnrollment,
+    enrollmentId,
+    "Enrollment",
+  );
   if (enrollment.playerId !== playerId) {
     throw new AppError("Forbidden — not your enrollment", 403);
   }

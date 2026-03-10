@@ -6,6 +6,7 @@ import {
   sendPaginated,
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { logger } from "../../config/logger";
 import * as svc from "./match.service";
 import { generateAutoTasks } from "./matchAutoTasks";
 
@@ -81,13 +82,15 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     generateAutoTasks(req.params.id, req.user!.id)
       .then((result) => {
         if (result.created > 0) {
-          console.log(
+          logger.info(
             `[AutoTasks] Match completed → Created ${result.created} tasks for match ${req.params.id}`,
           );
         }
       })
       .catch((err) => {
-        console.error("[AutoTasks] Error on match completion:", err.message);
+        logger.error("[AutoTasks] Error on match completion:", {
+          error: err.message,
+        });
       });
   }
 
@@ -183,13 +186,15 @@ export async function upsertStats(req: AuthRequest, res: Response) {
   generateAutoTasks(req.params.id, req.user!.id)
     .then((result) => {
       if (result.created > 0) {
-        console.log(
+        logger.info(
           `[AutoTasks] Created ${result.created} tasks for match ${req.params.id}: ${result.rules.join(", ")}`,
         );
       }
     })
     .catch((err) => {
-      console.error("[AutoTasks] Error generating auto-tasks:", err.message);
+      logger.error("[AutoTasks] Error generating auto-tasks:", {
+        error: err.message,
+      });
     });
 
   sendSuccess(res, stats, "Stats saved");
@@ -239,12 +244,19 @@ export async function listAnalyses(req: AuthRequest, res: Response) {
 }
 
 export async function getAnalysis(req: AuthRequest, res: Response) {
-  const analysis = await svc.getMatchAnalysisById(req.params.id, req.params.analysisId);
+  const analysis = await svc.getMatchAnalysisById(
+    req.params.id,
+    req.params.analysisId,
+  );
   sendSuccess(res, analysis);
 }
 
 export async function createAnalysis(req: AuthRequest, res: Response) {
-  const analysis = await svc.createMatchAnalysis(req.params.id, req.user!.id, req.body);
+  const analysis = await svc.createMatchAnalysis(
+    req.params.id,
+    req.user!.id,
+    req.body,
+  );
   await logAudit(
     "CREATE",
     "match_analyses",
@@ -256,7 +268,11 @@ export async function createAnalysis(req: AuthRequest, res: Response) {
 }
 
 export async function updateAnalysis(req: AuthRequest, res: Response) {
-  const analysis = await svc.updateMatchAnalysis(req.params.id, req.params.analysisId, req.body);
+  const analysis = await svc.updateMatchAnalysis(
+    req.params.id,
+    req.params.analysisId,
+    req.body,
+  );
   await logAudit(
     "UPDATE",
     "match_analyses",
@@ -268,7 +284,10 @@ export async function updateAnalysis(req: AuthRequest, res: Response) {
 }
 
 export async function publishAnalysis(req: AuthRequest, res: Response) {
-  const analysis = await svc.publishMatchAnalysis(req.params.id, req.params.analysisId);
+  const analysis = await svc.publishMatchAnalysis(
+    req.params.id,
+    req.params.analysisId,
+  );
   await logAudit(
     "UPDATE",
     "match_analyses",
@@ -280,7 +299,10 @@ export async function publishAnalysis(req: AuthRequest, res: Response) {
 }
 
 export async function removeAnalysis(req: AuthRequest, res: Response) {
-  const result = await svc.deleteMatchAnalysis(req.params.id, req.params.analysisId);
+  const result = await svc.deleteMatchAnalysis(
+    req.params.id,
+    req.params.analysisId,
+  );
   await logAudit(
     "DELETE",
     "match_analyses",

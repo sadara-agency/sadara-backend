@@ -7,6 +7,7 @@ import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { CreateReportInput } from "./report.schema";
 import { generateReportPdf } from "./report.pdf";
+import { logger } from "../../config/logger";
 
 // ── Shared includes ──
 const REPORT_INCLUDES = [
@@ -96,7 +97,7 @@ export async function createReport(
     const filePath = await generateReportPdf(report.id, player, data);
     await report.update({ status: "Generated", filePath });
   } catch (err: any) {
-    console.error("Report generation failed:", err.message);
+    logger.error("Report generation failed", { error: err.message });
     await report.update({
       status: "Failed",
       notes: `Generation error: ${err.message}`,

@@ -14,6 +14,7 @@ const mockMatchFindByPk = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn(), authenticate: jest.fn() },
+  transaction: async (cb: any) => cb({ LOCK: { UPDATE: 'UPDATE' } }),
 }));
 
 jest.mock('../../../src/modules/injuries/injury.model', () => ({

@@ -16,6 +16,7 @@ import { Club } from "./club.model";
 import { sequelize } from "../../config/database";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import {
   CreateClubInput,
   UpdateClubInput,
@@ -172,8 +173,7 @@ export async function createClub(input: CreateClubInput) {
 // Update Club
 // ────────────────────────────────────────────────────────────
 export async function updateClub(id: string, input: UpdateClubInput) {
-  const club = await Club.findByPk(id);
-  if (!club) throw new AppError("Club not found", 404);
+  const club = await findOrThrow(Club, id, "Club");
   return await club.update(input as any);
 }
 
@@ -181,8 +181,7 @@ export async function updateClub(id: string, input: UpdateClubInput) {
 // Delete Club (soft delete + FK cleanup)
 // ────────────────────────────────────────────────────────────
 export async function deleteClub(id: string) {
-  const club = await Club.findByPk(id);
-  if (!club) throw new AppError("Club not found", 404);
+  const club = await findOrThrow(Club, id, "Club");
 
   const txn = await sequelize.transaction();
   try {
@@ -299,8 +298,7 @@ export async function deleteClubs(ids: string[]) {
 // Update Club Logo URL
 // ────────────────────────────────────────────────────────────
 export async function updateClubLogo(id: string, logoUrl: string) {
-  const club = await Club.findByPk(id);
-  if (!club) throw new AppError("Club not found", 404);
+  const club = await findOrThrow(Club, id, "Club");
   return await club.update({ logoUrl });
 }
 
@@ -308,8 +306,7 @@ export async function updateClubLogo(id: string, logoUrl: string) {
 // Create Contact (raw SQL — no Sequelize model yet)
 // ────────────────────────────────────────────────────────────
 export async function createContact(clubId: string, input: CreateContactInput) {
-  const club = await Club.findByPk(clubId);
-  if (!club) throw new AppError("Club not found", 404);
+  await findOrThrow(Club, clubId, "Club");
 
   const results = await sequelize.query(
     `INSERT INTO contacts (id, name, name_ar, role, email, phone, is_primary, club_id, created_at, updated_at)
