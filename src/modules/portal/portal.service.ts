@@ -7,6 +7,7 @@ import { Player } from "../players/player.model";
 import { Club } from "../clubs/club.model";
 import { User } from "../Users/user.model";
 import { isEncrypted, decrypt } from "../../shared/utils/encryption";
+import { logger } from "../../config/logger";
 import { Contract } from "../contracts/contract.model";
 import { Match } from "../matches/match.model";
 import { Document } from "../documents/document.model";
@@ -577,10 +578,9 @@ export async function signMyContract(
       { where: { id: contractId } },
     );
   } catch (err: any) {
-    console.error(
-      "Failed to generate signed PDF after player signing:",
-      err.message,
-    );
+    logger.error("Failed to generate signed PDF after player signing", {
+      error: err.message,
+    });
     // Non-blocking — contract activation already succeeded
   }
 

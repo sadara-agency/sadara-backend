@@ -5,6 +5,7 @@ import puppeteer from "puppeteer";
 import { PDFDocument } from "pdf-lib";
 import { AuthRequest } from "../../shared/types";
 import { AppError } from "../../middleware/errorHandler";
+import { logger } from "../../config/logger";
 import * as contractService from "./contract.service";
 
 // ── Asset paths (brand template pages) ──
@@ -65,7 +66,7 @@ function getData(c: any) {
   const rawPlayerSig = c.signedDocumentUrl;
   const playerMethod = c.signingMethod;
 
-  console.log("[PDF getData] Player signature debug:", {
+  logger.debug("[PDF getData] Player signature debug", {
     hasSignedDocumentUrl: !!rawPlayerSig,
     signedDocumentUrlLength: rawPlayerSig ? rawPlayerSig.length : 0,
     signedDocumentUrlPrefix: rawPlayerSig
@@ -357,7 +358,7 @@ export async function generateContractPdfBuffer(
       try {
         await browser.close();
       } catch {}
-    console.error("PDF generation error:", err.message);
+    logger.error("PDF generation error", { error: err.message });
     throw new AppError(
       "PDF generation failed. Please try again or contact support.",
       500,

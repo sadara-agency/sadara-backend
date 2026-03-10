@@ -1,4 +1,4 @@
-import { Op, Sequelize, Model, ModelStatic } from "sequelize";
+import { Op, Sequelize } from "sequelize";
 import {
   ExerciseLibrary,
   BodyMetric,
@@ -19,6 +19,13 @@ import {
 import { Player } from "../players/player.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import {
+  findOrThrow,
+  destroyById,
+  bilingualSearch,
+  pickDefined,
+  buildDateRange,
+} from "../../shared/utils/serviceHelpers";
 import type {
   CreateExerciseInput,
   UpdateExerciseInput,
@@ -42,10 +49,6 @@ import type {
   LogAdherenceInput,
 } from "./gym.schema";
 
-// ═══════════════════════════════════════════
-// HELPERS
-// ═══════════════════════════════════════════
-
 const PLAYER_ATTRS = [
   "id",
   "firstName",
@@ -55,47 +58,6 @@ const PLAYER_ATTRS = [
   "position",
   "photoUrl",
 ] as const;
-
-async function findOrThrow<T extends Model>(
-  model: ModelStatic<T>,
-  id: string,
-  label: string,
-): Promise<T> {
-  const record = await model.findByPk(id);
-  if (!record) throw new AppError(`${label} not found`, 404);
-  return record;
-}
-
-async function destroyById<T extends Model>(
-  model: ModelStatic<T>,
-  id: string,
-  label: string,
-): Promise<{ id: string }> {
-  const record = await findOrThrow(model, id, label);
-  await record.destroy();
-  return { id };
-}
-
-function bilingualSearch(search: string | undefined) {
-  if (!search) return {};
-  return {
-    [Op.or]: [
-      { nameEn: { [Op.iLike]: `%${search}%` } },
-      { nameAr: { [Op.iLike]: `%${search}%` } },
-    ],
-  };
-}
-
-function pickDefined<T extends Record<string, unknown>>(
-  source: T,
-  keys: (keyof T)[],
-): Partial<T> {
-  const result: Partial<T> = {};
-  for (const key of keys) {
-    if (source[key] !== undefined) result[key] = source[key];
-  }
-  return result;
-}
 
 // ═══════════════════════════════════════════
 // EXERCISE LIBRARY
@@ -144,13 +106,6 @@ export async function deleteExercise(id: string) {
 // ═══════════════════════════════════════════
 // BODY METRICS
 // ═══════════════════════════════════════════
-
-function buildDateRange(from?: string, to?: string) {
-  const range: Record<symbol, string> = {};
-  if (from) range[Op.gte] = from;
-  if (to) range[Op.lte] = to;
-  return Object.getOwnPropertySymbols(range).length > 0 ? range : undefined;
-}
 
 function calculateBmi(weight: number, heightCm: number): number {
   const heightM = heightCm / 100;

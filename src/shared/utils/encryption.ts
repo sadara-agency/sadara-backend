@@ -11,7 +11,7 @@ const ENCODING = "base64"; // Store as base64 string
  * Uses SHA-256 to normalise any key length to exactly 32 bytes.
  */
 function getKey(): Buffer {
-  const raw = (env as any).encryption?.key || process.env.ENCRYPTION_KEY || "";
+  const raw = env.encryption.key || process.env.ENCRYPTION_KEY || "";
   if (!raw) {
     throw new Error("ENCRYPTION_KEY is not set — cannot encrypt/decrypt");
   }

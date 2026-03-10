@@ -13,7 +13,10 @@ import {
 } from "../notifications/notification.service";
 import { AppError } from "../../middleware/errorHandler";
 import { logger } from "../../config/logger";
-import type { CreateTemplateInput, UpdateTemplateInput } from "./approvalChain.schema";
+import type {
+  CreateTemplateInput,
+  UpdateTemplateInput,
+} from "./approvalChain.schema";
 
 const USER_ATTRS = ["id", "fullName", "role"] as const;
 
@@ -160,7 +163,9 @@ export async function findActiveTemplate(
         order: [["step_number", "ASC"]],
       },
     ],
-    order: [[{ model: ApprovalChainTemplateStep, as: "steps" }, "step_number", "ASC"]],
+    order: [
+      [{ model: ApprovalChainTemplateStep, as: "steps" }, "step_number", "ASC"],
+    ],
   });
 }
 
@@ -221,7 +226,11 @@ export async function createStepsForApproval(
     sourceType: "approval",
     sourceId: approval.id,
     priority: approval.priority || "normal",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Approval chain notification failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return steps;
 }
@@ -294,7 +303,11 @@ export async function resolveStep(
         sourceType: "approval",
         sourceId: approval.id,
         priority: approval.priority || "normal",
-      }).catch(() => {});
+      }).catch((err) =>
+        logger.warn("Approval chain notification failed", {
+          error: (err as Error).message,
+        }),
+      );
     } else {
       // Final step approved — resolve parent
       await approval.update({
@@ -313,7 +326,11 @@ export async function resolveStep(
         sourceType: "approval",
         sourceId: approval.id,
         priority: "normal",
-      }).catch(() => {});
+      }).catch((err) =>
+        logger.warn("Approval chain notification failed", {
+          error: (err as Error).message,
+        }),
+      );
     }
   } else {
     // Rejected — reject parent and skip remaining steps
@@ -346,7 +363,11 @@ export async function resolveStep(
       sourceType: "approval",
       sourceId: approval.id,
       priority: "normal",
-    }).catch(() => {});
+    }).catch((err) =>
+      logger.warn("Approval chain notification failed", {
+        error: (err as Error).message,
+      }),
+    );
   }
 
   return { step: activeStep, approval };

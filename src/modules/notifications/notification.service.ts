@@ -7,7 +7,10 @@ import {
 import { User } from "../Users/user.model";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { logger } from "../../config/logger";
-import { publishNotification, type SSENotificationPayload } from "./notification.sse";
+import {
+  publishNotification,
+  type SSENotificationPayload,
+} from "./notification.sse";
 
 // ── Create a single notification ──
 
@@ -40,9 +43,17 @@ export async function createNotification(input: CreateNotificationInput) {
         link: notif.link,
         priority: notif.priority,
         isRead: false,
-        createdAt: notif.createdAt instanceof Date ? notif.createdAt.toISOString() : String(notif.createdAt),
+        createdAt:
+          notif.createdAt instanceof Date
+            ? notif.createdAt.toISOString()
+            : String(notif.createdAt),
       };
-      publishNotification(input.userId, payload).catch(() => {});
+      publishNotification(input.userId, payload).catch((err) =>
+        logger.warn("SSE publish failed", {
+          userId: input.userId,
+          error: (err as Error).message,
+        }),
+      );
     }
 
     return notif;
@@ -114,9 +125,17 @@ export async function notifyByRole(
       link: notif.link,
       priority: notif.priority,
       isRead: false,
-      createdAt: notif.createdAt instanceof Date ? notif.createdAt.toISOString() : String(notif.createdAt),
+      createdAt:
+        notif.createdAt instanceof Date
+          ? notif.createdAt.toISOString()
+          : String(notif.createdAt),
     };
-    publishNotification(notif.userId, payload).catch(() => {});
+    publishNotification(notif.userId, payload).catch((err) =>
+      logger.warn("SSE publish failed", {
+        userId: notif.userId,
+        error: (err as Error).message,
+      }),
+    );
   }
 
   logger.info(

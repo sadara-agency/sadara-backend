@@ -4,6 +4,7 @@ import { Player } from "../players/player.model";
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import {
   notifyByRole,
   notifyUser,
@@ -127,12 +128,10 @@ export async function getReferralById(
 // ── Create ──
 
 export async function createReferral(input: any, userId: string) {
-  const player = await Player.findByPk(input.playerId);
-  if (!player) throw new AppError("Player not found", 404);
+  const player = await findOrThrow(Player, input.playerId, "Player");
 
   if (input.assignedTo) {
-    const user = await User.findByPk(input.assignedTo);
-    if (!user) throw new AppError("Assigned user not found", 404);
+    await findOrThrow(User, input.assignedTo, "Assigned user");
   }
 
   // Mental referrals are automatically restricted

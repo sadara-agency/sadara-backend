@@ -8,6 +8,7 @@
 //  4. Player signatures stay in signedDocumentUrl/signedAt/signingMethod
 // ─────────────────────────────────────────────────────────────
 import { Response } from "express";
+import { logger } from "../../config/logger";
 import { AuthRequest } from "../../shared/types";
 import { sendSuccess } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
@@ -169,10 +170,9 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       const signedPdfUrl = await regenerateSignedPdf(id);
       await Contract.update({ documentUrl: signedPdfUrl }, { where: { id } });
     } catch (err: any) {
-      console.error(
-        "Failed to generate signed PDF after agent signing:",
-        err.message,
-      );
+      logger.error("Failed to generate signed PDF after agent signing", {
+        error: err.message,
+      });
       // Non-blocking — contract transition already succeeded
     }
   }
@@ -199,7 +199,11 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       assignedRole: "Manager",
       priority: "high",
       dueDate: due.toISOString().split("T")[0],
-    }).catch(() => {});
+    }).catch((err) =>
+      logger.warn("Contract transition notification failed", {
+        error: (err as Error).message,
+      }),
+    );
   }
 
   if (action === "approve" || action === "reject_to_draft") {
@@ -208,7 +212,11 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       id,
       req.user!.id,
       action === "approve" ? "Approved" : "Rejected",
-    ).catch(() => {});
+    ).catch((err) =>
+      logger.warn("Contract transition notification failed", {
+        error: (err as Error).message,
+      }),
+    );
   }
 
   sendSuccess(res, contract, `Contract transitioned to ${nextStatus}`);

@@ -12,6 +12,7 @@ const mockContractUpdate = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn(), authenticate: jest.fn() },
+  transaction: async (cb: any) => cb({ LOCK: { UPDATE: 'UPDATE' } }),
 }));
 
 jest.mock('../../../src/modules/clearances/clearance.model', () => ({
@@ -124,7 +125,7 @@ describe('Clearance Service', () => {
       mockClearanceFindByPk.mockResolvedValue(clr);
       mockContractUpdate.mockResolvedValue([1]);
       await clearanceService.completeClearance('clr-001', { action: 'sign_digital', signatureData: 'sig-data' });
-      expect(clr.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Completed', signingMethod: 'digital' }));
+      expect(clr.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Completed', signingMethod: 'digital' }), expect.objectContaining({ transaction: expect.anything() }));
       expect(mockContractUpdate).toHaveBeenCalled();
     });
 
@@ -133,7 +134,7 @@ describe('Clearance Service', () => {
       mockClearanceFindByPk.mockResolvedValue(clr);
       mockContractUpdate.mockResolvedValue([1]);
       await clearanceService.completeClearance('clr-001', { action: 'sign_upload', signedDocumentUrl: '/docs/signed.pdf' });
-      expect(clr.update).toHaveBeenCalledWith(expect.objectContaining({ signingMethod: 'upload' }));
+      expect(clr.update).toHaveBeenCalledWith(expect.objectContaining({ signingMethod: 'upload' }), expect.objectContaining({ transaction: expect.anything() }));
     });
 
     it('should throw 404 if not found', async () => {

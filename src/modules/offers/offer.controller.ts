@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
+import { logger } from "../../config/logger";
 import {
   sendSuccess,
   sendCreated,
@@ -95,10 +96,17 @@ export async function updateStatus(req: AuthRequest, res: Response) {
       requestedBy: req.user!.id,
       assignedRole: "Manager",
       priority: "normal",
-    }).catch(() => {});
+    }).catch((err) =>
+      logger.warn("Offer approval request failed", {
+        error: (err as Error).message,
+      }),
+    );
   } else if (["Negotiation", "Closed", "Converted"].includes(req.body.status)) {
     resolveApprovalByEntity("offer", offer.id, req.user!.id, "Approved").catch(
-      () => {},
+      (err) =>
+        logger.warn("Offer approval resolution failed", {
+          error: (err as Error).message,
+        }),
     );
   }
 

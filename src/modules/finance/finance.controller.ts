@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
+import { logger } from "../../config/logger";
 import {
   sendSuccess,
   sendCreated,
@@ -37,7 +38,11 @@ export async function createInvoice(req: AuthRequest, res: Response) {
       requestedBy: req.user!.id,
       assignedRole: "Admin",
       priority: amount >= 100000 ? "critical" : "high",
-    }).catch(() => {});
+    }).catch((err) =>
+      logger.warn("Finance approval request failed", {
+        error: (err as Error).message,
+      }),
+    );
   }
 
   sendCreated(res, inv);

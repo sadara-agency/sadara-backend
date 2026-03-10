@@ -67,6 +67,12 @@ const envSchema = z.object({
   // Sportmonks Fixtures API (optional)
   SPORTMONKS_API_TOKEN: z.string().default(""),
 
+  // Database SSL
+  DB_SSL_REJECT_UNAUTHORIZED: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
+
   // Sentry error tracking (optional)
   SENTRY_DSN: z.string().url().optional(),
 });
@@ -103,6 +109,7 @@ export const env = {
     name: validated.POSTGRES_DB,
     user: validated.POSTGRES_USER,
     password: validated.POSTGRES_PASSWORD,
+    sslRejectUnauthorized: validated.DB_SSL_REJECT_UNAUTHORIZED,
   },
 
   jwt: {

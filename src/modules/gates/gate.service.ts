@@ -11,6 +11,7 @@ import { Player } from "../players/player.model";
 import { User } from "../Users/user.model";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { AppError } from "../../middleware/errorHandler";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 
 const PLAYER_ATTRS = [
   "id",
@@ -409,8 +410,7 @@ export async function getPlayerGates(playerId: string) {
 // ── Create Gate ──
 
 export async function createGate(input: any) {
-  const player = await Player.findByPk(input.playerId);
-  if (!player) throw new AppError("Player not found", 404);
+  await findOrThrow(Player, input.playerId, "Player");
 
   // Check duplicate
   const existing = await Gate.findOne({
@@ -554,8 +554,7 @@ export async function advanceGate(
 // ── Update Gate ──
 
 export async function updateGate(id: string, input: any) {
-  const gate = await Gate.findByPk(id);
-  if (!gate) throw new AppError("Gate not found", 404);
+  const gate = await findOrThrow(Gate, id, "Gate");
 
   if (gate.status === "Completed") {
     throw new AppError("Cannot modify a completed gate", 400);
@@ -570,8 +569,7 @@ export async function updateGate(id: string, input: any) {
 // ── Delete Gate ──
 
 export async function deleteGate(id: string) {
-  const gate = await Gate.findByPk(id);
-  if (!gate) throw new AppError("Gate not found", 404);
+  const gate = await findOrThrow(Gate, id, "Gate");
 
   if (gate.status === "Completed") {
     throw new AppError("Cannot delete a completed gate", 400);
@@ -588,8 +586,7 @@ export async function deleteGate(id: string) {
 // ── Add Checklist Item ──
 
 export async function addChecklistItem(gateId: string, input: any) {
-  const gate = await Gate.findByPk(gateId);
-  if (!gate) throw new AppError("Gate not found", 404);
+  const gate = await findOrThrow(Gate, gateId, "Gate");
   if (gate.status === "Completed")
     throw new AppError("Cannot modify checklist of a completed gate", 400);
 
@@ -610,8 +607,7 @@ export async function toggleChecklistItem(
   userId: string,
   userRole: string,
 ) {
-  const item = await GateChecklist.findByPk(itemId);
-  if (!item) throw new AppError("Checklist item not found", 404);
+  const item = await findOrThrow(GateChecklist, itemId, "Checklist item");
 
   // Verify parent gate is not completed
   const gate = await Gate.findByPk(item.gateId);
@@ -660,8 +656,7 @@ export async function toggleChecklistItem(
 // ── Delete Checklist Item ──
 
 export async function deleteChecklistItem(itemId: string) {
-  const item = await GateChecklist.findByPk(itemId);
-  if (!item) throw new AppError("Checklist item not found", 404);
+  const item = await findOrThrow(GateChecklist, itemId, "Checklist item");
 
   const gate = await Gate.findByPk(item.gateId);
   if (gate?.status === "Completed")

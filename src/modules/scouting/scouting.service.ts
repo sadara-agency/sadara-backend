@@ -10,7 +10,9 @@ import {
 import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import { notifyByRole } from "../notifications/notification.service";
+import { logger } from "../../config/logger";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 
@@ -83,20 +85,17 @@ export async function createWatchlist(input: any, userId: string) {
 }
 
 export async function updateWatchlist(id: string, input: any) {
-  const item = await Watchlist.findByPk(id);
-  if (!item) throw new AppError("Watchlist entry not found", 404);
+  const item = await findOrThrow(Watchlist, id, "Watchlist entry");
   return await item.update(input);
 }
 
 export async function updateWatchlistStatus(id: string, status: string) {
-  const item = await Watchlist.findByPk(id);
-  if (!item) throw new AppError("Watchlist entry not found", 404);
+  const item = await findOrThrow(Watchlist, id, "Watchlist entry");
   return await item.update({ status: status as WatchlistAttributes["status"] });
 }
 
 export async function deleteWatchlist(id: string) {
-  const item = await Watchlist.findByPk(id);
-  if (!item) throw new AppError("Watchlist entry not found", 404);
+  const item = await findOrThrow(Watchlist, id, "Watchlist entry");
   // Can't delete if has screening cases
   const cases = await ScreeningCase.count({ where: { watchlistId: id } });
   if (cases > 0)
@@ -113,8 +112,7 @@ export async function deleteWatchlist(id: string) {
 // ══════════════════════════════════════════
 
 export async function createScreeningCase(input: any, userId: string) {
-  const wl = await Watchlist.findByPk(input.watchlistId);
-  if (!wl) throw new AppError("Watchlist entry not found", 404);
+  const wl = await findOrThrow(Watchlist, input.watchlistId, "Watchlist entry");
   if (wl.status === "Rejected")
     throw new AppError("Cannot screen a rejected prospect", 400);
 
@@ -153,7 +151,11 @@ export async function createScreeningCase(input: any, userId: string) {
     sourceType: "screening",
     sourceId: sc.id,
     priority: "normal",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Scouting notification failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return sc;
 }
@@ -172,16 +174,14 @@ export async function getScreeningCase(id: string) {
 }
 
 export async function updateScreeningCase(id: string, input: any) {
-  const sc = await ScreeningCase.findByPk(id);
-  if (!sc) throw new AppError("Screening case not found", 404);
+  const sc = await findOrThrow(ScreeningCase, id, "Screening case");
   if (sc.status === "Closed")
     throw new AppError("Cannot modify a closed screening case", 400);
   return await sc.update(input);
 }
 
 export async function markPackReady(id: string, userId: string) {
-  const sc = await ScreeningCase.findByPk(id);
-  if (!sc) throw new AppError("Screening case not found", 404);
+  const sc = await findOrThrow(ScreeningCase, id, "Screening case");
   if (sc.status === "Closed") throw new AppError("Case is closed", 400);
 
   // Verify prerequisites
@@ -211,7 +211,11 @@ export async function markPackReady(id: string, userId: string) {
     sourceType: "screening",
     sourceId: sc.id,
     priority: "high",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Scouting notification failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return sc;
 }
@@ -256,7 +260,11 @@ export async function createDecision(input: any, userId: string) {
     sourceType: "decision",
     sourceId: decision.id,
     priority: "high",
-  }).catch(() => {});
+  }).catch((err) =>
+    logger.warn("Scouting notification failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return decision;
 }

@@ -9,6 +9,7 @@ import {
   hasPermission,
   CrudAction,
 } from "../modules/permissions/permission.service";
+import { logger } from "../config/logger";
 
 // Throttle activity updates — at most once per 5 minutes per user
 const activityCache = new Map<string, number>();
@@ -24,7 +25,12 @@ function trackActivity(userId: string) {
     .query("UPDATE users SET last_activity = NOW() WHERE id = :id", {
       replacements: { id: userId },
     })
-    .catch(() => {});
+    .catch((err) =>
+      logger.warn("Activity update failed", {
+        userId,
+        error: (err as Error).message,
+      }),
+    );
 }
 
 /** Extract token from cookie (browser) or Authorization header (API clients). */

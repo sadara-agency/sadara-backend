@@ -1,9 +1,17 @@
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../../config/database";
+import { logger } from "../../config/logger";
 import type { UserRole } from "../../shared/types";
 
 /** Roles that see ALL data (no player-level filtering). */
-const UNFILTERED_ROLES: UserRole[] = ["Admin", "Manager", "Executive", "Finance", "Legal", "Media"];
+const UNFILTERED_ROLES: UserRole[] = [
+  "Admin",
+  "Manager",
+  "Executive",
+  "Finance",
+  "Legal",
+  "Media",
+];
 
 /** Main KPI counters from the dashboard view. */
 export async function getKpis() {
@@ -156,7 +164,12 @@ export async function getRecentOffers(limit = 5) {
 }
 
 /** Upcoming matches with managed player count per match (role-filtered). */
-export async function getUpcomingMatches(limit = 5, userId?: string, userRole?: UserRole, playerId?: string | null) {
+export async function getUpcomingMatches(
+  limit = 5,
+  userId?: string,
+  userRole?: UserRole,
+  playerId?: string | null,
+) {
   // Unfiltered roles — see all matches
   if (!userId || !userRole || UNFILTERED_ROLES.includes(userRole)) {
     return sequelize.query(
@@ -220,7 +233,12 @@ export async function getUpcomingMatches(limit = 5, userId?: string, userRole?: 
 }
 
 /** Non-completed tasks sorted by priority (critical first, role-filtered). */
-export async function getUrgentTasks(limit = 5, userId?: string, userRole?: UserRole, playerId?: string | null) {
+export async function getUrgentTasks(
+  limit = 5,
+  userId?: string,
+  userRole?: UserRole,
+  playerId?: string | null,
+) {
   // Unfiltered roles — see all tasks
   if (!userId || !userRole || UNFILTERED_ROLES.includes(userRole)) {
     return sequelize.query(
@@ -399,10 +417,25 @@ export async function getInjuryTrends(months = 6) {
   );
 
   // Pivot rows into { month, minor, moderate, severe, critical }[]
-  const map = new Map<string, { month: string; minor: number; moderate: number; severe: number; critical: number }>();
+  const map = new Map<
+    string,
+    {
+      month: string;
+      minor: number;
+      moderate: number;
+      severe: number;
+      critical: number;
+    }
+  >();
   for (const r of rows) {
     if (!map.has(r.month)) {
-      map.set(r.month, { month: r.month, minor: 0, moderate: 0, severe: 0, critical: 0 });
+      map.set(r.month, {
+        month: r.month,
+        minor: 0,
+        moderate: 0,
+        severe: 0,
+        critical: 0,
+      });
     }
     const entry = map.get(r.month)!;
     const key = r.severity.toLowerCase() as keyof typeof entry;
@@ -415,48 +448,50 @@ export async function getInjuryTrends(months = 6) {
 
 /** Monthly KPI snapshots for sparklines (last 6 months). */
 export async function getKpiTrends(months = 6) {
-  const [players, contracts, revenue, injuries, tasks, matches] = await Promise.all([
-    sequelize.query<{ month: string; value: number }>(
-      `SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+  const [players, contracts, revenue, injuries, tasks, matches] =
+    await Promise.all([
+      sequelize.query<{ month: string; value: number }>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS value
        FROM players WHERE created_at >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
        GROUP BY DATE_TRUNC('month', created_at) ORDER BY month`,
-      { bind: [months], type: QueryTypes.SELECT },
-    ),
-    sequelize.query<{ month: string; value: number }>(
-      `SELECT TO_CHAR(DATE_TRUNC('month', start_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+        { bind: [months], type: QueryTypes.SELECT },
+      ),
+      sequelize.query<{ month: string; value: number }>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', start_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
        FROM contracts WHERE status = 'Active'
          AND start_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
        GROUP BY DATE_TRUNC('month', start_date) ORDER BY month`,
-      { bind: [months], type: QueryTypes.SELECT },
-    ),
-    sequelize.query<{ month: string; value: number }>(
-      `SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month, SUM(amount)::NUMERIC AS value
+        { bind: [months], type: QueryTypes.SELECT },
+      ),
+      sequelize.query<{ month: string; value: number }>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month, SUM(amount)::NUMERIC AS value
        FROM payments WHERE status = 'Paid'
          AND paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
        GROUP BY DATE_TRUNC('month', paid_date) ORDER BY month`,
-      { bind: [months], type: QueryTypes.SELECT },
-    ),
-    sequelize.query<{ month: string; value: number }>(
-      `SELECT TO_CHAR(DATE_TRUNC('month', injury_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+        { bind: [months], type: QueryTypes.SELECT },
+      ),
+      sequelize.query<{ month: string; value: number }>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', injury_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
        FROM injuries WHERE injury_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
        GROUP BY DATE_TRUNC('month', injury_date) ORDER BY month`,
-      { bind: [months], type: QueryTypes.SELECT },
-    ),
-    sequelize.query<{ month: string; value: number }>(
-      `SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+        { bind: [months], type: QueryTypes.SELECT },
+      ),
+      sequelize.query<{ month: string; value: number }>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month, COUNT(*)::INT AS value
        FROM tasks WHERE created_at >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
        GROUP BY DATE_TRUNC('month', created_at) ORDER BY month`,
-      { bind: [months], type: QueryTypes.SELECT },
-    ),
-    sequelize.query<{ month: string; value: number }>(
-      `SELECT TO_CHAR(DATE_TRUNC('month', match_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
+        { bind: [months], type: QueryTypes.SELECT },
+      ),
+      sequelize.query<{ month: string; value: number }>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', match_date), 'YYYY-MM') AS month, COUNT(*)::INT AS value
        FROM matches WHERE match_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
        GROUP BY DATE_TRUNC('month', match_date) ORDER BY month`,
-      { bind: [months], type: QueryTypes.SELECT },
-    ),
-  ]);
+        { bind: [months], type: QueryTypes.SELECT },
+      ),
+    ]);
 
-  const toValues = (rows: { month: string; value: number }[]) => rows.map((r) => Number(r.value));
+  const toValues = (rows: { month: string; value: number }[]) =>
+    rows.map((r) => Number(r.value));
 
   return {
     players: toValues(players),
@@ -473,7 +508,11 @@ export async function getKpiTrends(months = 6) {
  * Uses Promise.allSettled so a single failing query doesn't crash the entire dashboard.
  * Failed sections return safe defaults and the dashboard renders partially.
  */
-export async function getFullDashboard(userId?: string, userRole?: UserRole, playerId?: string | null) {
+export async function getFullDashboard(
+  userId?: string,
+  userRole?: UserRole,
+  playerId?: string | null,
+) {
   const labels = [
     "kpis",
     "alerts",
@@ -517,7 +556,14 @@ export async function getFullDashboard(userId?: string, userRole?: UserRole, pla
     },
     offerPipeline: [],
     injuryTrends: [],
-    kpiTrends: { players: [], contracts: [], revenue: [], injuries: [], tasks: [], matches: [] },
+    kpiTrends: {
+      players: [],
+      contracts: [],
+      revenue: [],
+      injuries: [],
+      tasks: [],
+      matches: [],
+    },
   };
 
   const results = await Promise.allSettled([
@@ -544,10 +590,9 @@ export async function getFullDashboard(userId?: string, userRole?: UserRole, pla
     if (result.status === "fulfilled") {
       dashboard[key] = result.value;
     } else {
-      console.error(
-        `[Dashboard] ${key} query failed:`,
-        result.reason?.message || result.reason,
-      );
+      logger.error(`[Dashboard] ${key} query failed`, {
+        error: result.reason?.message || result.reason,
+      });
       dashboard[key] = defaults[key];
     }
   });

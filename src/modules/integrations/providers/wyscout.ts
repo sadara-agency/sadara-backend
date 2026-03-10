@@ -8,6 +8,7 @@
  */
 
 import axios, { type AxiosInstance, type AxiosError } from "axios";
+import { logger } from "../../../config/logger";
 import type {
   MatchAnalysisProvider,
   ExternalMatch,
@@ -63,7 +64,7 @@ export class WyscoutProvider implements MatchAnalysisProvider {
         // Rate-limited — retry with exponential backoff
         if (status === 429) {
           const delay = RETRY_BASE_MS * Math.pow(2, attempt);
-          console.warn(
+          logger.warn(
             `[Wyscout] Rate limited (429). Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
           );
           await new Promise((r) => setTimeout(r, delay));
@@ -80,9 +81,7 @@ export class WyscoutProvider implements MatchAnalysisProvider {
 
         // Not found
         if (status === 404) {
-          throw new Error(
-            `Wyscout resource not found: ${path}`,
-          );
+          throw new Error(`Wyscout resource not found: ${path}`);
         }
 
         // Other errors — don't retry
@@ -132,11 +131,13 @@ export class WyscoutProvider implements MatchAnalysisProvider {
     return matches.map((m: any) => ({
       externalId: String(m.matchId ?? m.wyId ?? m.id),
       date: m.dateutc ?? m.date ?? "",
-      homeTeam: m.teamsData?.home?.team?.name ?? m.label?.split(" - ")?.[0] ?? "",
-      awayTeam: m.teamsData?.away?.team?.name ?? m.label?.split(" - ")?.[1] ?? "",
+      homeTeam:
+        m.teamsData?.home?.team?.name ?? m.label?.split(" - ")?.[0] ?? "",
+      awayTeam:
+        m.teamsData?.away?.team?.name ?? m.label?.split(" - ")?.[1] ?? "",
       competition: m.competitionId
         ? String(m.competitionId)
-        : m.competition?.name ?? "",
+        : (m.competition?.name ?? ""),
       season: m.seasonId ? String(m.seasonId) : "",
       minutesPlayed: m.minutesPlayed ?? m.player?.minutesPlayed ?? 0,
       goals: m.player?.goals ?? m.goals ?? 0,
@@ -153,10 +154,7 @@ export class WyscoutProvider implements MatchAnalysisProvider {
     externalPlayerId?: string,
   ): Promise<ExternalMatchStats> {
     // Fetch full match data
-    const data = await this.request<any>(
-      "GET",
-      `/matches/${externalMatchId}`,
-    );
+    const data = await this.request<any>("GET", `/matches/${externalMatchId}`);
 
     // If a specific player ID is provided, extract their stats
     let playerStats: any = {};
@@ -176,9 +174,7 @@ export class WyscoutProvider implements MatchAnalysisProvider {
       passes: total.accuratePasses ?? total.totalPasses ?? 0,
       passAccuracy:
         total.accuratePasses && total.totalPasses
-          ? Math.round(
-              (total.accuratePasses / total.totalPasses) * 100,
-            )
+          ? Math.round((total.accuratePasses / total.totalPasses) * 100)
           : 0,
       shots: total.shots ?? total.totalShots ?? 0,
       shotsOnTarget: total.shotsOnTarget ?? 0,
