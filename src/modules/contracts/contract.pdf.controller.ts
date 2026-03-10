@@ -112,33 +112,33 @@ const LOGO_SVG = `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" 
 // ─── CSS — compact to fit all content on exactly 2 pages ────
 
 const CSS = `*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#000;background:#fff;width:595px;height:842px;overflow:hidden;font-size:7.8pt;line-height:1.4}
+body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#000;background:#fff;width:595px;height:842px;overflow:hidden;font-size:7.5pt;line-height:1.35}
 .pg{width:595px;height:842px;position:relative}
-.hd{display:flex;justify-content:space-between;align-items:flex-start;padding:14px 30px 10px;border-bottom:2px solid #000}
+.hd{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 30px 8px;border-bottom:2px solid #000}
 .hd-r{display:flex;align-items:center;gap:8px}.hd-r-txt{text-align:right}
 .lt{font-size:13pt;font-weight:700}.ls{font-size:7pt;font-weight:500;letter-spacing:1px}
 .hd-l{text-align:left;direction:ltr;font-size:7pt;line-height:1.5}.nn{font-weight:700}
-.ct{padding:6px 30px 8px}
-.tt{text-align:center;font-size:16pt;font-weight:700;margin:8px 0 6px;letter-spacing:2px}
-.st{font-weight:700;font-size:8pt;background:#3C3CFA;color:#fff;display:inline-block;padding:1px 8px;margin:5px 0 2px}
-.stb{font-weight:700;font-size:8pt;background:#000;color:#fff;display:inline-block;padding:1px 8px;margin:5px 0 2px}
-.at{font-weight:700;font-size:8pt;text-decoration:underline;margin:5px 0 1px}
-p{margin-bottom:1px}
+.ct{padding:4px 30px 6px}
+.tt{text-align:center;font-size:16pt;font-weight:700;margin:6px 0 4px;letter-spacing:2px}
+.st{font-weight:700;font-size:7.5pt;background:#3C3CFA;color:#fff;display:inline-block;padding:1px 8px;margin:4px 0 1px}
+.stb{font-weight:700;font-size:7.5pt;background:#000;color:#fff;display:inline-block;padding:1px 8px;margin:4px 0 1px}
+.at{font-weight:700;font-size:8pt;text-decoration:underline;margin:4px 0 1px}
+p{margin-bottom:0.5px}
 .pts{display:flex;justify-content:space-between;gap:10px;margin-top:3px}
 .pr{flex:1;text-align:right;font-size:7.5pt;line-height:1.5}
 .pl{width:155px}
 .pl table{border-collapse:collapse;width:100%}.pl td{border:1px solid #000;padding:1px 5px;font-size:7pt}
 .vl{color:#3C3CFA;font-weight:600}
-.ni{display:flex;align-items:flex-start;gap:3px;font-size:7.8pt;margin:0}
-.nc{min-width:13px;height:13px;border-radius:50%;background:#3C3CFA;color:#fff;font-size:6pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0}
-.db{display:flex;align-items:center;gap:5px;margin:2px 0}
+.ni{display:flex;align-items:flex-start;gap:3px;font-size:7.5pt;margin:0}
+.nc{min-width:12px;height:12px;border-radius:50%;background:#3C3CFA;color:#fff;font-size:6pt;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0}
+.db{display:flex;align-items:center;gap:5px;margin:1px 0}
 .dx{border:1px solid #000;padding:1px 8px;font-size:7.5pt;text-align:center;direction:ltr}
 .dl{font-weight:700;font-size:7.5pt;background:#3C3CFA;color:#fff;padding:1px 8px}
-.ss{display:flex;justify-content:space-between;margin-top:6px;gap:15px}
-.sb{flex:1;font-size:7.5pt;line-height:1.4}
+.ss{display:flex;justify-content:space-between;margin-top:4px;gap:15px}
+.sb{flex:1;font-size:7.5pt;line-height:1.3}
 .sf{border-bottom:1px solid #000;display:inline-block;min-width:120px;height:12px}
-.gu{margin-top:5px;padding-top:3px;border-top:1px solid #ccc;font-size:7pt}
-.gt{border-collapse:collapse;margin-top:2px}.gt td{border:1px solid #000;padding:1px 5px;font-size:7pt}`;
+.gu{margin-top:3px;padding-top:2px;border-top:1px solid #ccc;font-size:6.5pt}
+.gt{border-collapse:collapse;margin-top:2px}.gt td{border:1px solid #000;padding:1px 5px;font-size:6.5pt}`;
 
 // ─── Header (with logo) ─────────────────────────────────────
 
@@ -250,7 +250,7 @@ function pg3(d: any) {
 <p style="direction:ltr;text-align:left;font-size:8pt">Ahmed Osman Hadoug</p>
 </div>
 <div class="sb" style="text-align:right">
-<p style="font-size:8.5pt;margin-top:16px"><strong>الطرف الثاني / اللاعب</strong></p>
+<p style="font-size:8.5pt;margin-top:4px"><strong>الطرف الثاني / اللاعب</strong></p>
 <p>${d.pn}</p>
 <p>من تاريخ &nbsp; ${playerSigDate}</p>
 <p style="margin-top:3px">التوقيع:${playerSig || "_________________________"}</p>
@@ -260,7 +260,7 @@ ${d.pnEn ? `<p style="direction:ltr;text-align:left;font-size:8pt">${d.pnEn}</p>
 <div class="gu">
 <p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p>
 <p>أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p>
-<table class="gt" style="width:160px"><tr><td>الاسم</td><td style="min-width:70px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table>
+<table class="gt" style="width:150px"><tr><td>الاسم</td><td style="min-width:60px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table>
 </div>
 </div></div>`);
 }
