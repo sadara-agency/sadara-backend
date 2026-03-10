@@ -268,21 +268,11 @@ ${d.pnEn ? `<p style="direction:ltr;text-align:left;font-size:8pt">${d.pnEn}</p>
 
 async function renderHtmlPage(page: any, html: string): Promise<Uint8Array> {
   await page.setContent(html, {
-    waitUntil: "networkidle0",
-    timeout: 15000,
+    waitUntil: "domcontentloaded",
+    timeout: 10000,
   });
-  // Wait for all images (including base64 data-URI) to fully decode
-  await page.evaluate(`
-    Promise.all(
-      Array.from(document.querySelectorAll('img')).map(img =>
-        img.complete
-          ? Promise.resolve()
-          : new Promise(r => { img.onload = r; img.onerror = r; })
-      )
-    )
-  `);
-  // Extra safety margin for rendering
-  await page.evaluate(`new Promise(r => setTimeout(r, 300))`);
+  // Wait for base64 images to decode + render
+  await page.evaluate(`new Promise(r => setTimeout(r, 500))`);
   return page.pdf({
     width: "595px",
     height: "842px",
