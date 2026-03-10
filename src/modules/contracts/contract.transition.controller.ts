@@ -18,6 +18,7 @@ import { transaction } from "../../config/database";
 import {
   createApprovalRequest,
   resolveApprovalByEntity,
+  isApprovalChainResolved,
 } from "../approvals/approval.service";
 import { regenerateSignedPdf } from "./contract.signing.service";
 
@@ -49,6 +50,35 @@ export async function transitionContract(req: AuthRequest, res: Response) {
 
   if (!action || typeof action !== "string") {
     throw new AppError("action is required", 400);
+  }
+
+  // ── Guard: contract approve/reject requires completed approval chain ──
+  if (action === "approve") {
+    const chain = await isApprovalChainResolved("contract", id);
+    if (!chain.resolved) {
+      throw new AppError(
+        "Cannot approve contract: the approval chain has not been fully resolved. " +
+          "All approval steps must be completed first.",
+        409,
+      );
+    }
+    if (chain.status === "Rejected") {
+      throw new AppError(
+        "Cannot approve contract: the approval chain was rejected.",
+        409,
+      );
+    }
+  }
+
+  if (action === "reject_to_draft") {
+    const chain = await isApprovalChainResolved("contract", id);
+    if (!chain.resolved && chain.status === "Pending") {
+      throw new AppError(
+        "Cannot reject contract: the approval chain is still pending. " +
+          "Reject it through the Approvals page first.",
+        409,
+      );
+    }
   }
 
   // Wrap in transaction with row-level lock to prevent race conditions

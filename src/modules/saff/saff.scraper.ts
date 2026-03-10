@@ -6,6 +6,10 @@ const BASE_URL_EN = "https://www.saff.com.sa/en";
 const BASE_URL_AR = "https://www.saff.com.sa/ar";
 const REQUEST_DELAY = 1500; // ms between requests to be respectful
 
+// Standard browser UA — SAFF's WAF rejects non-browser User-Agents
+const BROWSER_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+
 // ── Types ──
 
 export interface ScrapedStanding {
@@ -80,33 +84,57 @@ function parseScore(scoreStr: string): [number | null, number | null] {
   return [isNaN(home) ? null : home, isNaN(away) ? null : away];
 }
 
-// ── Fetch page with proper encoding ──
+// ── Fetch page with proper encoding + retry ──
+
+const MAX_RETRIES = 2;
+const RETRY_DELAY = 3000; // ms
 
 async function fetchPage(
   url: string,
   lang: "en" | "ar" = "en",
 ): Promise<cheerio.CheerioAPI> {
-  const response = await axios.get(url, {
-    responseType: "arraybuffer",
-    timeout: 15000,
-    headers: {
-      "User-Agent": "Sadara-Sports-Platform/1.0 (data-integration)",
-      Accept: "text/html",
-      "Accept-Language": lang,
-    },
-  });
+  let lastError: Error | null = null;
 
-  // SAFF uses windows-1256 encoding — decode properly
-  const contentType = response.headers["content-type"] || "";
-  let html: string;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 0) await delay(RETRY_DELAY * attempt);
 
-  if (contentType.includes("1256")) {
-    html = iconv.decode(Buffer.from(response.data), "windows-1256");
-  } else {
-    html = Buffer.from(response.data).toString("utf-8");
+      const response = await axios.get(url, {
+        responseType: "arraybuffer",
+        timeout: 15000,
+        headers: {
+          "User-Agent": BROWSER_UA,
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+          "Accept-Language": lang === "ar" ? "ar,en;q=0.5" : "en,ar;q=0.5",
+          "Accept-Encoding": "gzip, deflate, br",
+          Connection: "keep-alive",
+          "Cache-Control": "no-cache",
+        },
+      });
+
+      // SAFF uses windows-1256 encoding — decode properly
+      const contentType = response.headers["content-type"] || "";
+      let html: string;
+
+      if (contentType.includes("1256")) {
+        html = iconv.decode(Buffer.from(response.data), "windows-1256");
+      } else {
+        html = Buffer.from(response.data).toString("utf-8");
+      }
+
+      return cheerio.load(html);
+    } catch (err: any) {
+      lastError = err;
+      if (attempt < MAX_RETRIES) {
+        console.warn(
+          `[SAFF Scraper] Retry ${attempt + 1}/${MAX_RETRIES} for ${url}: ${err.message}`,
+        );
+      }
+    }
   }
 
-  return cheerio.load(html);
+  throw lastError;
 }
 
 // ══════════════════════════════════════════
