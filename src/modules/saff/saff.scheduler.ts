@@ -165,43 +165,13 @@ export async function runSync(
 const cronJobs: ScheduledTask[] = [];
 
 export function startSaffScheduler(): void {
-  logger.info("[SAFF Scheduler] Initializing auto-sync schedules...");
-
-  for (const schedule of SCHEDULES) {
-    if (!cron.validate(schedule.cron)) {
-      logger.error(
-        `[SAFF Scheduler] Invalid cron expression for "${schedule.name}": ${schedule.cron}`,
-      );
-      continue;
-    }
-
-    const job = cron.schedule(
-      schedule.cron,
-      () => {
-        runSync(
-          schedule.agencyValues,
-          schedule.season,
-          `cron:${schedule.name}`,
-        );
-      },
-      {
-        timezone: "Asia/Riyadh",
-      },
-    );
-
-    cronJobs.push(job);
-    logger.info(
-      `[SAFF Scheduler] ✓ Registered: "${schedule.name}" — ${schedule.cron} (Asia/Riyadh)`,
-    );
-  }
-
-  logger.info(`[SAFF Scheduler] ${cronJobs.length} cron jobs active`);
-
-  // Run initial sync for Critical tournaments 30 seconds after startup
-  setTimeout(() => {
-    logger.info("[SAFF Scheduler] Running initial Critical sync on startup...");
-    runSync(["Critical"], CURRENT_SEASON, "startup");
-  }, 30_000);
+  // ARCHIVED: SAFF scraper is disabled — website returns 404 for all tournaments.
+  // Data is preserved as read-only. Competition data now lives in the `competitions` table.
+  // Sportmonks is the primary fixture data source going forward.
+  logger.info(
+    "[SAFF Scheduler] ARCHIVED — scraper disabled (SAFF website returns 404). " +
+      "Use Sportmonks for fixture data. Historical SAFF data is still available via read-only endpoints.",
+  );
 }
 
 export function stopSaffScheduler(): void {

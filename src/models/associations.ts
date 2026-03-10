@@ -41,6 +41,10 @@ import { Note } from "../modules/notes/note.model";
 import { PlayerClubHistory } from "../modules/players/playerClubHistory.model";
 import { TechnicalReport } from "../modules/reports/report.model";
 import { MatchAnalysis } from "../modules/matches/matchAnalysis.model";
+import {
+  Competition,
+  ClubCompetition,
+} from "../modules/competitions/competition.model";
 import { ApprovalRequest } from "../modules/approvals/approval.model";
 import {
   ApprovalChainTemplate,
@@ -113,6 +117,34 @@ export function setupAssociations() {
   Match.belongsTo(Club, { foreignKey: "awayClubId", as: "awayClub" });
   Club.hasMany(Match, { foreignKey: "homeClubId", as: "homeMatches" });
   Club.hasMany(Match, { foreignKey: "awayClubId", as: "awayMatches" });
+
+  // Match ↔ Competition
+  Match.belongsTo(Competition, {
+    foreignKey: "competitionId",
+    as: "competitionRef",
+  });
+  Competition.hasMany(Match, { foreignKey: "competitionId", as: "matches" });
+
+  // Club ↔ Competition (many-to-many via ClubCompetition)
+  Club.belongsToMany(Competition, {
+    through: ClubCompetition,
+    foreignKey: "clubId",
+    otherKey: "competitionId",
+    as: "competitions",
+  });
+  Competition.belongsToMany(Club, {
+    through: ClubCompetition,
+    foreignKey: "competitionId",
+    otherKey: "clubId",
+    as: "clubs",
+  });
+
+  // ClubCompetition direct associations (for include queries)
+  ClubCompetition.belongsTo(Club, { foreignKey: "clubId", as: "club" });
+  ClubCompetition.belongsTo(Competition, {
+    foreignKey: "competitionId",
+    as: "competition",
+  });
 
   // Match ↔ MatchPlayer ↔ Player
   Match.hasMany(MatchPlayer, { foreignKey: "matchId", as: "matchPlayers" });

@@ -221,6 +221,18 @@ const RAW: Perm[] = [
   ...allRoles("settings", { canRead: true, canUpdate: true }),
   ...forRoles("settings", ["Admin"], { canCreate: true, canDelete: true }),
 
+  // ── competitions: read=all, write=Admin+Manager ──
+  ...allRoles("competitions", { canRead: true }),
+  ...forRoles("competitions", ["Admin"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("competitions", ["Manager"], {
+    canCreate: true,
+    canUpdate: true,
+  }),
+
   // ── saff-data: GET=any, POST=Admin(+Manager for fetch/maps) ──
   ...allRoles("saff-data", { canRead: true }),
   ...forRoles("saff-data", ["Admin"], { canCreate: true, canUpdate: true }),

@@ -13,6 +13,19 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
   },
 }));
 
+jest.mock('../../../src/modules/competitions/competition.model', () => ({
+  Competition: {
+    findOne: jest.fn().mockResolvedValue({ id: 'comp-001' }),
+    init: jest.fn(),
+    name: 'Competition',
+  },
+  ClubCompetition: {
+    findOrCreate: jest.fn().mockResolvedValue([{}, true]),
+    init: jest.fn(),
+    name: 'ClubCompetition',
+  },
+}));
+
 jest.mock('../../../src/modules/spl/spl.registry', () => ({
   SPL_CLUB_REGISTRY: [
     { nameEn: 'Al Hilal', nameAr: 'الهلال', splTeamId: '1', espnTeamId: '100' },
