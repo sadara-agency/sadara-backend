@@ -83,7 +83,11 @@ export async function createApprovalRequest(input: CreateApprovalInput) {
 
 // ── List ──
 
-export async function listApprovalRequests(queryParams: any, userId: string, userRole: string) {
+export async function listApprovalRequests(
+  queryParams: any,
+  userId: string,
+  userRole: string,
+) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "createdAt",
@@ -124,9 +128,7 @@ export async function listApprovalRequests(queryParams: any, userId: string, use
       {
         model: ApprovalStep,
         as: "steps",
-        include: [
-          { model: User, as: "resolver", attributes: [...USER_ATTRS] },
-        ],
+        include: [{ model: User, as: "resolver", attributes: [...USER_ATTRS] }],
       },
     ],
   });
@@ -139,13 +141,8 @@ export async function listApprovalRequests(queryParams: any, userId: string, use
 export async function getApprovalStats(userId: string, userRole: string) {
   const baseWhere: any = {};
 
-  if (userRole === "Admin" || userRole === "Manager") {
-    baseWhere[Op.or] = [
-      { assignedTo: userId },
-      { assignedRole: userRole },
-      { assignedTo: null, assignedRole: null },
-    ];
-  } else {
+  // Admin/Manager see stats for ALL approvals (consistent with list?showAll behavior)
+  if (userRole !== "Admin" && userRole !== "Manager") {
     baseWhere.requestedBy = userId;
   }
 
@@ -181,7 +178,8 @@ export async function resolveApproval(
 
   // Multi-step: delegate to step resolution
   if (approval.totalSteps > 1) {
-    if (!userRole) throw new AppError("User role required for multi-step approval", 400);
+    if (!userRole)
+      throw new AppError("User role required for multi-step approval", 400);
     const result = await resolveStep(id, userId, userRole, decision, comment);
     return result.approval;
   }
@@ -212,6 +210,8 @@ export async function resolveApproval(
 }
 
 // ── Resolve by entity (for hooks) ──
+// Only resolves single-step approvals directly.
+// Multi-step approvals must be resolved through the approval chain UI step-by-step.
 
 export async function resolveApprovalByEntity(
   entityType: string,
@@ -224,21 +224,13 @@ export async function resolveApprovalByEntity(
   });
   if (!approval) return null;
 
-  // For entity-based resolution, auto-resolve all remaining steps
+  // Multi-step approvals cannot be bypassed — they must go through the chain
   if (approval.totalSteps > 1) {
-    await ApprovalStep.update(
-      {
-        status: decision === "Approved" ? "Approved" : "Skipped",
-        resolvedBy: userId,
-        resolvedAt: new Date(),
-      },
-      {
-        where: {
-          approvalRequestId: approval.id,
-          status: { [Op.in]: ["Active", "Pending"] },
-        },
-      },
+    logger.warn(
+      `resolveApprovalByEntity skipped: multi-step approval ${approval.id} ` +
+        `(${entityType}/${entityId}) must be resolved through the approval chain`,
     );
+    return null;
   }
 
   await approval.update({
@@ -248,6 +240,29 @@ export async function resolveApprovalByEntity(
   });
 
   return approval;
+}
+
+// ── Check if entity's approval chain is fully resolved ──
+
+export async function isApprovalChainResolved(
+  entityType: string,
+  entityId: string,
+): Promise<{
+  resolved: boolean;
+  status: "Approved" | "Rejected" | "Pending" | "none";
+}> {
+  const approval = await ApprovalRequest.findOne({
+    where: { entityType, entityId },
+    order: [["createdAt", "DESC"]],
+  });
+
+  if (!approval) return { resolved: true, status: "none" };
+  if (approval.status === "Approved")
+    return { resolved: true, status: "Approved" };
+  if (approval.status === "Rejected")
+    return { resolved: true, status: "Rejected" };
+
+  return { resolved: false, status: "Pending" };
 }
 
 // ── Re-export detail query ──

@@ -301,6 +301,29 @@ describe('Approval Service', () => {
       expect(mockCount).toHaveBeenCalledTimes(4);
     });
 
+    it('should count ALL approvals for Admin (no restrictive filter)', async () => {
+      mockCount.mockResolvedValue(0);
+
+      await approvalService.getApprovalStats('admin-001', 'Admin');
+
+      // Admin stats should NOT have requestedBy or assignedTo filters
+      for (const call of mockCount.mock.calls) {
+        expect(call[0].where).not.toHaveProperty('requestedBy');
+        expect(call[0].where).not.toHaveProperty('assignedTo');
+      }
+    });
+
+    it('should count ALL approvals for Manager (no restrictive filter)', async () => {
+      mockCount.mockResolvedValue(0);
+
+      await approvalService.getApprovalStats('manager-001', 'Manager');
+
+      for (const call of mockCount.mock.calls) {
+        expect(call[0].where).not.toHaveProperty('requestedBy');
+        expect(call[0].where).not.toHaveProperty('assignedTo');
+      }
+    });
+
     it('should filter by requestedBy for non-admin users', async () => {
       mockCount.mockResolvedValue(0);
 
@@ -404,10 +427,9 @@ describe('Approval Service', () => {
   // RESOLVE BY ENTITY
   // ════════════════════════════════════════════════════════
   describe('resolveApprovalByEntity', () => {
-    it('should find and resolve matching approval', async () => {
-      const pending = mockModelInstance(mockApproval({ status: 'Pending' }));
+    it('should resolve single-step approval', async () => {
+      const pending = mockModelInstance(mockApproval({ status: 'Pending', totalSteps: 1 }));
       mockFindOne.mockResolvedValue(pending);
-      mockFindByPk.mockResolvedValue(pending);
 
       const result = await approvalService.resolveApprovalByEntity(
         'contract',
@@ -428,6 +450,21 @@ describe('Approval Service', () => {
       expect(pending.update).toHaveBeenCalled();
     });
 
+    it('should return null for multi-step approval (must go through chain)', async () => {
+      const pending = mockModelInstance(mockApproval({ status: 'Pending', totalSteps: 2 }));
+      mockFindOne.mockResolvedValue(pending);
+
+      const result = await approvalService.resolveApprovalByEntity(
+        'contract',
+        'contract-001',
+        'user-002',
+        'Approved',
+      );
+
+      expect(result).toBeNull();
+      expect(pending.update).not.toHaveBeenCalled();
+    });
+
     it('should return null when no pending approval found', async () => {
       mockFindOne.mockResolvedValue(null);
 
@@ -439,6 +476,43 @@ describe('Approval Service', () => {
       );
 
       expect(result).toBeNull();
+    });
+  });
+
+  // ════════════════════════════════════════════════════════
+  // IS APPROVAL CHAIN RESOLVED
+  // ════════════════════════════════════════════════════════
+  describe('isApprovalChainResolved', () => {
+    it('should return resolved:true with status "none" when no approval exists', async () => {
+      mockFindOne.mockResolvedValue(null);
+
+      const result = await approvalService.isApprovalChainResolved('contract', 'contract-001');
+
+      expect(result).toEqual({ resolved: true, status: 'none' });
+    });
+
+    it('should return resolved:true when approval is Approved', async () => {
+      mockFindOne.mockResolvedValue(mockModelInstance(mockApproval({ status: 'Approved' })));
+
+      const result = await approvalService.isApprovalChainResolved('contract', 'contract-001');
+
+      expect(result).toEqual({ resolved: true, status: 'Approved' });
+    });
+
+    it('should return resolved:true when approval is Rejected', async () => {
+      mockFindOne.mockResolvedValue(mockModelInstance(mockApproval({ status: 'Rejected' })));
+
+      const result = await approvalService.isApprovalChainResolved('contract', 'contract-001');
+
+      expect(result).toEqual({ resolved: true, status: 'Rejected' });
+    });
+
+    it('should return resolved:false when approval is Pending', async () => {
+      mockFindOne.mockResolvedValue(mockModelInstance(mockApproval({ status: 'Pending' })));
+
+      const result = await approvalService.isApprovalChainResolved('contract', 'contract-001');
+
+      expect(result).toEqual({ resolved: false, status: 'Pending' });
     });
   });
 });
