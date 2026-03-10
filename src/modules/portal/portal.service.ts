@@ -1045,12 +1045,27 @@ export async function updatePlayerAccount(
 // ══════════════════════════════════════════
 
 export async function deletePlayerAccount(accountId: string) {
+  // Try users table first (invite-based accounts)
   const account = await User.findByPk(accountId);
-  if (!account || account.role !== "Player")
-    throw new AppError("Player account not found", 404);
+  if (account && account.role === "Player") {
+    await account.destroy();
+    return { id: accountId };
+  }
 
-  await account.destroy();
-  return { id: accountId };
+  // Try player_accounts table (direct login accounts)
+  const [pa] = await sequelize.query<{ id: string }>(
+    `SELECT id FROM player_accounts WHERE id = :id`,
+    { replacements: { id: accountId }, type: QueryTypes.SELECT },
+  );
+  if (pa) {
+    await sequelize.query(`DELETE FROM player_accounts WHERE id = :id`, {
+      replacements: { id: accountId },
+      type: QueryTypes.DELETE,
+    });
+    return { id: accountId };
+  }
+
+  throw new AppError("Player account not found", 404);
 }
 
 // ══════════════════════════════════════════
