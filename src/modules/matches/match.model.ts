@@ -7,6 +7,7 @@ export interface MatchAttributes {
   id: string;
   homeClubId?: string | null;
   awayClubId?: string | null;
+  competitionId?: string | null;
   competition?: string | null;
   season?: string | null;
   matchDate: Date;
@@ -40,6 +41,7 @@ export class Match
   declare id: string;
   declare homeClubId: string | null;
   declare awayClubId: string | null;
+  declare competitionId: string | null;
   declare competition: string | null;
   declare season: string | null;
   declare matchDate: Date;
@@ -85,6 +87,10 @@ Match.init(
     awayClubId: {
       type: DataTypes.UUID,
       field: "away_club_id",
+    },
+    competitionId: {
+      type: DataTypes.UUID,
+      field: "competition_id",
     },
     competition: {
       type: DataTypes.STRING,

@@ -6,6 +6,10 @@
 
 import { Op, Sequelize } from "sequelize";
 import { Club } from "../clubs/club.model";
+import {
+  Competition,
+  ClubCompetition,
+} from "../competitions/competition.model";
 import { SPL_CLUB_REGISTRY } from "./spl.registry";
 
 // ══════════════════════════════════════════
@@ -40,6 +44,27 @@ export async function seedClubExternalIds(): Promise<{
         splTeamId: parseInt(entry.splTeamId, 10),
         espnTeamId: parseInt(entry.espnTeamId, 10),
       });
+
+      // Auto-enroll in Roshn Saudi League competition
+      const splComp = await Competition.findOne({
+        where: { name: "Roshn Saudi League" },
+        attributes: ["id"],
+      });
+      if (splComp) {
+        await ClubCompetition.findOrCreate({
+          where: {
+            clubId: club.id,
+            competitionId: splComp.id,
+            season: "2025-2026",
+          },
+          defaults: {
+            clubId: club.id,
+            competitionId: splComp.id,
+            season: "2025-2026",
+          },
+        });
+      }
+
       updated++;
       console.log(
         `[SPL Service] ✓ ${entry.nameEn} → spl=${entry.splTeamId} espn=${entry.espnTeamId}`,
