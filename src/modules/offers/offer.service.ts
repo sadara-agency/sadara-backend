@@ -139,13 +139,15 @@ export async function createOffer(input: any, createdBy: string) {
   const offer = await Offer.create({ ...input, createdBy });
 
   // Notify Admin/Manager about new offer
-  const playerName = player.firstName
-    ? `${player.firstName} ${player.lastName || ""}`.trim()
-    : "Unknown";
+  const playerName =
+    [player.firstName, player.lastName].filter(Boolean).join(" ") || "Unknown";
+  const playerNameAr = player.firstNameAr
+    ? [player.firstNameAr, player.lastNameAr].filter(Boolean).join(" ")
+    : playerName;
   notifyByRole(["Admin", "Manager"], {
     type: "contract",
     title: `New offer: ${playerName}`,
-    titleAr: `عرض جديد: ${playerName}`,
+    titleAr: `عرض جديد: ${playerNameAr}`,
     link: `/dashboard/offers/${offer.id}`,
     sourceType: "offer",
     sourceId: offer.id,
@@ -198,10 +200,18 @@ export async function updateOfferStatus(
   await offer.update(updateData);
 
   // Notify Admin/Manager about status change
+  const statusAr: Record<string, string> = {
+    Pending: "معلق",
+    Negotiating: "قيد التفاوض",
+    Accepted: "مقبول",
+    Rejected: "مرفوض",
+    Closed: "مغلق",
+    Converted: "محوّل",
+  };
   notifyByRole(["Admin", "Manager"], {
     type: "contract",
     title: `Offer status → ${input.status}`,
-    titleAr: `حالة العرض → ${input.status}`,
+    titleAr: `حالة العرض → ${statusAr[input.status] || input.status}`,
     link: `/dashboard/offers/${id}`,
     sourceType: "offer",
     sourceId: id,
