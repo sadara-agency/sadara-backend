@@ -11,6 +11,13 @@ import {
   cleanupOldNotifications,
 } from "../modules/notifications/notification.service";
 import { generatePreMatchTasks } from "../modules/matches/matchAutoTasks";
+import {
+  checkPerformanceTrends,
+  checkFatigueRisk,
+  checkBreakoutPlayers,
+  checkMinutesDrought,
+  checkConsecutiveLowRatings,
+} from "./engines/performance.engine";
 
 // ── Job registry ──
 
@@ -407,6 +414,13 @@ registerJob("payment-reminders", checkPaymentDueDates);
 registerJob("document-expiry", checkDocumentExpiry);
 registerJob("cleanup", cleanup);
 
+// ── Performance Trend Engine ──
+registerJob("performance-trends", checkPerformanceTrends);
+registerJob("fatigue-risk", checkFatigueRisk);
+registerJob("breakout-players", checkBreakoutPlayers);
+registerJob("minutes-drought", checkMinutesDrought);
+registerJob("consecutive-low-ratings", checkConsecutiveLowRatings);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -461,5 +475,12 @@ export function startCronJobs() {
   cron.schedule("30 9 * * *", safeJob("document-expiry")); // 9:30 AM
   cron.schedule("0 3 * * *", safeJob("cleanup")); // 3:00 AM
 
-  logger.info("[CRON] 7 jobs scheduled ✓");
+  // ── Performance Trend Engine ──
+  cron.schedule("0 10 * * 1", safeJob("performance-trends")); // Monday 10:00 AM
+  cron.schedule("15 7 * * *", safeJob("fatigue-risk")); // Daily 7:15 AM
+  cron.schedule("30 10 * * 1", safeJob("breakout-players")); // Monday 10:30 AM
+  cron.schedule("0 10 * * 1", safeJob("minutes-drought")); // Monday 10:00 AM
+  cron.schedule("0 10 * * *", safeJob("consecutive-low-ratings")); // Daily 10:00 AM
+
+  logger.info("[CRON] 12 jobs scheduled ✓");
 }

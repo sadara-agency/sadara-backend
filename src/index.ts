@@ -9,6 +9,7 @@ import { migrator } from "./config/migrator";
 import { startSaffScheduler } from "./modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "./modules/matches/matchAutoTasks";
+import { loadPerformanceTrendConfig } from "./cron/engines/performance.engine";
 import { loadPermissions } from "./modules/permissions/permission.service";
 import { ensureSportmonksColumn } from "./modules/sportmonks/sportmonks.service";
 import { registerProvider } from "./modules/integrations/matchAnalysis.service";
@@ -51,6 +52,7 @@ async function initApplication(): Promise<void> {
   await seedDatabase();
   await loadPermissions();
   await loadTaskRuleConfigFromDB();
+  await loadPerformanceTrendConfig();
   await ensureSportmonksColumn();
   registerProviders();
 }

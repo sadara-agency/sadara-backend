@@ -48,6 +48,12 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   pre_confirm_availability: { enabled: true, dueDays: 2 },
   pre_tactical_report: { enabled: true, dueDays: 1 },
   pre_travel_logistics: { enabled: true, dueDays: 3 },
+  // Performance trend rules (triggered by performance.engine.ts cron jobs)
+  perf_trend_decline: { enabled: true, dueDays: 3, threshold: 1.5 },
+  fatigue_risk: { enabled: true, dueDays: 2 },
+  breakout_player: { enabled: true, dueDays: 5, threshold: 7.5 },
+  minutes_drought: { enabled: true, dueDays: 5 },
+  consecutive_low_rating: { enabled: true, dueDays: 1, threshold: 5.0 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
