@@ -48,6 +48,19 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   pre_confirm_availability: { enabled: true, dueDays: 2 },
   pre_tactical_report: { enabled: true, dueDays: 1 },
   pre_travel_logistics: { enabled: true, dueDays: 3 },
+  // Performance trend rules (triggered by performance.engine.ts cron jobs)
+  perf_trend_decline: { enabled: true, dueDays: 3, threshold: 1.5 },
+  fatigue_risk: { enabled: true, dueDays: 2 },
+  breakout_player: { enabled: true, dueDays: 5, threshold: 7.5 },
+  minutes_drought: { enabled: true, dueDays: 5 },
+  consecutive_low_rating: { enabled: true, dueDays: 1, threshold: 5.0 },
+  // Injury intelligence rules (triggered by injury.engine.ts cron jobs)
+  injury_recurrence: { enabled: true, dueDays: 1, threshold: 3 },
+  return_to_play_validation: { enabled: true, dueDays: 1 },
+  injury_risk_high: { enabled: true, dueDays: 3 },
+  surgery_milestone_30d: { enabled: true, dueDays: 2 },
+  surgery_milestone_60d: { enabled: true, dueDays: 2 },
+  surgery_milestone_90d: { enabled: true, dueDays: 2 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {

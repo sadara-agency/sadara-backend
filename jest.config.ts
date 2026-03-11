@@ -24,6 +24,7 @@ const config: Config = {
     '!src/**/types/**',
     '!src/**/*.swagger.ts',
     '!src/**/*.swagger.docs.ts',
+    '!src/cron/**',
   ],
   coverageThreshold: {
     global: {
