@@ -54,6 +54,13 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   breakout_player: { enabled: true, dueDays: 5, threshold: 7.5 },
   minutes_drought: { enabled: true, dueDays: 5 },
   consecutive_low_rating: { enabled: true, dueDays: 1, threshold: 5.0 },
+  // Injury intelligence rules (triggered by injury.engine.ts cron jobs)
+  injury_recurrence: { enabled: true, dueDays: 1, threshold: 3 },
+  return_to_play_validation: { enabled: true, dueDays: 1 },
+  injury_risk_high: { enabled: true, dueDays: 3 },
+  surgery_milestone_30d: { enabled: true, dueDays: 2 },
+  surgery_milestone_60d: { enabled: true, dueDays: 2 },
+  surgery_milestone_90d: { enabled: true, dueDays: 2 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {

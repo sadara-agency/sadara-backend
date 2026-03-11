@@ -18,6 +18,12 @@ import {
   checkMinutesDrought,
   checkConsecutiveLowRatings,
 } from "./engines/performance.engine";
+import {
+  checkInjuryRecurrence,
+  checkReturnToPlay,
+  calculateInjuryRisk,
+  checkSurgeryMilestones,
+} from "./engines/injury.engine";
 
 // ── Job registry ──
 
@@ -421,6 +427,12 @@ registerJob("breakout-players", checkBreakoutPlayers);
 registerJob("minutes-drought", checkMinutesDrought);
 registerJob("consecutive-low-ratings", checkConsecutiveLowRatings);
 
+// ── Injury Intelligence Engine ──
+registerJob("injury-recurrence", checkInjuryRecurrence);
+registerJob("return-to-play", checkReturnToPlay);
+registerJob("injury-risk-scoring", calculateInjuryRisk);
+registerJob("surgery-milestones", checkSurgeryMilestones);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -482,5 +494,11 @@ export function startCronJobs() {
   cron.schedule("0 10 * * 1", safeJob("minutes-drought")); // Monday 10:00 AM
   cron.schedule("0 10 * * *", safeJob("consecutive-low-ratings")); // Daily 10:00 AM
 
-  logger.info("[CRON] 12 jobs scheduled ✓");
+  // ── Injury Intelligence Engine ──
+  cron.schedule("0 11 * * *", safeJob("injury-recurrence")); // Daily 11:00 AM
+  cron.schedule("30 7 * * *", safeJob("return-to-play")); // Daily 7:30 AM
+  cron.schedule("0 6 * * 1", safeJob("injury-risk-scoring")); // Monday 6:00 AM
+  cron.schedule("0 8 * * *", safeJob("surgery-milestones")); // Daily 8:00 AM
+
+  logger.info("[CRON] 16 jobs scheduled ✓");
 }
