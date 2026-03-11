@@ -90,6 +90,78 @@ const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
     ),
     "performance",
   ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.tackles_total), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "tackles",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.interceptions), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "interceptions",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.duels_won), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "duels_won",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.duels_total), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "duels_total",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.dribbles_completed), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "dribbles_completed",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.dribbles_attempted), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "dribbles_attempted",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.key_passes), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "key_passes",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.shots_on_target), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "shots_on_target",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.saves), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "saves",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.clean_sheet::int), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "clean_sheets",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.goals_conceded), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "goals_conceded",
+  ],
+  [
+    literal(
+      `(SELECT COALESCE(SUM(pms.penalties_saved), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
+    ),
+    "penalties_saved",
+  ],
 ];
 
 /**
@@ -113,6 +185,18 @@ async function batchLoadPlayerStats(
        COALESCE(pms_agg.goals, 0) AS goals,
        COALESCE(pms_agg.assists, 0) AS assists,
        pms_agg.rating,
+       COALESCE(pms_agg.tackles, 0) AS tackles,
+       COALESCE(pms_agg.interceptions, 0) AS interceptions,
+       COALESCE(pms_agg.duels_won, 0) AS duels_won,
+       COALESCE(pms_agg.duels_total, 0) AS duels_total,
+       COALESCE(pms_agg.dribbles_completed, 0) AS dribbles_completed,
+       COALESCE(pms_agg.dribbles_attempted, 0) AS dribbles_attempted,
+       COALESCE(pms_agg.key_passes, 0) AS key_passes,
+       COALESCE(pms_agg.shots_on_target, 0) AS shots_on_target,
+       COALESCE(pms_agg.saves, 0) AS saves,
+       COALESCE(pms_agg.clean_sheets, 0) AS clean_sheets,
+       COALESCE(pms_agg.goals_conceded, 0) AS goals_conceded,
+       COALESCE(pms_agg.penalties_saved, 0) AS penalties_saved,
        -- Latest performance
        perf_latest.performance,
        -- Provider linked?
@@ -145,7 +229,19 @@ async function batchLoadPlayerStats(
      LEFT JOIN LATERAL (
        SELECT COALESCE(SUM(pms.goals), 0)::int AS goals,
               COALESCE(SUM(pms.assists), 0)::int AS assists,
-              ROUND(AVG(pms.rating) FILTER (WHERE pms.rating IS NOT NULL), 1) AS rating
+              ROUND(AVG(pms.rating) FILTER (WHERE pms.rating IS NOT NULL), 1) AS rating,
+              COALESCE(SUM(pms.tackles_total), 0)::int AS tackles,
+              COALESCE(SUM(pms.interceptions), 0)::int AS interceptions,
+              COALESCE(SUM(pms.duels_won), 0)::int AS duels_won,
+              COALESCE(SUM(pms.duels_total), 0)::int AS duels_total,
+              COALESCE(SUM(pms.dribbles_completed), 0)::int AS dribbles_completed,
+              COALESCE(SUM(pms.dribbles_attempted), 0)::int AS dribbles_attempted,
+              COALESCE(SUM(pms.key_passes), 0)::int AS key_passes,
+              COALESCE(SUM(pms.shots_on_target), 0)::int AS shots_on_target,
+              COALESCE(SUM(pms.saves), 0)::int AS saves,
+              COALESCE(SUM(pms.clean_sheet::int), 0)::int AS clean_sheets,
+              COALESCE(SUM(pms.goals_conceded), 0)::int AS goals_conceded,
+              COALESCE(SUM(pms.penalties_saved), 0)::int AS penalties_saved
        FROM player_match_stats pms WHERE pms.player_id = p.id
      ) pms_agg ON true
      LEFT JOIN LATERAL (
@@ -254,6 +350,18 @@ export async function listPlayers(queryParams: any) {
       assists: stats.assists ?? 0,
       rating: stats.rating ?? null,
       performance: stats.performance ?? null,
+      tackles: stats.tackles ?? 0,
+      interceptions: stats.interceptions ?? 0,
+      duels_won: stats.duels_won ?? 0,
+      duels_total: stats.duels_total ?? 0,
+      dribbles_completed: stats.dribbles_completed ?? 0,
+      dribbles_attempted: stats.dribbles_attempted ?? 0,
+      key_passes: stats.key_passes ?? 0,
+      shots_on_target: stats.shots_on_target ?? 0,
+      saves: stats.saves ?? 0,
+      clean_sheets: stats.clean_sheets ?? 0,
+      goals_conceded: stats.goals_conceded ?? 0,
+      penalties_saved: stats.penalties_saved ?? 0,
       has_provider_mapping: stats.has_provider_mapping ?? false,
     };
   });

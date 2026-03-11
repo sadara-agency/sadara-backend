@@ -474,6 +474,40 @@ export async function getPlayerAggregateStats(
         Sequelize.fn("SUM", Sequelize.col("passes_completed")),
         "totalPassesCompleted",
       ],
+      // Defensive / midfield stats
+      [Sequelize.fn("SUM", Sequelize.col("tackles_total")), "totalTackles"],
+      [
+        Sequelize.fn("SUM", Sequelize.col("interceptions")),
+        "totalInterceptions",
+      ],
+      [Sequelize.fn("SUM", Sequelize.col("duels_won")), "totalDuelsWon"],
+      [Sequelize.fn("SUM", Sequelize.col("duels_total")), "totalDuelsTotal"],
+      [
+        Sequelize.fn("SUM", Sequelize.col("dribbles_completed")),
+        "totalDribblesCompleted",
+      ],
+      [
+        Sequelize.fn("SUM", Sequelize.col("dribbles_attempted")),
+        "totalDribblesAttempted",
+      ],
+      [Sequelize.fn("SUM", Sequelize.col("key_passes")), "totalKeyPasses"],
+      // Goalkeeper stats
+      [Sequelize.fn("SUM", Sequelize.col("saves")), "totalSaves"],
+      [
+        Sequelize.fn(
+          "SUM",
+          Sequelize.cast(Sequelize.col("clean_sheet"), "integer"),
+        ),
+        "totalCleanSheets",
+      ],
+      [
+        Sequelize.fn("SUM", Sequelize.col("goals_conceded")),
+        "totalGoalsConceded",
+      ],
+      [
+        Sequelize.fn("SUM", Sequelize.col("penalties_saved")),
+        "totalPenaltiesSaved",
+      ],
     ],
     include:
       Object.keys(matchWhere).length > 0
