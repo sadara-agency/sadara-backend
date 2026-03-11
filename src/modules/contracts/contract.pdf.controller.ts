@@ -113,7 +113,7 @@ const LOGO_SVG = `<svg width="32" height="32" viewBox="0 0 100 100" fill="none" 
 
 const CSS = `*{margin:0;padding:0;box-sizing:border-box}
 body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#000;background:#fff;width:595px;height:842px;overflow:hidden;font-size:7.5pt;line-height:1.35}
-.pg{width:595px;height:842px;position:relative}
+.pg{width:595px;height:842px;position:relative;overflow:hidden}
 .hd{display:flex;justify-content:space-between;align-items:flex-start;padding:12px 30px 8px;border-bottom:2px solid #000}
 .hd-r{display:flex;align-items:center;gap:8px}.hd-r-txt{text-align:right}
 .lt{font-size:13pt;font-weight:700}.ls{font-size:7pt;font-weight:500;letter-spacing:1px}
@@ -134,8 +134,10 @@ p{margin-bottom:0.5px}
 .db{display:flex;align-items:center;gap:5px;margin:1px 0}
 .dx{border:1px solid #000;padding:1px 8px;font-size:7.5pt;text-align:center;direction:ltr}
 .dl{font-weight:700;font-size:7.5pt;background:#3C3CFA;color:#fff;padding:1px 8px}
-.ss{display:flex;justify-content:space-between;margin-top:4px;gap:15px}
-.sb{flex:1;font-size:7.5pt;line-height:1.3}
+.ss{width:100%;border-collapse:collapse;margin-top:4px}
+.ss td{width:50%;vertical-align:top;font-size:7.5pt;line-height:1.3;padding:0}
+.ss td:first-child{padding-left:8px}
+.ss td:last-child{padding-right:8px}
 .sf{border-bottom:1px solid #000;display:inline-block;min-width:120px;height:12px}
 .gu{margin-top:3px;padding-top:2px;border-top:1px solid #ccc;font-size:6.5pt}
 .gt{border-collapse:collapse;margin-top:2px}.gt td{border:1px solid #000;padding:1px 5px;font-size:6.5pt}`;
@@ -195,7 +197,7 @@ function pg2(d: any) {
 function pg3(d: any) {
   // Agent signature (First Party — right side in RTL)
   const agentSig = d.agentSigImg
-    ? `<img src="${d.agentSigImg}" style="height:35px;margin-top:2px" />`
+    ? `<img src="${d.agentSigImg}" style="height:35px;max-width:120px;margin-top:2px" />`
     : "_________________________";
   const agentSigDate = d.agentSigDt
     ? `<span class="dx">${fmtDate(d.agentSigDt)}</span>`
@@ -239,8 +241,8 @@ function pg3(d: any) {
 <div class="ni"><span class="nc">1</span><span>أي تعديل على العقد يجب أن يكون مكتوباً وموقعاً من الطرفين</span></div>
 <div class="ni"><span class="nc">2</span><span>إذا أصبح أي بند غير قابل للتطبيق يتم استبداله بما يحقق الغرض دون إبطال العقد</span></div>
 <div class="ni"><span class="nc">3</span><span>يُحرّر العقد من نسختين أصليتين، بيد كل طرف نسخة للعمل بموجبها</span></div>
-<div class="ss">
-<div class="sb" style="text-align:right">
+<table class="ss"><tr>
+<td style="text-align:right">
 <p style="font-size:8.5pt"><strong>التوقيعات</strong></p>
 <p>الطرف الأول / شركة صدارة المواهب الرياضية</p>
 <p>يمثلها/ خالد بن علي الشهري</p>
@@ -248,15 +250,15 @@ function pg3(d: any) {
 <p>من تاريخ &nbsp; ${agentSigDate}</p>
 <p style="margin-top:3px">التوقيع:${agentSig}</p>
 <p style="direction:ltr;text-align:left;font-size:8pt">Ahmed Osman Hadoug</p>
-</div>
-<div class="sb" style="text-align:right">
-<p style="font-size:8.5pt;margin-top:4px"><strong>الطرف الثاني / اللاعب</strong></p>
+</td>
+<td style="text-align:right">
+<p style="font-size:8.5pt"><strong>الطرف الثاني / اللاعب</strong></p>
 <p>${d.pn}</p>
 <p>من تاريخ &nbsp; ${playerSigDate}</p>
 <p style="margin-top:3px">التوقيع:${playerSig || "_________________________"}</p>
 ${d.pnEn ? `<p style="direction:ltr;text-align:left;font-size:8pt">${d.pnEn}</p>` : ""}
-</div>
-</div>
+</td>
+</tr></table>
 <div class="gu">
 <p><strong>توقيع ولي أمر اللاعب (إن كان اللاعب قاصراً)</strong></p>
 <p>أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p>
