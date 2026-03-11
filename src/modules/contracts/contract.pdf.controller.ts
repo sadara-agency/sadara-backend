@@ -197,7 +197,7 @@ function pg2(d: any) {
 function pg3(d: any) {
   // Agent signature (First Party — right side in RTL)
   const agentSig = d.agentSigImg
-    ? `<img src="${d.agentSigImg}" style="height:35px;max-width:120px;margin-top:2px" />`
+    ? `<img src="${d.agentSigImg}" style="height:50px;max-width:160px;margin-top:4px;filter:contrast(2.5) brightness(0.3)" />`
     : "_________________________";
   const agentSigDate = d.agentSigDt
     ? `<span class="dx">${fmtDate(d.agentSigDt)}</span>`
@@ -205,7 +205,7 @@ function pg3(d: any) {
 
   // Player signature (Second Party — left side in RTL)
   const playerSig = d.sigImg
-    ? `<img src="${d.sigImg}" style="max-height:40px;max-width:120px;margin-top:2px;display:block" />`
+    ? `<img src="${d.sigImg}" style="max-height:55px;max-width:160px;margin-top:4px;display:block;filter:contrast(2.5) brightness(0.3)" />`
     : "";
   const playerSigDate = d.sigDt
     ? `<span class="dx">${fmtDate(d.sigDt)}</span>`

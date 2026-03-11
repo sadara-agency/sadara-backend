@@ -90,23 +90,41 @@ export async function remove(req: AuthRequest, res: Response) {
 
 // ── Terminate Contract (NEW) ──
 export async function terminate(req: AuthRequest, res: Response) {
-  const contract = await contractService.terminateContract(
+  const result = await contractService.terminateContract(
     req.params.id,
     req.body,
     req.user!.id,
   );
 
-  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
+  await invalidateMultiple([
+    CachePrefix.CONTRACTS,
+    CachePrefix.DASHBOARD,
+    CachePrefix.CLEARANCES,
+  ]);
 
-  await logAudit(
-    "UPDATE",
-    "contracts",
-    req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    `Contract terminated: ${contract.title || "Untitled"} — Reason: ${req.body.reason}`,
-  );
-
-  sendSuccess(res, contract, "Contract terminated");
+  if (req.body.method === "clearance" && "clearance" in result) {
+    await logAudit(
+      "CREATE",
+      "clearances",
+      result.clearance.id,
+      buildAuditContext(req.user!, req.ip),
+      `Clearance created for contract — Reason: ${req.body.reason}`,
+    );
+    sendCreated(
+      res,
+      result,
+      "Clearance created — contract will terminate upon completion",
+    );
+  } else {
+    await logAudit(
+      "UPDATE",
+      "contracts",
+      req.params.id,
+      buildAuditContext(req.user!, req.ip),
+      `Contract terminated: ${(result as any).title || "Untitled"} — Reason: ${req.body.reason}`,
+    );
+    sendSuccess(res, result, "Contract terminated");
+  }
 }
 
 // ── Contract History ──

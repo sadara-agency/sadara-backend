@@ -260,6 +260,11 @@ export interface TerminateContractInput {
   reason: string;
   terminationDate?: string; // defaults to today
   clearanceId?: string; // optional reference to a clearance record
+  method?: "quick" | "clearance";
+  hasOutstanding?: boolean;
+  outstandingAmount?: number;
+  outstandingCurrency?: string;
+  outstandingDetails?: string;
 }
 
 export async function terminateContract(
@@ -281,7 +286,26 @@ export async function terminateContract(
   const termDate =
     input.terminationDate || new Date().toISOString().split("T")[0];
 
-  // Append termination note with reason
+  // ── Clearance method: create a clearance record, don't terminate yet ──
+  if (input.method === "clearance") {
+    const { createClearance } = await import("../clearances/clearance.service");
+    const clearance = await createClearance(
+      {
+        contractId: id,
+        reason: input.reason,
+        terminationDate: termDate,
+        hasOutstanding: input.hasOutstanding ?? false,
+        outstandingAmount: input.outstandingAmount ?? 0,
+        outstandingCurrency: input.outstandingCurrency ?? "SAR",
+        outstandingDetails: input.outstandingDetails,
+      },
+      terminatedBy,
+    );
+    // Contract stays active — it will be terminated when clearance is completed
+    return { contract: await getContractById(id), clearance };
+  }
+
+  // ── Quick method: terminate immediately ──
   const existing = contract.notes || "";
   const timestamp = new Date().toISOString().split("T")[0];
   const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
