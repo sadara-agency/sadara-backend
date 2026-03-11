@@ -3,6 +3,8 @@
 // All TypeScript interfaces for the player module.
 // ─────────────────────────────────────────────────────────────
 
+import type { TechnicalAttributesJson } from "./attributeConfig";
+
 // ── Query params from req.query ──
 export interface ListPlayersQuery {
   page?: number;
@@ -79,6 +81,14 @@ export interface EnrichedPlayerListItem {
     league?: string;
   } | null;
   agent: { id: string; fullName: string; fullNameAr?: string } | null;
+
+  // Physical attributes
+  pace: number;
+  stamina: number;
+  strength: number;
+  agility: number;
+  jumping: number;
+  technicalAttributes: TechnicalAttributesJson | null;
 
   // Enriched fields
   contractStatus: ContractStatusLabel;
