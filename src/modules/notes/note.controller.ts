@@ -9,7 +9,7 @@ import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import * as svc from "./note.service";
 
 export async function list(req: AuthRequest, res: Response) {
-  const result = await svc.listNotes(req.query);
+  const result = await svc.listNotes(req.query, req.user?.role);
   sendPaginated(res, result.data, result.meta);
 }
 

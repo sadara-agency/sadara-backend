@@ -23,6 +23,12 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/permissions/permission.service', () => ({
+  hasPermission: jest.fn().mockResolvedValue(true),
+  loadPermissions: jest.fn(),
+  getPermissions: jest.fn().mockResolvedValue({}),
+}));
+
 import * as noteService from '../../../src/modules/notes/note.service';
 
 describe('Note Service', () => {

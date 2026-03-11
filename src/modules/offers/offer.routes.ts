@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "../../middleware/errorHandler";
 import { authenticate, authorizeModule } from "../../middleware/auth";
+import { dynamicFieldAccess } from "../../middleware/fieldAccess";
 import { validate } from "../../middleware/validate";
 import {
   createOfferSchema,
@@ -17,11 +18,22 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("offers", "read"),
+  dynamicFieldAccess("offers"),
   validate(offerQuerySchema, "query"),
   asyncHandler(offerController.list),
 );
-router.get("/:id", authorizeModule("offers", "read"), asyncHandler(offerController.getById));
-router.get("/player/:playerId", authorizeModule("offers", "read"), asyncHandler(offerController.getByPlayer));
+router.get(
+  "/:id",
+  authorizeModule("offers", "read"),
+  dynamicFieldAccess("offers"),
+  asyncHandler(offerController.getById),
+);
+router.get(
+  "/player/:playerId",
+  authorizeModule("offers", "read"),
+  dynamicFieldAccess("offers"),
+  asyncHandler(offerController.getByPlayer),
+);
 
 // ── Create ──
 router.post(
@@ -46,7 +58,11 @@ router.patch(
 );
 
 // ── Delete ──
-router.delete("/:id", authorizeModule("offers", "delete"), asyncHandler(offerController.remove));
+router.delete(
+  "/:id",
+  authorizeModule("offers", "delete"),
+  asyncHandler(offerController.remove),
+);
 
 router.post(
   "/:id/convert",

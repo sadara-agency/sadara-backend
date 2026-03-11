@@ -7,6 +7,10 @@ import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { sequelize } from "../../config/database";
 import { ExternalProviderMapping } from "./externalProvider.model";
 import { PlayerClubHistory } from "./playerClubHistory.model";
+import {
+  getPositionGroup,
+  createEmptyTechnicalAttributes,
+} from "./utils/attributeConfig";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -292,6 +296,13 @@ export async function getPlayerById(id: string) {
 
 // ── Create/Update/Delete ──
 export async function createPlayer(input: any, createdBy: string) {
+  // Auto-initialize technical attributes when position is provided
+  if (input.position && !input.technicalAttributes) {
+    const group = getPositionGroup(input.position);
+    if (group) {
+      input.technicalAttributes = createEmptyTechnicalAttributes(group);
+    }
+  }
   return await Player.create({ ...input, createdBy });
 }
 
@@ -302,6 +313,25 @@ export async function updatePlayer(id: string, input: any) {
   // Sanitize email — empty string → null
   if ("email" in input) {
     input.email = input.email?.trim() || null;
+  }
+
+  // Handle position change → reset/initialize technical attributes
+  if ("position" in input) {
+    const newPosition = input.position;
+    const oldGroup = getPositionGroup(player.position);
+    const newGroup = getPositionGroup(newPosition);
+
+    if (!newPosition) {
+      // Position cleared → null out technical attributes
+      input.technicalAttributes = null;
+    } else if (newGroup && newGroup !== oldGroup) {
+      // Different position group → reset technical attributes to zeros
+      input.technicalAttributes = createEmptyTechnicalAttributes(newGroup);
+    } else if (newGroup && !player.technicalAttributes) {
+      // Same group but no existing technical data → initialize
+      input.technicalAttributes = createEmptyTechnicalAttributes(newGroup);
+    }
+    // Same group with existing data → keep current values (no change needed)
   }
 
   // Auto-track club history when currentClubId changes

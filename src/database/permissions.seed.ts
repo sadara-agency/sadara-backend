@@ -74,7 +74,8 @@ const RAW: Perm[] = [
   // ── dashboard: all routes are authenticate-only ──
   ...allRoles("dashboard", { canRead: true }),
 
-  // ── players: GET=any, POST/PATCH=Admin+Manager, DELETE=Admin ──
+  // ── players: read=all, write=Admin+Manager, DELETE=Admin ──
+  // All roles can read player profiles (field-level hiding protects sensitive fields)
   ...allRoles("players", { canRead: true }),
   ...forRoles("players", ["Admin"], {
     canCreate: true,
@@ -83,109 +84,217 @@ const RAW: Perm[] = [
   }),
   ...forRoles("players", ["Manager"], { canCreate: true, canUpdate: true }),
 
-  // ── clubs: GET=any, POST/PATCH=Admin+Manager, DELETE=Admin ──
-  ...allRoles("clubs", { canRead: true }),
+  // ── clubs: read=most roles, write=Admin+Manager, DELETE=Admin ──
+  // Finance excluded (no business need for club data)
   ...forRoles("clubs", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("clubs", ["Manager"], { canCreate: true, canUpdate: true }),
+  ...forRoles("clubs", ["Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles(
+    "clubs",
+    ["Analyst", "Scout", "Player", "Legal", "Coach", "Media", "Executive"],
+    { canRead: true },
+  ),
 
-  // ── matches: GET=any, POST/PATCH=Admin+Manager+Coach, score/stats PATCH=+Analyst, DELETE=Admin ──
-  ...allRoles("matches", { canRead: true }),
+  // ── matches: read=tactical/scouting roles, write=Admin+Manager+Coach ──
+  // Legal & Finance excluded (no tactical/match need)
   ...forRoles("matches", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
   ...forRoles("matches", ["Manager", "Coach"], {
+    canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("matches", ["Analyst"], { canUpdate: true }),
+  ...forRoles("matches", ["Analyst"], { canRead: true, canUpdate: true }),
+  ...forRoles("matches", ["Scout", "Player", "Media", "Executive"], {
+    canRead: true,
+  }),
 
-  // ── contracts: GET=any, POST/PATCH/transition=Admin+Manager+Legal, DELETE=Admin ──
-  ...allRoles("contracts", { canRead: true }),
+  // ── contracts: STRICT — only management, legal, finance, executive ──
+  // Scout, Coach, Media, Player excluded (data silo: salary/legal terms)
+  // Player access handled via row-level filtering (own contracts only)
   ...forRoles("contracts", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
   ...forRoles("contracts", ["Manager", "Legal"], {
+    canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
+  ...forRoles("contracts", ["Finance", "Executive", "Analyst"], {
+    canRead: true,
+  }),
+  ...forRoles("contracts", ["Player"], { canRead: true }), // row-level: own only
 
-  // ── offers: GET=any, POST/PATCH=Admin+Manager, DELETE=Admin ──
-  ...allRoles("offers", { canRead: true }),
+  // ── offers: STRICT — only management, legal, finance, executive ──
+  // Scout, Player, Coach, Media excluded (negotiation confidentiality)
   ...forRoles("offers", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("offers", ["Manager"], { canCreate: true, canUpdate: true }),
+  ...forRoles("offers", ["Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("offers", ["Legal", "Finance", "Executive", "Analyst"], {
+    canRead: true,
+  }),
 
-  // ── gates: GET=any, POST/PATCH=Admin+Manager, checklist toggle=+Analyst, DELETE=Admin ──
-  ...allRoles("gates", { canRead: true }),
+  // ── gates: management/analyst workflow only ──
   ...forRoles("gates", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("gates", ["Manager"], { canCreate: true, canUpdate: true }),
-  ...forRoles("gates", ["Analyst"], { canUpdate: true }),
+  ...forRoles("gates", ["Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("gates", ["Analyst"], { canRead: true, canUpdate: true }),
+  ...forRoles("gates", ["Legal", "Executive"], { canRead: true }),
 
-  // ── approvals: GET=any, approve/reject PATCH=Admin+Manager ──
-  ...allRoles("approvals", { canRead: true }),
-  ...forRoles("approvals", ["Admin", "Manager"], { canUpdate: true }),
+  // ── approvals: management/legal/finance/executive ──
+  ...forRoles("approvals", ["Admin", "Manager"], {
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("approvals", ["Legal", "Finance", "Executive", "Analyst"], {
+    canRead: true,
+  }),
 
-  // ── scouting: GET=any, watchlist POST=Admin+Manager+Analyst, screening/decisions POST=Admin+Manager, DELETE=Admin ──
-  ...allRoles("scouting", { canRead: true }),
+  // ── scouting: STRICT — scouting pipeline roles only ──
+  // Player, Legal, Finance, Media excluded (internal talent pipeline)
   ...forRoles("scouting", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("scouting", ["Manager"], { canCreate: true, canUpdate: true }),
-  ...forRoles("scouting", ["Analyst"], { canCreate: true, canUpdate: true }),
+  ...forRoles("scouting", ["Manager", "Analyst", "Scout"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("scouting", ["Coach", "Executive"], { canRead: true }),
 
-  // ── referrals: GET=any, POST=Admin+Manager+Analyst, PATCH=Admin+Manager(+Analyst status), DELETE=Admin ──
-  ...allRoles("referrals", { canRead: true }),
+  // ── referrals: scouting pipeline roles only ──
   ...forRoles("referrals", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("referrals", ["Manager"], { canCreate: true, canUpdate: true }),
-  ...forRoles("referrals", ["Analyst"], { canCreate: true, canUpdate: true }),
+  ...forRoles("referrals", ["Manager", "Analyst", "Scout"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("referrals", ["Executive"], { canRead: true }),
 
-  // ── injuries: GET/POST/PATCH=any authenticated, DELETE=Admin+Manager ──
-  ...allRoles("injuries", { canRead: true, canCreate: true, canUpdate: true }),
-  ...forRoles("injuries", ["Admin", "Manager"], { canDelete: true }),
+  // ── injuries: STRICT — medical/performance roles only ──
+  // Finance, Legal, Scout excluded (medical privacy)
+  // Media: read-only status (field-level hides diagnosis/treatment)
+  ...forRoles("injuries", ["Admin"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("injuries", ["Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("injuries", ["Coach"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("injuries", ["Analyst", "Executive", "Media"], {
+    canRead: true,
+  }),
+  ...forRoles("injuries", ["Player"], { canRead: true }), // row-level: own only
 
-  // ── training: GET/POST/PATCH=any authenticated, DELETE=Admin+Manager+Coach ──
-  ...allRoles("training", { canRead: true, canCreate: true, canUpdate: true }),
-  ...forRoles("training", ["Admin", "Manager", "Coach"], { canDelete: true }),
+  // ── training: performance/coaching roles only ──
+  // Legal, Finance, Media excluded
+  ...forRoles("training", ["Admin"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("training", ["Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("training", ["Coach"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("training", ["Analyst", "Scout"], {
+    canRead: true,
+  }),
+  ...forRoles("training", ["Player", "Executive"], { canRead: true }),
 
-  // ── finance: GET=any, POST/PATCH=Admin+Manager+Finance, valuations POST=+Analyst, DELETE=Admin ──
-  ...allRoles("finance", { canRead: true }),
+  // ── finance: STRICT — financial roles only ──
+  // Scout, Player, Coach, Media, Legal excluded (financial confidentiality)
   ...forRoles("finance", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
   ...forRoles("finance", ["Manager", "Finance"], {
+    canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("finance", ["Analyst"], { canCreate: true }),
+  ...forRoles("finance", ["Analyst"], { canRead: true, canCreate: true }),
+  ...forRoles("finance", ["Executive"], { canRead: true }),
 
-  // ── reports: GET/POST=any authenticated, DELETE=Admin+Manager ──
-  ...allRoles("reports", { canRead: true, canCreate: true }),
-  ...forRoles("reports", ["Admin", "Manager"], { canDelete: true }),
+  // ── reports: most roles can read, restricted create ──
+  ...forRoles("reports", ["Admin"], {
+    canRead: true,
+    canCreate: true,
+    canDelete: true,
+  }),
+  ...forRoles("reports", ["Manager"], {
+    canRead: true,
+    canCreate: true,
+    canDelete: true,
+  }),
+  ...forRoles("reports", ["Analyst"], { canRead: true, canCreate: true }),
+  ...forRoles(
+    "reports",
+    ["Scout", "Legal", "Finance", "Coach", "Media", "Executive"],
+    { canRead: true },
+  ),
 
-  // ── tasks: GET/POST/PATCH=any authenticated, DELETE=Admin+Manager ──
+  // ── tasks: all roles can manage their own tasks ──
   ...allRoles("tasks", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("tasks", ["Admin", "Manager"], { canDelete: true }),
 
@@ -196,26 +305,36 @@ const RAW: Perm[] = [
     canDelete: true,
   }),
 
-  // ── documents: GET=any, POST=Admin+Manager+Analyst+Legal, PATCH=Admin+Manager+Legal, DELETE=Admin ──
-  ...allRoles("documents", { canRead: true }),
+  // ── documents: read=most, write=Admin+Manager+Analyst+Legal ──
   ...forRoles("documents", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
   ...forRoles("documents", ["Manager", "Legal"], {
+    canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("documents", ["Analyst"], { canCreate: true }),
+  ...forRoles("documents", ["Analyst"], { canRead: true, canCreate: true }),
+  ...forRoles(
+    "documents",
+    ["Scout", "Player", "Finance", "Coach", "Media", "Executive"],
+    { canRead: true },
+  ),
 
-  // ── audit: GET=Admin+Manager only ──
-  ...forRoles("audit", ["Admin", "Manager"], { canRead: true }),
+  // ── audit: Admin+Manager+Executive only ──
+  ...forRoles("audit", ["Admin", "Manager", "Executive"], { canRead: true }),
 
-  // ── market-intel: read for Admin+Manager+Analyst (matches nav config) ──
-  ...forRoles("market-intel", ["Admin", "Manager", "Analyst"], {
-    canRead: true,
-  }),
+  // ── market-intel: scouting/analysis roles ──
+  ...forRoles(
+    "market-intel",
+    ["Admin", "Manager", "Analyst", "Scout", "Executive"],
+    {
+      canRead: true,
+    },
+  ),
 
   // ── settings: read/update for all, create/delete for Admin ──
   ...allRoles("settings", { canRead: true, canUpdate: true }),
@@ -233,39 +352,56 @@ const RAW: Perm[] = [
     canUpdate: true,
   }),
 
-  // ── saff-data: GET=any, POST=Admin(+Manager for fetch/maps) ──
-  ...allRoles("saff-data", { canRead: true }),
-  ...forRoles("saff-data", ["Admin"], { canCreate: true, canUpdate: true }),
-  ...forRoles("saff-data", ["Manager"], { canCreate: true }),
+  // ── saff-data: Admin+Manager only ──
+  ...forRoles("saff-data", ["Admin"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("saff-data", ["Manager"], { canRead: true, canCreate: true }),
 
-  // ── spl-sync: GET=any, POST=Admin+Manager, admin-only ops=Admin ──
-  ...allRoles("spl-sync", { canRead: true }),
+  // ── spl-sync: Admin+Manager only ──
   ...forRoles("spl-sync", ["Admin"], {
     canCreate: true,
+    canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("spl-sync", ["Manager"], { canCreate: true }),
+  ...forRoles("spl-sync", ["Manager"], { canRead: true, canCreate: true }),
 
-  // ── gym: GymCoach has full CRUD, Admin/Manager/Coach can read ──
+  // ── gym: GymCoach has full CRUD, Admin/Manager/Coach/Player can read ──
   ...forRoles("gym", ["Admin"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("gym", ["Manager", "Coach"], { canRead: true }),
   ...forRoles("gym", ["GymCoach"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
+  ...forRoles("gym", ["Manager", "Coach"], { canRead: true }),
+  ...forRoles("gym", ["Player"], { canRead: true }), // row-level: own only
+
+  // ── clearances: management/legal/finance/executive ──
+  ...forRoles(
+    "clearances",
+    ["Admin", "Manager", "Legal", "Finance", "Executive"],
+    {
+      canRead: true,
+    },
+  ),
 
   // ── GymCoach access to existing modules ──
   ...forRoles("dashboard", ["GymCoach"], { canRead: true }),
   ...forRoles("players", ["GymCoach"], { canRead: true }),
-  ...forRoles("injuries", ["GymCoach"], { canRead: true }),
+  ...forRoles("injuries", ["GymCoach"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
   ...forRoles("training", ["GymCoach"], { canRead: true }),
   ...forRoles("notifications", ["GymCoach"], {
     canRead: true,
@@ -273,6 +409,11 @@ const RAW: Perm[] = [
     canDelete: true,
   }),
   ...forRoles("settings", ["GymCoach"], { canRead: true, canUpdate: true }),
+  ...forRoles("tasks", ["GymCoach"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
 ];
 
 // ─────────────────────────────────────────────────────────────

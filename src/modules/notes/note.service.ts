@@ -1,16 +1,45 @@
-import { QueryTypes } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { Note, NoteOwnerType } from "./note.model";
 import { sequelize } from "../../config/database";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { findOrThrow } from "../../shared/utils/serviceHelpers";
+import { hasPermission } from "../permissions/permission.service";
 
-export async function listNotes(queryParams: any) {
+/**
+ * Maps NoteOwnerType to the backend permission module name.
+ * Notes on entities the user's role cannot read are excluded.
+ */
+const OWNER_TYPE_TO_MODULE: Record<string, string> = {
+  Player: "players",
+  Contract: "contracts",
+  Match: "matches",
+  Injury: "injuries",
+  Club: "clubs",
+  Offer: "offers",
+};
+
+export async function listNotes(queryParams: any, userRole?: string) {
   const { limit, offset, page } = parsePagination(queryParams, "createdAt");
 
   const where: any = {};
   if (queryParams.ownerType) where.ownerType = queryParams.ownerType;
   if (queryParams.ownerId) where.ownerId = queryParams.ownerId;
+
+  // RBAC: Exclude notes attached to entities the role cannot read
+  if (userRole && userRole !== "Admin") {
+    const excludedOwnerTypes: string[] = [];
+    for (const [ownerType, mod] of Object.entries(OWNER_TYPE_TO_MODULE)) {
+      const canRead = await hasPermission(userRole, mod, "read");
+      if (!canRead) excludedOwnerTypes.push(ownerType);
+    }
+    if (excludedOwnerTypes.length > 0) {
+      where.ownerType = {
+        ...(where.ownerType ? { [Op.eq]: where.ownerType } : {}),
+        [Op.notIn]: excludedOwnerTypes,
+      };
+    }
+  }
 
   const { count, rows } = await Note.findAndCountAll({
     where,

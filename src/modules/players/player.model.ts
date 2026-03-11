@@ -1,6 +1,12 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "../../config/database";
 import { encryptFields, decryptFields } from "../../shared/utils/encryption";
+import {
+  TechnicalAttributesJson,
+  getPositionGroup,
+  createEmptyTechnicalAttributes,
+  validateTechnicalAttributes,
+} from "./utils/attributeConfig";
 
 interface PlayerAttributes {
   id: string;
@@ -26,12 +32,12 @@ interface PlayerAttributes {
   marketValue?: number | null;
   marketValueCurrency: "SAR" | "USD" | "EUR";
   status: "active" | "injured" | "inactive";
-  speed?: number | null;
-  passing?: number | null;
-  shooting?: number | null;
-  defense?: number | null;
-  fitness?: number | null;
-  tactical?: number | null;
+  pace?: number | null;
+  stamina?: number | null;
+  strength?: number | null;
+  agility?: number | null;
+  jumping?: number | null;
+  technicalAttributes?: TechnicalAttributesJson | null;
   nationalId?: string | null;
   email?: string | null;
   phone?: string | null;
@@ -84,12 +90,12 @@ export class Player
   declare marketValue: number | null;
   declare marketValueCurrency: "SAR" | "USD" | "EUR";
   declare status: "active" | "injured" | "inactive";
-  declare speed: number | null;
-  declare passing: number | null;
-  declare shooting: number | null;
-  declare defense: number | null;
-  declare fitness: number | null;
-  declare tactical: number | null;
+  declare pace: number | null;
+  declare stamina: number | null;
+  declare strength: number | null;
+  declare agility: number | null;
+  declare jumping: number | null;
+  declare technicalAttributes: TechnicalAttributesJson | null;
   declare nationalId: string | null;
   declare email: string | null;
   declare phone: string | null;
@@ -162,12 +168,16 @@ Player.init(
       type: DataTypes.ENUM("active", "injured", "inactive"),
       defaultValue: "active",
     },
-    speed: { type: DataTypes.INTEGER, defaultValue: 0 },
-    passing: { type: DataTypes.INTEGER, defaultValue: 0 },
-    shooting: { type: DataTypes.INTEGER, defaultValue: 0 },
-    defense: { type: DataTypes.INTEGER, defaultValue: 0 },
-    fitness: { type: DataTypes.INTEGER, defaultValue: 0 },
-    tactical: { type: DataTypes.INTEGER, defaultValue: 0 },
+    pace: { type: DataTypes.INTEGER, defaultValue: 0 },
+    stamina: { type: DataTypes.INTEGER, defaultValue: 0 },
+    strength: { type: DataTypes.INTEGER, defaultValue: 0 },
+    agility: { type: DataTypes.INTEGER, defaultValue: 0 },
+    jumping: { type: DataTypes.INTEGER, defaultValue: 0 },
+    technicalAttributes: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: "technical_attributes",
+    },
     nationalId: { type: DataTypes.STRING, field: "national_id" },
     email: {
       type: DataTypes.STRING,
@@ -207,3 +217,20 @@ Player.init(
 const ENCRYPTED_PLAYER_FIELDS = ["phone", "email", "guardianPhone"];
 Player.addHook("beforeSave", encryptFields(ENCRYPTED_PLAYER_FIELDS));
 Player.addHook("afterFind", decryptFields(ENCRYPTED_PLAYER_FIELDS));
+
+// ── Auto-initialize / validate technical attributes ──
+Player.addHook("beforeValidate", (instance: Player) => {
+  const ta = instance.technicalAttributes;
+  if (ta && !validateTechnicalAttributes(ta)) {
+    throw new Error(
+      `Invalid technical_attributes shape for group "${(ta as any)?.group}"`,
+    );
+  }
+  // Auto-init when position is set but technical_attributes is missing
+  if (instance.position && !ta) {
+    const group = getPositionGroup(instance.position);
+    if (group) {
+      instance.technicalAttributes = createEmptyTechnicalAttributes(group);
+    }
+  }
+});

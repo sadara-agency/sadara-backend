@@ -50,6 +50,12 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/permissions/permission.service', () => ({
+  hasPermission: jest.fn().mockResolvedValue(true),
+  loadPermissions: jest.fn(),
+  getPermissions: jest.fn().mockResolvedValue({}),
+}));
+
 import * as docService from '../../../src/modules/documents/document.service';
 
 describe('Document Service', () => {
