@@ -10,6 +10,7 @@ import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
+import { hasPermission } from "../permissions/permission.service";
 
 const USER_ATTRS = ["id", "fullName"] as const;
 
@@ -108,9 +109,32 @@ async function validateEntity(
   if (!exists) throw new AppError(`${entityType} not found`, 404);
 }
 
+// ── Entity type → permission module mapping ──
+
+const ENTITY_TYPE_TO_MODULE: Record<string, string> = {
+  Player: "players",
+  Contract: "contracts",
+  Match: "matches",
+  Injury: "injuries",
+  Club: "clubs",
+  Offer: "offers",
+};
+
+/**
+ * Document types that contain sensitive personal/medical data.
+ * These are hidden from roles that should not see them.
+ */
+const SENSITIVE_DOC_TYPES_BY_ROLE: Record<string, string[]> = {
+  Scout: ["Passport", "Medical", "ID"],
+  Player: ["Passport", "ID"],
+  Media: ["Passport", "Medical", "ID"],
+  GymCoach: ["Passport", "ID", "Contract"],
+  Coach: ["Passport", "ID", "Contract"],
+};
+
 // ── List ──
 
-export async function listDocuments(queryParams: any) {
+export async function listDocuments(queryParams: any, userRole?: string) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -121,6 +145,34 @@ export async function listDocuments(queryParams: any) {
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.entityType) where.entityType = queryParams.entityType;
   if (queryParams.entityId) where.entityId = queryParams.entityId;
+
+  // RBAC: Filter out sensitive document types for restricted roles
+  if (userRole && userRole !== "Admin") {
+    const blockedTypes = SENSITIVE_DOC_TYPES_BY_ROLE[userRole];
+    if (blockedTypes && blockedTypes.length > 0) {
+      where.type = where.type
+        ? { [Op.and]: [{ [Op.eq]: where.type }, { [Op.notIn]: blockedTypes }] }
+        : { [Op.notIn]: blockedTypes };
+    }
+
+    // Exclude documents linked to entities the role cannot read
+    const excludedEntityTypes: string[] = [];
+    for (const [entityType, mod] of Object.entries(ENTITY_TYPE_TO_MODULE)) {
+      const canRead = await hasPermission(userRole, mod, "read");
+      if (!canRead) excludedEntityTypes.push(entityType);
+    }
+    if (excludedEntityTypes.length > 0) {
+      where[Op.and] = [
+        ...(where[Op.and] || []),
+        {
+          [Op.or]: [
+            { entityType: { [Op.notIn]: excludedEntityTypes } },
+            { entityType: null },
+          ],
+        },
+      ];
+    }
+  }
 
   if (search) {
     where[Op.or] = [

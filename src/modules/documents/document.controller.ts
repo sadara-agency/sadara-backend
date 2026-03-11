@@ -12,7 +12,7 @@ import * as svc from "./document.service";
 // ── List ──
 
 export async function list(req: AuthRequest, res: Response) {
-  const r = await svc.listDocuments(req.query);
+  const r = await svc.listDocuments(req.query, req.user?.role);
   sendPaginated(res, r.data, r.meta);
 }
 
