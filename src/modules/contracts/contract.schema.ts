@@ -107,6 +107,11 @@ export const terminateContractSchema = z.object({
     .regex(DATE_REGEX, "Date must be YYYY-MM-DD")
     .optional(),
   clearanceId: z.string().uuid().optional(),
+  method: z.enum(["quick", "clearance"]).default("quick"),
+  hasOutstanding: z.boolean().optional(),
+  outstandingAmount: z.number().min(0).optional(),
+  outstandingCurrency: z.enum(CURRENCIES).optional(),
+  outstandingDetails: z.string().optional(),
 });
 
 // ── Query / List Contracts ──
