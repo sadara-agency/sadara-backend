@@ -24,6 +24,48 @@ import {
   calculateInjuryRisk,
   checkSurgeryMilestones,
 } from "./engines/injury.engine";
+import {
+  checkContractRenewalWindow,
+  checkContractValueMismatch,
+  checkLoanReturns,
+  checkStaleDrafts,
+  checkCommissionsDue,
+} from "./engines/contract.engine";
+import {
+  checkInvoiceAging,
+  checkRevenueAnomalies,
+  checkExpenseBudget,
+  checkPlayerROI,
+  checkValuationStaleness,
+} from "./engines/financial.engine";
+import {
+  runGateAutoVerification,
+  checkStaleGates,
+  checkChecklistFollowups,
+  checkGateProgressionNudge,
+  checkClearanceFollowups,
+} from "./engines/gate.engine";
+import {
+  checkWatchlistStaleness,
+  checkScreeningIncomplete,
+  checkProspectUnrated,
+  checkDeferredDecisions,
+  checkApprovedNotActioned,
+} from "./engines/scouting.engine";
+import {
+  checkEnrollmentStaleness,
+  checkWorkoutAdherence,
+  checkMetricTargetDeadlines,
+  checkDietAdherence,
+  checkNoTrainingPlan,
+} from "./engines/training.engine";
+import {
+  detectOrphanRecords,
+  checkPlayerDataCompleteness,
+  escalateStaleTasks,
+  checkRiskRadarConsistency,
+  detectDuplicateRecords,
+} from "./engines/systemhealth.engine";
 
 // ── Job registry ──
 
@@ -433,6 +475,48 @@ registerJob("return-to-play", checkReturnToPlay);
 registerJob("injury-risk-scoring", calculateInjuryRisk);
 registerJob("surgery-milestones", checkSurgeryMilestones);
 
+// ── Contract Lifecycle Engine ──
+registerJob("contract-renewal-window", checkContractRenewalWindow);
+registerJob("contract-value-mismatch", checkContractValueMismatch);
+registerJob("loan-return-tracker", checkLoanReturns);
+registerJob("draft-contract-stale", checkStaleDrafts);
+registerJob("commission-due-calculator", checkCommissionsDue);
+
+// ── Financial Intelligence Engine ──
+registerJob("invoice-aging-tracker", checkInvoiceAging);
+registerJob("revenue-anomaly-detector", checkRevenueAnomalies);
+registerJob("expense-budget-monitor", checkExpenseBudget);
+registerJob("player-roi-calculator", checkPlayerROI);
+registerJob("valuation-staleness-check", checkValuationStaleness);
+
+// ── Gate & Onboarding Engine ──
+registerJob("gate-auto-verify", runGateAutoVerification);
+registerJob("gate-stale-detector", checkStaleGates);
+registerJob("checklist-follow-up", checkChecklistFollowups);
+registerJob("gate-progression-nudge", checkGateProgressionNudge);
+registerJob("clearance-follow-up", checkClearanceFollowups);
+
+// ── Scouting Pipeline Engine ──
+registerJob("watchlist-staleness", checkWatchlistStaleness);
+registerJob("screening-incomplete", checkScreeningIncomplete);
+registerJob("prospect-unrated", checkProspectUnrated);
+registerJob("deferred-decision-followup", checkDeferredDecisions);
+registerJob("approved-not-actioned", checkApprovedNotActioned);
+
+// ── Training & Development Engine ──
+registerJob("training-enrollment-stale", checkEnrollmentStaleness);
+registerJob("workout-adherence-check", checkWorkoutAdherence);
+registerJob("body-metric-target-deadline", checkMetricTargetDeadlines);
+registerJob("diet-adherence-monitor", checkDietAdherence);
+registerJob("training-no-plan", checkNoTrainingPlan);
+
+// ── System Health & Data Quality Engine ──
+registerJob("orphan-record-detector", detectOrphanRecords);
+registerJob("player-data-completeness", checkPlayerDataCompleteness);
+registerJob("stale-task-escalator", escalateStaleTasks);
+registerJob("risk-radar-consistency", checkRiskRadarConsistency);
+registerJob("duplicate-record-detector", detectDuplicateRecords);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -500,5 +584,47 @@ export function startCronJobs() {
   cron.schedule("0 6 * * 1", safeJob("injury-risk-scoring")); // Monday 6:00 AM
   cron.schedule("0 8 * * *", safeJob("surgery-milestones")); // Daily 8:00 AM
 
-  logger.info("[CRON] 16 jobs scheduled ✓");
+  // ── Contract Lifecycle Engine ──
+  cron.schedule("0 9 * * 2", safeJob("contract-renewal-window")); // Tuesday 9:00 AM
+  cron.schedule("30 9 * * 2", safeJob("contract-value-mismatch")); // Tuesday 9:30 AM
+  cron.schedule("30 8 * * *", safeJob("loan-return-tracker")); // Daily 8:30 AM
+  cron.schedule("30 11 * * *", safeJob("draft-contract-stale")); // Daily 11:30 AM
+  cron.schedule("0 9 * * 3", safeJob("commission-due-calculator")); // Wednesday 9:00 AM
+
+  // ── Financial Intelligence Engine ──
+  cron.schedule("0 11 * * *", safeJob("invoice-aging-tracker")); // Daily 11:00 AM
+  cron.schedule("0 10 * * 4", safeJob("revenue-anomaly-detector")); // Thursday 10:00 AM
+  cron.schedule("0 9 1 * *", safeJob("expense-budget-monitor")); // 1st of month 9:00 AM
+  cron.schedule("30 10 * * 4", safeJob("player-roi-calculator")); // Thursday 10:30 AM
+  cron.schedule("0 11 * * 1", safeJob("valuation-staleness-check")); // Monday 11:00 AM
+
+  // ── Gate & Onboarding Engine ──
+  cron.schedule("30 6 * * *", safeJob("gate-auto-verify")); // Daily 6:30 AM
+  cron.schedule("30 10 * * *", safeJob("gate-stale-detector")); // Daily 10:30 AM
+  cron.schedule("30 9 * * *", safeJob("checklist-follow-up")); // Daily 9:30 AM
+  cron.schedule("0 10 * * 5", safeJob("gate-progression-nudge")); // Friday 10:00 AM
+  cron.schedule("0 10 * * *", safeJob("clearance-follow-up")); // Daily 10:00 AM
+
+  // ── Scouting Pipeline Engine ──
+  cron.schedule("0 10 * * 3", safeJob("watchlist-staleness")); // Wednesday 10:00 AM
+  cron.schedule("30 10 * * 3", safeJob("screening-incomplete")); // Wednesday 10:30 AM
+  cron.schedule("30 11 * * 1", safeJob("prospect-unrated")); // Monday 11:30 AM
+  cron.schedule("0 11 * * 5", safeJob("deferred-decision-followup")); // Friday 11:00 AM
+  cron.schedule("30 11 * * 5", safeJob("approved-not-actioned")); // Friday 11:30 AM
+
+  // ── Training & Development Engine ──
+  cron.schedule("15 8 * * *", safeJob("training-enrollment-stale")); // Daily 8:15 AM
+  cron.schedule("0 9 * * 6", safeJob("workout-adherence-check")); // Saturday 9:00 AM
+  cron.schedule("15 9 * * *", safeJob("body-metric-target-deadline")); // Daily 9:15 AM
+  cron.schedule("30 9 * * 6", safeJob("diet-adherence-monitor")); // Saturday 9:30 AM
+  cron.schedule("30 8 * * 1", safeJob("training-no-plan")); // Monday 8:30 AM
+
+  // ── System Health & Data Quality Engine ──
+  cron.schedule("0 4 * * 0", safeJob("orphan-record-detector")); // Sunday 4:00 AM
+  cron.schedule("0 7 * * 1", safeJob("player-data-completeness")); // Monday 7:00 AM
+  cron.schedule("45 7 * * *", safeJob("stale-task-escalator")); // Daily 7:45 AM
+  cron.schedule("0 5 * * 0", safeJob("risk-radar-consistency")); // Sunday 5:00 AM
+  cron.schedule("0 6 * * 0", safeJob("duplicate-record-detector")); // Sunday 6:00 AM
+
+  logger.info("[CRON] 46 jobs scheduled ✓");
 }

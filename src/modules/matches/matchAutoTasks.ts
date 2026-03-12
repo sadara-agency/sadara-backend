@@ -61,6 +61,44 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   surgery_milestone_30d: { enabled: true, dueDays: 2 },
   surgery_milestone_60d: { enabled: true, dueDays: 2 },
   surgery_milestone_90d: { enabled: true, dueDays: 2 },
+  // Contract lifecycle rules (triggered by contract.engine.ts cron jobs)
+  contract_renewal_window: { enabled: true, dueDays: 7 },
+  contract_value_mismatch: { enabled: true, dueDays: 7, threshold: 30 },
+  loan_return_tracker: { enabled: true, dueDays: 5 },
+  draft_contract_stale: { enabled: true, dueDays: 3, threshold: 14 },
+  commission_due_upcoming: { enabled: true, dueDays: 5 },
+  commission_due_overdue: { enabled: true, dueDays: 1 },
+  // Financial intelligence rules (triggered by financial.engine.ts cron jobs)
+  invoice_aging_30: { enabled: true, dueDays: 5 },
+  invoice_aging_60: { enabled: true, dueDays: 3 },
+  invoice_aging_90: { enabled: true, dueDays: 1 },
+  revenue_anomaly: { enabled: true, dueDays: 5, threshold: 20 },
+  expense_budget_overage: { enabled: true, dueDays: 5, threshold: 50 },
+  player_roi_negative: { enabled: true, dueDays: 7 },
+  valuation_stale: { enabled: true, dueDays: 5, threshold: 90 },
+  // Gate & onboarding rules (triggered by gate.engine.ts cron jobs)
+  gate_stale: { enabled: true, dueDays: 3, threshold: 14 },
+  checklist_overdue: { enabled: true, dueDays: 2, threshold: 7 },
+  gate_progression_nudge: { enabled: true, dueDays: 3, threshold: 80 },
+  clearance_stale: { enabled: true, dueDays: 2, threshold: 7 },
+  // Scouting pipeline rules (triggered by scouting.engine.ts cron jobs)
+  watchlist_stale: { enabled: true, dueDays: 5, threshold: 30 },
+  screening_incomplete: { enabled: true, dueDays: 3, threshold: 14 },
+  prospect_unrated: { enabled: true, dueDays: 3, threshold: 7 },
+  deferred_decision_followup: { enabled: true, dueDays: 5, threshold: 30 },
+  approved_not_actioned: { enabled: true, dueDays: 3, threshold: 14 },
+  // Training & development rules (triggered by training.engine.ts cron jobs)
+  enrollment_stale: { enabled: true, dueDays: 5, threshold: 14 },
+  workout_adherence: { enabled: true, dueDays: 3, threshold: 7 },
+  metric_target_deadline: { enabled: true, dueDays: 3, threshold: 14 },
+  diet_adherence_low: { enabled: true, dueDays: 3, threshold: 50 },
+  no_training_plan: { enabled: true, dueDays: 5 },
+  // System health rules (triggered by systemhealth.engine.ts cron jobs)
+  orphan_records: { enabled: true, dueDays: 7 },
+  player_data_incomplete: { enabled: true, dueDays: 5 },
+  stale_task_escalation: { enabled: true, dueDays: 7, threshold: 60 },
+  risk_radar_inconsistency: { enabled: true, dueDays: 3 },
+  duplicate_records: { enabled: true, dueDays: 7 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
