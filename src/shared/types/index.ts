@@ -1,13 +1,41 @@
 import { Request } from "express";
 
-// ── Re-export shared types ──
-export type {
-  UserRole,
-  ApiResponse,
-  PaginationMeta,
-  PaginationQuery,
-} from "@sadara/shared";
-import type { UserRole } from "@sadara/shared";
+// ── Shared types (inlined from @sadara/shared) ──
+export type UserRole =
+  | "Admin"
+  | "Manager"
+  | "Analyst"
+  | "Scout"
+  | "Player"
+  | "Legal"
+  | "Finance"
+  | "Coach"
+  | "Media"
+  | "Executive"
+  | "GymCoach";
+
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  message?: string;
+  error?: string;
+  meta?: PaginationMeta;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface PaginationQuery {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: "asc" | "desc";
+  search?: string;
+}
 
 // ── Authenticated Request (Express-specific, stays in backend) ──
 export interface AuthUser {

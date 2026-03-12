@@ -1,22 +1,18 @@
 # ── Stage 1: Builder ──────────────────────────────────────
-# Build context must be the repo root (for workspace access to shared/)
 FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Copy workspace root + package manifests first (layer caching)
+# Copy package manifests first (layer caching)
 COPY package.json package-lock.json ./
-COPY shared/package.json shared/
-COPY backend/package.json backend/
 
-RUN npm ci -w @sadara/shared -w sadara-backend
+RUN npm ci
 
-# Build shared types first, then backend
-COPY shared/ shared/
-RUN npm run build -w @sadara/shared
+# Copy source and build
+COPY tsconfig.build.json tsconfig.json ./
+COPY src/ src/
 
-COPY backend/ backend/
-RUN npm run build -w sadara-backend
+RUN npm run build
 
 # ── Stage 2: Production ──────────────────────────────────
 FROM node:20-slim
@@ -60,21 +56,15 @@ RUN groupadd -r sadara && useradd -r -g sadara -m sadara
 
 WORKDIR /app
 
-# Production dependencies only (workspace-aware)
+# Production dependencies only
 COPY package.json package-lock.json ./
-COPY shared/package.json shared/
-COPY backend/package.json backend/
-RUN npm ci -w @sadara/shared -w sadara-backend --omit=dev
+RUN npm ci --omit=dev
 
-# Copy compiled shared types + backend output from builder
-COPY --from=builder /app/shared/dist shared/dist
-COPY --from=builder /app/backend/dist backend/dist
-
-# Copy backend assets
-COPY --from=builder /app/backend/dist/assets backend/dist/assets
+# Copy compiled output from builder
+COPY --from=builder /app/dist dist/
 
 # Runtime directories
-RUN mkdir -p backend/tmp backend/uploads backend/logs && chown -R sadara:sadara /app
+RUN mkdir -p tmp uploads logs && chown -R sadara:sadara /app
 
 USER sadara
 
@@ -83,4 +73,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8080/api/health || exit 1
 
-CMD ["node", "backend/dist/index.js"]
+CMD ["node", "dist/index.js"]

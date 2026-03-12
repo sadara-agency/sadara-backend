@@ -1,8 +1,16 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
-export type { NotificationType, NotificationPriority } from "@sadara/shared";
-import type { NotificationType, NotificationPriority } from "@sadara/shared";
+export type NotificationType =
+  | "injury"
+  | "contract"
+  | "payment"
+  | "match"
+  | "referral"
+  | "document"
+  | "task"
+  | "system";
+export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
 interface NotificationAttributes {
   id: string;
