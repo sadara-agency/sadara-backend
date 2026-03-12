@@ -8,6 +8,9 @@ import {
   Valuation,
   Expense,
   type PaymentStatus,
+  type PaymentType,
+  type ExpenseCategory,
+  type ValuationTrend,
 } from "./finance.model";
 import { Player } from "../players/player.model";
 import { Club } from "../clubs/club.model";
@@ -15,6 +18,226 @@ import { User } from "../Users/user.model";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
 import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
+import { PaginationQuery } from "../../shared/types";
+
+// ── Query parameter interfaces ──
+
+interface InvoiceQueryParams extends PaginationQuery {
+  status?: PaymentStatus;
+  playerId?: string;
+  clubId?: string;
+}
+
+interface PaymentQueryParams extends PaginationQuery {
+  status?: PaymentStatus;
+  paymentType?: PaymentType;
+  playerId?: string;
+}
+
+interface LedgerQueryParams extends PaginationQuery {
+  side?: "Debit" | "Credit";
+  account?: string;
+  playerId?: string;
+}
+
+interface ValuationQueryParams extends PaginationQuery {
+  playerId?: string;
+}
+
+interface ExpenseQueryParams extends PaginationQuery {
+  category?: ExpenseCategory;
+  playerId?: string;
+}
+
+// ── Input interfaces ──
+
+interface CreateInvoiceInput {
+  contractId?: string;
+  playerId?: string;
+  clubId?: string;
+  amount: number;
+  taxAmount?: number;
+  totalAmount: number;
+  currency?: string;
+  issueDate: string;
+  dueDate: string;
+  description?: string;
+  lineItems?: object;
+}
+
+interface UpdateInvoiceInput {
+  amount?: number;
+  taxAmount?: number;
+  totalAmount?: number;
+  dueDate?: string;
+  description?: string;
+  lineItems?: object;
+}
+
+interface UpdateStatusInput {
+  status: PaymentStatus;
+  paidDate?: string;
+  reference?: string;
+}
+
+interface CreatePaymentInput {
+  invoiceId?: string;
+  milestoneId?: string;
+  playerId?: string;
+  amount: number;
+  currency?: string;
+  paymentType: PaymentType;
+  dueDate: string;
+  reference?: string;
+  payer?: string;
+  notes?: string;
+}
+
+interface CreateLedgerInput {
+  side: "Debit" | "Credit";
+  account: string;
+  amount: number;
+  currency?: string;
+  description?: string;
+  referenceType?: string;
+  referenceId?: string;
+  playerId?: string;
+}
+
+interface CreateValuationInput {
+  playerId: string;
+  value: number;
+  currency?: string;
+  source?: string;
+  trend?: ValuationTrend;
+  changePct?: number | string;
+  valuedAt: string;
+  notes?: string;
+}
+
+interface CreateExpenseInput {
+  category: ExpenseCategory;
+  amount: number;
+  currency?: string;
+  date: string;
+  description?: string;
+  playerId?: string;
+}
+
+// ── Raw query result interfaces ──
+
+interface MarketValueRow {
+  total_market_value: string;
+  total_players: number;
+}
+
+interface DistributionRow {
+  contract_type: string;
+  count: number;
+}
+
+interface CommissionsRow {
+  expected_commissions: string;
+  collected_commissions: string;
+  outstanding_commissions: string;
+}
+
+interface TopPlayerRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  market_value: string;
+  market_value_currency: string;
+  position: string;
+  photo_url: string | null;
+  club_name: string | null;
+  club_name_ar: string | null;
+}
+
+interface MarketValueTrendRow {
+  month: string;
+  total_value: string;
+  players_valued: number;
+}
+
+interface RevenueByClubRow {
+  club_id: string;
+  club_name: string;
+  club_name_ar: string | null;
+  logo_url: string | null;
+  total_revenue: string;
+  invoice_count: number;
+}
+
+interface PlayerRevenueRow {
+  id: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  photo_url: string | null;
+  club_name: string | null;
+  club_name_ar: string | null;
+  commissions: string;
+  sponsorship: string;
+  bonus: string;
+  total_revenue: string;
+}
+
+interface CashFlowRow {
+  month: string;
+  expected: string;
+  received: string;
+}
+
+interface RevenueRow {
+  total_revenue: string;
+}
+
+interface ExpenseTotalRow {
+  total_expenses: string;
+}
+
+interface InvoiceStatsRow {
+  total_paid: string;
+  total_pending: string;
+  total_overdue: string;
+  overdue_count: number;
+  total_invoices: number;
+}
+
+interface RevenueByMonthRow {
+  month: string;
+  paid: string;
+}
+
+interface RevenueByTypeRow {
+  payment_type: string;
+  total: string;
+}
+
+interface PeriodComparisonRow {
+  current_revenue: string;
+  previous_revenue: string;
+  current_commissions: string;
+  previous_commissions: string;
+  current_count: number;
+  previous_count: number;
+}
+
+interface ContractExpiryRow {
+  id: string;
+  end_date: string;
+  status: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  club_name: string | null;
+  club_name_ar: string | null;
+}
 
 const PLAYER_ATTRS = [
   "id",
@@ -30,12 +253,13 @@ const CLUB_ATTRS = ["id", "name", "nameAr", "logoUrl"] as const;
 // INVOICES
 // ══════════════════════════════════════════
 
-export async function listInvoices(queryParams: any) {
+export async function listInvoices(queryParams: InvoiceQueryParams) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
   );
-  const where: any = {};
+
+  const where: Record<string | symbol, any> = {};
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   if (queryParams.clubId) where.clubId = queryParams.clubId;
@@ -74,7 +298,7 @@ export async function getInvoiceById(id: string) {
   return inv;
 }
 
-export async function createInvoice(input: any, userId: string) {
+export async function createInvoice(input: CreateInvoiceInput, userId: string) {
   // invoice_number auto-generated by DB trigger
   return await Invoice.create({
     ...input,
@@ -83,16 +307,19 @@ export async function createInvoice(input: any, userId: string) {
   });
 }
 
-export async function updateInvoice(id: string, input: any) {
+export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   const inv = await findOrThrow(Invoice, id, "Invoice");
   if (inv.status === "Paid")
     throw new AppError("Cannot modify a paid invoice", 400);
   return await inv.update(input);
 }
 
-export async function updateInvoiceStatus(id: string, input: any) {
+export async function updateInvoiceStatus(
+  id: string,
+  input: UpdateStatusInput,
+) {
   const inv = await findOrThrow(Invoice, id, "Invoice");
-  const data: any = { status: input.status };
+  const data: Record<string, unknown> = { status: input.status };
   if (input.status === "Paid")
     data.paidDate = input.paidDate || new Date().toISOString().split("T")[0];
   return await inv.update(data);
@@ -110,12 +337,12 @@ export async function deleteInvoice(id: string) {
 // PAYMENTS
 // ══════════════════════════════════════════
 
-export async function listPayments(queryParams: any) {
+export async function listPayments(queryParams: PaymentQueryParams) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "dueDate",
   );
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.paymentType) where.paymentType = queryParams.paymentType;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
@@ -129,13 +356,16 @@ export async function listPayments(queryParams: any) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function createPayment(input: any) {
+export async function createPayment(input: CreatePaymentInput) {
   return await Payment.create(input);
 }
 
-export async function updatePaymentStatus(id: string, input: any) {
+export async function updatePaymentStatus(
+  id: string,
+  input: UpdateStatusInput,
+) {
   const pay = await findOrThrow(Payment, id, "Payment");
-  const data: any = { status: input.status };
+  const data: Record<string, unknown> = { status: input.status };
   if (input.status === "Paid")
     data.paidDate = input.paidDate || new Date().toISOString().split("T")[0];
   if (input.reference) data.reference = input.reference;
@@ -146,12 +376,13 @@ export async function updatePaymentStatus(id: string, input: any) {
 // LEDGER
 // ══════════════════════════════════════════
 
-export async function listLedger(queryParams: any) {
+export async function listLedger(queryParams: LedgerQueryParams) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "postedAt",
   );
-  const where: any = {};
+
+  const where: Record<string | symbol, any> = {};
   if (queryParams.side) where.side = queryParams.side;
   if (queryParams.account)
     where.account = { [Op.iLike]: `%${queryParams.account}%` };
@@ -172,7 +403,10 @@ export async function listLedger(queryParams: any) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function createLedgerEntry(input: any, userId: string) {
+export async function createLedgerEntry(
+  input: CreateLedgerInput,
+  userId: string,
+) {
   return await LedgerEntry.create({ ...input, createdBy: userId });
 }
 
@@ -209,12 +443,12 @@ export async function createLedgerPair(
 // VALUATIONS
 // ══════════════════════════════════════════
 
-export async function listValuations(queryParams: any) {
+export async function listValuations(queryParams: ValuationQueryParams) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "valuedAt",
   );
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   const { count, rows } = await Valuation.findAndCountAll({
     where,
@@ -226,7 +460,7 @@ export async function listValuations(queryParams: any) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function createValuation(input: any) {
+export async function createValuation(input: CreateValuationInput) {
   await findOrThrow(Player, input.playerId, "Player");
 
   // Auto-compute trend from previous valuation
@@ -248,7 +482,10 @@ export async function createValuation(input: any) {
     }
   }
 
-  return await Valuation.create(input);
+  return await Valuation.create({
+    ...input,
+    changePct: input.changePct != null ? Number(input.changePct) : undefined,
+  });
 }
 
 // ══════════════════════════════════════════
@@ -268,7 +505,7 @@ export async function getFinancialDashboard(
   const typeBind = playerContractType ? { bind: [playerContractType] } : {};
 
   // Total portfolio market value
-  const [marketValue] = await sequelize.query<any>(
+  const [marketValue] = await sequelize.query<MarketValueRow>(
     `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
             COUNT(*)::INT AS total_players
      FROM players WHERE status = 'active' ${typeFilter}`,
@@ -276,7 +513,7 @@ export async function getFinancialDashboard(
   );
 
   // Player distribution by contract type
-  const distribution = await sequelize.query<any>(
+  const distribution = await sequelize.query<DistributionRow>(
     `SELECT contract_type, COUNT(*)::INT AS count
      FROM players WHERE status = 'active' ${typeFilter}
      GROUP BY contract_type ORDER BY count DESC`,
@@ -290,7 +527,7 @@ export async function getFinancialDashboard(
   const commissionPayJoin = playerContractType
     ? "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = $1"
     : "";
-  const [commissions] = await sequelize.query<any>(
+  const [commissions] = await sequelize.query<CommissionsRow>(
     `SELECT
        COALESCE(SUM(CASE WHEN c.total_commission ~ '^[0-9.]+$' THEN c.total_commission::NUMERIC ELSE 0 END), 0) AS expected_commissions,
        (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
@@ -305,7 +542,7 @@ export async function getFinancialDashboard(
   );
 
   // Top 10 valued players
-  const topPlayers = await sequelize.query<any>(
+  const topPlayers = await sequelize.query<TopPlayerRow>(
     `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
             p.market_value, p.market_value_currency, p.position, p.photo_url,
             c.name AS club_name, c.name_ar AS club_name_ar
@@ -320,7 +557,7 @@ export async function getFinancialDashboard(
   const trendTypeJoin = playerContractType
     ? "JOIN players p ON v.player_id = p.id AND p.contract_type = $1"
     : "";
-  const marketValueTrend = await sequelize.query<any>(
+  const marketValueTrend = await sequelize.query<MarketValueTrendRow>(
     `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
             SUM(v.value)::NUMERIC AS total_value,
             COUNT(DISTINCT v.player_id)::INT AS players_valued
@@ -333,7 +570,7 @@ export async function getFinancialDashboard(
   );
 
   // Revenue by club (top 10 clubs by paid invoice revenue)
-  const revenueByClub = await sequelize.query<any>(
+  const revenueByClub = await sequelize.query<RevenueByClubRow>(
     `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
             COALESCE(SUM(i.total_amount), 0)::NUMERIC AS total_revenue,
             COUNT(*)::INT AS invoice_count
@@ -348,7 +585,7 @@ export async function getFinancialDashboard(
 
   // Per-player revenue breakdown (top 20 by paid payments)
   const playerTypeJoin = playerContractType ? "AND p.contract_type = $1" : "";
-  const playerRevenueBreakdown = await sequelize.query<any>(
+  const playerRevenueBreakdown = await sequelize.query<PlayerRevenueRow>(
     `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
             c.name AS club_name, c.name_ar AS club_name_ar,
             COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Commission'), 0)::NUMERIC AS commissions,
@@ -366,7 +603,7 @@ export async function getFinancialDashboard(
   );
 
   // Cash flow timeline (-12 months to +6 months)
-  const cashFlowTimeline = await sequelize.query<any>(
+  const cashFlowTimeline = await sequelize.query<CashFlowRow>(
     `WITH months AS (
        SELECT TO_CHAR(d, 'YYYY-MM') AS month
        FROM generate_series(
@@ -405,13 +642,13 @@ export async function getFinancialDashboard(
   const periodComparison = await computePeriodComparison(comparisonPeriod);
 
   // Profitability
-  const [revRow] = await sequelize.query<any>(
+  const [revRow] = await sequelize.query<RevenueRow>(
     `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
      FROM payments WHERE status = 'Paid'
        AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
     { type: QueryTypes.SELECT },
   );
-  const [expRow] = await sequelize.query<any>(
+  const [expRow] = await sequelize.query<ExpenseTotalRow>(
     `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
      FROM expenses
      WHERE date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
@@ -442,7 +679,7 @@ export async function getFinancialDashboard(
 }
 
 export async function getFinanceSummary(months = 12) {
-  const [invoiceStats] = (await sequelize.query(
+  const [invoiceStats] = await sequelize.query<InvoiceStatsRow>(
     `
     SELECT
       SUM(CASE WHEN status = 'Paid' THEN total_amount ELSE 0 END)::NUMERIC AS total_paid,
@@ -453,13 +690,13 @@ export async function getFinanceSummary(months = 12) {
     FROM invoices
   `,
     { type: QueryTypes.SELECT },
-  )) as any[];
+  );
 
   const upcomingPayments = await Payment.count({
     where: { status: "Expected" },
   });
 
-  const revenueByMonth = (await sequelize.query(
+  const revenueByMonth = await sequelize.query<RevenueByMonthRow>(
     `
     SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
       SUM(amount)::NUMERIC AS paid
@@ -467,16 +704,16 @@ export async function getFinanceSummary(months = 12) {
     GROUP BY DATE_TRUNC('month', paid_date) ORDER BY month
   `,
     { bind: [months], type: QueryTypes.SELECT },
-  )) as any[];
+  );
 
-  const revenueByType = (await sequelize.query(
+  const revenueByType = await sequelize.query<RevenueByTypeRow>(
     `
     SELECT payment_type, SUM(amount)::NUMERIC AS total
     FROM payments WHERE status = 'Paid'
     GROUP BY payment_type ORDER BY total DESC
   `,
     { type: QueryTypes.SELECT },
-  )) as any[];
+  );
 
   return {
     ...(invoiceStats || {}),
@@ -517,7 +754,7 @@ async function computePeriodComparison(period: "MoM" | "QoQ" | "YoY") {
 
   const fmt = (d: Date) => d.toISOString().split("T")[0];
 
-  const rows = await sequelize.query<any>(
+  const rows = await sequelize.query<PeriodComparisonRow>(
     `SELECT
        COALESCE(SUM(amount) FILTER (WHERE paid_date >= $1 AND paid_date < $2), 0)::NUMERIC AS current_revenue,
        COALESCE(SUM(amount) FILTER (WHERE paid_date >= $3 AND paid_date < $4), 0)::NUMERIC AS previous_revenue,
@@ -561,12 +798,12 @@ async function computePeriodComparison(period: "MoM" | "QoQ" | "YoY") {
 // EXPENSES
 // ══════════════════════════════════════════
 
-export async function listExpenses(queryParams: any) {
+export async function listExpenses(queryParams: ExpenseQueryParams) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "date",
   );
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (queryParams.category) where.category = queryParams.category;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
 
@@ -580,11 +817,14 @@ export async function listExpenses(queryParams: any) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function createExpense(input: any, userId: string) {
+export async function createExpense(input: CreateExpenseInput, userId: string) {
   return Expense.create({ ...input, createdBy: userId });
 }
 
-export async function updateExpense(id: string, input: any) {
+export async function updateExpense(
+  id: string,
+  input: Partial<CreateExpenseInput>,
+) {
   const exp = await findOrThrow(Expense, id, "Expense");
   return exp.update(input);
 }

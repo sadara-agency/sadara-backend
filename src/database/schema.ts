@@ -135,6 +135,20 @@ export async function createMissingTables() {
         END $$;`,
   );
 
+  // Add account lockout columns to player_accounts if missing (security requirement)
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE player_accounts ADD COLUMN failed_login_attempts INT DEFAULT 0;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+  await sequelize.query(
+    `DO $$ BEGIN
+            ALTER TABLE player_accounts ADD COLUMN locked_until TIMESTAMPTZ;
+        EXCEPTION WHEN duplicate_column THEN NULL;
+        END $$;`,
+  );
+
   // Add logo_url column to saff_team_maps if missing (for existing DBs)
   await sequelize.query(
     `DO $$ BEGIN
@@ -173,15 +187,18 @@ export async function createMissingTables() {
   // Add 'Converted' to offers status enum if missing
   // NOTE: ALTER TYPE...ADD VALUE cannot run inside a PL/pgSQL block / transaction,
   // so we check existence first, then run it as a top-level statement.
-  const [enumCheck] = await sequelize.query(
-    `SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
+  const [enumCheck] = await sequelize
+    .query(
+      `SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
      WHERE t.typname = 'enum_offers_status' AND e.enumlabel = 'Converted'`,
-    { type: QueryTypes.SELECT },
-  ).catch(() => [[]]); // table may not exist yet
-  const typeExists = await sequelize.query(
-    `SELECT 1 FROM pg_type WHERE typname = 'enum_offers_status'`,
-    { type: QueryTypes.SELECT },
-  ).catch(() => []);
+      { type: QueryTypes.SELECT },
+    )
+    .catch(() => [[]]); // table may not exist yet
+  const typeExists = await sequelize
+    .query(`SELECT 1 FROM pg_type WHERE typname = 'enum_offers_status'`, {
+      type: QueryTypes.SELECT,
+    })
+    .catch(() => []);
   if (typeExists.length > 0 && !enumCheck) {
     await sequelize.query(
       `ALTER TYPE enum_offers_status ADD VALUE IF NOT EXISTS 'Converted'`,
@@ -189,15 +206,18 @@ export async function createMissingTables() {
   }
 
   // Add 'Canceled' to tasks status enum if missing
-  const [taskEnumCheck] = await sequelize.query(
-    `SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
+  const [taskEnumCheck] = await sequelize
+    .query(
+      `SELECT 1 FROM pg_type t JOIN pg_enum e ON t.oid = e.enumtypid
      WHERE t.typname = 'enum_tasks_status' AND e.enumlabel = 'Canceled'`,
-    { type: QueryTypes.SELECT },
-  ).catch(() => [[]]); // table may not exist yet
-  const taskTypeExists = await sequelize.query(
-    `SELECT 1 FROM pg_type WHERE typname = 'enum_tasks_status'`,
-    { type: QueryTypes.SELECT },
-  ).catch(() => []);
+      { type: QueryTypes.SELECT },
+    )
+    .catch(() => [[]]); // table may not exist yet
+  const taskTypeExists = await sequelize
+    .query(`SELECT 1 FROM pg_type WHERE typname = 'enum_tasks_status'`, {
+      type: QueryTypes.SELECT,
+    })
+    .catch(() => []);
   if (taskTypeExists.length > 0 && !taskEnumCheck) {
     await sequelize.query(
       `ALTER TYPE enum_tasks_status ADD VALUE IF NOT EXISTS 'Canceled'`,
@@ -206,14 +226,18 @@ export async function createMissingTables() {
 
   // ── Document polymorphic columns migration ──
   // Add entity_type, entity_id, entity_label columns; backfill from player_id/contract_id
-  const [docTableCheck] = await sequelize.query(
-    `SELECT 1 FROM information_schema.tables WHERE table_name = 'documents'`,
-    { type: QueryTypes.SELECT },
-  ).catch(() => [[]]);
+  const [docTableCheck] = await sequelize
+    .query(
+      `SELECT 1 FROM information_schema.tables WHERE table_name = 'documents'`,
+      { type: QueryTypes.SELECT },
+    )
+    .catch(() => [[]]);
 
   if (docTableCheck) {
     // Add new columns if missing
-    await sequelize.query(`
+    await sequelize
+      .query(
+        `
       DO $$ BEGIN
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns
           WHERE table_name = 'documents' AND column_name = 'entity_type') THEN
@@ -228,19 +252,29 @@ export async function createMissingTables() {
           ALTER TABLE documents ADD COLUMN entity_label VARCHAR(500);
         END IF;
       END $$;
-    `).catch(() => {});
+    `,
+      )
+      .catch(() => {});
 
     // Backfill from player_id → entity_type='Player', entity_id=player_id
-    await sequelize.query(`
+    await sequelize
+      .query(
+        `
       UPDATE documents SET entity_type = 'Player', entity_id = player_id
       WHERE player_id IS NOT NULL AND entity_type IS NULL
-    `).catch(() => {});
+    `,
+      )
+      .catch(() => {});
 
     // Backfill from contract_id → entity_type='Contract', entity_id=contract_id
-    await sequelize.query(`
+    await sequelize
+      .query(
+        `
       UPDATE documents SET entity_type = 'Contract', entity_id = contract_id
       WHERE contract_id IS NOT NULL AND entity_type IS NULL
-    `).catch(() => {});
+    `,
+      )
+      .catch(() => {});
   }
 
   // ── Notes ──
@@ -403,6 +437,18 @@ export async function createMissingTables() {
     "CREATE INDEX IF NOT EXISTS idx_technical_reports_player ON technical_reports(player_id)",
     "CREATE INDEX IF NOT EXISTS idx_match_analyses_match ON match_analyses(match_id)",
     "CREATE INDEX IF NOT EXISTS idx_matches_external_match_id ON matches(external_match_id)",
+    // Performance & match stats indexes (high-traffic subquery targets)
+    "CREATE INDEX IF NOT EXISTS idx_performances_player_id ON performances(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_performances_match_date ON performances(match_date)",
+    "CREATE INDEX IF NOT EXISTS idx_match_players_match_id ON match_players(match_id)",
+    "CREATE INDEX IF NOT EXISTS idx_match_players_player_id ON match_players(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_player_match_stats_player_id ON player_match_stats(player_id)",
+    "CREATE INDEX IF NOT EXISTS idx_player_match_stats_match_id ON player_match_stats(match_id)",
+    // RBAC indexes (queried on every authenticated request)
+    "CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role)",
+    "CREATE INDEX IF NOT EXISTS idx_role_field_permissions_role ON role_field_permissions(role)",
+    // Risk radar (queried by player detail & cron engines)
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_risk_radars_player_id ON risk_radars(player_id)",
   ];
 
   for (const sql of indexes) {

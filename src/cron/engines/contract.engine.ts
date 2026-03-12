@@ -59,8 +59,13 @@ export async function loadContractLifecycleConfig() {
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
       _config = { ...DEFAULT_CONFIG, ...parsed };
     }
-  } catch {
-    // Table may not exist yet — use defaults
+  } catch (err) {
+    logger.warn(
+      "[ContractEngine] Could not load config from app_settings — using defaults",
+      {
+        error: (err as Error).message,
+      },
+    );
   }
 }
 
@@ -75,8 +80,10 @@ export async function saveContractLifecycleConfig(
        ON CONFLICT (key) DO UPDATE SET value = :val`,
       { replacements: { val: JSON.stringify(_config) }, type: "RAW" as any },
     );
-  } catch {
-    // silently ignore if table missing
+  } catch (err) {
+    logger.warn("[ContractEngine] Could not save config to app_settings", {
+      error: (err as Error).message,
+    });
   }
 }
 
@@ -304,7 +311,11 @@ export async function checkContractRenewalWindow(): Promise<{
          )`,
       { replacements: { today, windowDate: windowStr } },
     )
-    .catch(() => {});
+    .catch((err) =>
+      logger.warn("[ContractEngine] risk_radar reset failed", {
+        error: (err as Error).message,
+      }),
+    );
 
   return {
     contractsChecked: rows.length,

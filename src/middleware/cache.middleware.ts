@@ -38,8 +38,15 @@ export function cacheRoute(
     if (options.keyBuilder) {
       cacheKey = options.keyBuilder(req);
     } else {
+      // Normalize query params: sorted, trimmed, skip defaults that don't change results
+      const SKIP_PARAMS = new Set(["_", "t", "timestamp"]); // cache-busting params
       const queryString = Object.keys(req.query)
-        .filter((k) => req.query[k] !== undefined && req.query[k] !== "")
+        .filter(
+          (k) =>
+            req.query[k] !== undefined &&
+            req.query[k] !== "" &&
+            !SKIP_PARAMS.has(k),
+        )
         .sort()
         .map((k) => `${k}=${req.query[k]}`)
         .join("&");

@@ -4,15 +4,15 @@ services:
     container_name: postgres_db
     restart: always
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin1234
-      POSTGRES_DB: SadaraDB
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin1234}
+      POSTGRES_DB: ${POSTGRES_DB:-SadaraDB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U admin"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-admin}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,9 +22,10 @@ services:
     image: dpage/pgadmin4:latest
     container_name: pgadmin_ui
     restart: always
+    profiles: ["tools"]
     environment:
-      PGADMIN_DEFAULT_EMAIL: mkaawaja5000@gmail.com
-      PGADMIN_DEFAULT_PASSWORD: admin1234
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sadara.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin1234}
     ports:
       - "5050:80"
     depends_on:
