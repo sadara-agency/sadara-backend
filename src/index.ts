@@ -11,6 +11,7 @@ import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "./modules/matches/matchAutoTasks";
 import { loadPerformanceTrendConfig } from "./cron/engines/performance.engine";
 import { loadInjuryIntelConfig } from "./cron/engines/injury.engine";
+import { loadContractLifecycleConfig } from "./cron/engines/contract.engine";
 import { loadPermissions } from "./modules/permissions/permission.service";
 import { ensureSportmonksColumn } from "./modules/sportmonks/sportmonks.service";
 import { registerProvider } from "./modules/integrations/matchAnalysis.service";
@@ -55,6 +56,7 @@ async function initApplication(): Promise<void> {
   await loadTaskRuleConfigFromDB();
   await loadPerformanceTrendConfig();
   await loadInjuryIntelConfig();
+  await loadContractLifecycleConfig();
   await ensureSportmonksColumn();
   registerProviders();
 }

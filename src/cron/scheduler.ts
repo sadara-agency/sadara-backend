@@ -24,6 +24,13 @@ import {
   calculateInjuryRisk,
   checkSurgeryMilestones,
 } from "./engines/injury.engine";
+import {
+  checkContractRenewalWindow,
+  checkContractValueMismatch,
+  checkLoanReturns,
+  checkStaleDrafts,
+  checkCommissionsDue,
+} from "./engines/contract.engine";
 
 // ── Job registry ──
 
@@ -433,6 +440,13 @@ registerJob("return-to-play", checkReturnToPlay);
 registerJob("injury-risk-scoring", calculateInjuryRisk);
 registerJob("surgery-milestones", checkSurgeryMilestones);
 
+// ── Contract Lifecycle Engine ──
+registerJob("contract-renewal-window", checkContractRenewalWindow);
+registerJob("contract-value-mismatch", checkContractValueMismatch);
+registerJob("loan-return-tracker", checkLoanReturns);
+registerJob("draft-contract-stale", checkStaleDrafts);
+registerJob("commission-due-calculator", checkCommissionsDue);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -500,5 +514,12 @@ export function startCronJobs() {
   cron.schedule("0 6 * * 1", safeJob("injury-risk-scoring")); // Monday 6:00 AM
   cron.schedule("0 8 * * *", safeJob("surgery-milestones")); // Daily 8:00 AM
 
-  logger.info("[CRON] 16 jobs scheduled ✓");
+  // ── Contract Lifecycle Engine ──
+  cron.schedule("0 9 * * 2", safeJob("contract-renewal-window")); // Tuesday 9:00 AM
+  cron.schedule("30 9 * * 2", safeJob("contract-value-mismatch")); // Tuesday 9:30 AM
+  cron.schedule("30 8 * * *", safeJob("loan-return-tracker")); // Daily 8:30 AM
+  cron.schedule("30 11 * * *", safeJob("draft-contract-stale")); // Daily 11:30 AM
+  cron.schedule("0 9 * * 3", safeJob("commission-due-calculator")); // Wednesday 9:00 AM
+
+  logger.info("[CRON] 21 jobs scheduled ✓");
 }

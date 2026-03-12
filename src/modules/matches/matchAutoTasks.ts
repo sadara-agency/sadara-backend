@@ -61,6 +61,13 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   surgery_milestone_30d: { enabled: true, dueDays: 2 },
   surgery_milestone_60d: { enabled: true, dueDays: 2 },
   surgery_milestone_90d: { enabled: true, dueDays: 2 },
+  // Contract lifecycle rules (triggered by contract.engine.ts cron jobs)
+  contract_renewal_window: { enabled: true, dueDays: 7 },
+  contract_value_mismatch: { enabled: true, dueDays: 7, threshold: 30 },
+  loan_return_tracker: { enabled: true, dueDays: 5 },
+  draft_contract_stale: { enabled: true, dueDays: 3, threshold: 14 },
+  commission_due_upcoming: { enabled: true, dueDays: 5 },
+  commission_due_overdue: { enabled: true, dueDays: 1 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
