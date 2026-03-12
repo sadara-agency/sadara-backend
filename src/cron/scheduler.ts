@@ -45,6 +45,13 @@ import {
   checkGateProgressionNudge,
   checkClearanceFollowups,
 } from "./engines/gate.engine";
+import {
+  checkWatchlistStaleness,
+  checkScreeningIncomplete,
+  checkProspectUnrated,
+  checkDeferredDecisions,
+  checkApprovedNotActioned,
+} from "./engines/scouting.engine";
 
 // ── Job registry ──
 
@@ -475,6 +482,13 @@ registerJob("checklist-follow-up", checkChecklistFollowups);
 registerJob("gate-progression-nudge", checkGateProgressionNudge);
 registerJob("clearance-follow-up", checkClearanceFollowups);
 
+// ── Scouting Pipeline Engine ──
+registerJob("watchlist-staleness", checkWatchlistStaleness);
+registerJob("screening-incomplete", checkScreeningIncomplete);
+registerJob("prospect-unrated", checkProspectUnrated);
+registerJob("deferred-decision-followup", checkDeferredDecisions);
+registerJob("approved-not-actioned", checkApprovedNotActioned);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -563,5 +577,12 @@ export function startCronJobs() {
   cron.schedule("0 10 * * 5", safeJob("gate-progression-nudge")); // Friday 10:00 AM
   cron.schedule("0 10 * * *", safeJob("clearance-follow-up")); // Daily 10:00 AM
 
-  logger.info("[CRON] 31 jobs scheduled ✓");
+  // ── Scouting Pipeline Engine ──
+  cron.schedule("0 10 * * 3", safeJob("watchlist-staleness")); // Wednesday 10:00 AM
+  cron.schedule("30 10 * * 3", safeJob("screening-incomplete")); // Wednesday 10:30 AM
+  cron.schedule("30 11 * * 1", safeJob("prospect-unrated")); // Monday 11:30 AM
+  cron.schedule("0 11 * * 5", safeJob("deferred-decision-followup")); // Friday 11:00 AM
+  cron.schedule("30 11 * * 5", safeJob("approved-not-actioned")); // Friday 11:30 AM
+
+  logger.info("[CRON] 36 jobs scheduled ✓");
 }

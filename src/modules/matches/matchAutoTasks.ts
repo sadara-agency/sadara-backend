@@ -81,6 +81,12 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   checklist_overdue: { enabled: true, dueDays: 2, threshold: 7 },
   gate_progression_nudge: { enabled: true, dueDays: 3, threshold: 80 },
   clearance_stale: { enabled: true, dueDays: 2, threshold: 7 },
+  // Scouting pipeline rules (triggered by scouting.engine.ts cron jobs)
+  watchlist_stale: { enabled: true, dueDays: 5, threshold: 30 },
+  screening_incomplete: { enabled: true, dueDays: 3, threshold: 14 },
+  prospect_unrated: { enabled: true, dueDays: 3, threshold: 7 },
+  deferred_decision_followup: { enabled: true, dueDays: 5, threshold: 30 },
+  approved_not_actioned: { enabled: true, dueDays: 3, threshold: 14 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
