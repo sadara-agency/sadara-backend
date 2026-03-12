@@ -30,6 +30,16 @@ jest.mock('../../../src/modules/Users/user.model', () => ({
   },
 }));
 
+jest.mock('../../../src/modules/portal/playerAccount.model', () => ({
+  PlayerAccount: {
+    findOne: jest.fn(),
+    findByPk: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    name: 'PlayerAccount',
+  },
+}));
+
 // Import after mocks are set up
 import * as authService from '../../../src/modules/auth/auth.service';
 

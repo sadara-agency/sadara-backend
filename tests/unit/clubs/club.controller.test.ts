@@ -3,6 +3,7 @@ jest.mock('../../../src/modules/clubs/club.service');
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
+  buildChanges: jest.fn().mockReturnValue(null),
 }));
 
 import * as controller from '../../../src/modules/clubs/club.controller';
