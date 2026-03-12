@@ -87,6 +87,12 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   prospect_unrated: { enabled: true, dueDays: 3, threshold: 7 },
   deferred_decision_followup: { enabled: true, dueDays: 5, threshold: 30 },
   approved_not_actioned: { enabled: true, dueDays: 3, threshold: 14 },
+  // Training & development rules (triggered by training.engine.ts cron jobs)
+  enrollment_stale: { enabled: true, dueDays: 5, threshold: 14 },
+  workout_adherence: { enabled: true, dueDays: 3, threshold: 7 },
+  metric_target_deadline: { enabled: true, dueDays: 3, threshold: 14 },
+  diet_adherence_low: { enabled: true, dueDays: 3, threshold: 50 },
+  no_training_plan: { enabled: true, dueDays: 5 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {

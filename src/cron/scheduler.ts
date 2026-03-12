@@ -52,6 +52,13 @@ import {
   checkDeferredDecisions,
   checkApprovedNotActioned,
 } from "./engines/scouting.engine";
+import {
+  checkEnrollmentStaleness,
+  checkWorkoutAdherence,
+  checkMetricTargetDeadlines,
+  checkDietAdherence,
+  checkNoTrainingPlan,
+} from "./engines/training.engine";
 
 // ── Job registry ──
 
@@ -489,6 +496,13 @@ registerJob("prospect-unrated", checkProspectUnrated);
 registerJob("deferred-decision-followup", checkDeferredDecisions);
 registerJob("approved-not-actioned", checkApprovedNotActioned);
 
+// ── Training & Development Engine ──
+registerJob("training-enrollment-stale", checkEnrollmentStaleness);
+registerJob("workout-adherence-check", checkWorkoutAdherence);
+registerJob("body-metric-target-deadline", checkMetricTargetDeadlines);
+registerJob("diet-adherence-monitor", checkDietAdherence);
+registerJob("training-no-plan", checkNoTrainingPlan);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -584,5 +598,12 @@ export function startCronJobs() {
   cron.schedule("0 11 * * 5", safeJob("deferred-decision-followup")); // Friday 11:00 AM
   cron.schedule("30 11 * * 5", safeJob("approved-not-actioned")); // Friday 11:30 AM
 
-  logger.info("[CRON] 36 jobs scheduled ✓");
+  // ── Training & Development Engine ──
+  cron.schedule("15 8 * * *", safeJob("training-enrollment-stale")); // Daily 8:15 AM
+  cron.schedule("0 9 * * 6", safeJob("workout-adherence-check")); // Saturday 9:00 AM
+  cron.schedule("15 9 * * *", safeJob("body-metric-target-deadline")); // Daily 9:15 AM
+  cron.schedule("30 9 * * 6", safeJob("diet-adherence-monitor")); // Saturday 9:30 AM
+  cron.schedule("30 8 * * 1", safeJob("training-no-plan")); // Monday 8:30 AM
+
+  logger.info("[CRON] 41 jobs scheduled ✓");
 }
