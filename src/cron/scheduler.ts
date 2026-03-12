@@ -75,18 +75,70 @@ function registerJob(name: string, fn: () => Promise<any>) {
   jobs[name] = fn;
 }
 
-// ── Safe wrapper for scheduled execution ──
+// ── Distributed lock via Redis SET NX EX ──
+
+import { getRedisClient, isRedisConnected } from "../config/redis";
+
+async function acquireLock(name: string, ttlSeconds: number): Promise<boolean> {
+  if (!isRedisConnected()) return true; // Single instance — no lock needed
+  const client = getRedisClient();
+  if (!client) return true;
+  const key = `cron:lock:${name}`;
+  const result = await client.set(key, Date.now().toString(), {
+    NX: true,
+    EX: ttlSeconds,
+  });
+  return result === "OK";
+}
+
+async function releaseLock(name: string): Promise<void> {
+  if (!isRedisConnected()) return;
+  const client = getRedisClient();
+  if (!client) return;
+  await client.del(`cron:lock:${name}`).catch(() => {});
+}
+
+// ── Safe wrapper with retry + distributed lock ──
+
+const MAX_RETRIES = 2;
+const LOCK_TTL_SECONDS = 300; // 5 min — prevents overlapping runs
 
 function safeJob(name: string) {
   return async () => {
-    try {
-      logger.info(`[CRON] Starting: ${name}`);
-      const start = Date.now();
-      await jobs[name]();
-      logger.info(`[CRON] Completed: ${name} (${Date.now() - start}ms)`);
-    } catch (err) {
-      logger.error(`[CRON] Failed: ${name}`, err);
+    // Acquire distributed lock (prevents concurrent execution across instances)
+    if (!(await acquireLock(name, LOCK_TTL_SECONDS))) {
+      logger.info(`[CRON] Skipped (locked): ${name}`);
+      return;
     }
+
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = Math.min(1000 * 2 ** attempt, 8000);
+          logger.info(
+            `[CRON] Retry ${attempt}/${MAX_RETRIES}: ${name} (after ${delay}ms)`,
+          );
+          await new Promise((r) => setTimeout(r, delay));
+        }
+        logger.info(`[CRON] Starting: ${name}`);
+        const start = Date.now();
+        await jobs[name]();
+        logger.info(`[CRON] Completed: ${name} (${Date.now() - start}ms)`);
+        await releaseLock(name);
+        return; // Success
+      } catch (err) {
+        lastErr = err;
+        logger.warn(`[CRON] Attempt ${attempt + 1} failed: ${name}`, err);
+      }
+    }
+
+    // All retries exhausted
+    logger.error(
+      `[CRON] Failed after ${MAX_RETRIES + 1} attempts: ${name}`,
+      lastErr,
+    );
+    await releaseLock(name);
   };
 }
 

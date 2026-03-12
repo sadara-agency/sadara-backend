@@ -54,7 +54,11 @@ export async function register(input: RegisterInput) {
 
   // Send welcome email (non-blocking — don't fail registration if email fails)
   sendWelcomeEmail(user.email, user.fullName || user.fullNameAr || "").catch(
-    (err) => logger.warn("Failed to send welcome email", { email: user.email, error: (err as Error).message }),
+    (err) =>
+      logger.warn("Failed to send welcome email", {
+        email: user.email,
+        error: (err as Error).message,
+      }),
   );
 
   return { user: safe };
@@ -146,8 +150,11 @@ export async function login(input: LoginInput) {
     password_hash: string;
     status: string;
     last_login: Date | null;
+    failed_login_attempts: number | null;
+    locked_until: Date | null;
   }>(
-    `SELECT id, player_id, email, password_hash, status, last_login
+    `SELECT id, player_id, email, password_hash, status, last_login,
+            failed_login_attempts, locked_until
      FROM player_accounts
      WHERE email = :email
      LIMIT 1`,
@@ -160,7 +167,36 @@ export async function login(input: LoginInput) {
     throw new AppError("Invalid email or password", 401);
   }
 
+  // Check if player account is locked
+  if (
+    playerAccount.locked_until &&
+    new Date(playerAccount.locked_until) > new Date()
+  ) {
+    const remainingMs =
+      new Date(playerAccount.locked_until).getTime() - Date.now();
+    const remainingMin = Math.ceil(remainingMs / 60000);
+    throw new AppError(
+      `Account is temporarily locked. Try again in ${remainingMin} minute(s).`,
+      423,
+    );
+  }
+
   if (!(await bcrypt.compare(input.password, playerAccount.password_hash))) {
+    // Increment failed attempts and possibly lock
+    const attempts = (playerAccount.failed_login_attempts || 0) + 1;
+    const lockUntil =
+      attempts >= MAX_FAILED_ATTEMPTS
+        ? new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString()
+        : null;
+    await sequelize.query(
+      `UPDATE player_accounts SET failed_login_attempts = :attempts,
+              locked_until = ${lockUntil ? ":lockUntil" : "NULL"}
+       WHERE id = :id`,
+      {
+        replacements: { attempts, lockUntil, id: playerAccount.id },
+        type: QueryTypes.UPDATE,
+      },
+    );
     throw new AppError("Invalid email or password", 401);
   }
 
@@ -197,9 +233,9 @@ export async function login(input: LoginInput) {
     ? `${player.first_name_ar || ""} ${player.last_name_ar || ""}`.trim()
     : null;
 
-  // Update last_login
+  // Update last_login and reset lockout counters
   await sequelize.query(
-    `UPDATE player_accounts SET last_login = NOW() WHERE id = :id`,
+    `UPDATE player_accounts SET last_login = NOW(), failed_login_attempts = 0, locked_until = NULL WHERE id = :id`,
     { replacements: { id: playerAccount.id }, type: QueryTypes.UPDATE },
   );
 
@@ -299,7 +335,9 @@ export async function changePassword(
     sendPasswordChangedEmail(
       user.email,
       user.fullName || user.fullNameAr || "",
-    ).catch((err) => logger.warn("Failed to send email", { error: (err as Error).message }));
+    ).catch((err) =>
+      logger.warn("Failed to send email", { error: (err as Error).message }),
+    );
     return { message: "Password changed successfully" };
   }
 
@@ -325,7 +363,9 @@ export async function changePassword(
     { replacements: { hash: newHash, id: userId }, type: QueryTypes.UPDATE },
   );
 
-  sendPasswordChangedEmail(accounts[0].email, "").catch((err) => logger.warn("Failed to send email", { error: (err as Error).message }));
+  sendPasswordChangedEmail(accounts[0].email, "").catch((err) =>
+    logger.warn("Failed to send email", { error: (err as Error).message }),
+  );
   return { message: "Password changed successfully" };
 }
 
@@ -400,7 +440,9 @@ export async function resetPassword(token: string, newPassword: string) {
   sendPasswordChangedEmail(
     user.email,
     user.fullName || user.fullNameAr || "",
-  ).catch((err) => logger.warn("Failed to send email", { error: (err as Error).message }));
+  ).catch((err) =>
+    logger.warn("Failed to send email", { error: (err as Error).message }),
+  );
 
   return { message: "Password reset successfully. You can now log in." };
 }

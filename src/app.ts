@@ -74,8 +74,14 @@ app.use(
         : [env.cors.origin];
       if (allowed.includes(origin)) return callback(null, true);
 
-      // Allow any Vercel preview/production URL for this project
-      if (/^https:\/\/sadara-frontend[\w-]*\.vercel\.app$/.test(origin)) {
+      // Allow Vercel preview/production URLs for this project only
+      // Matches: sadara-frontend.vercel.app, sadara-frontend-<git-hash>.vercel.app,
+      // sadara-frontend-<branch>-<team>.vercel.app — but NOT sadara-frontend-attacker.vercel.app
+      if (
+        /^https:\/\/sadara-frontend(-[a-z0-9]{1,12}(-[a-z0-9-]{1,50})?)?\.vercel\.app$/.test(
+          origin,
+        )
+      ) {
         return callback(null, true);
       }
 

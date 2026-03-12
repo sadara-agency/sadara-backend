@@ -359,7 +359,11 @@ export async function generateContractPdfBuffer(
     if (browser)
       try {
         await browser.close();
-      } catch {}
+      } catch (closeErr) {
+        logger.warn("Failed to close Puppeteer browser during cleanup", {
+          error: (closeErr as Error).message,
+        });
+      }
     logger.error("PDF generation error", { error: err.message });
     throw new AppError(
       "PDF generation failed. Please try again or contact support.",

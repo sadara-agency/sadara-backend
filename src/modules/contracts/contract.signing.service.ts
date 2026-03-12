@@ -48,7 +48,13 @@ export async function regenerateSignedPdf(contractId: string): Promise<string> {
     if (fs.existsSync(oldFile) && oldFile !== filePath) {
       try {
         fs.unlinkSync(oldFile);
-      } catch {}
+      } catch (unlinkErr) {
+        // Log but don't fail — old file cleanup is best-effort
+        console.warn(
+          `[SigningService] Failed to remove old signed PDF: ${oldFile}`,
+          (unlinkErr as Error).message,
+        );
+      }
     }
   }
 
