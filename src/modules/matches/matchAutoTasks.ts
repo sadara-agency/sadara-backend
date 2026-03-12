@@ -76,6 +76,11 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   expense_budget_overage: { enabled: true, dueDays: 5, threshold: 50 },
   player_roi_negative: { enabled: true, dueDays: 7 },
   valuation_stale: { enabled: true, dueDays: 5, threshold: 90 },
+  // Gate & onboarding rules (triggered by gate.engine.ts cron jobs)
+  gate_stale: { enabled: true, dueDays: 3, threshold: 14 },
+  checklist_overdue: { enabled: true, dueDays: 2, threshold: 7 },
+  gate_progression_nudge: { enabled: true, dueDays: 3, threshold: 80 },
+  clearance_stale: { enabled: true, dueDays: 2, threshold: 7 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {

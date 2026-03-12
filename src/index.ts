@@ -13,6 +13,7 @@ import { loadPerformanceTrendConfig } from "./cron/engines/performance.engine";
 import { loadInjuryIntelConfig } from "./cron/engines/injury.engine";
 import { loadContractLifecycleConfig } from "./cron/engines/contract.engine";
 import { loadFinancialIntelConfig } from "./cron/engines/financial.engine";
+import { loadGateOnboardingConfig } from "./cron/engines/gate.engine";
 import { loadPermissions } from "./modules/permissions/permission.service";
 import { ensureSportmonksColumn } from "./modules/sportmonks/sportmonks.service";
 import { registerProvider } from "./modules/integrations/matchAnalysis.service";
@@ -59,6 +60,7 @@ async function initApplication(): Promise<void> {
   await loadInjuryIntelConfig();
   await loadContractLifecycleConfig();
   await loadFinancialIntelConfig();
+  await loadGateOnboardingConfig();
   await ensureSportmonksColumn();
   registerProviders();
 }

@@ -38,6 +38,13 @@ import {
   checkPlayerROI,
   checkValuationStaleness,
 } from "./engines/financial.engine";
+import {
+  runGateAutoVerification,
+  checkStaleGates,
+  checkChecklistFollowups,
+  checkGateProgressionNudge,
+  checkClearanceFollowups,
+} from "./engines/gate.engine";
 
 // ── Job registry ──
 
@@ -461,6 +468,13 @@ registerJob("expense-budget-monitor", checkExpenseBudget);
 registerJob("player-roi-calculator", checkPlayerROI);
 registerJob("valuation-staleness-check", checkValuationStaleness);
 
+// ── Gate & Onboarding Engine ──
+registerJob("gate-auto-verify", runGateAutoVerification);
+registerJob("gate-stale-detector", checkStaleGates);
+registerJob("checklist-follow-up", checkChecklistFollowups);
+registerJob("gate-progression-nudge", checkGateProgressionNudge);
+registerJob("clearance-follow-up", checkClearanceFollowups);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -542,5 +556,12 @@ export function startCronJobs() {
   cron.schedule("30 10 * * 4", safeJob("player-roi-calculator")); // Thursday 10:30 AM
   cron.schedule("0 11 * * 1", safeJob("valuation-staleness-check")); // Monday 11:00 AM
 
-  logger.info("[CRON] 26 jobs scheduled ✓");
+  // ── Gate & Onboarding Engine ──
+  cron.schedule("30 6 * * *", safeJob("gate-auto-verify")); // Daily 6:30 AM
+  cron.schedule("30 10 * * *", safeJob("gate-stale-detector")); // Daily 10:30 AM
+  cron.schedule("30 9 * * *", safeJob("checklist-follow-up")); // Daily 9:30 AM
+  cron.schedule("0 10 * * 5", safeJob("gate-progression-nudge")); // Friday 10:00 AM
+  cron.schedule("0 10 * * *", safeJob("clearance-follow-up")); // Daily 10:00 AM
+
+  logger.info("[CRON] 31 jobs scheduled ✓");
 }
