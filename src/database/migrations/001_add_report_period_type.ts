@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export async function up() {
   // Create ENUM type if it doesn't exist

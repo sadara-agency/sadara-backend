@@ -1,5 +1,5 @@
-import { env } from "../../config/env";
-import { PaginationMeta, PaginationQuery } from "../types";
+import { env } from "@config/env";
+import { PaginationMeta, PaginationQuery } from "@shared/types";
 
 export interface ParsedPagination {
   limit: number;

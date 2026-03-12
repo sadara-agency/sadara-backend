@@ -1,8 +1,7 @@
 import { QueryTypes } from "sequelize";
-import { sequelize } from "../../config/database";
-import { logger } from "../../config/logger";
-import type { UserRole } from "../../shared/types";
-import { camelCaseKeys } from "../../shared/utils/caseTransform";
+import { sequelize } from "@config/database";
+import type { UserRole } from "@shared/types";
+import { camelCaseKeys } from "@shared/utils/caseTransform";
 
 /** Roles that see ALL data (no player-level filtering). */
 const UNFILTERED_ROLES: UserRole[] = [
@@ -503,101 +502,4 @@ export async function getKpiTrends(months = 6) {
     tasks: toValues(tasks),
     matches: toValues(matches),
   };
-}
-
-/**
- * Full dashboard — fires all queries in parallel for initial page load.
- * Uses Promise.allSettled so a single failing query doesn't crash the entire dashboard.
- * Failed sections return safe defaults and the dashboard renders partially.
- */
-export async function getFullDashboard(
-  userId?: string,
-  userRole?: UserRole,
-  playerId?: string | null,
-) {
-  const labels = [
-    "kpis",
-    "alerts",
-    "topPlayers",
-    "contractStatus",
-    "playerDistribution",
-    "recentOffers",
-    "upcomingMatches",
-    "urgentTasks",
-    "revenueChart",
-    "performanceAvg",
-    "recentActivity",
-    "quickStats",
-    "offerPipeline",
-    "injuryTrends",
-    "kpiTrends",
-  ] as const;
-
-  const defaults: Record<string, any> = {
-    kpis: {},
-    alerts: {
-      expiringContracts: [],
-      overduePayments: [],
-      injuryConflicts: [],
-      openReferrals: [],
-    },
-    topPlayers: [],
-    contractStatus: [],
-    playerDistribution: [],
-    recentOffers: [],
-    upcomingMatches: [],
-    urgentTasks: [],
-    revenueChart: [],
-    performanceAvg: [{}],
-    recentActivity: [],
-    quickStats: {
-      completedGates: 0,
-      activeReferrals: 0,
-      watchlistCount: 0,
-      taskCompletionRate: 0,
-    },
-    offerPipeline: [],
-    injuryTrends: [],
-    kpiTrends: {
-      players: [],
-      contracts: [],
-      revenue: [],
-      injuries: [],
-      tasks: [],
-      matches: [],
-    },
-  };
-
-  const results = await Promise.allSettled([
-    getKpis(),
-    getAlerts(),
-    getTopPlayers(),
-    getContractStatusDistribution(),
-    getPlayerDistribution(),
-    getRecentOffers(),
-    getUpcomingMatches(5, userId, userRole, playerId),
-    getUrgentTasks(5, userId, userRole, playerId),
-    getRevenueChart(),
-    getPerformanceAverages(),
-    getRecentActivity(),
-    getQuickStats(),
-    getOfferPipeline(),
-    getInjuryTrends(),
-    getKpiTrends(),
-  ]);
-
-  const dashboard: Record<string, any> = {};
-  results.forEach((result, i) => {
-    const key = labels[i];
-    if (result.status === "fulfilled") {
-      dashboard[key] = result.value;
-    } else {
-      logger.error(`[Dashboard] ${key} query failed`, {
-        error: result.reason?.message || result.reason,
-      });
-      dashboard[key] = defaults[key];
-    }
-  });
-
-  return dashboard;
 }

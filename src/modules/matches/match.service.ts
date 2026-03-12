@@ -1,15 +1,15 @@
 import { Op, Sequelize } from "sequelize";
-import { Match, type MatchAttributes } from "./match.model";
-import { MatchPlayer } from "./matchPlayer.model";
-import { PlayerMatchStats } from "./playerMatchStats.model";
-import { MatchAnalysis } from "./matchAnalysis.model";
-import { Club } from "../clubs/club.model";
-import { Player } from "../players/player.model";
-import { User } from "../Users/user.model";
-import { Task } from "../tasks/task.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
+import { Match, type MatchAttributes } from "@modules/matches/match.model";
+import { MatchPlayer } from "@modules/matches/matchPlayer.model";
+import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { MatchAnalysis } from "@modules/matches/matchAnalysis.model";
+import { Club } from "@modules/clubs/club.model";
+import { Player } from "@modules/players/player.model";
+import { User } from "@modules/users/user.model";
+import { Task } from "@modules/tasks/task.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
 
 const CLUB_ATTRS = ["id", "name", "nameAr", "logoUrl"] as const;
 const PLAYER_ATTRS = [

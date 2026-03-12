@@ -3,23 +3,31 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   syncPlayerSchema,
   syncTeamSchema,
   syncAllSchema,
   seedClubIdsSchema,
-} from "./spl.schema";
-import * as c from "./spl.controller";
+} from "@modules/spl/spl.schema";
+import * as c from "@modules/spl/spl.controller";
 
 const router = Router();
 router.use(authenticate);
 
 // Read
-router.get("/registry", authorizeModule("spl-sync", "read"), asyncHandler(c.getRegistry));
-router.get("/sync-status", authorizeModule("spl-sync", "read"), asyncHandler(c.getStatus));
+router.get(
+  "/registry",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(c.getRegistry),
+);
+router.get(
+  "/sync-status",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(c.getStatus),
+);
 
 // Sync operations
 router.post(

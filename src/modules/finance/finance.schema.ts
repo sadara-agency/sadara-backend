@@ -177,9 +177,7 @@ export const updateExpenseSchema = z.object({
 export const expenseQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(20),
-  sort: z
-    .enum(["date", "created_at", "amount", "category"])
-    .default("date"),
+  sort: z.enum(["date", "created_at", "amount", "category"]).default("date"),
   order: z.enum(["asc", "desc"]).default("desc"),
   category: z.enum(expenseCategories).optional(),
   playerId: z.string().uuid().optional(),
@@ -188,9 +186,7 @@ export const expenseQuerySchema = z.object({
 // ── Dashboard Query ──
 
 export const dashboardQuerySchema = z.object({
-  playerContractType: z
-    .enum(["Professional", "Amateur", "Youth"])
-    .optional(),
+  playerContractType: z.enum(["Professional", "Amateur", "Youth"]).optional(),
   comparisonPeriod: z.enum(["MoM", "QoQ", "YoY"]).default("MoM"),
 });
 

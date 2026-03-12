@@ -1,6 +1,6 @@
 import { Response, NextFunction } from "express";
-import { AuthRequest, UserRole } from "../shared/types";
-import { getHiddenFields } from "../modules/permissions/permission.service";
+import { AuthRequest, UserRole } from "@shared/types";
+import { getHiddenFields } from "@modules/permissions/permission.service";
 
 /**
  * Field-level access control middleware.

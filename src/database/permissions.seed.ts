@@ -3,7 +3,7 @@
 // across all 27 route files so that switching to DB-driven
 // permissions changes nothing for existing users.
 // ─────────────────────────────────────────────────────────────
-import { RolePermission } from "../modules/permissions/permission.model";
+import { RolePermission } from "@modules/permissions/permission.model";
 
 interface Perm {
   role: string;

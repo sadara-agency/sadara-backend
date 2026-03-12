@@ -3,20 +3,20 @@
  */
 
 import { Op } from "sequelize";
-import { sequelize } from "../../config/database";
-import { Match } from "../matches/match.model";
-import { Club } from "../clubs/club.model";
+import { sequelize } from "@config/database";
+import { Match } from "@modules/matches/match.model";
+import { Club } from "@modules/clubs/club.model";
 import {
   Competition,
   ClubCompetition,
-} from "../competitions/competition.model";
-import * as provider from "./sportmonks.provider";
+} from "@modules/competitions/competition.model";
+import * as provider from "@modules/sportmonks/sportmonks.provider";
 import {
   SM_STATE_MAP,
   type SmFixture,
   type NormalizedFixture,
   type ImportResult,
-} from "./sportmonks.types";
+} from "@modules/sportmonks/sportmonks.types";
 
 // ── Column migration ──
 

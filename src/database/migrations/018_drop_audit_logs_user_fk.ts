@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 /**
  * Drop the foreign key constraint on audit_logs.user_id.

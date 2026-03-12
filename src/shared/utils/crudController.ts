@@ -1,8 +1,12 @@
 import { Response } from "express";
-import { AuthRequest } from "../types";
-import { sendSuccess, sendCreated, sendPaginated } from "./apiResponse";
-import { logAudit, buildAuditContext, buildChanges } from "./audit";
-import { invalidateMultiple } from "./cache";
+import { AuthRequest } from "@shared/types";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext, buildChanges } from "@shared/utils/audit";
+import { invalidateMultiple } from "@shared/utils/cache";
 
 // ── Types ──
 

@@ -2,18 +2,22 @@ import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Op, QueryTypes } from "sequelize";
-import { User } from "../Users/user.model";
-import { PlayerAccount } from "../portal/playerAccount.model";
-import { sequelize } from "../../config/database";
-import { env } from "../../config/env";
-import { AppError } from "../../middleware/errorHandler";
-import { logger } from "../../config/logger";
-import { RegisterInput, LoginInput, InviteInput } from "./auth.schema";
+import { User } from "@modules/users/user.model";
+import { PlayerAccount } from "@modules/portal/playerAccount.model";
+import { sequelize } from "@config/database";
+import { env } from "@config/env";
+import { AppError } from "@middleware/errorHandler";
+import { logger } from "@config/logger";
+import {
+  RegisterInput,
+  LoginInput,
+  InviteInput,
+} from "@modules/auth/auth.schema";
 import {
   sendPasswordResetEmail,
   sendPasswordChangedEmail,
   sendWelcomeEmail,
-} from "../../shared/utils/mail";
+} from "@shared/utils/mail";
 
 /** Default role for self-registered users (no admin privileges). */
 const DEFAULT_ROLE = "Analyst";
@@ -22,8 +26,25 @@ const DEFAULT_ROLE = "Analyst";
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
-/** Generate JWT with user identity + role for frontend RBAC. */
-function generateToken(payload: {
+/** Refresh token expiry in ms (parsed from env, e.g. "30d") */
+const REFRESH_TOKEN_MS = parseExpiry(env.jwt.refreshExpiresIn);
+
+function parseExpiry(val: string): number {
+  const match = val.match(/^(\d+)([smhd])$/);
+  if (!match) return 30 * 24 * 60 * 60 * 1000; // fallback 30d
+  const n = parseInt(match[1], 10);
+  const unit = match[2];
+  const multipliers: Record<string, number> = {
+    s: 1000,
+    m: 60 * 1000,
+    h: 60 * 60 * 1000,
+    d: 24 * 60 * 60 * 1000,
+  };
+  return n * multipliers[unit];
+}
+
+/** Generate short-lived access JWT (15 min). */
+function generateAccessToken(payload: {
   id: string;
   email: string;
   fullName: string;
@@ -31,8 +52,55 @@ function generateToken(payload: {
   playerId?: string | null;
 }): string {
   return jwt.sign(payload, env.jwt.secret as jwt.Secret, {
-    expiresIn: env.jwt.expiresIn as any,
+    expiresIn: "15m",
   });
+}
+
+/** Create a refresh token, store its hash in DB, return the raw token. */
+async function createRefreshToken(
+  userId: string,
+  userType: "user" | "player",
+  family?: string,
+): Promise<string> {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  const tokenFamily = family || crypto.randomBytes(16).toString("hex");
+
+  await sequelize.query(
+    `INSERT INTO refresh_tokens (token_hash, user_id, user_type, family, expires_at)
+     VALUES (:tokenHash, :userId, :userType, :family, :expiresAt)`,
+    {
+      replacements: {
+        tokenHash,
+        userId,
+        userType,
+        family: tokenFamily,
+        expiresAt: new Date(Date.now() + REFRESH_TOKEN_MS),
+      },
+    },
+  );
+
+  return rawToken;
+}
+
+/** Revoke all tokens in a family (used on reuse detection). */
+async function revokeFamily(family: string): Promise<void> {
+  await sequelize.query(
+    `UPDATE refresh_tokens SET revoked_at = NOW() WHERE family = :family AND revoked_at IS NULL`,
+    { replacements: { family } },
+  );
+}
+
+/** Revoke all refresh tokens for a user (logout from all devices). */
+export async function revokeAllUserTokens(
+  userId: string,
+  userType: "user" | "player" = "user",
+): Promise<void> {
+  await sequelize.query(
+    `UPDATE refresh_tokens SET revoked_at = NOW()
+     WHERE user_id = :userId AND user_type = :userType AND revoked_at IS NULL`,
+    { replacements: { userId, userType } },
+  );
 }
 
 // ── Public Register (default role, no role selection) ──
@@ -132,14 +200,17 @@ export async function login(input: LoginInput) {
       ...userWithoutPassword
     } = user.get({ plain: true });
 
+    const tokenPayload = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    };
+
     return {
       user: userWithoutPassword,
-      token: generateToken({
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: user.role,
-      }),
+      token: generateAccessToken(tokenPayload),
+      refreshToken: await createRefreshToken(user.id, "user"),
     };
   }
 
@@ -233,16 +304,122 @@ export async function login(input: LoginInput) {
     playerId: playerAccount.playerId,
   };
 
+  const tokenPayload = {
+    id: playerAccount.id,
+    email: playerAccount.email,
+    fullName,
+    role: "Player",
+    playerId: playerAccount.playerId,
+  };
+
   return {
     user: playerUser,
-    token: generateToken({
-      id: playerAccount.id,
-      email: playerAccount.email,
-      fullName,
-      role: "Player",
-      playerId: playerAccount.playerId,
-    }),
+    token: generateAccessToken(tokenPayload),
+    refreshToken: await createRefreshToken(playerAccount.id, "player"),
   };
+}
+
+// ── Refresh Session — rotate refresh token, issue new access token ──
+export async function refreshSession(rawToken: string) {
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  // Look up the refresh token
+  const rows = await sequelize.query<{
+    id: string;
+    user_id: string;
+    user_type: string;
+    family: string;
+    expires_at: Date;
+    revoked_at: Date | null;
+  }>(
+    `SELECT id, user_id, user_type, family, expires_at, revoked_at
+     FROM refresh_tokens WHERE token_hash = :tokenHash LIMIT 1`,
+    { replacements: { tokenHash }, type: QueryTypes.SELECT },
+  );
+
+  const record = rows[0];
+  if (!record) {
+    throw new AppError("Invalid refresh token", 401);
+  }
+
+  // If this token was already revoked, someone reused an old token.
+  // Revoke the entire family as a security measure.
+  if (record.revoked_at) {
+    await revokeFamily(record.family);
+    logger.warn("Refresh token reuse detected — entire family revoked", {
+      userId: record.user_id,
+      family: record.family,
+    });
+    throw new AppError("Token reuse detected. Please log in again.", 401);
+  }
+
+  // Check expiry
+  if (new Date(record.expires_at) < new Date()) {
+    throw new AppError("Refresh token expired", 401);
+  }
+
+  // Revoke the used token (single use)
+  await sequelize.query(
+    `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = :id`,
+    { replacements: { id: record.id } },
+  );
+
+  // Look up user to build the access token payload
+  const userType = record.user_type as "user" | "player";
+  let tokenPayload: {
+    id: string;
+    email: string;
+    fullName: string;
+    role: string;
+    playerId?: string | null;
+  };
+
+  if (userType === "user") {
+    const user = await User.findByPk(record.user_id);
+    if (!user || !user.isActive) {
+      throw new AppError("Account not found or inactive", 401);
+    }
+    tokenPayload = {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      role: user.role,
+    };
+  } else {
+    const account = await PlayerAccount.findByPk(record.user_id);
+    if (!account || account.status !== "active") {
+      throw new AppError("Account not found or inactive", 401);
+    }
+
+    const playerData = await sequelize.query<{
+      first_name: string;
+      last_name: string;
+    }>(
+      `SELECT first_name, last_name FROM players WHERE id = :playerId LIMIT 1`,
+      {
+        replacements: { playerId: account.playerId },
+        type: QueryTypes.SELECT,
+      },
+    );
+    const p = playerData[0];
+    tokenPayload = {
+      id: account.id,
+      email: account.email,
+      fullName: p ? `${p.first_name} ${p.last_name}` : account.email,
+      role: "Player",
+      playerId: account.playerId,
+    };
+  }
+
+  // Issue new tokens (rotation)
+  const newAccessToken = generateAccessToken(tokenPayload);
+  const newRefreshToken = await createRefreshToken(
+    record.user_id,
+    userType,
+    record.family,
+  );
+
+  return { token: newAccessToken, refreshToken: newRefreshToken };
 }
 
 // ── Get Profile ──
@@ -312,6 +489,8 @@ export async function changePassword(
     }
     const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
     await user.update({ passwordHash: newHash });
+    // Revoke all refresh tokens on password change
+    await revokeAllUserTokens(userId, "user");
     sendPasswordChangedEmail(
       user.email,
       user.fullName || user.fullNameAr || "",
@@ -332,6 +511,8 @@ export async function changePassword(
 
   const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
   await account.update({ passwordHash: newHash });
+  // Revoke all refresh tokens on password change
+  await revokeAllUserTokens(userId, "player");
 
   sendPasswordChangedEmail(account.email, "").catch((err) =>
     logger.warn("Failed to send email", { error: (err as Error).message }),
@@ -405,6 +586,9 @@ export async function resetPassword(token: string, newPassword: string) {
     resetToken: null,
     resetTokenExpiry: null,
   } as any);
+
+  // Revoke all refresh tokens on password reset
+  await revokeAllUserTokens(user.id, "user");
 
   // Send confirmation email (non-blocking)
   sendPasswordChangedEmail(

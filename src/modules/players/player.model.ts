@@ -1,12 +1,12 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
-import { encryptFields, decryptFields } from "../../shared/utils/encryption";
+import { sequelize } from "@config/database";
+import { encryptFields, decryptFields } from "@shared/utils/encryption";
 import {
   TechnicalAttributesJson,
   getPositionGroup,
   createEmptyTechnicalAttributes,
   validateTechnicalAttributes,
-} from "./utils/attributeConfig";
+} from "@modules/players/utils/attributeConfig";
 
 interface PlayerAttributes {
   id: string;

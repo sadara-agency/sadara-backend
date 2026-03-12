@@ -1,6 +1,6 @@
 import { Umzug, SequelizeStorage } from "umzug";
-import { sequelize } from "./database";
-import { logger } from "./logger";
+import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
 import path from "path";
 
 export const migrator = new Umzug({

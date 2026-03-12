@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/database/seed/players.seed.ts
 // ─────────────────────────────────────────────────────────────
-import { Player } from "./../modules/players/player.model";
+import { Player } from "@modules/players/player.model";
 import { IDS } from "./ids";
 
 const rand = (min: number, max: number) =>

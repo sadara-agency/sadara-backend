@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { dynamicFieldAccess } from "../../middleware/fieldAccess";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { validate } from "@middleware/validate";
 import {
   createInjurySchema,
   updateInjurySchema,
   addInjuryUpdateSchema,
   injuryQuerySchema,
-} from "./injury.schema";
-import * as ctrl from "./injury.controller";
+} from "@modules/injuries/injury.schema";
+import * as ctrl from "@modules/injuries/injury.controller";
 
 const router = Router();
 router.use(authenticate);

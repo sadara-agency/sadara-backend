@@ -11,9 +11,7 @@ const options: swaggerJsdoc.Options = {
       description:
         "REST API for the Sadara Player Management Platform — contracts, matches, finance, scouting, and more.",
     },
-    servers: [
-      { url: "/api/v1", description: "API v1" },
-    ],
+    servers: [{ url: "/api/v1", description: "API v1" }],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -60,7 +58,10 @@ const options: swaggerJsdoc.Options = {
             jerseyNumber: { type: "integer" },
             currentClubId: { type: "string", format: "uuid" },
             marketValue: { type: "number" },
-            marketValueCurrency: { type: "string", enum: ["SAR", "USD", "EUR"] },
+            marketValueCurrency: {
+              type: "string",
+              enum: ["SAR", "USD", "EUR"],
+            },
             email: { type: "string", format: "email" },
             phone: { type: "string" },
             photoUrl: { type: "string" },
@@ -77,7 +78,19 @@ const options: swaggerJsdoc.Options = {
             playerId: { type: "string", format: "uuid" },
             clubId: { type: "string", format: "uuid" },
             category: { type: "string", enum: ["Club", "Sponsorship"] },
-            contractType: { type: "string", enum: ["Representation", "CareerManagement", "Transfer", "Loan", "Renewal", "Sponsorship", "ImageRights", "MedicalAuth"] },
+            contractType: {
+              type: "string",
+              enum: [
+                "Representation",
+                "CareerManagement",
+                "Transfer",
+                "Loan",
+                "Renewal",
+                "Sponsorship",
+                "ImageRights",
+                "MedicalAuth",
+              ],
+            },
             title: { type: "string" },
             status: { type: "string" },
             startDate: { type: "string", format: "date" },
@@ -88,7 +101,10 @@ const options: swaggerJsdoc.Options = {
             releaseClause: { type: "number" },
             performanceBonus: { type: "number" },
             commissionPct: { type: "number" },
-            exclusivity: { type: "string", enum: ["Exclusive", "NonExclusive"] },
+            exclusivity: {
+              type: "string",
+              enum: ["Exclusive", "NonExclusive"],
+            },
             notes: { type: "string" },
             createdAt: { type: "string", format: "date-time" },
             updatedAt: { type: "string", format: "date-time" },
@@ -104,7 +120,10 @@ const options: swaggerJsdoc.Options = {
             season: { type: "string" },
             matchDate: { type: "string", format: "date-time" },
             venue: { type: "string" },
-            status: { type: "string", enum: ["upcoming", "live", "completed", "cancelled"] },
+            status: {
+              type: "string",
+              enum: ["upcoming", "live", "completed", "cancelled"],
+            },
             homeScore: { type: "integer" },
             awayScore: { type: "integer" },
             attendance: { type: "integer" },
@@ -122,9 +141,18 @@ const options: swaggerJsdoc.Options = {
             matchId: { type: "string", format: "uuid" },
             injuryType: { type: "string" },
             bodyPart: { type: "string" },
-            severity: { type: "string", enum: ["Minor", "Moderate", "Severe", "Critical"] },
-            cause: { type: "string", enum: ["Training", "Match", "NonFootball", "Unknown"] },
-            status: { type: "string", enum: ["UnderTreatment", "Recovered", "Relapsed", "Chronic"] },
+            severity: {
+              type: "string",
+              enum: ["Minor", "Moderate", "Severe", "Critical"],
+            },
+            cause: {
+              type: "string",
+              enum: ["Training", "Match", "NonFootball", "Unknown"],
+            },
+            status: {
+              type: "string",
+              enum: ["UnderTreatment", "Recovered", "Relapsed", "Chronic"],
+            },
             injuryDate: { type: "string", format: "date" },
             expectedReturnDate: { type: "string", format: "date" },
             actualReturnDate: { type: "string", format: "date" },
@@ -147,7 +175,10 @@ const options: swaggerJsdoc.Options = {
             taxAmount: { type: "number" },
             totalAmount: { type: "number" },
             currency: { type: "string" },
-            status: { type: "string", enum: ["Paid", "Expected", "Overdue", "Cancelled"] },
+            status: {
+              type: "string",
+              enum: ["Paid", "Expected", "Overdue", "Cancelled"],
+            },
             dueDate: { type: "string", format: "date" },
             issueDate: { type: "string", format: "date" },
             description: { type: "string" },
@@ -162,8 +193,14 @@ const options: swaggerJsdoc.Options = {
             playerId: { type: "string", format: "uuid" },
             amount: { type: "number" },
             currency: { type: "string" },
-            paymentType: { type: "string", enum: ["Commission", "Sponsorship", "Bonus"] },
-            status: { type: "string", enum: ["Paid", "Expected", "Overdue", "Cancelled"] },
+            paymentType: {
+              type: "string",
+              enum: ["Commission", "Sponsorship", "Bonus"],
+            },
+            status: {
+              type: "string",
+              enum: ["Paid", "Expected", "Overdue", "Cancelled"],
+            },
             dueDate: { type: "string", format: "date" },
             paidDate: { type: "string", format: "date" },
             reference: { type: "string" },
@@ -178,7 +215,10 @@ const options: swaggerJsdoc.Options = {
             fromClubId: { type: "string", format: "uuid" },
             toClubId: { type: "string", format: "uuid" },
             offerType: { type: "string", enum: ["Transfer", "Loan"] },
-            status: { type: "string", enum: ["New", "Under Review", "Negotiation", "Closed"] },
+            status: {
+              type: "string",
+              enum: ["New", "Under Review", "Negotiation", "Closed"],
+            },
             transferFee: { type: "number" },
             salaryOffered: { type: "number" },
             contractYears: { type: "integer" },
@@ -194,19 +234,20 @@ const options: swaggerJsdoc.Options = {
     },
     security: [{ bearerAuth: [] }],
   },
-  apis: [
-    "./src/modules/**/*.swagger.ts",
-    "./src/modules/**/*.swagger.docs.ts",
-  ],
+  apis: ["./src/modules/**/*.swagger.ts", "./src/modules/**/*.swagger.docs.ts"],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
 
 export function setupSwagger(app: Express): void {
-  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-    customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "Sadara API Docs",
-  }));
+  app.use(
+    "/api/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(swaggerSpec, {
+      customCss: ".swagger-ui .topbar { display: none }",
+      customSiteTitle: "Sadara API Docs",
+    }),
+  );
 
   // Raw JSON spec
   app.get("/api/docs.json", (_req, res) => {

@@ -3,15 +3,15 @@
 // Express routes for clearance (مخالصة) endpoints.
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
-import * as controller from "./clearance.controller";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import * as controller from "@modules/clearances/clearance.controller";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createClearanceSchema,
   updateClearanceSchema,
   completeClearanceSchema,
   clearanceQuerySchema,
-} from "./clearance.schema";
+} from "@modules/clearances/clearance.schema";
 
 const router = Router();
 
@@ -54,6 +54,10 @@ router.post(
 );
 
 // DELETE /api/v1/clearances/:id      — Delete clearance (Processing only)
-router.delete("/:id", authorizeModule("contracts", "delete"), controller.remove);
+router.delete(
+  "/:id",
+  authorizeModule("contracts", "delete"),
+  controller.remove,
+);
 
 export default router;

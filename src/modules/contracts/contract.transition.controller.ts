@@ -8,20 +8,20 @@
 //  4. Player signatures stay in signedDocumentUrl/signedAt/signingMethod
 // ─────────────────────────────────────────────────────────────
 import { Response } from "express";
-import { logger } from "../../config/logger";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
-import { AppError } from "../../middleware/errorHandler";
-import { Contract } from "./contract.model";
-import { transaction } from "../../config/database";
+import { logger } from "@config/logger";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { AppError } from "@middleware/errorHandler";
+import { Contract } from "@modules/contracts/contract.model";
+import { transaction } from "@config/database";
 import {
   createApprovalRequest,
   resolveApprovalByEntity,
   isApprovalChainResolved,
-} from "../approvals/approval.service";
-import { regenerateSignedPdf } from "./contract.signing.service";
+} from "@modules/approvals/approval.service";
+import { regenerateSignedPdf } from "@modules/contracts/contract.signing.service";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {

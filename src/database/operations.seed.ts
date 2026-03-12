@@ -1,14 +1,10 @@
-import { Offer } from "./../modules/offers/offer.model";
-import { Task } from "./../modules/tasks/task.model";
-import {
-  Invoice,
-  Payment,
-  Valuation,
-} from "./../modules/finance/finance.model";
-import { Document } from "./../modules/documents/document.model";
-import { Gate, GateChecklist } from "./../modules/gates/gate.model";
-import { Referral } from "./../modules/referrals/referral.model";
-import { Watchlist } from "./../modules/scouting/scouting.model";
+import { Offer } from "@modules/offers/offer.model";
+import { Task } from "@modules/tasks/task.model";
+import { Invoice, Payment, Valuation } from "@modules/finance/finance.model";
+import { Document } from "@modules/documents/document.model";
+import { Gate, GateChecklist } from "@modules/gates/gate.model";
+import { Referral } from "@modules/referrals/referral.model";
+import { Watchlist } from "@modules/scouting/scouting.model";
 import { IDS } from "./ids";
 
 // ── Offers ──

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   tournamentQuerySchema,
   fetchRequestSchema,
@@ -10,8 +10,8 @@ import {
   teamMapQuerySchema,
   mapTeamSchema,
   importRequestSchema,
-} from "./saff.schema";
-import * as saffController from "./saff.controller";
+} from "@modules/saff/saff.schema";
+import * as saffController from "@modules/saff/saff.controller";
 
 const router = Router();
 
@@ -85,10 +85,18 @@ router.post(
 );
 
 // ── Stats ──
-router.get("/stats", authorizeModule("saff-data", "read"), asyncHandler(saffController.getStats));
+router.get(
+  "/stats",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getStats),
+);
 
 // ── Sync (Scheduler) ──
-router.get("/sync-status", authorizeModule("saff-data", "read"), asyncHandler(saffController.getSyncStatus));
+router.get(
+  "/sync-status",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getSyncStatus),
+);
 router.post(
   "/sync-now",
   authorizeModule("saff-data", "create"),

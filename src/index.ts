@@ -1,14 +1,14 @@
 // src/index.ts
 
 import app from "./app";
-import { env } from "./config/env";
-import { testConnection, sequelize } from "./config/database";
-import { initRedis, closeRedis } from "./config/redis";
+import { env } from "@config/env";
+import { testConnection, sequelize } from "@config/database";
+import { initRedis, closeRedis } from "@config/redis";
 import { seedDatabase } from "./database/seed";
-import { migrator } from "./config/migrator";
-import { startSaffScheduler } from "./modules/saff/saff.scheduler";
+import { migrator } from "@config/migrator";
+import { startSaffScheduler } from "@modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
-import { loadTaskRuleConfigFromDB } from "./modules/matches/matchAutoTasks";
+import { loadTaskRuleConfigFromDB } from "@modules/matches/matchAutoTasks";
 import { loadPerformanceTrendConfig } from "./cron/engines/performance.engine";
 import { loadInjuryIntelConfig } from "./cron/engines/injury.engine";
 import { loadContractLifecycleConfig } from "./cron/engines/contract.engine";
@@ -17,18 +17,18 @@ import { loadGateOnboardingConfig } from "./cron/engines/gate.engine";
 import { loadScoutingPipelineConfig } from "./cron/engines/scouting.engine";
 import { loadTrainingDevConfig } from "./cron/engines/training.engine";
 import { loadSystemHealthConfig } from "./cron/engines/systemhealth.engine";
-import { loadPermissions } from "./modules/permissions/permission.service";
-import { ensureSportmonksColumn } from "./modules/sportmonks/sportmonks.service";
-import { registerProvider } from "./modules/integrations/matchAnalysis.service";
-import { WyscoutProvider } from "./modules/integrations/providers/wyscout";
+import { loadPermissions } from "@modules/permissions/permission.service";
+import { ensureSportmonksColumn } from "@modules/sportmonks/sportmonks.service";
+import { registerProvider } from "@modules/integrations/matchAnalysis.service";
+import { WyscoutProvider } from "@modules/integrations/providers/wyscout";
 import chalk from "chalk";
 import gradient from "gradient-string";
-import { logger } from "./config/logger";
+import { logger } from "@config/logger";
 import * as Sentry from "@sentry/node";
 import {
   initSSESubscriber,
   closeSSESubscriber,
-} from "./modules/notifications/notification.sse";
+} from "@modules/notifications/notification.sse";
 
 // ── Sentry Error Tracking (opt-in via SENTRY_DSN) ──
 if (env.sentry?.dsn) {

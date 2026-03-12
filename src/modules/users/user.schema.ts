@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/Users/user.schema.ts
+// src/modules/users/user.schema.ts
 // Zod validation schemas for the User CRUD module.
 //
 // NOTE: This is separate from auth.schema.ts (register/login).

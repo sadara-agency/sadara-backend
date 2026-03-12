@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export async function up() {
   // Add 'GymCoach' to the user_role enum type if it exists

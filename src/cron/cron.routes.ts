@@ -12,10 +12,10 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { Router, Response } from "express";
-import { asyncHandler } from "../middleware/errorHandler";
-import { authenticate, authorize } from "../middleware/auth";
-import { AuthRequest } from "../shared/types";
-import { sendSuccess } from "../shared/utils/apiResponse";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorize } from "@middleware/auth";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
 import { runJob, runAllJobs, getJobNames } from "./scheduler";
 
 const router = Router();

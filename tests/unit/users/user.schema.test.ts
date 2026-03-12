@@ -3,7 +3,7 @@ import {
   updateUserSchema,
   resetPasswordSchema,
   userQuerySchema,
-} from '../../../src/modules/Users/user.schema';
+} from '../../../src/modules/users/user.schema';
 
 describe('User Schemas', () => {
   describe('createUserSchema', () => {

@@ -5,12 +5,12 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Op, Sequelize } from "sequelize";
-import { Club } from "../clubs/club.model";
+import { Club } from "@modules/clubs/club.model";
 import {
   Competition,
   ClubCompetition,
-} from "../competitions/competition.model";
-import { SPL_CLUB_REGISTRY } from "./spl.registry";
+} from "@modules/competitions/competition.model";
+import { SPL_CLUB_REGISTRY } from "@modules/spl/spl.registry";
 
 // ══════════════════════════════════════════
 // SEED CLUB EXTERNAL IDS

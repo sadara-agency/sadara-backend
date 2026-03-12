@@ -3,7 +3,7 @@
 // Static registry of all 18 SPL 2025/26 clubs.
 // ─────────────────────────────────────────────────────────────
 
-import { SplClubEntry } from "./spl.types";
+import { SplClubEntry } from "@modules/spl/spl.types";
 
 export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
   {

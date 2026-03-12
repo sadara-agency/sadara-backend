@@ -133,10 +133,22 @@ function buildProfilePage(watchlist: any): string {
   const age = watchlist.dateOfBirth ? calcAge(watchlist.dateOfBirth) : "—";
 
   const ratings = [
-    { label: "Technical", labelAr: "تقني", value: watchlist.technicalRating || 0 },
-    { label: "Physical", labelAr: "بدني", value: watchlist.physicalRating || 0 },
+    {
+      label: "Technical",
+      labelAr: "تقني",
+      value: watchlist.technicalRating || 0,
+    },
+    {
+      label: "Physical",
+      labelAr: "بدني",
+      value: watchlist.physicalRating || 0,
+    },
     { label: "Mental", labelAr: "ذهني", value: watchlist.mentalRating || 0 },
-    { label: "Potential", labelAr: "إمكانية", value: watchlist.potentialRating || 0 },
+    {
+      label: "Potential",
+      labelAr: "إمكانية",
+      value: watchlist.potentialRating || 0,
+    },
   ];
 
   const ratingBars = ratings
@@ -220,9 +232,7 @@ function buildScreeningPage(screening: any, watchlist: any): string {
           : '<span class="nok">حرج</span>';
 
   const preparerName =
-    screening.preparer?.fullNameAr ||
-    screening.preparer?.fullName ||
-    "—";
+    screening.preparer?.fullNameAr || screening.preparer?.fullName || "—";
 
   return `<div class="pg">${HD}
     <div class="title">تقرير الفحص — ${name}</div>

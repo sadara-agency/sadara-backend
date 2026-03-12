@@ -1,8 +1,8 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import * as svc from "./sportmonks.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import * as svc from "@modules/sportmonks/sportmonks.service";
 
 export async function getFixtures(req: AuthRequest, res: Response) {
   const { from, to, leagueId } = req.query as {
@@ -11,17 +11,28 @@ export async function getFixtures(req: AuthRequest, res: Response) {
     leagueId?: string;
   };
   if (!from || !to) {
-    res.status(400).json({ success: false, message: "from and to date params required" });
+    res
+      .status(400)
+      .json({ success: false, message: "from and to date params required" });
     return;
   }
-  const fixtures = await svc.fetchFixtures(from, to, leagueId ? Number(leagueId) : undefined);
+  const fixtures = await svc.fetchFixtures(
+    from,
+    to,
+    leagueId ? Number(leagueId) : undefined,
+  );
   sendSuccess(res, fixtures);
 }
 
 export async function importFixtures(req: AuthRequest, res: Response) {
   const { fixtureIds, from, to, leagueId } = req.body;
   if (!fixtureIds?.length || !from || !to) {
-    res.status(400).json({ success: false, message: "fixtureIds array and from/to dates required" });
+    res
+      .status(400)
+      .json({
+        success: false,
+        message: "fixtureIds array and from/to dates required",
+      });
     return;
   }
   const result = await svc.importFixtures(fixtureIds, from, to, leagueId);
@@ -66,7 +77,12 @@ export async function mapTeam(req: AuthRequest, res: Response) {
 export async function searchTeamsHandler(req: AuthRequest, res: Response) {
   const q = (req.query.q as string) || "";
   if (!q || q.length < 2) {
-    res.status(400).json({ success: false, message: "Search query must be at least 2 characters" });
+    res
+      .status(400)
+      .json({
+        success: false,
+        message: "Search query must be at least 2 characters",
+      });
     return;
   }
   const teams = await svc.searchTeams(q);

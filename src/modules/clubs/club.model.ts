@@ -7,7 +7,7 @@
 // fix applied to Player and other models.
 // ─────────────────────────────────────────────────────────────
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 interface ClubAttributes {
   id: string;

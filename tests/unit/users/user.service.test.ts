@@ -22,7 +22,7 @@ jest.mock('../../../src/modules/players/player.model', () => ({
   },
 }));
 
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: {
     findAndCountAll: (...a: unknown[]) => mockFindAndCountAll(...a),
     findByPk: (...a: unknown[]) => mockFindByPk(...a),
@@ -35,7 +35,7 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
-import * as userService from '../../../src/modules/Users/user.service';
+import * as userService from '../../../src/modules/users/user.service';
 
 describe('User Service', () => {
   beforeEach(() => { jest.clearAllMocks(); });

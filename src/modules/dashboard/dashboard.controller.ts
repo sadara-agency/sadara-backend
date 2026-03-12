@@ -1,15 +1,8 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { camelCaseKeys } from "../../shared/utils/caseTransform";
-import * as dashboardService from "./dashboard.service";
-
-// GET /dashboard — full aggregated dashboard
-export async function getFullDashboard(req: AuthRequest, res: Response) {
-  const { id, role, playerId } = req.user!;
-  const data = await dashboardService.getFullDashboard(id, role, playerId);
-  sendSuccess(res, camelCaseKeys(data));
-}
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { camelCaseKeys } from "@shared/utils/caseTransform";
+import * as dashboardService from "@modules/dashboard/dashboard.service";
 
 // GET /dashboard/kpis
 export async function getKpis(_req: AuthRequest, res: Response) {

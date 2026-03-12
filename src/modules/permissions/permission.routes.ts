@@ -1,21 +1,24 @@
 import { Router, Response } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { RolePermission } from "./permission.model";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorize } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { RolePermission } from "@modules/permissions/permission.model";
 import {
   getPermissions,
   invalidatePermissionCache,
   loadPermissions,
   getFieldPermissions,
   loadFieldPermissions,
-} from "./permission.service";
-import { RoleFieldPermission } from "./fieldPermission.model";
-import { CONFIGURABLE_FIELDS } from "./fieldPermission.config";
-import { updatePermissionsSchema, updateFieldPermissionsSchema } from "./permission.schema";
+} from "@modules/permissions/permission.service";
+import { RoleFieldPermission } from "@modules/permissions/fieldPermission.model";
+import { CONFIGURABLE_FIELDS } from "@modules/permissions/fieldPermission.config";
+import {
+  updatePermissionsSchema,
+  updateFieldPermissionsSchema,
+} from "@modules/permissions/permission.schema";
 
 const router = Router();
 router.use(authenticate);
@@ -40,9 +43,7 @@ router.put(
     const { permissions } = req.body;
 
     // Prevent modifying Admin permissions (Admin always has full access)
-    const filtered = permissions.filter(
-      (p: any) => p.role !== "Admin",
-    );
+    const filtered = permissions.filter((p: any) => p.role !== "Admin");
 
     for (const perm of filtered) {
       await RolePermission.upsert({
@@ -99,9 +100,7 @@ router.put(
     const { fieldPermissions } = req.body;
 
     // Prevent modifying Admin field permissions
-    const filtered = fieldPermissions.filter(
-      (p: any) => p.role !== "Admin",
-    );
+    const filtered = fieldPermissions.filter((p: any) => p.role !== "Admin");
 
     for (const perm of filtered) {
       await RoleFieldPermission.upsert({

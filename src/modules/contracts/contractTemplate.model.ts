@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export interface ContractTemplateDefaultValues {
   playerContractType?: "Professional" | "Amateur" | "Youth";
@@ -29,11 +29,10 @@ interface ContractTemplateAttributes {
   updatedAt?: Date;
 }
 
-interface ContractTemplateCreation
-  extends Optional<
-    ContractTemplateAttributes,
-    "id" | "nameAr" | "isActive" | "createdBy" | "createdAt" | "updatedAt"
-  > {}
+interface ContractTemplateCreation extends Optional<
+  ContractTemplateAttributes,
+  "id" | "nameAr" | "isActive" | "createdBy" | "createdAt" | "updatedAt"
+> {}
 
 export class ContractTemplate
   extends Model<ContractTemplateAttributes, ContractTemplateCreation>

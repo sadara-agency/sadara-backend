@@ -26,7 +26,7 @@ jest.mock('../../../src/modules/approvals/approval.model', () => ({
   ApprovalStatus: {},
 }));
 
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: { name: 'User' },
 }));
 

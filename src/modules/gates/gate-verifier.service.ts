@@ -1,11 +1,11 @@
 import { Op } from "sequelize";
-import { Gate, GateChecklist } from "./gate.model";
-import { Player } from "../players/player.model";
-import { Document } from "../documents/document.model";
-import { Contract } from "../contracts/contract.model";
-import { Note } from "../notes/note.model";
-import { Valuation } from "../finance/finance.model";
-import { ScreeningCase, Watchlist } from "../scouting/scouting.model";
+import { Gate, GateChecklist } from "@modules/gates/gate.model";
+import { Player } from "@modules/players/player.model";
+import { Document } from "@modules/documents/document.model";
+import { Contract } from "@modules/contracts/contract.model";
+import { Note } from "@modules/notes/note.model";
+import { Valuation } from "@modules/finance/finance.model";
+import { ScreeningCase, Watchlist } from "@modules/scouting/scouting.model";
 
 // ══════════════════════════════════════════
 // TYPES

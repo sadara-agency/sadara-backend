@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export interface MatchAnalysisAttributes {
   id: string;
@@ -16,8 +16,10 @@ export interface MatchAnalysisAttributes {
   updatedAt?: Date;
 }
 
-interface MatchAnalysisCreationAttributes
-  extends Optional<MatchAnalysisAttributes, "id" | "status" | "createdAt" | "updatedAt"> {}
+interface MatchAnalysisCreationAttributes extends Optional<
+  MatchAnalysisAttributes,
+  "id" | "status" | "createdAt" | "updatedAt"
+> {}
 
 export class MatchAnalysis
   extends Model<MatchAnalysisAttributes, MatchAnalysisCreationAttributes>

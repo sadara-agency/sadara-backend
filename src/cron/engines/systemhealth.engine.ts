@@ -6,9 +6,9 @@
 // risk radar consistency, and duplicate detection.
 // ═══════════════════════════════════════════════════════════════
 
-import { sequelize } from "../../config/database";
-import { logger } from "../../config/logger";
-import { notifyByRole } from "../../modules/notifications/notification.service";
+import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
+import { notifyByRole } from "@modules/notifications/notification.service";
 
 // ── Configurable thresholds (loaded from app_settings) ──
 

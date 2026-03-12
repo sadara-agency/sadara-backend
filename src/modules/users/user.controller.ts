@@ -1,19 +1,19 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/Users/user.controller.ts
+// src/modules/users/user.controller.ts
 // Thin controller layer — delegates to user.service.ts,
 // handles audit logging, and sends standardized responses.
 //
 // Follows the same pattern as player.controller.ts.
 // ─────────────────────────────────────────────────────────────
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import * as userService from "./user.service";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import * as userService from "@modules/users/user.service";
 
 // ── List Users ──
 export async function list(req: AuthRequest, res: Response) {

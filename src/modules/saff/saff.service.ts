@@ -4,17 +4,17 @@ import {
   SaffStanding,
   SaffFixture,
   SaffTeamMap,
-} from "./saff.model";
-import { Club } from "../clubs/club.model";
-import { Match } from "../matches/match.model";
-import { sequelize } from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+} from "@modules/saff/saff.model";
+import { Club } from "@modules/clubs/club.model";
+import { Match } from "@modules/matches/match.model";
+import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   scrapeBatch,
   scrapeTeamLogos,
   type ScrapeResult,
-} from "./saff.scraper";
+} from "@modules/saff/saff.scraper";
 import type {
   TournamentQuery,
   FetchRequest,
@@ -23,7 +23,7 @@ import type {
   TeamMapQuery,
   MapTeamInput,
   ImportRequest,
-} from "./saff.schema";
+} from "@modules/saff/saff.schema";
 
 // ══════════════════════════════════════════
 // TOURNAMENT CATALOG

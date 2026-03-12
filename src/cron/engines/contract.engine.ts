@@ -6,13 +6,13 @@
 // tracking, stale draft cleanup, and commission due alerts.
 // ═══════════════════════════════════════════════════════════════
 
-import { sequelize } from "../../config/database";
-import { logger } from "../../config/logger";
-import { Task } from "../../modules/tasks/task.model";
+import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
+import { Task } from "@modules/tasks/task.model";
 import {
   notifyByRole,
   notifyUser,
-} from "../../modules/notifications/notification.service";
+} from "@modules/notifications/notification.service";
 import { QueryTypes } from "sequelize";
 
 // ── Row-level interfaces for raw SQL results ──

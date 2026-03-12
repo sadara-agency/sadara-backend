@@ -7,18 +7,18 @@ import {
   TrainingCourse,
   TrainingEnrollment,
   TrainingActivity,
-} from "./training.model";
-import { Player } from "../players/player.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
+} from "@modules/training/training.model";
+import { Player } from "@modules/players/player.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import type {
   CreateCourseInput,
   UpdateCourseInput,
   UpdateEnrollmentInput,
   TrackActivityInput,
   SelfUpdateProgressInput,
-} from "./training.schema";
+} from "@modules/training/training.schema";
 
 const PLAYER_ATTRS = [
   "id",

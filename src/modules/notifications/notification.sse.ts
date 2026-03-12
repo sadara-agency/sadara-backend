@@ -3,11 +3,11 @@
 // ─────────────────────────────────────────────────────────────
 import { Request, Response } from "express";
 import jwt from "jsonwebtoken";
-import { env } from "../../config/env";
-import { getRedisClient } from "../../config/redis";
-import { COOKIE_NAME } from "../../shared/utils/cookie";
-import { AuthUser } from "../../shared/types";
-import { logger } from "../../config/logger";
+import { env } from "@config/env";
+import { getRedisClient } from "@config/redis";
+import { COOKIE_NAME } from "@shared/utils/cookie";
+import { AuthUser } from "@shared/types";
+import { logger } from "@config/logger";
 import type { RedisClientType } from "redis";
 
 // ── SSE Notification Payload ──
@@ -119,9 +119,12 @@ export async function publishNotification(
       );
       return;
     } catch (err) {
-      logger.debug("SSE: Redis publish failed, falling back to local delivery", {
-        error: (err as Error).message,
-      });
+      logger.debug(
+        "SSE: Redis publish failed, falling back to local delivery",
+        {
+          error: (err as Error).message,
+        },
+      );
     }
   }
 
@@ -208,7 +211,9 @@ export function handleSSEConnection(req: Request, res: Response): void {
   }
   connections.get(userId)!.add(res);
 
-  logger.debug(`SSE: User ${userId} connected (${connections.get(userId)!.size} active)`);
+  logger.debug(
+    `SSE: User ${userId} connected (${connections.get(userId)!.size} active)`,
+  );
 
   // ── Heartbeat (keep TCP alive through proxies) ──
   const heartbeat = setInterval(() => {
@@ -238,7 +243,10 @@ export function handleSSEConnection(req: Request, res: Response): void {
 
 // ── Stats (for health check) ──
 
-export function getSSEStats(): { totalConnections: number; uniqueUsers: number } {
+export function getSSEStats(): {
+  totalConnections: number;
+  uniqueUsers: number;
+} {
   let totalConnections = 0;
   for (const conns of connections.values()) {
     totalConnections += conns.size;

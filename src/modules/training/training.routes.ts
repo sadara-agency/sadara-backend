@@ -3,9 +3,9 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createCourseSchema,
   updateCourseSchema,
@@ -13,8 +13,8 @@ import {
   updateEnrollmentSchema,
   trackActivitySchema,
   selfUpdateProgressSchema,
-} from "./training.schema";
-import * as ctrl from "./training.controller";
+} from "@modules/training/training.schema";
+import * as ctrl from "@modules/training/training.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -24,7 +24,11 @@ router.use(authenticate);
 // ══════════════════════════════════════════
 
 // Player sees only their assigned courses
-router.get("/my", authorizeModule("training", "read"), asyncHandler(ctrl.myEnrollments));
+router.get(
+  "/my",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.myEnrollments),
+);
 
 // Player logs a content interaction (Clicked, VideoCompleted, etc.)
 router.post(
@@ -56,10 +60,27 @@ router.get(
 // COURSES (Admin / Manager CRUD)
 // ══════════════════════════════════════════
 
-router.get("/", authorizeModule("training", "read"), asyncHandler(ctrl.listCourses));
-router.get("/player/:playerId", authorizeModule("training", "read"), asyncHandler(ctrl.playerEnrollments));
-router.get("/:id", authorizeModule("training", "read"), asyncHandler(ctrl.getCourse));
-router.post("/", authorizeModule("training", "create"), validate(createCourseSchema), asyncHandler(ctrl.createCourse));
+router.get(
+  "/",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.listCourses),
+);
+router.get(
+  "/player/:playerId",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.playerEnrollments),
+);
+router.get(
+  "/:id",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.getCourse),
+);
+router.post(
+  "/",
+  authorizeModule("training", "create"),
+  validate(createCourseSchema),
+  asyncHandler(ctrl.createCourse),
+);
 router.patch(
   "/:id",
   authorizeModule("training", "update"),

@@ -1,10 +1,10 @@
 import { Op, QueryTypes } from "sequelize";
-import { Note, NoteOwnerType } from "./note.model";
-import { sequelize } from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
-import { hasPermission } from "../permissions/permission.service";
+import { Note, NoteOwnerType } from "@modules/notes/note.model";
+import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { hasPermission } from "@modules/permissions/permission.service";
 
 /**
  * Maps NoteOwnerType to the backend permission module name.

@@ -1,13 +1,16 @@
-import { ContractTemplate } from "./contractTemplate.model";
-import { AppError } from "../../middleware/errorHandler";
+import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
+import { AppError } from "@middleware/errorHandler";
 import type {
   CreateContractTemplateInput,
   UpdateContractTemplateInput,
-} from "./contractTemplate.schema";
+} from "@modules/contracts/contractTemplate.schema";
 
 export async function listContractTemplates() {
   return ContractTemplate.findAll({
-    order: [["contractType", "ASC"], ["name", "ASC"]],
+    order: [
+      ["contractType", "ASC"],
+      ["name", "ASC"],
+    ],
   });
 }
 
@@ -40,9 +43,11 @@ export async function updateContractTemplate(
 
   if (input.name !== undefined) template.name = input.name;
   if (input.nameAr !== undefined) template.nameAr = input.nameAr;
-  if (input.contractType !== undefined) template.contractType = input.contractType;
+  if (input.contractType !== undefined)
+    template.contractType = input.contractType;
   if (input.category !== undefined) template.category = input.category;
-  if (input.defaultValues !== undefined) template.defaultValues = input.defaultValues;
+  if (input.defaultValues !== undefined)
+    template.defaultValues = input.defaultValues;
   if (input.isActive !== undefined) template.isActive = input.isActive;
 
   await template.save();

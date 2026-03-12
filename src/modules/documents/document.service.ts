@@ -1,16 +1,19 @@
 import { Op } from "sequelize";
-import { Document, DocumentEntityType } from "./document.model";
-import { Player } from "../players/player.model";
-import { Contract } from "../contracts/contract.model";
-import { Match } from "../matches/match.model";
-import { Injury } from "../injuries/injury.model";
-import { Club } from "../clubs/club.model";
-import { Offer } from "../offers/offer.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
-import { hasPermission } from "../permissions/permission.service";
+import {
+  Document,
+  DocumentEntityType,
+} from "@modules/documents/document.model";
+import { Player } from "@modules/players/player.model";
+import { Contract } from "@modules/contracts/contract.model";
+import { Match } from "@modules/matches/match.model";
+import { Injury } from "@modules/injuries/injury.model";
+import { Club } from "@modules/clubs/club.model";
+import { Offer } from "@modules/offers/offer.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
+import { hasPermission } from "@modules/permissions/permission.service";
 
 const USER_ATTRS = ["id", "fullName"] as const;
 

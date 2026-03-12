@@ -1,9 +1,9 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { createCrudController } from "../../shared/utils/crudController";
-import * as svc from "./injury.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { createCrudController } from "@shared/utils/crudController";
+import * as svc from "@modules/injuries/injury.service";
 
 const crud = createCrudController({
   service: {

@@ -13,9 +13,9 @@
 //   ├── matches.seed.ts     — 8 matches + match players + stats
 //   └── operations.seed.ts  — Offers, tasks, finance, docs, gates, referrals, scouting
 // ─────────────────────────────────────────────────────────────
-import { sequelize } from "../config/database";
-import { env } from "../config/env";
-import { User } from "../modules/Users/user.model";
+import { sequelize } from "@config/database";
+import { env } from "@config/env";
+import { User } from "@modules/users/user.model";
 
 // Data seeders
 import { seedUsers } from "./users.seed";

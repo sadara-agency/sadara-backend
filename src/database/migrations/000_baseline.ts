@@ -2,7 +2,7 @@
 // Baseline migration — all DDL is consolidated here (no separate schema.ts).
 // All operations are idempotent (IF NOT EXISTS, etc.) so safe for existing databases.
 
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
 
 async function createMissingTables() {

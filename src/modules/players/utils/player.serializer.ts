@@ -15,8 +15,11 @@ import {
   RawContractRow,
   RawPlayerStatsRow,
   EnrichedPlayerListItem,
-} from "./player.types";
-import { deriveContractInfo, calculatePerformance } from "./player.utils";
+} from "@modules/players/utils/player.types";
+import {
+  deriveContractInfo,
+  calculatePerformance,
+} from "@modules/players/utils/player.utils";
 
 export interface EnrichmentMaps {
   contractMap: Map<string, RawContractRow>;

@@ -1,15 +1,15 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { logger } from "../../config/logger";
-import { createCrudController } from "../../shared/utils/crudController";
-import * as offerService from "./offer.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { logger } from "@config/logger";
+import { createCrudController } from "@shared/utils/crudController";
+import * as offerService from "@modules/offers/offer.service";
 import {
   createApprovalRequest,
   resolveApprovalByEntity,
-} from "../approvals/approval.service";
-import { Player } from "../players/player.model";
+} from "@modules/approvals/approval.service";
+import { Player } from "@modules/players/player.model";
 
 const crud = createCrudController({
   service: {

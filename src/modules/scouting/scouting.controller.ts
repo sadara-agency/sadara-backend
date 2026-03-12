@@ -1,13 +1,13 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { logger } from "../../config/logger";
-import * as scoutingService from "./scouting.service";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { logger } from "@config/logger";
+import * as scoutingService from "@modules/scouting/scouting.service";
 
 // ══════════════════════════════════════════
 // WATCHLIST

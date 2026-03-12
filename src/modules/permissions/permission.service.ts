@@ -1,6 +1,6 @@
-import { RolePermission } from "./permission.model";
-import { RoleFieldPermission } from "./fieldPermission.model";
-import { cacheGet, cacheSet, cacheDel, CacheTTL } from "../../shared/utils/cache";
+import { RolePermission } from "@modules/permissions/permission.model";
+import { RoleFieldPermission } from "@modules/permissions/fieldPermission.model";
+import { cacheGet, cacheSet, cacheDel, CacheTTL } from "@shared/utils/cache";
 
 // ── Types ──
 

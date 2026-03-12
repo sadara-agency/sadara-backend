@@ -1,16 +1,16 @@
 import { Response } from "express";
 import path from "path";
 import fs from "fs";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import * as svc from "./report.service";
-import { generateReportXlsx } from "./report.xlsx";
-import { generatePredefinedReportPdf } from "./report.predefined-pdf";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import * as svc from "@modules/reports/report.service";
+import { generateReportXlsx } from "@modules/reports/report.xlsx";
+import { generatePredefinedReportPdf } from "@modules/reports/report.predefined-pdf";
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await svc.listReports(req.query);
@@ -117,11 +117,14 @@ export async function expiringContracts(req: AuthRequest, res: Response) {
 
 // ── Generic Export Dispatch ──
 
-const REPORT_DATA_MAP: Record<string, {
-  fetch: (f: any) => Promise<any>;
-  title: string;
-  extractSections: (d: any) => { sheetName: string; rows: any[] }[];
-}> = {
+const REPORT_DATA_MAP: Record<
+  string,
+  {
+    fetch: (f: any) => Promise<any>;
+    title: string;
+    extractSections: (d: any) => { sheetName: string; rows: any[] }[];
+  }
+> = {
   "player-portfolio": {
     fetch: svc.getPlayerPortfolioReport,
     title: "Player Portfolio Report",
@@ -170,7 +173,10 @@ const REPORT_DATA_MAP: Record<string, {
   },
 };
 
-export async function exportXlsx(req: AuthRequest, res: Response): Promise<void> {
+export async function exportXlsx(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
   const { type } = req.params;
   const config = REPORT_DATA_MAP[type];
   if (!config) {
@@ -187,12 +193,18 @@ export async function exportXlsx(req: AuthRequest, res: Response): Promise<void>
   });
 
   const fileName = `sadara-${type}-${new Date().toISOString().split("T")[0]}.xlsx`;
-  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader(
+    "Content-Type",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  );
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   res.send(buffer);
 }
 
-export async function exportPdf(req: AuthRequest, res: Response): Promise<void> {
+export async function exportPdf(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
   const { type } = req.params;
   const config = REPORT_DATA_MAP[type];
   if (!config) {

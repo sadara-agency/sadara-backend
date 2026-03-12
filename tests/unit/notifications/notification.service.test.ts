@@ -24,7 +24,7 @@ jest.mock('../../../src/modules/notifications/notification.model', () => ({
   },
 }));
 
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: {
     findAll: (...a: unknown[]) => mockUserFindAll(...a),
   },

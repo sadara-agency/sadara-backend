@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createExerciseSchema,
   updateExerciseSchema,
@@ -23,8 +23,8 @@ import {
   updateDietPlanSchema,
   createDietMealSchema,
   logAdherenceSchema,
-} from "./gym.schema";
-import * as ctrl from "./gym.controller";
+} from "@modules/gym/gym.schema";
+import * as ctrl from "@modules/gym/gym.controller";
 
 const router = Router();
 router.use(authenticate);

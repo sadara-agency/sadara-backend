@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { dynamicFieldAccess } from "../../middleware/fieldAccess";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { validate } from "@middleware/validate";
 import {
   createWatchlistSchema,
   updateWatchlistSchema,
@@ -12,9 +12,9 @@ import {
   updateScreeningSchema,
   markPackReadySchema,
   createDecisionSchema,
-} from "./scouting.schema";
-import * as ctrl from "./scouting.controller";
-import { generatePackPdf } from "./scouting.pdf.controller";
+} from "@modules/scouting/scouting.schema";
+import * as ctrl from "@modules/scouting/scouting.controller";
+import { generatePackPdf } from "@modules/scouting/scouting.pdf.controller";
 
 const router = Router();
 router.use(authenticate);

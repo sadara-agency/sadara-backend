@@ -10,13 +10,13 @@
 //   - Auto-set completedAt when status → Completed
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, literal } from "sequelize";
-import { Task } from "./task.model";
-import { Player } from "../players/player.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
-import { CreateTaskInput, UpdateTaskInput } from "./task.schema";
+import { Task } from "@modules/tasks/task.model";
+import { Player } from "@modules/players/player.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
+import { CreateTaskInput, UpdateTaskInput } from "@modules/tasks/task.schema";
 
 // ── Shared includes for player + assignee names ──
 const TASK_INCLUDES = [

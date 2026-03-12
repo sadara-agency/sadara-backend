@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export type ApprovalStepStatus =
   | "Pending"
@@ -25,21 +25,20 @@ interface ApprovalStepAttributes {
   updatedAt?: Date;
 }
 
-interface ApprovalStepCreation
-  extends Optional<
-    ApprovalStepAttributes,
-    | "id"
-    | "approverUserId"
-    | "status"
-    | "label"
-    | "labelAr"
-    | "comment"
-    | "dueDate"
-    | "resolvedBy"
-    | "resolvedAt"
-    | "createdAt"
-    | "updatedAt"
-  > {}
+interface ApprovalStepCreation extends Optional<
+  ApprovalStepAttributes,
+  | "id"
+  | "approverUserId"
+  | "status"
+  | "label"
+  | "labelAr"
+  | "comment"
+  | "dueDate"
+  | "resolvedBy"
+  | "resolvedAt"
+  | "createdAt"
+  | "updatedAt"
+> {}
 
 export class ApprovalStep
   extends Model<ApprovalStepAttributes, ApprovalStepCreation>
@@ -120,9 +119,6 @@ ApprovalStep.init(
     tableName: "approval_steps",
     underscored: true,
     timestamps: true,
-    indexes: [
-      { fields: ["approval_request_id"] },
-      { fields: ["status"] },
-    ],
+    indexes: [{ fields: ["approval_request_id"] }, { fields: ["status"] }],
   },
 );

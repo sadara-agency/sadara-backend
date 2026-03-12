@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/database/seed/clubs.seed.ts
 // ─────────────────────────────────────────────────────────────
-import { Club } from "./../modules/clubs/club.model";
+import { Club } from "@modules/clubs/club.model";
 import { IDS } from "./ids";
 
 export async function seedClubs() {

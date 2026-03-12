@@ -16,6 +16,8 @@
     "baseUrl": "./src",
     "types": ["jest", "node"],
     "paths": {
+      "@sadara/shared": ["../../shared/src"],
+      "@sadara/shared/*": ["../../shared/src/*"],
       "@config/*": ["config/*"],
       "@middleware/*": ["middleware/*"],
       "@modules/*": ["modules/*"],
@@ -29,5 +31,8 @@
   "exclude": [
     "node_modules",
     "dist"
+  ],
+  "references": [
+    { "path": "../shared" }
   ]
 }

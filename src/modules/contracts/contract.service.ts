@@ -6,16 +6,19 @@ import {
   col,
   where as seqWhere,
 } from "sequelize";
-import { Contract } from "./contract.model";
-import { Player } from "../players/player.model";
-import { Club } from "../clubs/club.model";
-import { User } from "../Users/user.model";
-import { AuditLog } from "../audit/AuditLog.model";
-import { sequelize } from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
-import { CreateContractInput, UpdateContractInput } from "./contract.schema";
+import { Contract } from "@modules/contracts/contract.model";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { User } from "@modules/users/user.model";
+import { AuditLog } from "@modules/audit/AuditLog.model";
+import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
+import {
+  CreateContractInput,
+  UpdateContractInput,
+} from "@modules/contracts/contract.schema";
 
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [

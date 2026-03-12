@@ -2,8 +2,8 @@
 // src/database/seed/users.seed.ts
 // ─────────────────────────────────────────────────────────────
 import bcrypt from "bcryptjs";
-import { User } from "./../modules/Users/user.model";
-import { env } from "./../config/env";
+import { User } from "@modules/users/user.model";
+import { env } from "@config/env";
 import { IDS } from "./ids";
 
 export async function seedUsers() {

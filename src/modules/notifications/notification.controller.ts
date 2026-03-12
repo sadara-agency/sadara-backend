@@ -1,7 +1,7 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
-import * as svc from "./notification.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import * as svc from "@modules/notifications/notification.service";
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await svc.listNotifications(req.user!.id, req.query);

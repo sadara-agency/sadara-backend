@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 // ── ApprovalChainTemplate ──
 
@@ -14,11 +14,10 @@ interface ApprovalChainTemplateAttributes {
   updatedAt?: Date;
 }
 
-interface ApprovalChainTemplateCreation
-  extends Optional<
-    ApprovalChainTemplateAttributes,
-    "id" | "nameAr" | "isActive" | "createdAt" | "updatedAt"
-  > {}
+interface ApprovalChainTemplateCreation extends Optional<
+  ApprovalChainTemplateAttributes,
+  "id" | "nameAr" | "isActive" | "createdAt" | "updatedAt"
+> {}
 
 export class ApprovalChainTemplate
   extends Model<ApprovalChainTemplateAttributes, ApprovalChainTemplateCreation>
@@ -91,11 +90,10 @@ interface ApprovalChainTemplateStepAttributes {
   updatedAt?: Date;
 }
 
-interface ApprovalChainTemplateStepCreation
-  extends Optional<
-    ApprovalChainTemplateStepAttributes,
-    "id" | "labelAr" | "dueDays" | "isMandatory" | "createdAt" | "updatedAt"
-  > {}
+interface ApprovalChainTemplateStepCreation extends Optional<
+  ApprovalChainTemplateStepAttributes,
+  "id" | "labelAr" | "dueDays" | "isMandatory" | "createdAt" | "updatedAt"
+> {}
 
 export class ApprovalChainTemplateStep
   extends Model<

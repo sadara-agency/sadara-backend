@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export async function up() {
   await sequelize.query(`
@@ -25,9 +25,15 @@ export async function up() {
     );
   `);
 
-  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)`);
-  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`);
-  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_expenses_player_id ON expenses(player_id)`);
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date)`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category)`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_expenses_player_id ON expenses(player_id)`,
+  );
 }
 
 export async function down() {

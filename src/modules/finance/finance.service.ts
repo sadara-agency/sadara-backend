@@ -1,6 +1,6 @@
 import { Op, QueryTypes } from "sequelize";
 import { randomUUID } from "crypto";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 import {
   Invoice,
   Payment,
@@ -11,14 +11,14 @@ import {
   type PaymentType,
   type ExpenseCategory,
   type ValuationTrend,
-} from "./finance.model";
-import { Player } from "../players/player.model";
-import { Club } from "../clubs/club.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
-import { PaginationQuery } from "../../shared/types";
+} from "@modules/finance/finance.model";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
+import { PaginationQuery } from "@shared/types";
 
 // ── Query parameter interfaces ──
 

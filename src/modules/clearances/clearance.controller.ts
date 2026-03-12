@@ -3,14 +3,14 @@
 // Route handlers for clearance (مخالصة) endpoints.
 // ─────────────────────────────────────────────────────────────
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import * as clearanceService from "./clearance.service";
+import { AuthRequest } from "@shared/types";
+import * as clearanceService from "@modules/clearances/clearance.service";
 import {
   sendSuccess,
   sendPaginated,
   sendCreated,
-} from "../../shared/utils/apiResponse";
-import { AppError } from "../../middleware/errorHandler";
+} from "@shared/utils/apiResponse";
+import { AppError } from "@middleware/errorHandler";
 
 // GET /api/v1/clearances
 export async function list(req: AuthRequest, res: Response) {

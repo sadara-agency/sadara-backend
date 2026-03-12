@@ -6,30 +6,30 @@
  */
 
 import { Op } from "sequelize";
-import { sequelize } from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { Player } from "../players/player.model";
-import { User } from "../Users/user.model";
-import { Contract } from "../contracts/contract.model";
-import { Injury, InjuryUpdate } from "../injuries/injury.model";
-import { Document } from "../documents/document.model";
-import { Note } from "../notes/note.model";
+import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
+import { Player } from "@modules/players/player.model";
+import { User } from "@modules/users/user.model";
+import { Contract } from "@modules/contracts/contract.model";
+import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { Document } from "@modules/documents/document.model";
+import { Note } from "@modules/notes/note.model";
 import {
   Invoice,
   Payment,
   LedgerEntry,
   Valuation,
-} from "../finance/finance.model";
-import { Offer } from "../offers/offer.model";
-import { Referral } from "../referrals/referral.model";
-import { Clearance } from "../clearances/clearance.model";
+} from "@modules/finance/finance.model";
+import { Offer } from "@modules/offers/offer.model";
+import { Referral } from "@modules/referrals/referral.model";
+import { Clearance } from "@modules/clearances/clearance.model";
 import {
   TrainingEnrollment,
   TrainingActivity,
-} from "../training/training.model";
-import { TechnicalReport } from "../reports/report.model";
-import { PlayerMatchStats } from "../matches/playerMatchStats.model";
-import { ExternalProviderMapping } from "../players/externalProvider.model";
+} from "@modules/training/training.model";
+import { TechnicalReport } from "@modules/reports/report.model";
+import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
 
 // ── Right to Access ──
 
@@ -299,10 +299,10 @@ export async function anonymizePlayerData(
       anonymizedTables.push("injuries");
 
       // InjuryUpdates
-      await InjuryUpdate.update(
-        { notes: null, notesAr: null } as any,
-        { where: { injuryId: { [Op.in]: injuryIds } }, ...txOpts },
-      );
+      await InjuryUpdate.update({ notes: null, notesAr: null } as any, {
+        where: { injuryId: { [Op.in]: injuryIds } },
+        ...txOpts,
+      });
       anonymizedTables.push("injury_updates");
     }
 
@@ -343,10 +343,10 @@ export async function anonymizePlayerData(
     };
     const noteCount = await Note.count({ where: noteWhere, ...txOpts });
     if (noteCount > 0) {
-      await Note.update(
-        { content: "[REDACTED]" } as any,
-        { where: noteWhere, ...txOpts },
-      );
+      await Note.update({ content: "[REDACTED]" } as any, {
+        where: noteWhere,
+        ...txOpts,
+      });
       anonymizedTables.push("notes");
     }
 
@@ -356,10 +356,10 @@ export async function anonymizePlayerData(
       ...txOpts,
     });
     if (invCount > 0) {
-      await Invoice.update(
-        { description: null } as any,
-        { where: { playerId }, ...txOpts },
-      );
+      await Invoice.update({ description: null } as any, {
+        where: { playerId },
+        ...txOpts,
+      });
       anonymizedTables.push("invoices");
     }
 
@@ -380,10 +380,10 @@ export async function anonymizePlayerData(
       ...txOpts,
     });
     if (ledgerCount > 0) {
-      await LedgerEntry.update(
-        { description: null } as any,
-        { where: { playerId }, ...txOpts },
-      );
+      await LedgerEntry.update({ description: null } as any, {
+        where: { playerId },
+        ...txOpts,
+      });
       anonymizedTables.push("ledger_entries");
     }
 
@@ -392,10 +392,10 @@ export async function anonymizePlayerData(
       ...txOpts,
     });
     if (valCount > 0) {
-      await Valuation.update(
-        { notes: null, source: null } as any,
-        { where: { playerId }, ...txOpts },
-      );
+      await Valuation.update({ notes: null, source: null } as any, {
+        where: { playerId },
+        ...txOpts,
+      });
       anonymizedTables.push("valuations");
     }
 
@@ -457,10 +457,10 @@ export async function anonymizePlayerData(
       ...txOpts,
     });
     if (enrollCount > 0) {
-      await TrainingEnrollment.update(
-        { notes: null } as any,
-        { where: { playerId }, ...txOpts },
-      );
+      await TrainingEnrollment.update({ notes: null } as any, {
+        where: { playerId },
+        ...txOpts,
+      });
       anonymizedTables.push("training_enrollments");
     }
 
@@ -469,10 +469,10 @@ export async function anonymizePlayerData(
       ...txOpts,
     });
     if (actCount > 0) {
-      await TrainingActivity.update(
-        { metadata: null } as any,
-        { where: { playerId }, ...txOpts },
-      );
+      await TrainingActivity.update({ metadata: null } as any, {
+        where: { playerId },
+        ...txOpts,
+      });
       anonymizedTables.push("training_activities");
     }
 

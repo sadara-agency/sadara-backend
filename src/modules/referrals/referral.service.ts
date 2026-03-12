@@ -1,15 +1,18 @@
 import { Op } from "sequelize";
-import { Referral, type ReferralAttributes } from "./referral.model";
-import { Player } from "../players/player.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
+import {
+  Referral,
+  type ReferralAttributes,
+} from "@modules/referrals/referral.model";
+import { Player } from "@modules/players/player.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
   notifyByRole,
   notifyUser,
-} from "../notifications/notification.service";
-import { logger } from "../../config/logger";
+} from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
 
 const PLAYER_ATTRS = [
   "id",

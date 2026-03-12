@@ -1,8 +1,8 @@
 import {
   ApprovalChainTemplate,
   ApprovalChainTemplateStep,
-} from "../modules/approvals/approvalChainTemplate.model";
-import { logger } from "../config/logger";
+} from "@modules/approvals/approvalChainTemplate.model";
+import { logger } from "@config/logger";
 
 interface TemplateSeed {
   entityType: string;

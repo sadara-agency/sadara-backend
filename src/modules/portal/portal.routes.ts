@@ -1,10 +1,10 @@
 import { Router } from "express";
 import { z } from "zod";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { uploadSingle, verifyFileType } from "../../middleware/upload";
-import * as portalController from "./portal.controller";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorize } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
+import * as portalController from "@modules/portal/portal.controller";
 
 const router = Router();
 

@@ -1,6 +1,6 @@
 import rateLimit from "express-rate-limit";
 import { RedisStore } from "rate-limit-redis";
-import { getRedisClient, isRedisConnected } from "../config/redis";
+import { getRedisClient, isRedisConnected } from "@config/redis";
 
 // ═══════════════════════════════════════════════════════════
 // Rate Limiter — Redis-backed (falls back to in-memory)

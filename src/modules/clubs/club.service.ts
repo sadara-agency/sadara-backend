@@ -12,18 +12,18 @@
 // - Consistent with player/user/task/contract service patterns
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, QueryTypes } from "sequelize";
-import { Club } from "./club.model";
-import { sequelize } from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { camelCaseKeys } from "../../shared/utils/caseTransform";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
+import { Club } from "@modules/clubs/club.model";
+import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { camelCaseKeys } from "@shared/utils/caseTransform";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
   CreateClubInput,
   UpdateClubInput,
   CreateContactInput,
   UpdateContactInput,
-} from "./club.schema";
+} from "@modules/clubs/club.schema";
 
 // ── Shared computed attributes (subqueries) ──
 // These are appended to every Club query so the frontend

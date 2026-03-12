@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-const ENTITY_TYPES = [
-  "contract",
-  "offer",
-  "payment",
-  "gate",
-] as const;
+const ENTITY_TYPES = ["contract", "offer", "payment", "gate"] as const;
 
 const ROLES = [
   "Admin",

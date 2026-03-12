@@ -15,16 +15,16 @@
  *  6. 90 min played + rating ≥ 8 → "Highlight for report" (low, positive)
  */
 
-import { Task } from "../tasks/task.model";
-import { MatchPlayer } from "./matchPlayer.model";
-import { PlayerMatchStats } from "./playerMatchStats.model";
-import { Player } from "../players/player.model";
-import { Match } from "./match.model";
-import { Club } from "../clubs/club.model";
-import { sequelize } from "../../config/database";
+import { Task } from "@modules/tasks/task.model";
+import { MatchPlayer } from "@modules/matches/matchPlayer.model";
+import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { Player } from "@modules/players/player.model";
+import { Match } from "@modules/matches/match.model";
+import { Club } from "@modules/clubs/club.model";
+import { sequelize } from "@config/database";
 import { Op } from "sequelize";
-import { notifyUser } from "../notifications/notification.service";
-import { logger } from "../../config/logger";
+import { notifyUser } from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
 
 // ── Configurable thresholds ──
 // Defaults can be overridden via the settings API (GET/PATCH /settings/task-rules)

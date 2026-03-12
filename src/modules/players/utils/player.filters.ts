@@ -10,7 +10,7 @@
 //   add them here without touching the main service flow.
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, fn, col } from "sequelize";
-import { ListPlayersQuery } from "./player.types";
+import { ListPlayersQuery } from "@modules/players/utils/player.types";
 
 /**
  * Builds a Sequelize-compatible `where` clause from the

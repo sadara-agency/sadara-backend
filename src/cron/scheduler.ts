@@ -4,14 +4,14 @@
 
 import cron from "node-cron";
 import { QueryTypes } from "sequelize";
-import { sequelize } from "../config/database";
-import { logger } from "../config/logger";
+import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
 import {
   notifyByRole,
   notifyUser,
   cleanupOldNotifications,
-} from "../modules/notifications/notification.service";
-import { generatePreMatchTasks } from "../modules/matches/matchAutoTasks";
+} from "@modules/notifications/notification.service";
+import { generatePreMatchTasks } from "@modules/matches/matchAutoTasks";
 import {
   checkPerformanceTrends,
   checkFatigueRisk,
@@ -136,7 +136,7 @@ function registerJob(name: string, fn: () => Promise<any>) {
 
 // ── Distributed lock via Redis SET NX EX ──
 
-import { getRedisClient, isRedisConnected } from "../config/redis";
+import { getRedisClient, isRedisConnected } from "@config/redis";
 
 async function acquireLock(name: string, ttlSeconds: number): Promise<boolean> {
   if (!isRedisConnected()) return true; // Single instance — no lock needed
@@ -244,13 +244,16 @@ async function checkContractExpiry() {
       { replacements: { targetDate: dateStr }, type: QueryTypes.SELECT },
     );
 
-    for (const c of contracts) {
+    if (contracts.length === 0) continue;
+
+    // Build all notification promises (parallelized, no N+1)
+    const notificationPromises = contracts.map((c) => {
       const playerName = `${c.first_name} ${c.last_name}`.trim();
       const playerNameAr = c.first_name_ar
         ? `${c.first_name_ar} ${c.last_name_ar || ""}`.trim()
         : playerName;
 
-      await notifyByRole(["Admin", "Manager", "Legal"], {
+      return notifyByRole(["Admin", "Manager", "Legal"], {
         type: "contract",
         title: `Contract expiring in ${t.label}: ${playerName}`,
         titleAr: `عقد ينتهي خلال ${t.labelAr}: ${playerNameAr}`,
@@ -261,14 +264,17 @@ async function checkContractExpiry() {
         sourceId: c.id,
         priority: t.priority,
       });
+    });
 
-      // Mark as alerted to prevent duplicate notifications
-      await sequelize.query(
-        `UPDATE contracts SET expiry_alert_sent = true WHERE id = :contractId`,
-        { replacements: { contractId: c.id } },
-      );
-      notified++;
-    }
+    await Promise.all(notificationPromises);
+
+    // Batch UPDATE — single query instead of N individual updates
+    const contractIds = contracts.map((c) => c.id);
+    await sequelize.query(
+      `UPDATE contracts SET expiry_alert_sent = true WHERE id IN (:contractIds)`,
+      { replacements: { contractIds } },
+    );
+    notified += contracts.length;
   }
 
   return { contractsChecked: notified };
@@ -334,38 +340,47 @@ async function checkInjuryFollowups() {
     { replacements: { today }, type: QueryTypes.SELECT },
   );
 
-  for (const inj of overdueInjuries) {
+  // Build all notification promises (parallelized, no N+1)
+  const injuryNotifications = overdueInjuries.flatMap((inj) => {
     const playerName = `${inj.first_name} ${inj.last_name}`.trim();
     const playerNameAr = inj.first_name_ar
       ? `${inj.first_name_ar} ${inj.last_name_ar || ""}`.trim()
       : playerName;
 
-    await notifyByRole(["Admin", "Manager", "Coach"], {
-      type: "injury",
-      title: `Overdue recovery: ${playerName} — ${inj.injury_type}`,
-      titleAr: `تأخر تعافي: ${playerNameAr} — ${inj.injury_type}`,
-      body: `Expected return was ${inj.expected_return_date}. Still ${inj.severity}.`,
-      link: "/dashboard/injuries",
-      sourceType: "injury",
-      sourceId: inj.id,
-      priority:
-        inj.severity === "Critical" || inj.severity === "Severe"
-          ? "critical"
-          : "high",
-    });
-
-    if (inj.agent_id) {
-      await notifyUser(inj.agent_id, {
+    const promises: Promise<any>[] = [
+      notifyByRole(["Admin", "Manager", "Coach"], {
         type: "injury",
         title: `Overdue recovery: ${playerName} — ${inj.injury_type}`,
         titleAr: `تأخر تعافي: ${playerNameAr} — ${inj.injury_type}`,
+        body: `Expected return was ${inj.expected_return_date}. Still ${inj.severity}.`,
         link: "/dashboard/injuries",
         sourceType: "injury",
         sourceId: inj.id,
-        priority: "high",
-      });
+        priority:
+          inj.severity === "Critical" || inj.severity === "Severe"
+            ? "critical"
+            : "high",
+      }),
+    ];
+
+    if (inj.agent_id) {
+      promises.push(
+        notifyUser(inj.agent_id, {
+          type: "injury",
+          title: `Overdue recovery: ${playerName} — ${inj.injury_type}`,
+          titleAr: `تأخر تعافي: ${playerNameAr} — ${inj.injury_type}`,
+          link: "/dashboard/injuries",
+          sourceType: "injury",
+          sourceId: inj.id,
+          priority: "high",
+        }),
+      );
     }
-  }
+
+    return promises;
+  });
+
+  await Promise.all(injuryNotifications);
 
   return { overdueInjuries: overdueInjuries.length };
 }
@@ -392,21 +407,24 @@ async function checkPaymentDueDates() {
     { replacements: { dueDate: dateStr }, type: QueryTypes.SELECT },
   );
 
-  for (const pm of upcoming) {
-    const playerName = `${pm.first_name} ${pm.last_name}`.trim();
-    const amount = `${Number(pm.amount).toLocaleString()} ${pm.currency}`;
+  // Batch upcoming payment notifications (parallelized, no N+1)
+  await Promise.all(
+    upcoming.map((pm) => {
+      const playerName = `${pm.first_name} ${pm.last_name}`.trim();
+      const amount = `${Number(pm.amount).toLocaleString()} ${pm.currency}`;
 
-    await notifyByRole(["Admin", "Manager", "Finance"], {
-      type: "payment",
-      title: `Payment due in 7 days: ${amount} — ${playerName}`,
-      titleAr: `دفعة مستحقة خلال 7 أيام: ${amount} — ${playerName}`,
-      body: `${pm.payment_type} payment of ${amount} due ${pm.due_date}`,
-      link: "/dashboard/finance",
-      sourceType: "payment",
-      sourceId: pm.id,
-      priority: "normal",
-    });
-  }
+      return notifyByRole(["Admin", "Manager", "Finance"], {
+        type: "payment",
+        title: `Payment due in 7 days: ${amount} — ${playerName}`,
+        titleAr: `دفعة مستحقة خلال 7 أيام: ${amount} — ${playerName}`,
+        body: `${pm.payment_type} payment of ${amount} due ${pm.due_date}`,
+        link: "/dashboard/finance",
+        sourceType: "payment",
+        sourceId: pm.id,
+        priority: "normal",
+      });
+    }),
+  );
 
   const overdue = await sequelize.query<PaymentReminderRow>(
     `
@@ -420,20 +438,23 @@ async function checkPaymentDueDates() {
     { replacements: { today }, type: QueryTypes.SELECT },
   );
 
-  for (const pm of overdue) {
-    const playerName = `${pm.first_name} ${pm.last_name}`.trim();
-    const amount = `${Number(pm.amount).toLocaleString()} ${pm.currency}`;
+  // Batch overdue payment notifications (parallelized, no N+1)
+  await Promise.all(
+    overdue.map((pm) => {
+      const playerName = `${pm.first_name} ${pm.last_name}`.trim();
+      const amount = `${Number(pm.amount).toLocaleString()} ${pm.currency}`;
 
-    await notifyByRole(["Admin", "Manager", "Finance"], {
-      type: "payment",
-      title: `OVERDUE payment: ${amount} — ${playerName}`,
-      titleAr: `دفعة متأخرة: ${amount} — ${playerName}`,
-      link: "/dashboard/finance",
-      sourceType: "payment",
-      sourceId: pm.id,
-      priority: "high",
-    });
-  }
+      return notifyByRole(["Admin", "Manager", "Finance"], {
+        type: "payment",
+        title: `OVERDUE payment: ${amount} — ${playerName}`,
+        titleAr: `دفعة متأخرة: ${amount} — ${playerName}`,
+        link: "/dashboard/finance",
+        sourceType: "payment",
+        sourceId: pm.id,
+        priority: "high",
+      });
+    }),
+  );
 
   return { upcoming: upcoming.length, overdue: overdue.length };
 }

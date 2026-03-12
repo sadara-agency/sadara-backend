@@ -1,14 +1,14 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { createCrudController } from "../../shared/utils/crudController";
-import { AppError } from "../../middleware/errorHandler";
-import * as svc from "./document.service";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { createCrudController } from "@shared/utils/crudController";
+import { AppError } from "@middleware/errorHandler";
+import * as svc from "@modules/documents/document.service";
 
 // Documents list takes req.user?.role for RBAC, so we override list.
 // Upload is custom (multipart/form-data).

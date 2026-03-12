@@ -1,17 +1,17 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { cacheRoute } from "../../middleware/cache.middleware";
-import { CacheTTL } from "../../shared/utils/cache";
-import { uploadSingle, verifyFileType } from "../../middleware/upload";
-import { dynamicFieldAccess } from "../../middleware/fieldAccess";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import {
   createPlayerSchema,
   updatePlayerSchema,
   playerQuerySchema,
-} from "./utils/player.schema";
-import * as playerController from "./player.controller";
+} from "@modules/players/utils/player.schema";
+import * as playerController from "@modules/players/player.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -25,7 +25,11 @@ router.get(
   cacheRoute("players", CacheTTL.MEDIUM),
   asyncHandler(playerController.list),
 );
-router.get("/check-duplicate", authorizeModule("players", "read"), asyncHandler(playerController.checkDuplicate));
+router.get(
+  "/check-duplicate",
+  authorizeModule("players", "read"),
+  asyncHandler(playerController.checkDuplicate),
+);
 router.get(
   "/:id",
   authorizeModule("players", "read"),
@@ -60,7 +64,11 @@ router.post(
   asyncHandler(playerController.uploadPhoto),
 );
 
-router.get("/:id/club-history", authorizeModule("players", "read"), asyncHandler(playerController.getClubHistory));
+router.get(
+  "/:id/club-history",
+  authorizeModule("players", "read"),
+  asyncHandler(playerController.getClubHistory),
+);
 router.get(
   "/:id/providers",
   authorizeModule("players", "read"),

@@ -1,22 +1,22 @@
 import { Op } from "sequelize";
-import { Injury, InjuryUpdate } from "./injury.model";
-import { Player } from "../players/player.model";
-import { Match } from "../matches/match.model";
-import { AppError } from "../../middleware/errorHandler";
-import { transaction } from "../../config/database";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { notifyByRole } from "../notifications/notification.service";
-import { logger } from "../../config/logger";
+import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { Player } from "@modules/players/player.model";
+import { Match } from "@modules/matches/match.model";
+import { AppError } from "@middleware/errorHandler";
+import { transaction } from "@config/database";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { notifyByRole } from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
 import {
   findOrThrow,
   destroyById,
   buildDateRange,
-} from "../../shared/utils/serviceHelpers";
+} from "@shared/utils/serviceHelpers";
 import type {
   CreateInjuryInput,
   UpdateInjuryInput,
   AddInjuryUpdateInput,
-} from "./injury.schema";
+} from "@modules/injuries/injury.schema";
 
 const PLAYER_ATTRS = [
   "id",

@@ -3,10 +3,10 @@ import path from "path";
 import fs from "fs";
 import puppeteer from "puppeteer";
 import { PDFDocument } from "pdf-lib";
-import { AuthRequest } from "../../shared/types";
-import { AppError } from "../../middleware/errorHandler";
-import { logger } from "../../config/logger";
-import * as contractService from "./contract.service";
+import { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
+import { logger } from "@config/logger";
+import * as contractService from "@modules/contracts/contract.service";
 
 // ── Asset paths (brand template pages) ──
 // In production the compiled JS runs from dist/, so __dirname is dist/modules/contracts.

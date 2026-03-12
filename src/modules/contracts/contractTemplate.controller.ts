@@ -1,12 +1,12 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import * as svc from "./contractTemplate.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import * as svc from "@modules/contracts/contractTemplate.service";
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
-} from "./contractTemplate.schema";
+} from "@modules/contracts/contractTemplate.schema";
 
 export async function listTemplates(_req: AuthRequest, res: Response) {
   const data = await svc.listContractTemplates();

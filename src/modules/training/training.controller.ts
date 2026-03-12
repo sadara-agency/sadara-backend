@@ -3,14 +3,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import * as svc from "./training.service";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import * as svc from "@modules/training/training.service";
 
 // ══════════════════════════════════════════
 // COURSES (Admin)

@@ -1,17 +1,17 @@
 import { Op, Sequelize, QueryTypes, literal } from "sequelize";
-import { Player } from "./player.model";
-import { Club } from "../clubs/club.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { sequelize } from "../../config/database";
-import { ExternalProviderMapping } from "./externalProvider.model";
-import { PlayerClubHistory } from "./playerClubHistory.model";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { sequelize } from "@config/database";
+import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
+import { PlayerClubHistory } from "@modules/players/playerClubHistory.model";
 import {
   getPositionGroup,
   createEmptyTechnicalAttributes,
-} from "./utils/attributeConfig";
-import { camelCaseKeys } from "../../shared/utils/caseTransform";
+} from "@modules/players/utils/attributeConfig";
+import { camelCaseKeys } from "@shared/utils/caseTransform";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [

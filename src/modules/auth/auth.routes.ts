@@ -1,8 +1,8 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorize } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { authLimiter, passwordResetLimiter } from "../../middleware/rateLimiter";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorize } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { authLimiter, passwordResetLimiter } from "@middleware/rateLimiter";
 import {
   registerSchema,
   loginSchema,
@@ -11,8 +11,8 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-} from "./auth.schema";
-import * as authController from "./auth.controller";
+} from "@modules/auth/auth.schema";
+import * as authController from "@modules/auth/auth.controller";
 
 const router = Router();
 
@@ -41,6 +41,9 @@ router.post(
   validate(resetPasswordSchema),
   asyncHandler(authController.resetPassword),
 );
+
+// ── Refresh Token ──
+router.post("/refresh", authLimiter, asyncHandler(authController.refresh));
 
 // ── Logout ──
 router.post("/logout", authenticate, asyncHandler(authController.logout));

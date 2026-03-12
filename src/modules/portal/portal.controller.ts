@@ -1,10 +1,10 @@
 import { Response } from "express";
-import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { AppError } from "../../middleware/errorHandler";
-import { AuthRequest } from "../../shared/types";
-import * as portalService from "./portal.service";
-import * as documentService from "../documents/document.service";
+import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { AppError } from "@middleware/errorHandler";
+import { AuthRequest } from "@shared/types";
+import * as portalService from "@modules/portal/portal.service";
+import * as documentService from "@modules/documents/document.service";
 
 // ── My Profile ──
 

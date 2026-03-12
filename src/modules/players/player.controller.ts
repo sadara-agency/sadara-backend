@@ -1,11 +1,11 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
-import { createCrudController } from "../../shared/utils/crudController";
-import { AppError } from "../../middleware/errorHandler";
-import * as playerService from "./player.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { createCrudController } from "@shared/utils/crudController";
+import { AppError } from "@middleware/errorHandler";
+import * as playerService from "@modules/players/player.service";
 
 const PLAYER_CACHE = [
   CachePrefix.PLAYERS,

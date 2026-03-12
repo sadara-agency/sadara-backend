@@ -14,7 +14,9 @@ interface XlsxOptions {
   dataSections: XlsxSection[];
 }
 
-export async function generateReportXlsx(options: XlsxOptions): Promise<Buffer> {
+export async function generateReportXlsx(
+  options: XlsxOptions,
+): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Sadara Sports Company";
   workbook.created = new Date();
@@ -69,9 +71,7 @@ export async function generateReportXlsx(options: XlsxOptions): Promise<Buffer> 
 }
 
 function formatLabel(key: string): string {
-  return key
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 function autoFitColumns(sheet: ExcelJS.Worksheet) {

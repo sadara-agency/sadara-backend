@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createGateSchema,
   updateGateSchema,
@@ -10,8 +10,8 @@ import {
   createChecklistItemSchema,
   toggleChecklistItemSchema,
   gateQuerySchema,
-} from "./gate.schema";
-import * as gateController from "./gate.controller";
+} from "@modules/gates/gate.schema";
+import * as gateController from "@modules/gates/gate.controller";
 
 const router = Router();
 router.use(authenticate);

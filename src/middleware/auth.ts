@@ -1,15 +1,15 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { env } from "../config/env";
-import { sequelize } from "../config/database";
-import { AuthRequest, AuthUser, UserRole } from "../shared/types";
-import { sendUnauthorized, sendForbidden } from "../shared/utils/apiResponse";
-import { COOKIE_NAME } from "../shared/utils/cookie";
+import { env } from "@config/env";
+import { sequelize } from "@config/database";
+import { AuthRequest, AuthUser, UserRole } from "@shared/types";
+import { sendUnauthorized, sendForbidden } from "@shared/utils/apiResponse";
+import { COOKIE_NAME } from "@shared/utils/cookie";
 import {
   hasPermission,
   CrudAction,
-} from "../modules/permissions/permission.service";
-import { logger } from "../config/logger";
+} from "@modules/permissions/permission.service";
+import { logger } from "@config/logger";
 
 // Throttle activity updates — at most once per 5 minutes per user
 const activityCache = new Map<string, number>();

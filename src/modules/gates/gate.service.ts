@@ -6,12 +6,12 @@ import {
   type GateNumber,
   type GateStatus,
   type VerificationType,
-} from "./gate.model";
-import { Player } from "../players/player.model";
-import { User } from "../Users/user.model";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { AppError } from "../../middleware/errorHandler";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
+} from "@modules/gates/gate.model";
+import { Player } from "@modules/players/player.model";
+import { User } from "@modules/users/user.model";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { AppError } from "@middleware/errorHandler";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
 
 const PLAYER_ATTRS = [
   "id",

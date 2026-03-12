@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 /**
  * Migration 024: RBAC Audit — Tighten permissions & add field-level hiding

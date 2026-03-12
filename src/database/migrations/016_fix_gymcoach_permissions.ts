@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 /**
  * Fix GymCoach permissions — the seed previously included GymCoach in

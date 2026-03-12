@@ -33,7 +33,7 @@ jest.mock('../../../src/modules/contracts/contract.model', () => ({
   },
 }));
 jest.mock('../../../src/modules/players/player.model', () => ({ Player: { name: 'Player' } }));
-jest.mock('../../../src/modules/Users/user.model', () => ({ User: { name: 'User' } }));
+jest.mock('../../../src/modules/users/user.model', () => ({ User: { name: 'User' } }));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
