@@ -1,6 +1,6 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
-import { encryptFields, decryptFields } from "../../shared/utils/encryption";
+import { sequelize } from "@config/database";
+import { encryptFields, decryptFields } from "@shared/utils/encryption";
 
 export type PlayerContractType = "Professional" | "Amateur" | "Youth";
 

@@ -1,5 +1,5 @@
-import { getRedisClient, isRedisConnected } from "../../config/redis";
-import { logger } from "../../config/logger";
+import { getRedisClient, isRedisConnected } from "@config/redis";
+import { logger } from "@config/logger";
 
 // Default TTL values (in seconds)
 export const CacheTTL = {

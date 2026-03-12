@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 const MISSING_ROLES = ["Legal", "Finance", "Media", "Executive"];
 

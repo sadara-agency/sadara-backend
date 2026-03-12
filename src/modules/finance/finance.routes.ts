@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createInvoiceSchema,
   updateInvoiceSchema,
@@ -18,16 +18,25 @@ import {
   updateExpenseSchema,
   expenseQuerySchema,
   dashboardQuerySchema,
-} from "./finance.schema";
-import * as ctrl from "./finance.controller";
-import { dynamicFieldAccess } from "../../middleware/fieldAccess";
+} from "@modules/finance/finance.schema";
+import * as ctrl from "@modules/finance/finance.controller";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 
 const router = Router();
 router.use(authenticate);
 
 // ── Summary & Dashboard ──
-router.get("/summary", authorizeModule("finance", "read"), asyncHandler(ctrl.summary));
-router.get("/dashboard", authorizeModule("finance", "read"), validate(dashboardQuerySchema, "query"), asyncHandler(ctrl.dashboard));
+router.get(
+  "/summary",
+  authorizeModule("finance", "read"),
+  asyncHandler(ctrl.summary),
+);
+router.get(
+  "/dashboard",
+  authorizeModule("finance", "read"),
+  validate(dashboardQuerySchema, "query"),
+  asyncHandler(ctrl.dashboard),
+);
 
 // ── Invoices ──
 router.get(
@@ -37,7 +46,12 @@ router.get(
   dynamicFieldAccess("finance"),
   asyncHandler(ctrl.listInvoices),
 );
-router.get("/invoices/:id", authorizeModule("finance", "read"), dynamicFieldAccess("finance"), asyncHandler(ctrl.getInvoice));
+router.get(
+  "/invoices/:id",
+  authorizeModule("finance", "read"),
+  dynamicFieldAccess("finance"),
+  asyncHandler(ctrl.getInvoice),
+);
 router.post(
   "/invoices",
   authorizeModule("finance", "create"),

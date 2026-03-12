@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export type ReportPeriodType = "Season" | "DateRange" | "LastNMatches";
 export type ReportStatus = "Draft" | "Generating" | "Generated" | "Failed";

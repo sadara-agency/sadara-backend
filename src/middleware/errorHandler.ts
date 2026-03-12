@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
-import { env } from "../config/env";
-import { logger } from "../config/logger";
+import { env } from "@config/env";
+import { logger } from "@config/logger";
 
 export class AppError extends Error {
   statusCode: number;

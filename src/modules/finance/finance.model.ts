@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 // ── Enum Types ──
 
@@ -7,7 +7,13 @@ export type PaymentStatus = "Paid" | "Expected" | "Overdue" | "Cancelled";
 export type PaymentType = "Commission" | "Sponsorship" | "Bonus";
 export type ValuationTrend = "up" | "down" | "stable";
 export type LedgerSide = "Debit" | "Credit";
-export type ExpenseCategory = "Operational" | "Marketing" | "Travel" | "Staff" | "Legal" | "Other";
+export type ExpenseCategory =
+  | "Operational"
+  | "Marketing"
+  | "Travel"
+  | "Staff"
+  | "Legal"
+  | "Other";
 
 // ══════════════════════════════════════════
 // INVOICE
@@ -363,11 +369,10 @@ export interface ExpenseAttributes {
   updatedAt?: Date;
 }
 
-interface ExpenseCreation
-  extends Optional<
-    ExpenseAttributes,
-    "id" | "category" | "currency" | "createdAt" | "updatedAt"
-  > {}
+interface ExpenseCreation extends Optional<
+  ExpenseAttributes,
+  "id" | "category" | "currency" | "createdAt" | "updatedAt"
+> {}
 
 export class Expense
   extends Model<ExpenseAttributes, ExpenseCreation>

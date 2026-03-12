@@ -1,16 +1,16 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { uploadSingle, verifyFileType } from "../../middleware/upload";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
 import {
   createClubSchema,
   updateClubSchema,
   clubQuerySchema,
   createContactSchema,
   updateContactSchema,
-} from "./club.schema";
-import * as clubController from "./club.controller";
+} from "@modules/clubs/club.schema";
+import * as clubController from "@modules/clubs/club.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -32,14 +32,22 @@ router.post(
   authorizeModule("clubs", "delete"),
   asyncHandler(clubController.bulkRemove),
 );
-router.get("/:id", authorizeModule("clubs", "read"), asyncHandler(clubController.getById));
+router.get(
+  "/:id",
+  authorizeModule("clubs", "read"),
+  asyncHandler(clubController.getById),
+);
 router.patch(
   "/:id",
   authorizeModule("clubs", "update"),
   validate(updateClubSchema),
   asyncHandler(clubController.update),
 );
-router.delete("/:id", authorizeModule("clubs", "delete"), asyncHandler(clubController.remove));
+router.delete(
+  "/:id",
+  authorizeModule("clubs", "delete"),
+  asyncHandler(clubController.remove),
+);
 
 // ── Logo Upload ──
 router.post(

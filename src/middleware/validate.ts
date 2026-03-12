@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ZodSchema, ZodError } from "zod";
-import { sendError } from "../shared/utils/apiResponse";
-import { logger } from "../config/logger";
+import { sendError } from "@shared/utils/apiResponse";
+import { logger } from "@config/logger";
 
 type ValidationTarget = "body" | "query" | "params";
 

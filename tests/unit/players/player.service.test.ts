@@ -33,7 +33,7 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: { name: 'Club' },
 }));
 
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: { name: 'User' },
 }));
 

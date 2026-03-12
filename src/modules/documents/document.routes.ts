@@ -1,14 +1,14 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createDocumentSchema,
   updateDocumentSchema,
   documentQuerySchema,
-} from "./document.schema";
-import { uploadSingle, verifyFileType } from "../../middleware/upload";
-import * as ctrl from "./document.controller";
+} from "@modules/documents/document.schema";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
+import * as ctrl from "@modules/documents/document.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -20,7 +20,11 @@ router.get(
   validate(documentQuerySchema, "query"),
   asyncHandler(ctrl.list),
 );
-router.get("/:id", authorizeModule("documents", "read"), asyncHandler(ctrl.getById));
+router.get(
+  "/:id",
+  authorizeModule("documents", "read"),
+  asyncHandler(ctrl.getById),
+);
 
 // Upload real file (multipart/form-data) — metadata in form fields
 router.post(
@@ -57,6 +61,10 @@ router.patch(
   validate(updateDocumentSchema),
   asyncHandler(ctrl.update),
 );
-router.delete("/:id", authorizeModule("documents", "delete"), asyncHandler(ctrl.remove));
+router.delete(
+  "/:id",
+  authorizeModule("documents", "delete"),
+  asyncHandler(ctrl.remove),
+);
 
 export default router;

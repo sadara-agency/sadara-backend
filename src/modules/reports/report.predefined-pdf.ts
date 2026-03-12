@@ -49,7 +49,10 @@ function escHtml(v: unknown): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function buildSummaryPage(title: string, summary: Record<string, unknown>): string {
+function buildSummaryPage(
+  title: string,
+  summary: Record<string, unknown>,
+): string {
   const entries = Object.entries(summary);
   const kpiHtml = entries
     .map(
@@ -67,7 +70,11 @@ function buildSummaryPage(title: string, summary: Record<string, unknown>): stri
   </div>`;
 }
 
-function buildDataPage(title: string, sectionTitle: string, rows: Record<string, unknown>[]): string {
+function buildDataPage(
+  title: string,
+  sectionTitle: string,
+  rows: Record<string, unknown>[],
+): string {
   if (!rows?.length) return "";
   const cols = Object.keys(rows[0]).filter(
     (k) => !k.endsWith("_id") && k !== "id" && !k.endsWith("_url"),
@@ -108,14 +115,22 @@ export async function generatePredefinedReportPdf(
   for (const section of options.dataSections) {
     if (section.rows?.length) {
       pages.push(
-        wrap(buildDataPage(options.reportTitle, section.sectionTitle, section.rows)),
+        wrap(
+          buildDataPage(
+            options.reportTitle,
+            section.sectionTitle,
+            section.rows,
+          ),
+        ),
       );
     }
   }
 
   if (pages.length === 0) {
     pages.push(
-      wrap(buildSummaryPage(options.reportTitle, { note: "No data available" })),
+      wrap(
+        buildSummaryPage(options.reportTitle, { note: "No data available" }),
+      ),
     );
   }
 

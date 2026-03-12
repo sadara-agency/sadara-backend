@@ -15,17 +15,17 @@ import {
   DietMealItem,
   DietAdherence,
   CoachAlert,
-} from "./gym.model";
-import { Player } from "../players/player.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+} from "@modules/gym/gym.model";
+import { Player } from "@modules/players/player.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   findOrThrow,
   destroyById,
   bilingualSearch,
   pickDefined,
   buildDateRange,
-} from "../../shared/utils/serviceHelpers";
+} from "@shared/utils/serviceHelpers";
 import type {
   CreateExerciseInput,
   UpdateExerciseInput,
@@ -47,7 +47,7 @@ import type {
   UpdateDietPlanInput,
   CreateDietMealInput,
   LogAdherenceInput,
-} from "./gym.schema";
+} from "@modules/gym/gym.schema";
 
 const PLAYER_ATTRS = [
   "id",

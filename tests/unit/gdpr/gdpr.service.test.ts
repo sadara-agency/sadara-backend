@@ -64,7 +64,7 @@ jest.mock('../../../src/modules/players/player.model', () => ({
     update: (...a: unknown[]) => mockPlayerUpdate(...a),
   },
 }));
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: { findOne: (...a: unknown[]) => mockUserFindOne(...a) },
 }));
 jest.mock('../../../src/modules/contracts/contract.model', () => ({

@@ -6,13 +6,13 @@
  */
 
 import axios, { type AxiosInstance, type AxiosError } from "axios";
-import { env } from "../../config/env";
+import { env } from "@config/env";
 import type {
   SmApiResponse,
   SmFixture,
   SmLeague,
   SmTeam,
-} from "./sportmonks.types";
+} from "@modules/sportmonks/sportmonks.types";
 
 const BASE_URL = "https://api.sportmonks.com/v3/football";
 const REQUEST_TIMEOUT = 15_000;
@@ -38,7 +38,9 @@ async function request<T>(
 ): Promise<T> {
   const token = getToken();
   if (!token) {
-    throw new Error("Sportmonks API token is not configured. Set SPORTMONKS_API_TOKEN in environment.");
+    throw new Error(
+      "Sportmonks API token is not configured. Set SPORTMONKS_API_TOKEN in environment.",
+    );
   }
 
   const client = createClient();
@@ -47,7 +49,11 @@ async function request<T>(
 
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     try {
-      const res = await client.request<T>({ method, url: path, params: allParams });
+      const res = await client.request<T>({
+        method,
+        url: path,
+        params: allParams,
+      });
       return res.data;
     } catch (err) {
       const axErr = err as AxiosError;
@@ -55,21 +61,27 @@ async function request<T>(
 
       if (status === 429) {
         const delay = RETRY_BASE_MS * Math.pow(2, attempt);
-        console.warn(`[Sportmonks] Rate limited (429). Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+        console.warn(
+          `[Sportmonks] Rate limited (429). Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+        );
         await new Promise((r) => setTimeout(r, delay));
         lastError = axErr;
         continue;
       }
 
       if (status === 401 || status === 403) {
-        throw new Error(`Sportmonks authentication failed (${status}). Check your API token.`);
+        throw new Error(
+          `Sportmonks authentication failed (${status}). Check your API token.`,
+        );
       }
 
       if (status === 404) {
         throw new Error(`Sportmonks resource not found: ${path}`);
       }
 
-      throw new Error(`Sportmonks API error: ${axErr.message} (status: ${status ?? "unknown"})`);
+      throw new Error(
+        `Sportmonks API error: ${axErr.message} (status: ${status ?? "unknown"})`,
+      );
     }
   }
 

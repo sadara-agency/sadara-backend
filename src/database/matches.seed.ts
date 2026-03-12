@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────
 // src/database/seed/matches.seed.ts
 // ─────────────────────────────────────────────────────────────
-import { Match } from "./../modules/matches/match.model";
-import { MatchPlayer } from "./../modules/matches/matchPlayer.model";
-import { PlayerMatchStats } from "./../modules/matches/playerMatchStats.model";
-import { sequelize } from "./../config/database";
+import { Match } from "@modules/matches/match.model";
+import { MatchPlayer } from "@modules/matches/matchPlayer.model";
+import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
 import { IDS } from "./ids";
 

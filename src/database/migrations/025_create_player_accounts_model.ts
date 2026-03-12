@@ -3,7 +3,7 @@
 // The table may already exist from legacy raw SQL — this migration is fully idempotent.
 
 import { QueryTypes } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export async function up() {
   // Create the table if it doesn't exist (fresh installs)

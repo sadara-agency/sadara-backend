@@ -3,16 +3,16 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Response } from "express";
-import { sendSuccess } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { AuthRequest } from "../../shared/types";
-import * as splSync from "./spl.sync";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { AuthRequest } from "@shared/types";
+import * as splSync from "@modules/spl/spl.sync";
 import {
   seedClubExternalIds,
   getSyncState,
   updateSyncState,
-} from "./spl.service";
-import { SPL_CLUB_REGISTRY } from "./spl.registry";
+} from "@modules/spl/spl.service";
+import { SPL_CLUB_REGISTRY } from "@modules/spl/spl.registry";
 
 export async function syncPlayer(req: AuthRequest, res: Response) {
   const { splPlayerId, slug } = req.body;

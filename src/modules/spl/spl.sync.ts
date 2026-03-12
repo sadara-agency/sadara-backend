@@ -13,17 +13,20 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Op, Sequelize } from "sequelize";
-import { sequelize } from "../../config/database";
-import { Player } from "../players/player.model";
-import { Club } from "../clubs/club.model";
-import { ExternalProviderMapping } from "../players/externalProvider.model";
-import { scrapePlayerProfile, scrapeTeamRoster } from "./spl.scraper";
-import { SPL_CLUB_REGISTRY } from "./spl.registry";
+import { sequelize } from "@config/database";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
+import {
+  scrapePlayerProfile,
+  scrapeTeamRoster,
+} from "@modules/spl/spl.scraper";
+import { SPL_CLUB_REGISTRY } from "@modules/spl/spl.registry";
 import {
   ScrapedPlayerFull,
   PlayerSyncResult,
   SplSyncSummary,
-} from "./spl.types";
+} from "@modules/spl/spl.types";
 
 const PROVIDER_SPL = "SPL";
 const PROVIDER_PULSELIVE = "PulseLive";

@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export async function up() {
   await sequelize.query(`
@@ -14,9 +14,15 @@ export async function up() {
     );
   `);
 
-  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_rfp_role ON role_field_permissions(role)`);
-  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_rfp_module ON role_field_permissions(module)`);
-  await sequelize.query(`CREATE INDEX IF NOT EXISTS idx_rfp_role_module ON role_field_permissions(role, module)`);
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_rfp_role ON role_field_permissions(role)`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_rfp_module ON role_field_permissions(module)`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_rfp_role_module ON role_field_permissions(role, module)`,
+  );
 
   // Seed data matching current hardcoded rules from fieldAccess.ts
   await sequelize.query(`

@@ -1,14 +1,14 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { AppError } from "../../middleware/errorHandler";
-import * as svc from "./approval.service";
-import * as chainSvc from "./approvalChain.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { AppError } from "@middleware/errorHandler";
+import * as svc from "@modules/approvals/approval.service";
+import * as chainSvc from "@modules/approvals/approvalChain.service";
 import {
   createTemplateSchema,
   updateTemplateSchema,
-} from "./approvalChain.schema";
+} from "@modules/approvals/approvalChain.schema";
 
 // ── List Approvals ──
 

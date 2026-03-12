@@ -153,5 +153,9 @@ export type MatchQuery = z.infer<typeof matchQuerySchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
 export type MatchPlayerInput = z.infer<typeof matchPlayerSchema>;
 export type PlayerMatchStatsInput = z.infer<typeof playerMatchStatsSchema>;
-export type CreateMatchAnalysisInput = z.infer<typeof createMatchAnalysisSchema>;
-export type UpdateMatchAnalysisInput = z.infer<typeof updateMatchAnalysisSchema>;
+export type CreateMatchAnalysisInput = z.infer<
+  typeof createMatchAnalysisSchema
+>;
+export type UpdateMatchAnalysisInput = z.infer<
+  typeof updateMatchAnalysisSchema
+>;

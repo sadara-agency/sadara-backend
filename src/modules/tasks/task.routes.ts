@@ -14,16 +14,16 @@
 //   DELETE /:id           → delete
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createTaskSchema,
   updateTaskSchema,
   updateStatusSchema,
   taskQuerySchema,
-} from "./task.schema";
-import * as taskController from "./task.controller";
+} from "@modules/tasks/task.schema";
+import * as taskController from "@modules/tasks/task.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -35,7 +35,11 @@ router.get(
   validate(taskQuerySchema, "query"),
   asyncHandler(taskController.list),
 );
-router.get("/:id", authorizeModule("tasks", "read"), asyncHandler(taskController.getById));
+router.get(
+  "/:id",
+  authorizeModule("tasks", "read"),
+  asyncHandler(taskController.getById),
+);
 
 // ── Write ──
 router.post(

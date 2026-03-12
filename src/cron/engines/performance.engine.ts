@@ -6,14 +6,14 @@
 // youth players, minutes drought, and assist streaks.
 // ═══════════════════════════════════════════════════════════════
 
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
-import { logger } from "../../config/logger";
-import { Task } from "../../modules/tasks/task.model";
+import { logger } from "@config/logger";
+import { Task } from "@modules/tasks/task.model";
 import {
   notifyByRole,
   notifyUser,
-} from "../../modules/notifications/notification.service";
+} from "@modules/notifications/notification.service";
 
 interface AppSettingRow {
   value: string | Record<string, unknown>;

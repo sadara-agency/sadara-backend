@@ -10,9 +10,9 @@
 import path from "path";
 import fs from "fs";
 import crypto from "crypto";
-import { Contract } from "./contract.model";
-import { generateContractPdfBuffer } from "./contract.pdf.controller";
-import { UPLOAD_DIR_PATH } from "../../middleware/upload";
+import { Contract } from "@modules/contracts/contract.model";
+import { generateContractPdfBuffer } from "@modules/contracts/contract.pdf.controller";
+import { UPLOAD_DIR_PATH } from "@middleware/upload";
 
 const SIGNED_DIR = path.resolve(UPLOAD_DIR_PATH, "..", "signed-contracts");
 if (!fs.existsSync(SIGNED_DIR)) {

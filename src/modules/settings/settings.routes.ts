@@ -1,16 +1,16 @@
 import { Router, Response } from "express";
-import { asyncHandler, AppError } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { User } from "../Users/user.model";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { asyncHandler, AppError } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { User } from "@modules/users/user.model";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { Op, QueryTypes } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 const router = Router();
 router.use(authenticate);

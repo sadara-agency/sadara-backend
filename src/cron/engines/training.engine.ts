@@ -6,13 +6,13 @@
 // and players without active training plans.
 // ═══════════════════════════════════════════════════════════════
 
-import { sequelize } from "../../config/database";
-import { logger } from "../../config/logger";
-import { Task } from "../../modules/tasks/task.model";
+import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
+import { Task } from "@modules/tasks/task.model";
 import {
   notifyByRole,
   notifyUser,
-} from "../../modules/notifications/notification.service";
+} from "@modules/notifications/notification.service";
 
 // ── Configurable thresholds (loaded from app_settings) ──
 

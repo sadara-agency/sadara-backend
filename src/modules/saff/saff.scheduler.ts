@@ -1,6 +1,6 @@
 import cron, { ScheduledTask } from "node-cron";
-import { logger } from "../../config/logger";
-import * as saffService from "./saff.service";
+import { logger } from "@config/logger";
+import * as saffService from "@modules/saff/saff.service";
 
 // ══════════════════════════════════════════
 // SCHEDULE CONFIG

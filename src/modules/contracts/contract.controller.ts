@@ -1,10 +1,10 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
-import { createCrudController } from "../../shared/utils/crudController";
-import * as contractService from "./contract.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { createCrudController } from "@shared/utils/crudController";
+import * as contractService from "@modules/contracts/contract.service";
 
 const crud = createCrudController({
   service: {

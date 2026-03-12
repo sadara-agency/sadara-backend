@@ -8,12 +8,12 @@
  */
 
 import axios, { type AxiosInstance, type AxiosError } from "axios";
-import { logger } from "../../../config/logger";
+import { logger } from "@config/logger";
 import type {
   MatchAnalysisProvider,
   ExternalMatch,
   ExternalMatchStats,
-} from "../matchAnalysis.service";
+} from "@modules/integrations/matchAnalysis.service";
 
 const REQUEST_TIMEOUT = 15_000; // 15 seconds
 const MAX_RETRIES = 3;

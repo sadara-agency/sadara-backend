@@ -1,6 +1,6 @@
-import { AuditLog } from "../../modules/audit/AuditLog.model";
-import { AuditContext, UserRole } from "../types";
-import { logger } from "../../config/logger";
+import { AuditLog } from "@modules/audit/AuditLog.model";
+import { AuditContext, UserRole } from "@shared/types";
+import { logger } from "@config/logger";
 
 export async function logAudit(
   action: string,

@@ -1,19 +1,19 @@
 import { Op, Sequelize } from "sequelize";
-import { Offer } from "./offer.model";
-import { Player } from "../players/player.model";
-import { Club } from "../clubs/club.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { Contract } from "../contracts/contract.model";
-import { transaction } from "../../config/database";
-import { notifyByRole } from "../notifications/notification.service";
+import { Offer } from "@modules/offers/offer.model";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { Contract } from "@modules/contracts/contract.model";
+import { transaction } from "@config/database";
+import { notifyByRole } from "@modules/notifications/notification.service";
 import {
   createApprovalRequest,
   resolveApprovalByEntity,
-} from "../approvals/approval.service";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
-import { logger } from "../../config/logger";
+} from "@modules/approvals/approval.service";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { logger } from "@config/logger";
 
 // ── List Offers ──
 

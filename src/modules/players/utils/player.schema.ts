@@ -17,7 +17,9 @@ export const createPlayerSchema = z.object({
   nationality: z.string().optional(),
   secondaryNationality: z.string().optional(),
   playerType: z.enum(["Pro", "Youth", "Amateur"]).default("Pro"),
-  contractType: z.enum(["Professional", "Amateur", "Youth"]).default("Professional"),
+  contractType: z
+    .enum(["Professional", "Amateur", "Youth"])
+    .default("Professional"),
   position: z.string().optional(),
   secondaryPosition: z.string().optional(),
   preferredFoot: z.enum(["Left", "Right", "Both"]).optional(),

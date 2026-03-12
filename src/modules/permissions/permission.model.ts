@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 // ── Types ──
 
@@ -13,8 +13,10 @@ export interface RolePermissionAttributes {
   canDelete: boolean;
 }
 
-interface RolePermissionCreationAttributes
-  extends Optional<RolePermissionAttributes, "id"> {}
+interface RolePermissionCreationAttributes extends Optional<
+  RolePermissionAttributes,
+  "id"
+> {}
 
 // ── Model ──
 

@@ -11,7 +11,7 @@ import {
   ScrapedSeasonStats,
   ScrapedCareerEntry,
   ScrapedPlayerFull,
-} from "./spl.types";
+} from "@modules/spl/spl.types";
 
 const SPL_BASE = "https://www.spl.com.sa";
 const REQUEST_DELAY = 1500;

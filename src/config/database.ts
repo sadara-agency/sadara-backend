@@ -1,6 +1,6 @@
 import { Sequelize, Options } from "sequelize";
-import { env } from "./env";
-import { logger } from "./logger";
+import { env } from "@config/env";
+import { logger } from "@config/logger";
 
 const sequelizeOptions: Options = {
   host: env.db.host,

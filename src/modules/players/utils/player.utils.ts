@@ -11,7 +11,7 @@ import {
   RawPlayerStatsRow,
   DerivedContractInfo,
   ContractStatusLabel,
-} from "./player.types";
+} from "@modules/players/utils/player.types";
 
 // ── Constants ──
 export const CONTRACT_EXPIRY_WARNING_MONTHS = 6;

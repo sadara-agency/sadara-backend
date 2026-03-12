@@ -1,6 +1,6 @@
 import { Op, Model, ModelStatic } from "sequelize";
-import { AppError } from "../../middleware/errorHandler";
-import { logger } from "../../config/logger";
+import { AppError } from "@middleware/errorHandler";
+import { logger } from "@config/logger";
 
 /**
  * Find a record by primary key or throw a 404 AppError.

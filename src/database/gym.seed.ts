@@ -1,4 +1,4 @@
-import { ExerciseLibrary, FoodItem } from "../modules/gym/gym.model";
+import { ExerciseLibrary, FoodItem } from "@modules/gym/gym.model";
 
 export async function seedExerciseLibrary(): Promise<void> {
   const exercises = [

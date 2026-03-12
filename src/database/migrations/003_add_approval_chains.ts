@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export async function up() {
   // ── Table: approval_chain_templates ──
@@ -98,10 +98,20 @@ export async function up() {
 }
 
 export async function down() {
-  await sequelize.query(`ALTER TABLE approval_requests DROP COLUMN IF EXISTS template_id`);
-  await sequelize.query(`ALTER TABLE approval_requests DROP COLUMN IF EXISTS total_steps`);
-  await sequelize.query(`ALTER TABLE approval_requests DROP COLUMN IF EXISTS current_step`);
+  await sequelize.query(
+    `ALTER TABLE approval_requests DROP COLUMN IF EXISTS template_id`,
+  );
+  await sequelize.query(
+    `ALTER TABLE approval_requests DROP COLUMN IF EXISTS total_steps`,
+  );
+  await sequelize.query(
+    `ALTER TABLE approval_requests DROP COLUMN IF EXISTS current_step`,
+  );
   await sequelize.query(`DROP TABLE IF EXISTS approval_steps CASCADE`);
-  await sequelize.query(`DROP TABLE IF EXISTS approval_chain_template_steps CASCADE`);
-  await sequelize.query(`DROP TABLE IF EXISTS approval_chain_templates CASCADE`);
+  await sequelize.query(
+    `DROP TABLE IF EXISTS approval_chain_template_steps CASCADE`,
+  );
+  await sequelize.query(
+    `DROP TABLE IF EXISTS approval_chain_templates CASCADE`,
+  );
 }

@@ -1,57 +1,57 @@
-import { Player } from "../modules/players/player.model";
-import { Club } from "../modules/clubs/club.model";
-import { User } from "../modules/Users/user.model";
-import { Task } from "../modules/tasks/task.model";
-import { Contract } from "../modules/contracts/contract.model";
-import { Offer } from "../modules/offers/offer.model";
-import { Match } from "../modules/matches/match.model";
-import { MatchPlayer } from "../modules/matches/matchPlayer.model";
-import { PlayerMatchStats } from "../modules/matches/playerMatchStats.model";
-import { Gate, GateChecklist } from "../modules/gates/gate.model";
-import { Referral } from "../modules/referrals/referral.model";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { User } from "@modules/users/user.model";
+import { Task } from "@modules/tasks/task.model";
+import { Contract } from "@modules/contracts/contract.model";
+import { Offer } from "@modules/offers/offer.model";
+import { Match } from "@modules/matches/match.model";
+import { MatchPlayer } from "@modules/matches/matchPlayer.model";
+import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { Gate, GateChecklist } from "@modules/gates/gate.model";
+import { Referral } from "@modules/referrals/referral.model";
 import {
   Watchlist,
   ScreeningCase,
   SelectionDecision,
-} from "../modules/scouting/scouting.model";
+} from "@modules/scouting/scouting.model";
 import {
   Invoice,
   Payment,
   LedgerEntry,
   Valuation,
   Expense,
-} from "../modules/finance/finance.model";
-import { Document } from "../modules/documents/document.model";
-import { Clearance } from "../modules/clearances/clearance.model";
-import { Injury, InjuryUpdate } from "../modules/injuries/injury.model";
+} from "@modules/finance/finance.model";
+import { Document } from "@modules/documents/document.model";
+import { Clearance } from "@modules/clearances/clearance.model";
+import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
 import {
   TrainingActivity,
   TrainingCourse,
   TrainingEnrollment,
-} from "../modules/training/training.model";
-import { ExternalProviderMapping } from "../modules/players/externalProvider.model";
+} from "@modules/training/training.model";
+import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
 import {
   SaffTournament,
   SaffFixture,
   SaffStanding,
   SaffTeamMap,
-} from "../modules/saff/saff.model";
-import { Notification } from "../modules/notifications/notification.model";
-import { Note } from "../modules/notes/note.model";
-import { PlayerClubHistory } from "../modules/players/playerClubHistory.model";
-import { TechnicalReport } from "../modules/reports/report.model";
-import { MatchAnalysis } from "../modules/matches/matchAnalysis.model";
+} from "@modules/saff/saff.model";
+import { Notification } from "@modules/notifications/notification.model";
+import { Note } from "@modules/notes/note.model";
+import { PlayerClubHistory } from "@modules/players/playerClubHistory.model";
+import { TechnicalReport } from "@modules/reports/report.model";
+import { MatchAnalysis } from "@modules/matches/matchAnalysis.model";
 import {
   Competition,
   ClubCompetition,
-} from "../modules/competitions/competition.model";
-import { ApprovalRequest } from "../modules/approvals/approval.model";
+} from "@modules/competitions/competition.model";
+import { ApprovalRequest } from "@modules/approvals/approval.model";
 import {
   ApprovalChainTemplate,
   ApprovalChainTemplateStep,
-} from "../modules/approvals/approvalChainTemplate.model";
-import { ApprovalStep } from "../modules/approvals/approvalStep.model";
-import { ContractTemplate } from "../modules/contracts/contractTemplate.model";
+} from "@modules/approvals/approvalChainTemplate.model";
+import { ApprovalStep } from "@modules/approvals/approvalStep.model";
+import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
 import {
   ExerciseLibrary,
   BodyMetric,
@@ -68,7 +68,7 @@ import {
   DietMealItem,
   DietAdherence,
   CoachAlert,
-} from "../modules/gym/gym.model";
+} from "@modules/gym/gym.model";
 
 export function setupAssociations() {
   // Player ↔ Club

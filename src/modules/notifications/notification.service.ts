@@ -3,14 +3,14 @@ import {
   Notification,
   NotificationType,
   NotificationPriority,
-} from "./notification.model";
-import { User } from "../Users/user.model";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { logger } from "../../config/logger";
+} from "@modules/notifications/notification.model";
+import { User } from "@modules/users/user.model";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { logger } from "@config/logger";
 import {
   publishNotification,
   type SSENotificationPayload,
-} from "./notification.sse";
+} from "@modules/notifications/notification.sse";
 
 // ── Create a single notification ──
 

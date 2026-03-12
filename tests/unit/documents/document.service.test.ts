@@ -43,7 +43,7 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
 jest.mock('../../../src/modules/offers/offer.model', () => ({
   Offer: { findByPk: (...a: unknown[]) => mockOfferFindByPk(...a), name: 'Offer' },
 }));
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: { name: 'User' },
 }));
 jest.mock('../../../src/config/logger', () => ({

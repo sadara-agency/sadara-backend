@@ -1,22 +1,22 @@
 import { Op, QueryTypes } from "sequelize";
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { sequelize } from "../../config/database";
-import { env } from "../../config/env";
-import { Player } from "../players/player.model";
-import { Club } from "../clubs/club.model";
-import { User } from "../Users/user.model";
-import { isEncrypted, decrypt } from "../../shared/utils/encryption";
-import { logger } from "../../config/logger";
-import { Contract } from "../contracts/contract.model";
-import { Match } from "../matches/match.model";
-import { Document } from "../documents/document.model";
-import { Gate, GateChecklist } from "../gates/gate.model";
-import { Task } from "../tasks/task.model";
-import { Injury, InjuryUpdate } from "../injuries/injury.model";
-import { AppError } from "../../middleware/errorHandler";
-import { regenerateSignedPdf } from "../contracts/contract.signing.service";
-import { PlayerAccount } from "./playerAccount.model";
+import { sequelize } from "@config/database";
+import { env } from "@config/env";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { User } from "@modules/users/user.model";
+import { isEncrypted, decrypt } from "@shared/utils/encryption";
+import { logger } from "@config/logger";
+import { Contract } from "@modules/contracts/contract.model";
+import { Match } from "@modules/matches/match.model";
+import { Document } from "@modules/documents/document.model";
+import { Gate, GateChecklist } from "@modules/gates/gate.model";
+import { Task } from "@modules/tasks/task.model";
+import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { AppError } from "@middleware/errorHandler";
+import { regenerateSignedPdf } from "@modules/contracts/contract.signing.service";
+import { PlayerAccount } from "@modules/portal/playerAccount.model";
 
 // ══════════════════════════════════════════
 // RESOLVE: User → Player

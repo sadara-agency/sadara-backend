@@ -1,13 +1,13 @@
 import { QueryTypes } from "sequelize";
-import { TechnicalReport } from "./report.model";
-import { Player } from "../players/player.model";
-import { Club } from "../clubs/club.model";
-import { sequelize } from "../../config/database";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { CreateReportInput } from "./report.schema";
-import { generateReportPdf } from "./report.pdf";
-import { logger } from "../../config/logger";
+import { TechnicalReport } from "@modules/reports/report.model";
+import { Player } from "@modules/players/player.model";
+import { Club } from "@modules/clubs/club.model";
+import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { CreateReportInput } from "@modules/reports/report.schema";
+import { generateReportPdf } from "@modules/reports/report.pdf";
+import { logger } from "@config/logger";
 
 // ── Shared includes ──
 const REPORT_INCLUDES = [

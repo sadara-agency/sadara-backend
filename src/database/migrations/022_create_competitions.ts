@@ -1,4 +1,4 @@
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
 
 // ── Tournament seed (from saff.service.ts TOURNAMENT_SEED) ──

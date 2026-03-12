@@ -22,7 +22,7 @@ const mockFindOne = jest.fn();
 const mockFindByPk = jest.fn();
 const mockCreate = jest.fn();
 
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: {
     findOne: (...args: unknown[]) => mockFindOne(...args),
     findByPk: (...args: unknown[]) => mockFindByPk(...args),

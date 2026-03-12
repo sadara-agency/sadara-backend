@@ -80,20 +80,20 @@ export interface SmTeam {
 
 /** state_id → match status mapping */
 export const SM_STATE_MAP: Record<number, string> = {
-  1: "upcoming",     // NS (Not Started)
-  2: "live",         // LIVE
-  3: "live",         // HT (Half Time)
-  4: "live",         // ET (Extra Time)
-  5: "completed",    // FT (Full Time)
-  6: "completed",    // AET (After Extra Time)
-  7: "completed",    // FT_PEN (Full Time Penalties)
-  8: "cancelled",    // CANCL
-  9: "cancelled",    // POSTP (Postponed)
-  10: "cancelled",   // SUSP (Suspended)
-  11: "cancelled",   // ABAN (Abandoned)
-  13: "completed",   // AU (Awarded)
-  14: "cancelled",   // DELAYED
-  17: "cancelled",   // WO (Walkover)
+  1: "upcoming", // NS (Not Started)
+  2: "live", // LIVE
+  3: "live", // HT (Half Time)
+  4: "live", // ET (Extra Time)
+  5: "completed", // FT (Full Time)
+  6: "completed", // AET (After Extra Time)
+  7: "completed", // FT_PEN (Full Time Penalties)
+  8: "cancelled", // CANCL
+  9: "cancelled", // POSTP (Postponed)
+  10: "cancelled", // SUSP (Suspended)
+  11: "cancelled", // ABAN (Abandoned)
+  13: "completed", // AU (Awarded)
+  14: "cancelled", // DELAYED
+  17: "cancelled", // WO (Walkover)
 };
 
 export interface NormalizedFixture {

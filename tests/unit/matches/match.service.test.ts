@@ -79,7 +79,7 @@ jest.mock('../../../src/modules/players/player.model', () => ({
   },
 }));
 
-jest.mock('../../../src/modules/Users/user.model', () => ({
+jest.mock('../../../src/modules/users/user.model', () => ({
   User: { name: 'User' },
 }));
 

@@ -39,7 +39,7 @@ jest.mock('../../../src/modules/scouting/scouting.model', () => ({
   },
 }));
 
-jest.mock('../../../src/modules/Users/user.model', () => ({ User: { name: 'User' } }));
+jest.mock('../../../src/modules/users/user.model', () => ({ User: { name: 'User' } }));
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
 }));

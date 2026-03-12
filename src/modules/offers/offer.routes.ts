@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { dynamicFieldAccess } from "../../middleware/fieldAccess";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { validate } from "@middleware/validate";
 import {
   createOfferSchema,
   updateOfferSchema,
   updateOfferStatusSchema,
   offerQuerySchema,
-} from "./offer.schema";
-import * as offerController from "./offer.controller";
+} from "@modules/offers/offer.schema";
+import * as offerController from "@modules/offers/offer.controller";
 
 const router = Router();
 router.use(authenticate);

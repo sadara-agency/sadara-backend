@@ -1,9 +1,9 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { createCrudController } from "../../shared/utils/crudController";
-import * as svc from "./note.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { createCrudController } from "@shared/utils/crudController";
+import * as svc from "@modules/notes/note.service";
 
 // Notes has non-standard service signatures (role-aware list, userId on
 // update/delete), so we only reuse create from the factory and keep

@@ -3,7 +3,7 @@
 // All TypeScript interfaces for the player module.
 // ─────────────────────────────────────────────────────────────
 
-import type { TechnicalAttributesJson } from "./attributeConfig";
+import type { TechnicalAttributesJson } from "@modules/players/utils/attributeConfig";
 
 // ── Query params from req.query ──
 export interface ListPlayersQuery {

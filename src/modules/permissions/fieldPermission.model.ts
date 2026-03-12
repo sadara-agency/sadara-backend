@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 // ── Types ──
 
@@ -11,13 +11,18 @@ export interface RoleFieldPermissionAttributes {
   hidden: boolean;
 }
 
-interface RoleFieldPermissionCreationAttributes
-  extends Optional<RoleFieldPermissionAttributes, "id"> {}
+interface RoleFieldPermissionCreationAttributes extends Optional<
+  RoleFieldPermissionAttributes,
+  "id"
+> {}
 
 // ── Model ──
 
 export class RoleFieldPermission
-  extends Model<RoleFieldPermissionAttributes, RoleFieldPermissionCreationAttributes>
+  extends Model<
+    RoleFieldPermissionAttributes,
+    RoleFieldPermissionCreationAttributes
+  >
   implements RoleFieldPermissionAttributes
 {
   declare id: string;

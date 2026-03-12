@@ -1,15 +1,15 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { logger } from "../../config/logger";
-import { createCrudController } from "../../shared/utils/crudController";
-import * as svc from "./match.service";
-import { generateAutoTasks } from "./matchAutoTasks";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { logger } from "@config/logger";
+import { createCrudController } from "@shared/utils/crudController";
+import * as svc from "@modules/matches/match.service";
+import { generateAutoTasks } from "@modules/matches/matchAutoTasks";
 
 // Matches create doesn't take userId, so we adapt.
 const crud = createCrudController({

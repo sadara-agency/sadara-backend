@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/Users/user.routes.ts
+// src/modules/users/user.routes.ts
 // RESTful routes for admin user management.
 //
 // All routes require authentication.
@@ -9,16 +9,16 @@
 // Follows the same pattern as player.routes.ts.
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createUserSchema,
   updateUserSchema,
   resetPasswordSchema,
   userQuerySchema,
-} from "./user.schema";
-import * as userController from "./user.controller";
+} from "@modules/users/user.schema";
+import * as userController from "@modules/users/user.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -55,6 +55,10 @@ router.post(
   validate(resetPasswordSchema),
   asyncHandler(userController.resetPassword),
 );
-router.delete("/:id", authorizeModule("settings", "delete"), asyncHandler(userController.remove));
+router.delete(
+  "/:id",
+  authorizeModule("settings", "delete"),
+  asyncHandler(userController.remove),
+);
 
 export default router;

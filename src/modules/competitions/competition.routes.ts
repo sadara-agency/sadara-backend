@@ -1,15 +1,15 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createCompetitionSchema,
   updateCompetitionSchema,
   competitionQuerySchema,
   addClubSchema,
   clubsQuerySchema,
-} from "./competition.schema";
-import * as ctrl from "./competition.controller";
+} from "@modules/competitions/competition.schema";
+import * as ctrl from "@modules/competitions/competition.controller";
 
 const router = Router();
 router.use(authenticate);

@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/Users/user.service.ts
+// src/modules/users/user.service.ts
 // Business logic for admin user management (CRUD).
 //
 // This is separate from auth.service.ts which handles
@@ -8,14 +8,14 @@
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize } from "sequelize";
 import bcrypt from "bcryptjs";
-import { User } from "./user.model";
-import { Player } from "../players/player.model";
-import { sequelize } from "../../config/database";
-import { env } from "../../config/env";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
-import { CreateUserInput, UpdateUserInput } from "./user.schema";
+import { User } from "@modules/users/user.model";
+import { Player } from "@modules/players/player.model";
+import { sequelize } from "@config/database";
+import { env } from "@config/env";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { CreateUserInput, UpdateUserInput } from "@modules/users/user.schema";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {

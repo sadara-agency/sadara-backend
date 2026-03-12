@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/database/seed/contracts.seed.ts
 // ─────────────────────────────────────────────────────────────
-import { Contract } from "./../modules/contracts/contract.model";
+import { Contract } from "@modules/contracts/contract.model";
 import { IDS } from "./ids";
 
 export async function seedContracts() {

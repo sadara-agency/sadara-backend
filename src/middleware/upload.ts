@@ -124,7 +124,17 @@ export function verifyFileType(
       return;
     }
   } catch {
-    // If we can't verify, allow through (fail open for reads)
+    // Fail closed — if we can't verify, reject the upload
+    try {
+      fs.unlinkSync(file.path);
+    } catch {
+      // Best-effort cleanup
+    }
+    res.status(400).json({
+      success: false,
+      message: "Unable to verify file type. Upload rejected.",
+    });
+    return;
   }
 
   next();

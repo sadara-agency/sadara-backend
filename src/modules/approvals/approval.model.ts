@@ -1,8 +1,8 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
-export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
-export type ApprovalEntityType = "contract" | "offer" | "payment" | "gate";
+export type { ApprovalStatus, ApprovalEntityType } from "@sadara/shared";
+import type { ApprovalStatus, ApprovalEntityType } from "@sadara/shared";
 
 interface ApprovalRequestAttributes {
   id: string;
@@ -26,24 +26,23 @@ interface ApprovalRequestAttributes {
   updatedAt?: Date;
 }
 
-interface ApprovalRequestCreation
-  extends Optional<
-    ApprovalRequestAttributes,
-    | "id"
-    | "status"
-    | "priority"
-    | "assignedTo"
-    | "assignedRole"
-    | "comment"
-    | "dueDate"
-    | "resolvedBy"
-    | "resolvedAt"
-    | "currentStep"
-    | "totalSteps"
-    | "templateId"
-    | "createdAt"
-    | "updatedAt"
-  > {}
+interface ApprovalRequestCreation extends Optional<
+  ApprovalRequestAttributes,
+  | "id"
+  | "status"
+  | "priority"
+  | "assignedTo"
+  | "assignedRole"
+  | "comment"
+  | "dueDate"
+  | "resolvedBy"
+  | "resolvedAt"
+  | "currentStep"
+  | "totalSteps"
+  | "templateId"
+  | "createdAt"
+  | "updatedAt"
+> {}
 
 export class ApprovalRequest
   extends Model<ApprovalRequestAttributes, ApprovalRequestCreation>

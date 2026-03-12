@@ -1,21 +1,24 @@
 import { Op } from "sequelize";
-import { ApprovalRequest, ApprovalStatus } from "./approval.model";
-import { ApprovalStep } from "./approvalStep.model";
-import { User } from "../Users/user.model";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import {
+  ApprovalRequest,
+  ApprovalStatus,
+} from "@modules/approvals/approval.model";
+import { ApprovalStep } from "@modules/approvals/approvalStep.model";
+import { User } from "@modules/users/user.model";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   createNotification,
   notifyByRole,
-} from "../notifications/notification.service";
-import { logger } from "../../config/logger";
-import { AppError } from "../../middleware/errorHandler";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
+} from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
+import { AppError } from "@middleware/errorHandler";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
   findActiveTemplate,
   createStepsForApproval,
   resolveStep,
   getApprovalWithSteps,
-} from "./approvalChain.service";
+} from "@modules/approvals/approvalChain.service";
 
 const USER_ATTRS = ["id", "fullName", "role"] as const;
 

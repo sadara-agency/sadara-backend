@@ -1,11 +1,11 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
+import { AuthRequest } from "@shared/types";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import * as competitionService from "./competition.service";
+} from "@shared/utils/apiResponse";
+import * as competitionService from "@modules/competitions/competition.service";
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await competitionService.listCompetitions(req.query as any);

@@ -1,5 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 
 export type DocumentType =
   | "Contract"
@@ -73,7 +73,14 @@ Document.init(
       primaryKey: true,
     },
     entityType: {
-      type: DataTypes.ENUM("Player", "Contract", "Match", "Injury", "Club", "Offer"),
+      type: DataTypes.ENUM(
+        "Player",
+        "Contract",
+        "Match",
+        "Injury",
+        "Club",
+        "Offer",
+      ),
       field: "entity_type",
     },
     entityId: { type: DataTypes.UUID, field: "entity_id" },

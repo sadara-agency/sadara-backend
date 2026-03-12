@@ -1,14 +1,14 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { logger } from "../../config/logger";
+import { AuthRequest } from "@shared/types";
+import { logger } from "@config/logger";
 import {
   sendSuccess,
   sendCreated,
   sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import * as svc from "./finance.service";
-import { createApprovalRequest } from "../approvals/approval.service";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import * as svc from "@modules/finance/finance.service";
+import { createApprovalRequest } from "@modules/approvals/approval.service";
 
 // ── Invoices ──
 export async function listInvoices(req: AuthRequest, res: Response) {

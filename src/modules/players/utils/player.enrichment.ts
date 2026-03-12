@@ -6,18 +6,18 @@
 // to match the actual contracts table column (commission_pct).
 // ─────────────────────────────────────────────────────────────
 import { Op, fn, col } from "sequelize";
-import { sequelize } from "../../../config/database";
+import { sequelize } from "@config/database";
 import {
   RawContractRow,
   RawInjuryCountRow,
   RawPlayerStatsRow,
-} from "./player.types";
+} from "@modules/players/utils/player.types";
 import {
   buildContractMap,
   buildInjuryMap,
   buildStatsMap,
-} from "./player.utils";
-import { EnrichmentMaps } from "./player.serializer";
+} from "@modules/players/utils/player.utils";
+import { EnrichmentMaps } from "@modules/players/utils/player.serializer";
 
 /**
  * Given an array of player IDs, fires 3 parallel queries and

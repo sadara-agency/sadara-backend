@@ -1,18 +1,18 @@
 import { Op } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 import {
   Watchlist,
   ScreeningCase,
   SelectionDecision,
   type WatchlistAttributes,
   type ScreeningCaseAttributes,
-} from "./scouting.model";
-import { User } from "../Users/user.model";
-import { AppError } from "../../middleware/errorHandler";
-import { parsePagination, buildMeta } from "../../shared/utils/pagination";
-import { findOrThrow } from "../../shared/utils/serviceHelpers";
-import { notifyByRole } from "../notifications/notification.service";
-import { logger } from "../../config/logger";
+} from "@modules/scouting/scouting.model";
+import { User } from "@modules/users/user.model";
+import { AppError } from "@middleware/errorHandler";
+import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { notifyByRole } from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 

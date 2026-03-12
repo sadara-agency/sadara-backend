@@ -1,8 +1,8 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { AppError } from "../../middleware/errorHandler";
-import * as scoutingService from "./scouting.service";
-import { generateScoutingPackPdf } from "./scouting.pdf";
+import { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
+import * as scoutingService from "@modules/scouting/scouting.service";
+import { generateScoutingPackPdf } from "@modules/scouting/scouting.pdf";
 
 export async function generatePackPdf(req: AuthRequest, res: Response) {
   const screening = await scoutingService.getScreeningCase(req.params.id);

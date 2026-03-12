@@ -7,11 +7,14 @@ import {
   sendSuccess,
   sendPaginated,
   sendCreated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { AuthRequest } from "../../shared/types";
-import * as saffService from "./saff.service";
-import { getSyncStatus as getSchedulerStatus, runSync } from "./saff.scheduler";
+} from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { AuthRequest } from "@shared/types";
+import * as saffService from "@modules/saff/saff.service";
+import {
+  getSyncStatus as getSchedulerStatus,
+  runSync,
+} from "@modules/saff/saff.scheduler";
 
 // ── Tournaments ──
 

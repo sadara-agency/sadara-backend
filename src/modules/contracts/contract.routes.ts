@@ -1,30 +1,26 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import {
-  authenticate,
-  authorize,
-  authorizeModule,
-} from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
-import { cacheRoute } from "../../middleware/cache.middleware";
-import { CacheTTL } from "../../shared/utils/cache";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 import {
   createContractSchema,
   updateContractSchema,
   contractQuerySchema,
   transitionStatusSchema,
   terminateContractSchema,
-} from "./contract.schema";
-import * as contractController from "./contract.controller";
-import * as templateController from "./contractTemplate.controller";
-import { getByContract as getClearancesByContract } from "../clearances/clearance.controller";
+} from "@modules/contracts/contract.schema";
+import * as contractController from "@modules/contracts/contract.controller";
+import * as templateController from "@modules/contracts/contractTemplate.controller";
+import { getByContract as getClearancesByContract } from "@modules/clearances/clearance.controller";
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
-} from "./contractTemplate.schema";
-import { transitionContract } from "./contract.transition.controller";
-import { generatePdf } from "./contract.pdf.controller";
-import { dynamicFieldAccess } from "../../middleware/fieldAccess";
+} from "@modules/contracts/contractTemplate.schema";
+import { transitionContract } from "@modules/contracts/contract.transition.controller";
+import { generatePdf } from "@modules/contracts/contract.pdf.controller";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 
 const router = Router();
 router.use(authenticate);

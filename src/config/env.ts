@@ -1,7 +1,8 @@
+import crypto from "crypto";
 import dotenv from "dotenv";
 import path from "path";
 import { z } from "zod";
-import { logger } from "./logger";
+import { logger } from "@config/logger";
 
 // Load environment-specific .env file
 const nodeEnv = process.env.NODE_ENV || "development";
@@ -10,6 +11,10 @@ dotenv.config({ path: path.resolve(process.cwd(), `.env.${nodeEnv}`) });
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
 
 const isProduction = nodeEnv === "production";
+
+// Generate random secrets for dev so a forgotten .env never ships a predictable token
+const devJwtSecret = crypto.randomBytes(32).toString("hex");
+const devEncryptionKey = crypto.randomBytes(32).toString("hex");
 
 const envSchema = z.object({
   NODE_ENV: z
@@ -29,9 +34,7 @@ const envSchema = z.object({
   // JWT — REQUIRED in production
   JWT_SECRET: isProduction
     ? z.string().min(32, "JWT_SECRET must be ≥32 chars in production")
-    : z
-        .string()
-        .default("sadara-dev-secret-DO-NOT-USE-IN-PROD-" + "x".repeat(32)),
+    : z.string().default(devJwtSecret),
   JWT_EXPIRES_IN: z.string().default("7d"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
 
@@ -58,7 +61,7 @@ const envSchema = z.object({
   // Encryption at rest (AES-256-GCM)
   ENCRYPTION_KEY: isProduction
     ? z.string().min(32, "ENCRYPTION_KEY must be ≥32 chars in production")
-    : z.string().default("sadara-dev-encryption-key-DO-NOT-USE-IN-PROD"),
+    : z.string().default(devEncryptionKey),
 
   // Wyscout Match Analysis (optional)
   WYSCOUT_API_KEY: z.string().default(""),
@@ -97,6 +100,20 @@ const validated = parsed.success
       ...process.env,
       // Force through with defaults for dev (parse will fill them in)
     });
+
+// ── Dev-secret warnings ──
+if (!isProduction) {
+  if (!process.env.JWT_SECRET) {
+    logger.warn(
+      "⚠️  JWT_SECRET not set — using random per-startup secret. JWTs will NOT survive restarts. Set JWT_SECRET in .env for persistent sessions.",
+    );
+  }
+  if (!process.env.ENCRYPTION_KEY) {
+    logger.warn(
+      "⚠️  ENCRYPTION_KEY not set — using random per-startup key. Encrypted data will NOT be readable after restart. Set ENCRYPTION_KEY in .env.",
+    );
+  }
+}
 
 // ── Export typed config ──
 export const env = {

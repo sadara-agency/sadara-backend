@@ -1,22 +1,22 @@
 import { Op } from "sequelize";
-import { sequelize } from "../../config/database";
+import { sequelize } from "@config/database";
 import {
   ApprovalChainTemplate,
   ApprovalChainTemplateStep,
-} from "./approvalChainTemplate.model";
-import { ApprovalStep } from "./approvalStep.model";
-import { ApprovalRequest } from "./approval.model";
-import { User } from "../Users/user.model";
+} from "@modules/approvals/approvalChainTemplate.model";
+import { ApprovalStep } from "@modules/approvals/approvalStep.model";
+import { ApprovalRequest } from "@modules/approvals/approval.model";
+import { User } from "@modules/users/user.model";
 import {
   createNotification,
   notifyByRole,
-} from "../notifications/notification.service";
-import { AppError } from "../../middleware/errorHandler";
-import { logger } from "../../config/logger";
+} from "@modules/notifications/notification.service";
+import { AppError } from "@middleware/errorHandler";
+import { logger } from "@config/logger";
 import type {
   CreateTemplateInput,
   UpdateTemplateInput,
-} from "./approvalChain.schema";
+} from "@modules/approvals/approvalChain.schema";
 
 const USER_ATTRS = ["id", "fullName", "role"] as const;
 

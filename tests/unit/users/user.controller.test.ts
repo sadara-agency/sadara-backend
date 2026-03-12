@@ -1,12 +1,12 @@
 /// <reference types="jest" />
-jest.mock('../../../src/modules/Users/user.service');
+jest.mock('../../../src/modules/users/user.service');
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
 }));
 
-import * as controller from '../../../src/modules/Users/user.controller';
-import * as userService from '../../../src/modules/Users/user.service';
+import * as controller from '../../../src/modules/users/user.controller';
+import * as userService from '../../../src/modules/users/user.service';
 
 const mockReq = (overrides = {}) => ({
   params: {}, body: {}, query: {},

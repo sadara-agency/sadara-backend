@@ -1,9 +1,9 @@
 import { Response } from "express";
-import { AuthRequest } from "../../shared/types";
-import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext } from "../../shared/utils/audit";
-import { createCrudController } from "../../shared/utils/crudController";
-import * as referralService from "./referral.service";
+import { AuthRequest } from "@shared/types";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { createCrudController } from "@shared/utils/crudController";
+import * as referralService from "@modules/referrals/referral.service";
 
 // Referrals pass userId/role to most service methods, so we adapt via
 // the service wrapper. list and getById need custom handlers since they

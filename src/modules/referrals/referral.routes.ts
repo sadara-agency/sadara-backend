@@ -1,14 +1,14 @@
 import { Router } from "express";
-import { asyncHandler } from "../../middleware/errorHandler";
-import { authenticate, authorizeModule } from "../../middleware/auth";
-import { validate } from "../../middleware/validate";
+import { asyncHandler } from "@middleware/errorHandler";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
 import {
   createReferralSchema,
   updateReferralSchema,
   updateReferralStatusSchema,
   referralQuerySchema,
-} from "./referral.schema";
-import * as referralController from "./referral.controller";
+} from "@modules/referrals/referral.schema";
+import * as referralController from "@modules/referrals/referral.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -20,7 +20,11 @@ router.get(
   validate(referralQuerySchema, "query"),
   asyncHandler(referralController.list),
 );
-router.get("/:id", authorizeModule("referrals", "read"), asyncHandler(referralController.getById));
+router.get(
+  "/:id",
+  authorizeModule("referrals", "read"),
+  asyncHandler(referralController.getById),
+);
 
 // ── Create ──
 router.post(

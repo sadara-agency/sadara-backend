@@ -1,14 +1,17 @@
 import { Op, WhereOptions } from "sequelize";
-import { Competition, ClubCompetition } from "./competition.model";
-import { Club } from "../clubs/club.model";
-import { AppError } from "../../middleware/errorHandler";
-import { findOrThrow, destroyById } from "../../shared/utils/serviceHelpers";
+import {
+  Competition,
+  ClubCompetition,
+} from "@modules/competitions/competition.model";
+import { Club } from "@modules/clubs/club.model";
+import { AppError } from "@middleware/errorHandler";
+import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import type {
   CreateCompetitionInput,
   UpdateCompetitionInput,
   CompetitionQuery,
   AddClubInput,
-} from "./competition.schema";
+} from "@modules/competitions/competition.schema";
 
 // ── List ──
 

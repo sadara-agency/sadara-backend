@@ -1,6 +1,6 @@
 import nodemailer from "nodemailer";
-import { env } from "../../config/env";
-import { logger } from "../../config/logger";
+import { env } from "@config/env";
+import { logger } from "@config/logger";
 
 function escapeHtml(str: string): string {
   return str
@@ -92,7 +92,10 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
     logger.info("Email sent", { to: options.to, messageId: info.messageId });
     return true;
   } catch (err: any) {
-    logger.error("Failed to send email", { to: options.to, error: err.message });
+    logger.error("Failed to send email", {
+      to: options.to,
+      error: err.message,
+    });
     return false;
   }
 }

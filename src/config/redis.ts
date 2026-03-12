@@ -1,6 +1,6 @@
 import { createClient, RedisClientType } from "redis";
-import { env } from "./env";
-import { logger } from "./logger";
+import { env } from "@config/env";
+import { logger } from "@config/logger";
 
 // ═══════════════════════════════════════════════════════════
 // Redis Client — Singleton with Graceful Fallback

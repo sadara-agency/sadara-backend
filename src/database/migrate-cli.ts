@@ -1,7 +1,7 @@
 // migrate-cli.ts
 // Usage: npx ts-node src/database/migrate-cli.ts [up|down|status]
 
-import { migrator } from "../config/migrator";
+import { migrator } from "@config/migrator";
 
 const command = process.argv[2] || "up";
 
@@ -20,8 +20,14 @@ async function run() {
     case "status": {
       const executed = await migrator.executed();
       const pending = await migrator.pending();
-      console.log("Executed:", executed.map((m) => m.name));
-      console.log("Pending:", pending.map((m) => m.name));
+      console.log(
+        "Executed:",
+        executed.map((m) => m.name),
+      );
+      console.log(
+        "Pending:",
+        pending.map((m) => m.name),
+      );
       break;
     }
 

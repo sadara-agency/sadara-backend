@@ -7,13 +7,13 @@
  */
 
 import { Op } from "sequelize";
-import { sequelize } from "../../config/database";
-import { logger } from "../../config/logger";
-import { Match } from "../matches/match.model";
-import { PlayerMatchStats } from "../matches/playerMatchStats.model";
-import { Club } from "../clubs/club.model";
-import { ExternalProviderMapping } from "../players/externalProvider.model";
-import { AppError } from "../../middleware/errorHandler";
+import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
+import { Match } from "@modules/matches/match.model";
+import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { Club } from "@modules/clubs/club.model";
+import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
+import { AppError } from "@middleware/errorHandler";
 
 // ── Provider interface ──
 
