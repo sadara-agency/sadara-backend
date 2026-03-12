@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Op, QueryTypes } from "sequelize";
 import { User } from "../Users/user.model";
+import { PlayerAccount } from "../portal/playerAccount.model";
 import { sequelize } from "../../config/database";
 import { env } from "../../config/env";
 import { AppError } from "../../middleware/errorHandler";
@@ -143,25 +144,9 @@ export async function login(input: LoginInput) {
   }
 
   // ─── Attempt 2: Check the player_accounts table ───
-  const playerAccounts = await sequelize.query<{
-    id: string;
-    player_id: string;
-    email: string;
-    password_hash: string;
-    status: string;
-    last_login: Date | null;
-    failed_login_attempts: number | null;
-    locked_until: Date | null;
-  }>(
-    `SELECT id, player_id, email, password_hash, status, last_login,
-            failed_login_attempts, locked_until
-     FROM player_accounts
-     WHERE email = :email
-     LIMIT 1`,
-    { replacements: { email: input.email }, type: QueryTypes.SELECT },
-  );
-
-  const playerAccount = playerAccounts[0];
+  const playerAccount = await PlayerAccount.findOne({
+    where: { email: input.email },
+  });
 
   if (!playerAccount) {
     throw new AppError("Invalid email or password", 401);
@@ -169,11 +154,11 @@ export async function login(input: LoginInput) {
 
   // Check if player account is locked
   if (
-    playerAccount.locked_until &&
-    new Date(playerAccount.locked_until) > new Date()
+    playerAccount.lockedUntil &&
+    new Date(playerAccount.lockedUntil) > new Date()
   ) {
     const remainingMs =
-      new Date(playerAccount.locked_until).getTime() - Date.now();
+      new Date(playerAccount.lockedUntil).getTime() - Date.now();
     const remainingMin = Math.ceil(remainingMs / 60000);
     throw new AppError(
       `Account is temporarily locked. Try again in ${remainingMin} minute(s).`,
@@ -181,22 +166,17 @@ export async function login(input: LoginInput) {
     );
   }
 
-  if (!(await bcrypt.compare(input.password, playerAccount.password_hash))) {
+  if (!(await bcrypt.compare(input.password, playerAccount.passwordHash))) {
     // Increment failed attempts and possibly lock
-    const attempts = (playerAccount.failed_login_attempts || 0) + 1;
+    const attempts = (playerAccount.failedLoginAttempts || 0) + 1;
     const lockUntil =
       attempts >= MAX_FAILED_ATTEMPTS
-        ? new Date(Date.now() + LOCKOUT_DURATION_MS).toISOString()
+        ? new Date(Date.now() + LOCKOUT_DURATION_MS)
         : null;
-    await sequelize.query(
-      `UPDATE player_accounts SET failed_login_attempts = :attempts,
-              locked_until = ${lockUntil ? ":lockUntil" : "NULL"}
-       WHERE id = :id`,
-      {
-        replacements: { attempts, lockUntil, id: playerAccount.id },
-        type: QueryTypes.UPDATE,
-      },
-    );
+    await playerAccount.update({
+      failedLoginAttempts: attempts,
+      lockedUntil: lockUntil ? new Date(lockUntil) : null,
+    });
     throw new AppError("Invalid email or password", 401);
   }
 
@@ -220,7 +200,7 @@ export async function login(input: LoginInput) {
      WHERE id = :playerId
      LIMIT 1`,
     {
-      replacements: { playerId: playerAccount.player_id },
+      replacements: { playerId: playerAccount.playerId },
       type: QueryTypes.SELECT,
     },
   );
@@ -234,10 +214,11 @@ export async function login(input: LoginInput) {
     : null;
 
   // Update last_login and reset lockout counters
-  await sequelize.query(
-    `UPDATE player_accounts SET last_login = NOW(), failed_login_attempts = 0, locked_until = NULL WHERE id = :id`,
-    { replacements: { id: playerAccount.id }, type: QueryTypes.UPDATE },
-  );
+  await playerAccount.update({
+    lastLogin: new Date(),
+    failedLoginAttempts: 0,
+    lockedUntil: null,
+  });
 
   // Build a user-like response so frontend works seamlessly
   const playerUser = {
@@ -249,7 +230,7 @@ export async function login(input: LoginInput) {
     avatarUrl: player?.photo_url || null,
     isActive: true,
     lastLogin: new Date(),
-    playerId: playerAccount.player_id,
+    playerId: playerAccount.playerId,
   };
 
   return {
@@ -259,7 +240,7 @@ export async function login(input: LoginInput) {
       email: playerAccount.email,
       fullName,
       role: "Player",
-      playerId: playerAccount.player_id,
+      playerId: playerAccount.playerId,
     }),
   };
 }
@@ -275,34 +256,33 @@ export async function getProfile(userId: string) {
   if (user) return user;
 
   // Fall back to player_accounts
-  const accounts = await sequelize.query<{
-    id: string;
-    player_id: string;
-    email: string;
-    status: string;
+  const account = await PlayerAccount.findByPk(userId);
+  if (!account) throw new AppError("User not found", 404);
+
+  const playerData = await sequelize.query<{
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+    photo_url: string | null;
   }>(
-    `SELECT pa.id, pa.player_id, pa.email, pa.status,
-            p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url
-     FROM player_accounts pa
-     LEFT JOIN players p ON pa.player_id = p.id
-     WHERE pa.id = :userId
-     LIMIT 1`,
-    { replacements: { userId }, type: QueryTypes.SELECT },
+    `SELECT first_name, last_name, first_name_ar, last_name_ar, photo_url
+     FROM players WHERE id = :playerId LIMIT 1`,
+    { replacements: { playerId: account.playerId }, type: QueryTypes.SELECT },
   );
+  const p = playerData[0];
 
-  if (!accounts[0]) throw new AppError("User not found", 404);
-
-  const acc: any = accounts[0];
   return {
-    id: acc.id,
-    email: acc.email,
-    fullName: `${acc.first_name} ${acc.last_name}`,
-    fullNameAr:
-      `${acc.first_name_ar || ""} ${acc.last_name_ar || ""}`.trim() || null,
+    id: account.id,
+    email: account.email,
+    fullName: p ? `${p.first_name} ${p.last_name}` : account.email,
+    fullNameAr: p
+      ? `${p.first_name_ar || ""} ${p.last_name_ar || ""}`.trim() || null
+      : null,
     role: "Player",
-    avatarUrl: acc.photo_url || null,
-    isActive: acc.status === "active",
-    playerId: acc.player_id,
+    avatarUrl: p?.photo_url || null,
+    isActive: account.status === "active",
+    playerId: account.playerId,
   };
 }
 
@@ -342,28 +322,18 @@ export async function changePassword(
   }
 
   // Fall back to player_accounts
-  const accounts = await sequelize.query<{
-    id: string;
-    password_hash: string;
-    email: string;
-  }>(
-    `SELECT id, password_hash, email FROM player_accounts WHERE id = :userId LIMIT 1`,
-    { replacements: { userId }, type: QueryTypes.SELECT },
-  );
+  const account = await PlayerAccount.findByPk(userId);
 
-  if (!accounts[0]) throw new AppError("User not found", 404);
+  if (!account) throw new AppError("User not found", 404);
 
-  if (!(await bcrypt.compare(currentPassword, accounts[0].password_hash))) {
+  if (!(await bcrypt.compare(currentPassword, account.passwordHash))) {
     throw new AppError("Current password is incorrect", 400);
   }
 
   const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
-  await sequelize.query(
-    `UPDATE player_accounts SET password_hash = :hash WHERE id = :id`,
-    { replacements: { hash: newHash, id: userId }, type: QueryTypes.UPDATE },
-  );
+  await account.update({ passwordHash: newHash });
 
-  sendPasswordChangedEmail(accounts[0].email, "").catch((err) =>
+  sendPasswordChangedEmail(account.email, "").catch((err) =>
     logger.warn("Failed to send email", { error: (err as Error).message }),
   );
   return { message: "Password changed successfully" };

@@ -66,6 +66,15 @@ jest.mock('../../../src/modules/injuries/injury.model', () => ({
 jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: { name: 'Club' },
 }));
+jest.mock('../../../src/modules/portal/playerAccount.model', () => ({
+  PlayerAccount: {
+    findOne: jest.fn(),
+    findByPk: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    name: 'PlayerAccount',
+  },
+}));
 jest.mock('../../../src/modules/contracts/contract.signing.service', () => ({
   regenerateSignedPdf: jest.fn(),
 }));
@@ -77,6 +86,9 @@ jest.mock('../../../src/config/logger', () => ({
 }));
 
 import * as portalService from '../../../src/modules/portal/portal.service';
+import { PlayerAccount } from '../../../src/modules/portal/playerAccount.model';
+
+const mockPlayerAccountFindByPk = PlayerAccount.findByPk as jest.Mock;
 
 // Helper
 const mockPlayerInst = (overrides: any = {}) => ({
@@ -126,7 +138,7 @@ describe('Portal Service', () => {
 
     it('should resolve from player_accounts table', async () => {
       mockUserFindByPk.mockResolvedValue(null);
-      mockSequelizeQuery.mockResolvedValue([{ player_id: 'player-001', status: 'active' }]);
+      mockPlayerAccountFindByPk.mockResolvedValue({ playerId: 'player-001', status: 'active' });
       mockPlayerFindByPk.mockResolvedValue(mockPlayerInst());
       const result = await portalService.getLinkedPlayer('user-001');
       expect(result.id).toBe('player-001');
@@ -134,13 +146,13 @@ describe('Portal Service', () => {
 
     it('should throw 404 if user not found anywhere', async () => {
       mockUserFindByPk.mockResolvedValue(null);
-      mockSequelizeQuery.mockResolvedValue([]);
+      mockPlayerAccountFindByPk.mockResolvedValue(null);
       await expect(portalService.getLinkedPlayer('bad')).rejects.toThrow('User not found');
     });
 
     it('should throw 403 if player account not active', async () => {
       mockUserFindByPk.mockResolvedValue(null);
-      mockSequelizeQuery.mockResolvedValue([{ player_id: 'player-001', status: 'pending' }]);
+      mockPlayerAccountFindByPk.mockResolvedValue({ playerId: 'player-001', status: 'pending' });
       await expect(portalService.getLinkedPlayer('user-001')).rejects.toThrow('not yet activated');
     });
   });

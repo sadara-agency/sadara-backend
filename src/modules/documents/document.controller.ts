@@ -6,21 +6,33 @@ import {
   sendPaginated,
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { createCrudController } from "../../shared/utils/crudController";
 import { AppError } from "../../middleware/errorHandler";
 import * as svc from "./document.service";
 
-// ── List ──
+// Documents list takes req.user?.role for RBAC, so we override list.
+// Upload is custom (multipart/form-data).
 
+const crud = createCrudController({
+  service: {
+    list: (query) => svc.listDocuments(query),
+    getById: (id) => svc.getDocumentById(id),
+    create: (body, userId) => svc.createDocument(body, userId),
+    update: (id, body) => svc.updateDocument(id, body),
+    delete: (id) => svc.deleteDocument(id),
+  },
+  entity: "documents",
+  cachePrefixes: [],
+  label: (d) => d.name,
+});
+
+// Override list to pass user role for RBAC filtering
 export async function list(req: AuthRequest, res: Response) {
   const r = await svc.listDocuments(req.query, req.user?.role);
   sendPaginated(res, r.data, r.meta);
 }
 
-// ── Get by ID ──
-
-export async function getById(req: AuthRequest, res: Response) {
-  sendSuccess(res, await svc.getDocumentById(req.params.id));
-}
+export const { getById, create, update, remove } = crud;
 
 // ── Upload (multipart/form-data — real file) ──
 
@@ -32,7 +44,6 @@ export async function upload(req: AuthRequest, res: Response) {
   const file = req.file;
   const body = req.body;
 
-  // Build the public URL for the file
   const baseUrl = `${req.protocol}://${req.get("host")}`;
   const fileUrl = `${baseUrl}/uploads/documents/${file.filename}`;
 
@@ -66,52 +77,4 @@ export async function upload(req: AuthRequest, res: Response) {
   );
 
   sendCreated(res, doc);
-}
-
-// ── Create (JSON — for records without file e.g. external URL) ──
-
-export async function create(req: AuthRequest, res: Response) {
-  const doc = await svc.createDocument(req.body, req.user!.id);
-
-  await logAudit(
-    "CREATE",
-    "documents",
-    doc!.id,
-    buildAuditContext(req.user!, req.ip),
-    `Created: ${doc!.name}`,
-  );
-
-  sendCreated(res, doc);
-}
-
-// ── Update ──
-
-export async function update(req: AuthRequest, res: Response) {
-  const doc = await svc.updateDocument(req.params.id, req.body);
-
-  await logAudit(
-    "UPDATE",
-    "documents",
-    doc!.id,
-    buildAuditContext(req.user!, req.ip),
-    `Updated: ${doc!.name}`,
-  );
-
-  sendSuccess(res, doc, "Document updated");
-}
-
-// ── Delete ──
-
-export async function remove(req: AuthRequest, res: Response) {
-  const r = await svc.deleteDocument(req.params.id);
-
-  await logAudit(
-    "DELETE",
-    "documents",
-    r.id,
-    buildAuditContext(req.user!, req.ip),
-    "Document deleted",
-  );
-
-  sendSuccess(res, r, "Document deleted");
 }

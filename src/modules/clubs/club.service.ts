@@ -16,6 +16,7 @@ import { Club } from "./club.model";
 import { sequelize } from "../../config/database";
 import { AppError } from "../../middleware/errorHandler";
 import { parsePagination, buildMeta } from "../../shared/utils/pagination";
+import { camelCaseKeys } from "../../shared/utils/caseTransform";
 import { findOrThrow } from "../../shared/utils/serviceHelpers";
 import {
   CreateClubInput,
@@ -32,25 +33,25 @@ const CLUB_AGGREGATES = [
     Sequelize.literal(
       `(SELECT COUNT(*) FROM players p WHERE p.current_club_id = "Club".id)`,
     ),
-    "player_count",
+    "playerCount",
   ],
   [
     Sequelize.literal(
       `(SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = "Club".id AND ct.status = 'Active')`,
     ),
-    "active_contracts",
+    "activeContracts",
   ],
   [
     Sequelize.literal(
       `(SELECT COALESCE(SUM(CASE WHEN ct.base_salary ~ '^[0-9.]+$' THEN ct.base_salary::NUMERIC ELSE 0 END), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
     ),
-    "total_contract_value",
+    "totalContractValue",
   ],
   [
     Sequelize.literal(
       `(SELECT COALESCE(SUM(CASE WHEN ct.total_commission ~ '^[0-9.]+$' THEN ct.total_commission::NUMERIC ELSE 0 END), 0) FROM contracts ct WHERE ct.club_id = "Club".id)`,
     ),
-    "total_commission",
+    "totalCommission",
   ],
 ] as [ReturnType<typeof Sequelize.literal>, string][];
 
@@ -156,9 +157,9 @@ export async function getClubById(id: string) {
 
   return {
     ...club.get({ plain: true }),
-    contacts,
-    players,
-    contracts,
+    contacts: (contacts as any[]).map((c) => camelCaseKeys(c)),
+    players: (players as any[]).map((p) => camelCaseKeys(p)),
+    contracts: (contracts as any[]).map((c) => camelCaseKeys(c)),
   };
 }
 
@@ -315,17 +316,17 @@ export async function createContact(clubId: string, input: CreateContactInput) {
     {
       replacements: {
         name: input.name,
-        name_ar: input.name_ar || null,
+        name_ar: input.nameAr || null,
         role: input.role,
         email: input.email || null,
         phone: input.phone || null,
-        is_primary: input.is_primary ?? false,
+        is_primary: input.isPrimary ?? false,
         club_id: clubId,
       },
       type: QueryTypes.SELECT,
     },
   );
-  return (results as any[])[0];
+  return camelCaseKeys((results as any[])[0]);
 }
 
 // ────────────────────────────────────────────────────────────
@@ -343,9 +344,9 @@ export async function updateContact(
     fields.push("name = :name");
     replacements.name = input.name;
   }
-  if (input.name_ar !== undefined) {
+  if (input.nameAr !== undefined) {
     fields.push("name_ar = :name_ar");
-    replacements.name_ar = input.name_ar;
+    replacements.name_ar = input.nameAr;
   }
   if (input.role !== undefined) {
     fields.push("role = :role");
@@ -359,9 +360,9 @@ export async function updateContact(
     fields.push("phone = :phone");
     replacements.phone = input.phone || null;
   }
-  if (input.is_primary !== undefined) {
+  if (input.isPrimary !== undefined) {
     fields.push("is_primary = :is_primary");
-    replacements.is_primary = input.is_primary;
+    replacements.is_primary = input.isPrimary;
   }
 
   if (fields.length === 0) throw new AppError("No fields to update", 400);
@@ -379,7 +380,7 @@ export async function updateContact(
     `SELECT id, name, name_ar, role, email, phone, is_primary FROM contacts WHERE id = :contactId`,
     { replacements: { contactId }, type: QueryTypes.SELECT },
   );
-  return (updated as any[])[0];
+  return camelCaseKeys((updated as any[])[0]);
 }
 
 // ────────────────────────────────────────────────────────────

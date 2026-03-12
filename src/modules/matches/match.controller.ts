@@ -7,52 +7,35 @@ import {
 } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import { logger } from "../../config/logger";
+import { createCrudController } from "../../shared/utils/crudController";
 import * as svc from "./match.service";
 import { generateAutoTasks } from "./matchAutoTasks";
 
-// ═══════════════════════════════════════════════════════════════
-//  MATCH CRUD
-// ═══════════════════════════════════════════════════════════════
+// Matches create doesn't take userId, so we adapt.
+const crud = createCrudController({
+  service: {
+    list: (query) => svc.listMatches(query),
+    getById: (id) => svc.getMatchById(id),
+    create: (body) => svc.createMatch(body),
+    update: (id, body) => svc.updateMatch(id, body),
+    delete: (id) => svc.deleteMatch(id),
+  },
+  entity: "matches",
+  cachePrefixes: [],
+  label: (m) => `${m.competition || "Match"} on ${m.matchDate}`,
+});
 
-export async function list(req: AuthRequest, res: Response) {
-  const result = await svc.listMatches(req.query);
-  sendPaginated(res, result.data, result.meta);
-}
+export const { list, getById, create, update, remove } = crud;
 
-export async function getById(req: AuthRequest, res: Response) {
-  const match = await svc.getMatchById(req.params.id);
-  sendSuccess(res, match);
-}
+// ═══════════════════════════════════════════════════════════════
+//  CUSTOM MATCH HANDLERS
+// ═══════════════════════════════════════════════════════════════
 
 export async function upcoming(req: AuthRequest, res: Response) {
   const days = Number(req.query.days) || 7;
   const limit = Number(req.query.limit) || 10;
   const matches = await svc.getUpcomingMatches(days, limit);
   sendSuccess(res, matches);
-}
-
-export async function create(req: AuthRequest, res: Response) {
-  const match = await svc.createMatch(req.body);
-  await logAudit(
-    "CREATE",
-    "matches",
-    match.id,
-    buildAuditContext(req.user!, req.ip),
-    `Created match: ${match.competition || "Match"} on ${match.matchDate}`,
-  );
-  sendCreated(res, match);
-}
-
-export async function update(req: AuthRequest, res: Response) {
-  const match = await svc.updateMatch(req.params.id, req.body);
-  await logAudit(
-    "UPDATE",
-    "matches",
-    match.id,
-    buildAuditContext(req.user!, req.ip),
-    `Updated match ${match.id}`,
-  );
-  sendSuccess(res, match, "Match updated");
 }
 
 export async function updateScore(req: AuthRequest, res: Response) {
@@ -95,18 +78,6 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   }
 
   sendSuccess(res, match, `Match status updated to ${match.status}`);
-}
-
-export async function remove(req: AuthRequest, res: Response) {
-  const result = await svc.deleteMatch(req.params.id);
-  await logAudit(
-    "DELETE",
-    "matches",
-    result.id,
-    buildAuditContext(req.user!, req.ip),
-    "Match deleted",
-  );
-  sendSuccess(res, result, "Match deleted");
 }
 
 // ═══════════════════════════════════════════════════════════════

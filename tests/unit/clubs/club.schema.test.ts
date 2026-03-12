@@ -56,8 +56,8 @@ describe('Club Schemas', () => {
     it('should reject missing role', () => {
       expect(createContactSchema.safeParse({ name: 'John' }).success).toBe(false);
     });
-    it('should default is_primary to false', () => {
-      expect(createContactSchema.parse({ name: 'John', role: 'Agent' }).is_primary).toBe(false);
+    it('should default isPrimary to false', () => {
+      expect(createContactSchema.parse({ name: 'John', role: 'Agent' }).isPrimary).toBe(false);
     });
     it('should reject invalid email', () => {
       expect(createContactSchema.safeParse({ name: 'J', role: 'R', email: 'bad' }).success).toBe(false);

@@ -1,59 +1,25 @@
 import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
-import { AppError } from "../../middleware/errorHandler";
-import {
-  sendSuccess,
-  sendCreated,
-  sendPaginated,
-} from "../../shared/utils/apiResponse";
+import { sendSuccess, sendCreated } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { createCrudController } from "../../shared/utils/crudController";
+import { AppError } from "../../middleware/errorHandler";
 import * as clubService from "./club.service";
 
-export async function list(req: AuthRequest, res: Response) {
-  const result = await clubService.listClubs(req.query);
-  sendPaginated(res, result.data, result.meta);
-}
+const crud = createCrudController({
+  service: {
+    list: (query) => clubService.listClubs(query),
+    getById: (id) => clubService.getClubById(id),
+    create: (body) => clubService.createClub(body),
+    update: (id, body) => clubService.updateClub(id, body),
+    delete: (id) => clubService.deleteClub(id),
+  },
+  entity: "clubs",
+  cachePrefixes: [],
+  label: (c) => c.name,
+});
 
-export async function getById(req: AuthRequest, res: Response) {
-  const club = await clubService.getClubById(req.params.id);
-  sendSuccess(res, club);
-}
-
-export async function create(req: AuthRequest, res: Response) {
-  const club = await clubService.createClub(req.body);
-  await logAudit(
-    "CREATE",
-    "clubs",
-    club.id,
-    buildAuditContext(req.user!, req.ip),
-    `Created club: ${club.name}`,
-  );
-  sendCreated(res, club);
-}
-
-export async function update(req: AuthRequest, res: Response) {
-  const club = await clubService.updateClub(req.params.id, req.body);
-  await logAudit(
-    "UPDATE",
-    "clubs",
-    club.id,
-    buildAuditContext(req.user!, req.ip),
-    `Updated club: ${club.name}`,
-  );
-  sendSuccess(res, club, "Club updated");
-}
-
-export async function remove(req: AuthRequest, res: Response) {
-  const result = await clubService.deleteClub(req.params.id);
-  await logAudit(
-    "DELETE",
-    "clubs",
-    result.id,
-    buildAuditContext(req.user!, req.ip),
-    "Club deleted",
-  );
-  sendSuccess(res, result, "Club deleted");
-}
+export const { list, getById, create, update, remove } = crud;
 
 // ── Bulk Delete ──
 

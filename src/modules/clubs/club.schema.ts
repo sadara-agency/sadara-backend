@@ -46,11 +46,11 @@ export const clubQuerySchema = z.object({
 // ── Create Contact ──
 export const createContactSchema = z.object({
   name: z.string().min(1, "Contact name is required"),
-  name_ar: z.string().optional(),
+  nameAr: z.string().optional(),
   role: z.string().min(1, "Contact role is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")),
   phone: z.string().optional(),
-  is_primary: z.boolean().default(false),
+  isPrimary: z.boolean().default(false),
 });
 
 // ── Update Contact (partial) ──
