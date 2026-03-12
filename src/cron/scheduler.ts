@@ -59,6 +59,13 @@ import {
   checkDietAdherence,
   checkNoTrainingPlan,
 } from "./engines/training.engine";
+import {
+  detectOrphanRecords,
+  checkPlayerDataCompleteness,
+  escalateStaleTasks,
+  checkRiskRadarConsistency,
+  detectDuplicateRecords,
+} from "./engines/systemhealth.engine";
 
 // ── Job registry ──
 
@@ -503,6 +510,13 @@ registerJob("body-metric-target-deadline", checkMetricTargetDeadlines);
 registerJob("diet-adherence-monitor", checkDietAdherence);
 registerJob("training-no-plan", checkNoTrainingPlan);
 
+// ── System Health & Data Quality Engine ──
+registerJob("orphan-record-detector", detectOrphanRecords);
+registerJob("player-data-completeness", checkPlayerDataCompleteness);
+registerJob("stale-task-escalator", escalateStaleTasks);
+registerJob("risk-radar-consistency", checkRiskRadarConsistency);
+registerJob("duplicate-record-detector", detectDuplicateRecords);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -605,5 +619,12 @@ export function startCronJobs() {
   cron.schedule("30 9 * * 6", safeJob("diet-adherence-monitor")); // Saturday 9:30 AM
   cron.schedule("30 8 * * 1", safeJob("training-no-plan")); // Monday 8:30 AM
 
-  logger.info("[CRON] 41 jobs scheduled ✓");
+  // ── System Health & Data Quality Engine ──
+  cron.schedule("0 4 * * 0", safeJob("orphan-record-detector")); // Sunday 4:00 AM
+  cron.schedule("0 7 * * 1", safeJob("player-data-completeness")); // Monday 7:00 AM
+  cron.schedule("45 7 * * *", safeJob("stale-task-escalator")); // Daily 7:45 AM
+  cron.schedule("0 5 * * 0", safeJob("risk-radar-consistency")); // Sunday 5:00 AM
+  cron.schedule("0 6 * * 0", safeJob("duplicate-record-detector")); // Sunday 6:00 AM
+
+  logger.info("[CRON] 46 jobs scheduled ✓");
 }

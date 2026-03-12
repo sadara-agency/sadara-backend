@@ -16,6 +16,7 @@ import { loadFinancialIntelConfig } from "./cron/engines/financial.engine";
 import { loadGateOnboardingConfig } from "./cron/engines/gate.engine";
 import { loadScoutingPipelineConfig } from "./cron/engines/scouting.engine";
 import { loadTrainingDevConfig } from "./cron/engines/training.engine";
+import { loadSystemHealthConfig } from "./cron/engines/systemhealth.engine";
 import { loadPermissions } from "./modules/permissions/permission.service";
 import { ensureSportmonksColumn } from "./modules/sportmonks/sportmonks.service";
 import { registerProvider } from "./modules/integrations/matchAnalysis.service";
@@ -65,6 +66,7 @@ async function initApplication(): Promise<void> {
   await loadGateOnboardingConfig();
   await loadScoutingPipelineConfig();
   await loadTrainingDevConfig();
+  await loadSystemHealthConfig();
   await ensureSportmonksColumn();
   registerProviders();
 }

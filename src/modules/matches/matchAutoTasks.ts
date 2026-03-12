@@ -93,6 +93,12 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   metric_target_deadline: { enabled: true, dueDays: 3, threshold: 14 },
   diet_adherence_low: { enabled: true, dueDays: 3, threshold: 50 },
   no_training_plan: { enabled: true, dueDays: 5 },
+  // System health rules (triggered by systemhealth.engine.ts cron jobs)
+  orphan_records: { enabled: true, dueDays: 7 },
+  player_data_incomplete: { enabled: true, dueDays: 5 },
+  stale_task_escalation: { enabled: true, dueDays: 7, threshold: 60 },
+  risk_radar_inconsistency: { enabled: true, dueDays: 3 },
+  duplicate_records: { enabled: true, dueDays: 7 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
