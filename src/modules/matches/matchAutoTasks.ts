@@ -68,6 +68,14 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   draft_contract_stale: { enabled: true, dueDays: 3, threshold: 14 },
   commission_due_upcoming: { enabled: true, dueDays: 5 },
   commission_due_overdue: { enabled: true, dueDays: 1 },
+  // Financial intelligence rules (triggered by financial.engine.ts cron jobs)
+  invoice_aging_30: { enabled: true, dueDays: 5 },
+  invoice_aging_60: { enabled: true, dueDays: 3 },
+  invoice_aging_90: { enabled: true, dueDays: 1 },
+  revenue_anomaly: { enabled: true, dueDays: 5, threshold: 20 },
+  expense_budget_overage: { enabled: true, dueDays: 5, threshold: 50 },
+  player_roi_negative: { enabled: true, dueDays: 7 },
+  valuation_stale: { enabled: true, dueDays: 5, threshold: 90 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {

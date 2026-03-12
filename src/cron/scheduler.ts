@@ -31,6 +31,13 @@ import {
   checkStaleDrafts,
   checkCommissionsDue,
 } from "./engines/contract.engine";
+import {
+  checkInvoiceAging,
+  checkRevenueAnomalies,
+  checkExpenseBudget,
+  checkPlayerROI,
+  checkValuationStaleness,
+} from "./engines/financial.engine";
 
 // ── Job registry ──
 
@@ -447,6 +454,13 @@ registerJob("loan-return-tracker", checkLoanReturns);
 registerJob("draft-contract-stale", checkStaleDrafts);
 registerJob("commission-due-calculator", checkCommissionsDue);
 
+// ── Financial Intelligence Engine ──
+registerJob("invoice-aging-tracker", checkInvoiceAging);
+registerJob("revenue-anomaly-detector", checkRevenueAnomalies);
+registerJob("expense-budget-monitor", checkExpenseBudget);
+registerJob("player-roi-calculator", checkPlayerROI);
+registerJob("valuation-staleness-check", checkValuationStaleness);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -521,5 +535,12 @@ export function startCronJobs() {
   cron.schedule("30 11 * * *", safeJob("draft-contract-stale")); // Daily 11:30 AM
   cron.schedule("0 9 * * 3", safeJob("commission-due-calculator")); // Wednesday 9:00 AM
 
-  logger.info("[CRON] 21 jobs scheduled ✓");
+  // ── Financial Intelligence Engine ──
+  cron.schedule("0 11 * * *", safeJob("invoice-aging-tracker")); // Daily 11:00 AM
+  cron.schedule("0 10 * * 4", safeJob("revenue-anomaly-detector")); // Thursday 10:00 AM
+  cron.schedule("0 9 1 * *", safeJob("expense-budget-monitor")); // 1st of month 9:00 AM
+  cron.schedule("30 10 * * 4", safeJob("player-roi-calculator")); // Thursday 10:30 AM
+  cron.schedule("0 11 * * 1", safeJob("valuation-staleness-check")); // Monday 11:00 AM
+
+  logger.info("[CRON] 26 jobs scheduled ✓");
 }
