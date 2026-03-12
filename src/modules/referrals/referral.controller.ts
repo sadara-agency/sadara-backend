@@ -1,15 +1,28 @@
 import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
-import {
-  sendSuccess,
-  sendCreated,
-  sendPaginated,
-} from "../../shared/utils/apiResponse";
+import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { createCrudController } from "../../shared/utils/crudController";
 import * as referralService from "./referral.service";
 
-// ── List ──
+// Referrals pass userId/role to most service methods, so we adapt via
+// the service wrapper. list and getById need custom handlers since they
+// require req.user context beyond what the factory provides.
 
+const crud = createCrudController({
+  service: {
+    list: (query) => referralService.listReferrals(query, "", ""),
+    getById: (id) => referralService.getReferralById(id, "", ""),
+    create: (body, userId) => referralService.createReferral(body, userId),
+    update: (id, body) => referralService.updateReferral(id, body, "", ""),
+    delete: (id) => referralService.deleteReferral(id, "", ""),
+  },
+  entity: "referrals",
+  cachePrefixes: [],
+  label: (r) => `${r.referralType} referral for player ${r.playerId}`,
+});
+
+// Override list/getById to pass user context
 export async function list(req: AuthRequest, res: Response) {
   const result = await referralService.listReferrals(
     req.query,
@@ -18,8 +31,6 @@ export async function list(req: AuthRequest, res: Response) {
   );
   sendPaginated(res, result.data, result.meta);
 }
-
-// ── Get by ID ──
 
 export async function getById(req: AuthRequest, res: Response) {
   const referral = await referralService.getReferralById(
@@ -30,24 +41,9 @@ export async function getById(req: AuthRequest, res: Response) {
   sendSuccess(res, referral);
 }
 
-// ── Create ──
+export const { create } = crud;
 
-export async function create(req: AuthRequest, res: Response) {
-  const referral = await referralService.createReferral(req.body, req.user!.id);
-
-  await logAudit(
-    "CREATE",
-    "referrals",
-    referral!.id,
-    buildAuditContext(req.user!, req.ip),
-    `Created ${referral!.referralType} referral for player ${referral!.playerId}`,
-  );
-
-  sendCreated(res, referral);
-}
-
-// ── Update ──
-
+// Override update/remove to pass user context
 export async function update(req: AuthRequest, res: Response) {
   const referral = await referralService.updateReferral(
     req.params.id,
@@ -67,8 +63,6 @@ export async function update(req: AuthRequest, res: Response) {
   sendSuccess(res, referral, "Referral updated");
 }
 
-// ── Update Status ──
-
 export async function updateStatus(req: AuthRequest, res: Response) {
   const referral = await referralService.updateReferralStatus(
     req.params.id,
@@ -87,8 +81,6 @@ export async function updateStatus(req: AuthRequest, res: Response) {
 
   sendSuccess(res, referral, `Status updated to ${referral!.status}`);
 }
-
-// ── Delete ──
 
 export async function remove(req: AuthRequest, res: Response) {
   const result = await referralService.deleteReferral(

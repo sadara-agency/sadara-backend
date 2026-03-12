@@ -11,6 +11,7 @@ import {
   getPositionGroup,
   createEmptyTechnicalAttributes,
 } from "./utils/attributeConfig";
+import { camelCaseKeys } from "../../shared/utils/caseTransform";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -19,17 +20,14 @@ const COMPUTED_ATTRIBUTES: [any, string][] = [
       NULLIF(CONCAT("Player".first_name_ar, ' ', "Player".last_name_ar), ' '),
       CONCAT("Player".first_name, ' ', "Player".last_name)
     )`),
-    "full_name_ar",
+    "fullNameAr",
   ],
-  [
-    literal(`CONCAT("Player".first_name, ' ', "Player".last_name)`),
-    "full_name",
-  ],
+  [literal(`CONCAT("Player".first_name, ' ', "Player".last_name)`), "fullName"],
   [
     literal(
       `EXTRACT(YEAR FROM age(CURRENT_DATE, "Player".date_of_birth))::int`,
     ),
-    "computed_age",
+    "computedAge",
   ],
 ];
 
@@ -40,19 +38,19 @@ const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
     literal(
       `(SELECT CASE WHEN c.end_date IS NULL THEN 'Active' WHEN c.end_date < CURRENT_DATE THEN 'Expired' WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon' ELSE 'Active' END FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`,
     ),
-    "contract_status",
+    "contractStatus",
   ],
   [
     literal(
       `(SELECT c.end_date::text FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`,
     ),
-    "contract_end",
+    "contractEnd",
   ],
   [
     literal(
       `(SELECT c.commission_pct FROM contracts c WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL ORDER BY c.created_at DESC LIMIT 1)`,
     ),
-    "commission_rate",
+    "commissionRate",
   ],
   [
     literal(
@@ -82,7 +80,7 @@ const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
     literal(
       `(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`,
     ),
-    "minutes_played",
+    "minutesPlayed",
   ],
   [
     literal(
@@ -106,37 +104,37 @@ const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
     literal(
       `(SELECT COALESCE(SUM(pms.duels_won), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "duels_won",
+    "duelsWon",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.duels_total), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "duels_total",
+    "duelsTotal",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.dribbles_completed), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "dribbles_completed",
+    "dribblesCompleted",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.dribbles_attempted), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "dribbles_attempted",
+    "dribblesAttempted",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.key_passes), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "key_passes",
+    "keyPasses",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.shots_on_target), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "shots_on_target",
+    "shotsOnTarget",
   ],
   [
     literal(
@@ -148,19 +146,19 @@ const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
     literal(
       `(SELECT COALESCE(SUM(pms.clean_sheet::int), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "clean_sheets",
+    "cleanSheets",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.goals_conceded), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "goals_conceded",
+    "goalsConceded",
   ],
   [
     literal(
       `(SELECT COALESCE(SUM(pms.penalties_saved), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
     ),
-    "penalties_saved",
+    "penaltiesSaved",
   ],
 ];
 
@@ -335,34 +333,35 @@ export async function listPlayers(queryParams: any) {
   const playerIds = rows.map((r) => r.id);
   const statsMap = await batchLoadPlayerStats(playerIds);
 
-  // Step 3: Merge stats into each player's plain object
+  // Step 3: Merge stats (converted to camelCase) into each player's plain object
   const data = rows.map((row) => {
     const plain = row.get({ plain: true });
-    const stats = statsMap.get(row.id) || {};
+    const rawStats = statsMap.get(row.id) || {};
+    const stats = camelCaseKeys<Record<string, any>>(rawStats);
     return {
       ...plain,
-      contract_status: stats.contract_status ?? null,
-      contract_end: stats.contract_end ?? null,
-      commission_rate: stats.commission_rate ?? null,
+      contractStatus: stats.contractStatus ?? null,
+      contractEnd: stats.contractEnd ?? null,
+      commissionRate: stats.commissionRate ?? null,
       matches: stats.matches ?? 0,
-      minutes_played: stats.minutes_played ?? 0,
+      minutesPlayed: stats.minutesPlayed ?? 0,
       goals: stats.goals ?? 0,
       assists: stats.assists ?? 0,
       rating: stats.rating ?? null,
       performance: stats.performance ?? null,
       tackles: stats.tackles ?? 0,
       interceptions: stats.interceptions ?? 0,
-      duels_won: stats.duels_won ?? 0,
-      duels_total: stats.duels_total ?? 0,
-      dribbles_completed: stats.dribbles_completed ?? 0,
-      dribbles_attempted: stats.dribbles_attempted ?? 0,
-      key_passes: stats.key_passes ?? 0,
-      shots_on_target: stats.shots_on_target ?? 0,
+      duelsWon: stats.duelsWon ?? 0,
+      duelsTotal: stats.duelsTotal ?? 0,
+      dribblesCompleted: stats.dribblesCompleted ?? 0,
+      dribblesAttempted: stats.dribblesAttempted ?? 0,
+      keyPasses: stats.keyPasses ?? 0,
+      shotsOnTarget: stats.shotsOnTarget ?? 0,
       saves: stats.saves ?? 0,
-      clean_sheets: stats.clean_sheets ?? 0,
-      goals_conceded: stats.goals_conceded ?? 0,
-      penalties_saved: stats.penalties_saved ?? 0,
-      has_provider_mapping: stats.has_provider_mapping ?? false,
+      cleanSheets: stats.cleanSheets ?? 0,
+      goalsConceded: stats.goalsConceded ?? 0,
+      penaltiesSaved: stats.penaltiesSaved ?? 0,
+      hasProviderMapping: stats.hasProviderMapping ?? false,
     };
   });
 
@@ -398,7 +397,7 @@ export async function getPlayerById(id: string) {
   return {
     ...player.get({ plain: true }),
     counts,
-    performance_history: performanceHistory,
+    performanceHistory,
   };
 }
 
@@ -552,15 +551,7 @@ export async function checkDuplicate(params: {
 
   if (conditions.length < 2) return []; // Need at least name + DOB to check
 
-  const rows = await sequelize.query<{
-    id: string;
-    first_name: string;
-    last_name: string;
-    first_name_ar: string;
-    last_name_ar: string;
-    date_of_birth: string;
-    nationality: string;
-  }>(
+  const rows = await sequelize.query<Record<string, any>>(
     `SELECT id, first_name, last_name, first_name_ar, last_name_ar, date_of_birth, nationality
      FROM players
      WHERE ${conditions.join(" AND ")}
@@ -568,12 +559,12 @@ export async function checkDuplicate(params: {
     { replacements, type: QueryTypes.SELECT },
   );
 
-  return rows;
+  return rows.map((r) => camelCaseKeys(r));
 }
 
 // ── Player Club History ──
 export async function getClubHistory(playerId: string) {
-  return sequelize.query<any>(
+  const rows = await sequelize.query<any>(
     `SELECT h.*, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url AS club_logo
      FROM player_club_history h
      LEFT JOIN clubs c ON h.club_id = c.id
@@ -581,6 +572,7 @@ export async function getClubHistory(playerId: string) {
      ORDER BY h.start_date DESC`,
     { replacements: { playerId }, type: QueryTypes.SELECT },
   );
+  return rows.map((r: any) => camelCaseKeys(r));
 }
 
 export async function removePlayerProvider(

@@ -1,80 +1,35 @@
 import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
-import {
-  sendSuccess,
-  sendCreated,
-  sendPaginated,
-} from "../../shared/utils/apiResponse";
-import { logAudit, buildAuditContext, buildChanges } from "../../shared/utils/audit";
+import { sendSuccess } from "../../shared/utils/apiResponse";
+import { logAudit, buildAuditContext } from "../../shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "../../shared/utils/cache";
+import { createCrudController } from "../../shared/utils/crudController";
 import { AppError } from "../../middleware/errorHandler";
 import * as playerService from "./player.service";
 
-export async function list(req: AuthRequest, res: Response) {
-  const result = await playerService.listPlayers(req.query);
-  sendPaginated(res, result.data, result.meta);
-}
+const PLAYER_CACHE = [
+  CachePrefix.PLAYERS,
+  CachePrefix.PLAYER,
+  CachePrefix.DASHBOARD,
+];
 
-export async function getById(req: AuthRequest, res: Response) {
-  const player = await playerService.getPlayerById(req.params.id);
-  sendSuccess(res, player);
-}
+const crud = createCrudController({
+  service: {
+    list: (query) => playerService.listPlayers(query),
+    getById: (id) => playerService.getPlayerById(id),
+    create: (body, userId) => playerService.createPlayer(body, userId),
+    update: (id, body) => playerService.updatePlayer(id, body),
+    delete: (id) => playerService.deletePlayer(id),
+  },
+  entity: "players",
+  cachePrefixes: PLAYER_CACHE,
+  deleteCachePrefixes: [...PLAYER_CACHE, CachePrefix.CONTRACTS],
+  label: (p) => `${p.firstName} ${p.lastName}`,
+});
 
-export async function create(req: AuthRequest, res: Response) {
-  const player = await playerService.createPlayer(req.body, req.user!.id);
-  await logAudit(
-    "CREATE",
-    "players",
-    player.id,
-    buildAuditContext(req.user!, req.ip),
-    `Created player: ${player.firstName} ${player.lastName}`,
-  );
-  await invalidateMultiple([CachePrefix.PLAYERS, CachePrefix.DASHBOARD]);
-  sendCreated(res, player);
-}
+export const { list, getById, create, update, remove } = crud;
 
-export async function update(req: AuthRequest, res: Response) {
-  const oldPlayer = await playerService.getPlayerById(req.params.id);
-  const player = await playerService.updatePlayer(req.params.id, req.body);
-
-  const changes = buildChanges(
-    oldPlayer instanceof Object ? (oldPlayer as any).get?.({ plain: true }) ?? oldPlayer : oldPlayer,
-    req.body,
-  );
-
-  await logAudit(
-    "UPDATE",
-    "players",
-    player.id,
-    buildAuditContext(req.user!, req.ip),
-    `Updated player: ${player.firstName} ${player.lastName}`,
-    changes ?? undefined,
-  );
-  await invalidateMultiple([
-    CachePrefix.PLAYERS,
-    CachePrefix.PLAYER,
-    CachePrefix.DASHBOARD,
-  ]);
-  sendSuccess(res, player, "Player updated");
-}
-
-export async function remove(req: AuthRequest, res: Response) {
-  const result = await playerService.deletePlayer(req.params.id);
-  await logAudit(
-    "DELETE",
-    "players",
-    result.id,
-    buildAuditContext(req.user!, req.ip),
-    "Player deleted",
-  );
-  await invalidateMultiple([
-    CachePrefix.PLAYERS,
-    CachePrefix.PLAYER,
-    CachePrefix.CONTRACTS,
-    CachePrefix.DASHBOARD,
-  ]);
-  sendSuccess(res, result, "Player deleted");
-}
+// ── Custom handlers ──
 
 export async function uploadPhoto(req: AuthRequest, res: Response) {
   if (!req.file) throw new AppError("No file uploaded", 400);
@@ -90,11 +45,7 @@ export async function uploadPhoto(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Updated player photo",
   );
-  await invalidateMultiple([
-    CachePrefix.PLAYERS,
-    CachePrefix.PLAYER,
-    CachePrefix.DASHBOARD,
-  ]);
+  await invalidateMultiple(PLAYER_CACHE);
   sendSuccess(res, { photoUrl }, "Photo uploaded");
 }
 
@@ -136,7 +87,6 @@ export async function refreshStats(req: AuthRequest, res: Response) {
   }
   const { syncPlayerMatches } =
     await import("../integrations/matchAnalysis.service");
-  // Look up external ID from player providers
   const providers = await playerService.getPlayerProviders(req.params.id);
   const mapping = providers.find((p: any) => p.providerName === provider);
   if (!mapping) {
@@ -156,11 +106,6 @@ export async function refreshStats(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Synced stats from ${provider}: ${result.imported} new, ${result.updated} updated matches`,
   );
-  await invalidateMultiple([
-    CachePrefix.PLAYERS,
-    CachePrefix.PLAYER,
-    CachePrefix.MATCHES,
-    CachePrefix.DASHBOARD,
-  ]);
+  await invalidateMultiple([...PLAYER_CACHE, CachePrefix.MATCHES]);
   sendSuccess(res, result);
 }

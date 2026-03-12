@@ -7,12 +7,89 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { sequelize } from "../../config/database";
+import { QueryTypes } from "sequelize";
 import { logger } from "../../config/logger";
 import { Task } from "../../modules/tasks/task.model";
 import {
   notifyByRole,
   notifyUser,
 } from "../../modules/notifications/notification.service";
+
+interface AppSettingRow {
+  value: string | Record<string, unknown>;
+}
+
+interface PerformanceTrendRow {
+  player_id: string;
+  season_avg: string | number;
+  total_matches: string | number;
+  recent_avg: string | number;
+  drop_amount: string | number;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  coach_id: string | null;
+  analyst_id: string | null;
+  agent_id: string | null;
+}
+
+interface FatigueRiskRow {
+  player_id: string;
+  full_matches: string | number;
+  total_minutes: string | number;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  coach_id: string | null;
+  agent_id: string | null;
+}
+
+interface BreakoutPlayerRow {
+  player_id: string;
+  avg_rating: string | number;
+  total_goals: string | number;
+  total_assists: string | number;
+  match_count: string | number;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  player_type: string;
+  position: string | null;
+  agent_id: string | null;
+  coach_id: string | null;
+}
+
+interface MinutesDroughtRow {
+  player_id: string;
+  squad_count: string | number;
+  total_minutes: string | number;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  position: string | null;
+  agent_id: string | null;
+  coach_id: string | null;
+}
+
+interface ConsecutiveLowRatingRow {
+  player_id: string;
+  last_ratings: number[];
+  avg_rating: string | number;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  coach_id: string | null;
+  analyst_id: string | null;
+}
+
+interface CountRow {
+  cnt: string | number;
+}
 
 // ── Configurable thresholds (loaded from app_settings) ──
 
@@ -50,8 +127,8 @@ export async function loadPerformanceTrendConfig() {
   try {
     const [row] = (await sequelize.query(
       `SELECT value FROM app_settings WHERE key = 'performance_trend_config' LIMIT 1`,
-      { type: "SELECT" as any },
-    )) as any[];
+      { type: QueryTypes.SELECT },
+    )) as AppSettingRow[];
     if (row?.value) {
       const parsed =
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
@@ -71,7 +148,7 @@ export async function savePerformanceTrendConfig(
     await sequelize.query(
       `INSERT INTO app_settings (key, value) VALUES ('performance_trend_config', :val)
        ON CONFLICT (key) DO UPDATE SET value = :val`,
-      { replacements: { val: JSON.stringify(_config) }, type: "RAW" as any },
+      { replacements: { val: JSON.stringify(_config) }, type: QueryTypes.RAW },
     );
   } catch {
     // silently ignore if table missing
@@ -168,7 +245,7 @@ export async function checkPerformanceTrends(): Promise<{
   const dropThreshold = _config.trendDropThreshold;
 
   // Get players who have enough recent match data
-  const players: any[] = await sequelize.query(
+  const players = (await sequelize.query(
     `
     WITH recent_stats AS (
       SELECT
@@ -211,9 +288,9 @@ export async function checkPerformanceTrends(): Promise<{
     `,
     {
       replacements: { window, threshold: dropThreshold },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
-  );
+  )) as PerformanceTrendRow[];
 
   let tasksCreated = 0;
 
@@ -331,7 +408,7 @@ export async function checkFatigueRisk(): Promise<{
   const windowSize = _config.fatigueWindowMatches;
   const minFull = _config.fatigueMinFullMatches;
 
-  const rows: any[] = await sequelize.query(
+  const rows = (await sequelize.query(
     `
     WITH recent_matches AS (
       SELECT
@@ -362,9 +439,9 @@ export async function checkFatigueRisk(): Promise<{
     `,
     {
       replacements: { windowSize, minFull },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
-  );
+  )) as FatigueRiskRow[];
 
   let tasksCreated = 0;
 
@@ -419,7 +496,7 @@ export async function checkBreakoutPlayers(): Promise<{
   const window = _config.breakoutWindowMatches;
   const minRating = _config.breakoutMinRating;
 
-  const rows: any[] = await sequelize.query(
+  const rows = (await sequelize.query(
     `
     WITH recent_stats AS (
       SELECT
@@ -456,9 +533,9 @@ export async function checkBreakoutPlayers(): Promise<{
     `,
     {
       replacements: { window, minRating, minMatches: Math.min(3, window) },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
-  );
+  )) as BreakoutPlayerRow[];
 
   let tasksCreated = 0;
 
@@ -507,8 +584,8 @@ export async function checkBreakoutPlayers(): Promise<{
   // Count total youth/amateur for stats
   const [countRow] = (await sequelize.query(
     `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active' AND player_type IN ('Youth', 'Amateur')`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  )) as CountRow[];
 
   return {
     youthChecked: Number(countRow?.cnt ?? 0),
@@ -534,7 +611,7 @@ export async function checkMinutesDrought(): Promise<{
 
   // Find active players who were on the squad (match_players) but got 0 minutes
   // for the last 4 completed matches
-  const rows: any[] = await sequelize.query(
+  const rows = (await sequelize.query(
     `
     WITH last_matches AS (
       SELECT id, match_date,
@@ -566,8 +643,8 @@ export async function checkMinutesDrought(): Promise<{
     WHERE p.status = 'active'
     ORDER BY pi.squad_count DESC
     `,
-    { type: "SELECT" as any },
-  );
+    { type: QueryTypes.SELECT },
+  )) as MinutesDroughtRow[];
 
   let tasksCreated = 0;
 
@@ -618,7 +695,7 @@ export async function checkConsecutiveLowRatings(): Promise<{
   if (!_config.enabled)
     return { playersChecked: 0, flagged: 0, tasksCreated: 0 };
 
-  const rows: any[] = await sequelize.query(
+  const rows = (await sequelize.query(
     `
     WITH recent_stats AS (
       SELECT
@@ -647,8 +724,8 @@ export async function checkConsecutiveLowRatings(): Promise<{
     HAVING COUNT(*) = 3 AND MAX(rs.rating) < 5.0
     ORDER BY AVG(rs.rating) ASC
     `,
-    { type: "SELECT" as any },
-  );
+    { type: QueryTypes.SELECT },
+  )) as ConsecutiveLowRatingRow[];
 
   let tasksCreated = 0;
 
@@ -692,7 +769,7 @@ export async function checkConsecutiveLowRatings(): Promise<{
 async function getActivePlayerCount(): Promise<number> {
   const [row] = (await sequelize.query(
     `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active'`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  )) as CountRow[];
   return Number(row?.cnt ?? 0);
 }

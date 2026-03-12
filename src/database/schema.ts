@@ -135,19 +135,7 @@ export async function createMissingTables() {
         END $$;`,
   );
 
-  // Add account lockout columns to player_accounts if missing (security requirement)
-  await sequelize.query(
-    `DO $$ BEGIN
-            ALTER TABLE player_accounts ADD COLUMN failed_login_attempts INT DEFAULT 0;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;`,
-  );
-  await sequelize.query(
-    `DO $$ BEGIN
-            ALTER TABLE player_accounts ADD COLUMN locked_until TIMESTAMPTZ;
-        EXCEPTION WHEN duplicate_column THEN NULL;
-        END $$;`,
-  );
+  // player_accounts lockout columns now handled by migration 025
 
   // Add logo_url column to saff_team_maps if missing (for existing DBs)
   await sequelize.query(

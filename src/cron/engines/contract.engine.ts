@@ -13,6 +13,107 @@ import {
   notifyByRole,
   notifyUser,
 } from "../../modules/notifications/notification.service";
+import { QueryTypes } from "sequelize";
+
+// ── Row-level interfaces for raw SQL results ──
+
+interface AppSettingRow {
+  value: string | Record<string, unknown>;
+}
+
+interface ContractRenewalRow {
+  contract_id: string;
+  player_id: string;
+  end_date: string;
+  contract_type: string;
+  status: string;
+  club_name: string | null;
+  club_name_ar: string | null;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  pending_renewals: string | number;
+  days_remaining: string | number;
+}
+
+interface ContractValueRow {
+  contract_id: string;
+  player_id: string;
+  base_salary: string | number;
+  salary_currency: string;
+  contract_type: string;
+  end_date: string;
+  market_value: string | number;
+  valuation_currency: string;
+  trend: string | null;
+  valued_at: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  club_name: string | null;
+  club_name_ar: string | null;
+}
+
+interface LoanReturnRow {
+  contract_id: string;
+  player_id: string;
+  end_date: string;
+  start_date: string;
+  status: string;
+  club_name: string | null;
+  club_name_ar: string | null;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  coach_id: string | null;
+  position: string | null;
+  days_remaining: string | number;
+}
+
+interface StaleDraftRow {
+  contract_id: string;
+  player_id: string;
+  contract_type: string;
+  contract_title: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string | null;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  club_name: string | null;
+  club_name_ar: string | null;
+  days_idle: string | number;
+}
+
+interface CommissionRow {
+  payment_id: string;
+  player_id: string;
+  amount: string | number;
+  currency: string;
+  due_date: string;
+  notes: string | null;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  days_until_due?: string | number;
+  days_overdue?: string | number;
+  payment_type?: string;
+}
+
+interface CountRow {
+  cnt: string | number;
+}
 
 // ── Configurable thresholds (loaded from app_settings) ──
 
@@ -50,10 +151,10 @@ export function getContractLifecycleConfig(): ContractLifecycleConfig {
 /** Load config from app_settings (called once at startup) */
 export async function loadContractLifecycleConfig() {
   try {
-    const [row] = (await sequelize.query(
+    const [row] = await sequelize.query<AppSettingRow>(
       `SELECT value FROM app_settings WHERE key = 'contract_lifecycle_config' LIMIT 1`,
-      { type: "SELECT" as any },
-    )) as any[];
+      { type: QueryTypes.SELECT },
+    );
     if (row?.value) {
       const parsed =
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
@@ -78,7 +179,7 @@ export async function saveContractLifecycleConfig(
     await sequelize.query(
       `INSERT INTO app_settings (key, value) VALUES ('contract_lifecycle_config', :val)
        ON CONFLICT (key) DO UPDATE SET value = :val`,
-      { replacements: { val: JSON.stringify(_config) }, type: "RAW" as any },
+      { replacements: { val: JSON.stringify(_config) }, type: QueryTypes.RAW },
     );
   } catch (err) {
     logger.warn("[ContractEngine] Could not save config to app_settings", {
@@ -182,7 +283,7 @@ export async function checkContractRenewalWindow(): Promise<{
   urgentDate.setDate(urgentDate.getDate() + _config.renewalUrgentDays);
   const urgentStr = urgentDate.toISOString().split("T")[0];
 
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<ContractRenewalRow>(
     `
     SELECT
       c.id AS contract_id,
@@ -217,7 +318,7 @@ export async function checkContractRenewalWindow(): Promise<{
     `,
     {
       replacements: { today, windowDate: windowStr },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
@@ -342,7 +443,7 @@ export async function checkContractValueMismatch(): Promise<{
 
   const thresholdPct = _config.mismatchThresholdPct;
 
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<ContractValueRow>(
     `
     WITH latest_valuation AS (
       SELECT DISTINCT ON (player_id)
@@ -376,7 +477,7 @@ export async function checkContractValueMismatch(): Promise<{
       AND p.status = 'active'
     ORDER BY c.player_id
     `,
-    { type: "SELECT" as any },
+    { type: QueryTypes.SELECT },
   );
 
   let tasksCreated = 0;
@@ -470,7 +571,7 @@ export async function checkLoanReturns(): Promise<{
   alertDate.setDate(alertDate.getDate() + _config.loanReturnAlertDays);
   const alertStr = alertDate.toISOString().split("T")[0];
 
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<LoanReturnRow>(
     `
     SELECT
       c.id AS contract_id,
@@ -497,17 +598,17 @@ export async function checkLoanReturns(): Promise<{
     `,
     {
       replacements: { today, alertDate: alertStr },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
   let tasksCreated = 0;
 
   // Count all active loans
-  const [loanCountRow] = (await sequelize.query(
+  const [loanCountRow] = await sequelize.query<CountRow>(
     `SELECT COUNT(*) AS cnt FROM contracts WHERE contract_type = 'Loan' AND status IN ('Active', 'Expiring Soon')`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  );
   const activeLoans = Number(loanCountRow?.cnt ?? 0);
 
   for (const row of rows) {
@@ -579,7 +680,7 @@ export async function checkStaleDrafts(): Promise<{
   staleCutoff.setDate(staleCutoff.getDate() - _config.staleDraftDays);
   const cutoffStr = staleCutoff.toISOString();
 
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<StaleDraftRow>(
     `
     SELECT
       c.id AS contract_id,
@@ -605,7 +706,7 @@ export async function checkStaleDrafts(): Promise<{
     `,
     {
       replacements: { cutoff: cutoffStr },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
@@ -641,10 +742,10 @@ export async function checkStaleDrafts(): Promise<{
   }
 
   // Count total drafts
-  const [draftCount] = (await sequelize.query(
+  const [draftCount] = await sequelize.query<CountRow>(
     `SELECT COUNT(*) AS cnt FROM contracts WHERE status = 'Draft'`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  );
 
   return {
     draftsChecked: Number(draftCount?.cnt ?? 0),
@@ -675,7 +776,7 @@ export async function checkCommissionsDue(): Promise<{
   const alertStr = alertDate.toISOString().split("T")[0];
 
   // Upcoming commissions
-  const upcomingRows: any[] = await sequelize.query(
+  const upcomingRows = await sequelize.query<CommissionRow>(
     `
     SELECT
       pm.id AS payment_id,
@@ -699,12 +800,12 @@ export async function checkCommissionsDue(): Promise<{
     `,
     {
       replacements: { today, alertDate: alertStr },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
   // Overdue commissions
-  const overdueRows: any[] = await sequelize.query(
+  const overdueRows = await sequelize.query<CommissionRow>(
     `
     SELECT
       pm.id AS payment_id,
@@ -726,7 +827,7 @@ export async function checkCommissionsDue(): Promise<{
     `,
     {
       replacements: { today },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
@@ -804,10 +905,10 @@ export async function checkCommissionsDue(): Promise<{
   }
 
   // Count total commissions
-  const [totalRow] = (await sequelize.query(
+  const [totalRow] = await sequelize.query<CountRow>(
     `SELECT COUNT(*) AS cnt FROM payments WHERE payment_type = 'Commission' AND status = 'Expected'`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  );
 
   return {
     commissionsChecked: Number(totalRow?.cnt ?? 0),

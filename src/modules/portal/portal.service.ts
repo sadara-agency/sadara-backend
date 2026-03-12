@@ -16,6 +16,7 @@ import { Task } from "../tasks/task.model";
 import { Injury, InjuryUpdate } from "../injuries/injury.model";
 import { AppError } from "../../middleware/errorHandler";
 import { regenerateSignedPdf } from "../contracts/contract.signing.service";
+import { PlayerAccount } from "./playerAccount.model";
 
 // ══════════════════════════════════════════
 // RESOLVE: User → Player
@@ -58,12 +59,10 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
   }
 
   // ── Path 2: Check the player_accounts table ──
-  const accounts = await sequelize.query<{ player_id: string; status: string }>(
-    `SELECT player_id, status FROM player_accounts WHERE id = :userId LIMIT 1`,
-    { replacements: { userId }, type: QueryTypes.SELECT },
-  );
+  const account = await PlayerAccount.findByPk(userId, {
+    attributes: ["playerId", "status"],
+  });
 
-  const account = accounts[0];
   if (!account) {
     throw new AppError("User not found", 404);
   }
@@ -72,7 +71,7 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
     throw new AppError("Account is not yet activated", 403);
   }
 
-  const player = await Player.findByPk(account.player_id);
+  const player = await Player.findByPk(account.playerId);
   if (!player) {
     throw new AppError(
       "No player profile linked to this account. Contact your agent.",
@@ -682,25 +681,22 @@ export async function generatePlayerInvite(
   }
 
   // ── Auto-create player_accounts row if missing ──
-  const existingAccount = await sequelize.query<{ id: string }>(
-    `SELECT id FROM player_accounts WHERE player_id = :playerId LIMIT 1`,
-    { replacements: { playerId }, type: QueryTypes.SELECT },
-  );
+  const existingAccount = await PlayerAccount.findOne({
+    where: { playerId },
+    attributes: ["id"],
+  });
 
-  if (!existingAccount[0]) {
-    const paId = crypto.randomUUID();
+  if (!existingAccount) {
     const placeholderHash = await bcrypt.hash(
       crypto.randomBytes(32).toString("hex"),
       env.bcrypt.saltRounds,
     );
-    await sequelize.query(
-      `INSERT INTO player_accounts (id, player_id, email, password_hash, status, created_at, updated_at)
-       VALUES (:id, :playerId, :email, :hash, 'pending', NOW(), NOW())`,
-      {
-        replacements: { id: paId, playerId, email, hash: placeholderHash },
-        type: QueryTypes.INSERT,
-      },
-    );
+    await PlayerAccount.create({
+      playerId,
+      email,
+      passwordHash: placeholderHash,
+      status: "pending",
+    });
   }
 
   // ── Create User record with invite token ──
@@ -772,13 +768,9 @@ export async function completePlayerRegistration(
   // Activate the player_accounts row if one exists
   const userPlayerId = (user as any).playerId;
   if (userPlayerId) {
-    await sequelize.query(
-      `UPDATE player_accounts SET status = 'active', password_hash = :hash, updated_at = NOW()
-       WHERE player_id = :playerId AND status != 'active'`,
-      {
-        replacements: { hash: hashedPassword, playerId: userPlayerId },
-        type: QueryTypes.UPDATE,
-      },
+    await PlayerAccount.update(
+      { status: "active", passwordHash: hashedPassword },
+      { where: { playerId: userPlayerId, status: { [Op.ne]: "active" } } },
     );
   }
 
@@ -1053,15 +1045,9 @@ export async function deletePlayerAccount(accountId: string) {
   }
 
   // Try player_accounts table (direct login accounts)
-  const [pa] = await sequelize.query<{ id: string }>(
-    `SELECT id FROM player_accounts WHERE id = :id`,
-    { replacements: { id: accountId }, type: QueryTypes.SELECT },
-  );
+  const pa = await PlayerAccount.findByPk(accountId);
   if (pa) {
-    await sequelize.query(`DELETE FROM player_accounts WHERE id = :id`, {
-      replacements: { id: accountId },
-      type: QueryTypes.DELETE,
-    });
+    await pa.destroy();
     return { id: accountId };
   }
 

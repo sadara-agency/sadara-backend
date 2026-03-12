@@ -1,29 +1,34 @@
 import { Response } from "express";
 import { AuthRequest } from "../../shared/types";
-import {
-  sendSuccess,
-  sendCreated,
-  sendPaginated,
-} from "../../shared/utils/apiResponse";
+import { sendSuccess, sendPaginated } from "../../shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "../../shared/utils/audit";
+import { createCrudController } from "../../shared/utils/crudController";
 import * as svc from "./note.service";
 
+// Notes has non-standard service signatures (role-aware list, userId on
+// update/delete), so we only reuse create from the factory and keep
+// list/update/remove as custom handlers.
+
+const crud = createCrudController({
+  service: {
+    list: (query) => svc.listNotes(query),
+    getById: (id) => Promise.resolve({ id }),
+    create: (body, userId) => svc.createNote(body, userId),
+    update: (id, body) => svc.updateNote(id, body.content, body.userId),
+    delete: (id) => svc.deleteNote(id, "", ""),
+  },
+  entity: "notes",
+  cachePrefixes: [],
+  label: (n) => `on ${n.ownerType} ${n.ownerId}`,
+});
+
+// Override list to pass user role for RBAC filtering
 export async function list(req: AuthRequest, res: Response) {
   const result = await svc.listNotes(req.query, req.user?.role);
   sendPaginated(res, result.data, result.meta);
 }
 
-export async function create(req: AuthRequest, res: Response) {
-  const note = await svc.createNote(req.body, req.user!.id);
-  await logAudit(
-    "CREATE",
-    "notes",
-    note.id,
-    buildAuditContext(req.user!, req.ip),
-    `Note added on ${req.body.ownerType} ${req.body.ownerId}`,
-  );
-  sendCreated(res, note);
-}
+export const { create } = crud;
 
 export async function update(req: AuthRequest, res: Response) {
   const note = await svc.updateNote(

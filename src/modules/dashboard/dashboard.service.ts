@@ -2,6 +2,7 @@ import { QueryTypes } from "sequelize";
 import { sequelize } from "../../config/database";
 import { logger } from "../../config/logger";
 import type { UserRole } from "../../shared/types";
+import { camelCaseKeys } from "../../shared/utils/caseTransform";
 
 /** Roles that see ALL data (no player-level filtering). */
 const UNFILTERED_ROLES: UserRole[] = [
@@ -86,7 +87,7 @@ export async function getTodayOverview() {
 
 /** Top players ranked by market value with club, risk, and trend data. */
 export async function getTopPlayers(limit = 5) {
-  return sequelize.query(
+  const rows = await sequelize.query(
     `SELECT
        p.id,
        p.first_name,
@@ -119,6 +120,7 @@ export async function getTopPlayers(limit = 5) {
      LIMIT $1`,
     { bind: [limit], type: QueryTypes.SELECT },
   );
+  return (rows as any[]).map((r) => camelCaseKeys(r));
 }
 
 /** Contract count grouped by status (for pie chart). */

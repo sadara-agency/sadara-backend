@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import cron from "node-cron";
+import { QueryTypes } from "sequelize";
 import { sequelize } from "../config/database";
 import { logger } from "../config/logger";
 import {
@@ -66,6 +67,64 @@ import {
   checkRiskRadarConsistency,
   detectDuplicateRecords,
 } from "./engines/systemhealth.engine";
+
+// ── Query result interfaces ──
+
+interface ContractExpiryRow {
+  id: string;
+  end_date: string;
+  status: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  club_name: string | null;
+  club_name_ar: string | null;
+}
+
+interface InjuryFollowupRow {
+  id: string;
+  injury_type: string;
+  expected_return_date: string;
+  severity: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+}
+
+interface PaymentReminderRow {
+  id: string;
+  amount: string | number;
+  currency: string;
+  due_date: string;
+  payment_type: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar?: string | null;
+  last_name_ar?: string | null;
+}
+
+interface DocumentExpiryRow {
+  id: string;
+  name: string;
+  expiry_date: string;
+  first_name: string | null;
+  last_name: string | null;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+}
+
+interface UpcomingMatchRow {
+  id: string;
+  competition: string | null;
+  match_date: string;
+  home_team: string | null;
+  home_team_ar: string | null;
+  away_team: string | null;
+  away_team_ar: string | null;
+}
 
 // ── Job registry ──
 
@@ -170,7 +229,7 @@ async function checkContractExpiry() {
     targetDate.setDate(targetDate.getDate() + t.days);
     const dateStr = targetDate.toISOString().split("T")[0];
 
-    const contracts: any[] = await sequelize.query(
+    const contracts = await sequelize.query<ContractExpiryRow>(
       `
       SELECT c.id, c.end_date, c.status,
              p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
@@ -182,7 +241,7 @@ async function checkContractExpiry() {
         AND c.end_date = :targetDate
         AND c.expiry_alert_sent = false
     `,
-      { replacements: { targetDate: dateStr }, type: "SELECT" as any },
+      { replacements: { targetDate: dateStr }, type: QueryTypes.SELECT },
     );
 
     for (const c of contracts) {
@@ -246,9 +305,12 @@ async function updateContractStatuses() {
   );
 
   return {
-    expired: (expiredCount as any)?.rowCount ?? expiredCount ?? 0,
+    expired:
+      (expiredCount as { rowCount?: number })?.rowCount ?? expiredCount ?? 0,
     expiringSoon:
-      (expiringSoonCount as any)?.rowCount ?? expiringSoonCount ?? 0,
+      (expiringSoonCount as { rowCount?: number })?.rowCount ??
+      expiringSoonCount ??
+      0,
   };
 }
 
@@ -259,7 +321,7 @@ async function updateContractStatuses() {
 async function checkInjuryFollowups() {
   const today = new Date().toISOString().split("T")[0];
 
-  const overdueInjuries: any[] = await sequelize.query(
+  const overdueInjuries = await sequelize.query<InjuryFollowupRow>(
     `
     SELECT i.id, i.injury_type, i.expected_return_date, i.severity,
            p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.agent_id
@@ -269,7 +331,7 @@ async function checkInjuryFollowups() {
       AND i.expected_return_date IS NOT NULL
       AND i.expected_return_date < :today
   `,
-    { replacements: { today }, type: "SELECT" as any },
+    { replacements: { today }, type: QueryTypes.SELECT },
   );
 
   for (const inj of overdueInjuries) {
@@ -318,7 +380,7 @@ async function checkPaymentDueDates() {
   const dateStr = sevenDaysOut.toISOString().split("T")[0];
   const today = new Date().toISOString().split("T")[0];
 
-  const upcoming: any[] = await sequelize.query(
+  const upcoming = await sequelize.query<PaymentReminderRow>(
     `
     SELECT pm.id, pm.amount, pm.currency, pm.due_date, pm.payment_type,
            p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
@@ -327,7 +389,7 @@ async function checkPaymentDueDates() {
     WHERE pm.status = 'Expected'
       AND pm.due_date = :dueDate
   `,
-    { replacements: { dueDate: dateStr }, type: "SELECT" as any },
+    { replacements: { dueDate: dateStr }, type: QueryTypes.SELECT },
   );
 
   for (const pm of upcoming) {
@@ -346,7 +408,7 @@ async function checkPaymentDueDates() {
     });
   }
 
-  const overdue: any[] = await sequelize.query(
+  const overdue = await sequelize.query<PaymentReminderRow>(
     `
     SELECT pm.id, pm.amount, pm.currency, pm.due_date,
            p.first_name, p.last_name
@@ -355,7 +417,7 @@ async function checkPaymentDueDates() {
     WHERE pm.status = 'Expected'
       AND pm.due_date < :today
   `,
-    { replacements: { today }, type: "SELECT" as any },
+    { replacements: { today }, type: QueryTypes.SELECT },
   );
 
   for (const pm of overdue) {
@@ -393,7 +455,7 @@ async function checkDocumentExpiry() {
     targetDate.setDate(targetDate.getDate() + t.days);
     const dateStr = targetDate.toISOString().split("T")[0];
 
-    const docs: any[] = await sequelize.query(
+    const docs = await sequelize.query<DocumentExpiryRow>(
       `
       SELECT d.id, d.name, d.expiry_date,
              p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
@@ -401,7 +463,7 @@ async function checkDocumentExpiry() {
       LEFT JOIN players p ON p.id = d.player_id
       WHERE d.expiry_date = :targetDate
     `,
-      { replacements: { targetDate: dateStr }, type: "SELECT" as any },
+      { replacements: { targetDate: dateStr }, type: QueryTypes.SELECT },
     );
 
     for (const doc of docs) {
@@ -432,7 +494,7 @@ async function checkDocumentExpiry() {
 
 async function checkUpcomingMatches() {
   // Query matches in the next 1–7 days (covers all possible pre-match rule windows)
-  const matches: any[] = await sequelize.query(
+  const matches = await sequelize.query<UpcomingMatchRow>(
     `
     SELECT m.id, m.competition, m.match_date,
            hc.name as home_team, hc.name_ar as home_team_ar,
@@ -444,7 +506,7 @@ async function checkUpcomingMatches() {
       AND m.match_date::date BETWEEN CURRENT_DATE + 1 AND CURRENT_DATE + 7
     ORDER BY m.match_date ASC
   `,
-    { type: "SELECT" as any },
+    { type: QueryTypes.SELECT },
   );
 
   const today = new Date();

@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { sequelize } from "../../config/database";
+import { QueryTypes } from "sequelize";
 import { logger } from "../../config/logger";
 import { Task } from "../../modules/tasks/task.model";
 import { Referral } from "../../modules/referrals/referral.model";
@@ -14,6 +15,87 @@ import {
   notifyByRole,
   notifyUser,
 } from "../../modules/notifications/notification.service";
+
+interface AppSettingRow {
+  value: string | Record<string, unknown>;
+}
+
+interface InjuryRecurrenceRow {
+  player_id: string;
+  body_part: string;
+  body_part_ar: string | null;
+  injury_count: string | number;
+  latest_injury: string;
+  injury_types: string[];
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  coach_id: string | null;
+  date_of_birth: string | null;
+}
+
+interface ReturnToPlayRow {
+  injury_id: string;
+  player_id: string;
+  injury_type: string;
+  body_part: string;
+  body_part_ar: string | null;
+  actual_return_date: string | null;
+  updated_at: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  coach_id: string | null;
+  doc_count: string | number;
+}
+
+interface InjuryRiskRow {
+  player_id: string;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  date_of_birth: string | null;
+  coach_id: string | null;
+  agent_id: string | null;
+  recent_injuries: string | number;
+  total_injuries: string | number;
+  recurring_count: string | number;
+  severe_count: string | number;
+  surgery_count: string | number;
+  active_injuries: string | number;
+  player_age: string | number;
+  risk_score: string | number;
+}
+
+interface SurgeryMilestoneRow {
+  injury_id: string;
+  player_id: string;
+  injury_type: string;
+  injury_type_ar: string | null;
+  body_part: string;
+  body_part_ar: string | null;
+  severity: string;
+  status: string;
+  surgery_date: string;
+  surgeon_name: string | null;
+  facility: string | null;
+  expected_return_date: string | null;
+  first_name: string;
+  last_name: string;
+  first_name_ar: string | null;
+  last_name_ar: string | null;
+  agent_id: string | null;
+  coach_id: string | null;
+}
+
+interface CountRow {
+  cnt: string | number;
+}
 
 // ── Configurable thresholds ──
 
@@ -52,10 +134,10 @@ export function getInjuryIntelConfig(): InjuryIntelConfig {
 /** Load config from app_settings (called once at startup) */
 export async function loadInjuryIntelConfig() {
   try {
-    const [row] = (await sequelize.query(
+    const [row] = await sequelize.query<AppSettingRow>(
       `SELECT value FROM app_settings WHERE key = 'injury_intel_config' LIMIT 1`,
-      { type: "SELECT" as any },
-    )) as any[];
+      { type: QueryTypes.SELECT },
+    );
     if (row?.value) {
       const parsed =
         typeof row.value === "string" ? JSON.parse(row.value) : row.value;
@@ -75,7 +157,7 @@ export async function saveInjuryIntelConfig(
     await sequelize.query(
       `INSERT INTO app_settings (key, value) VALUES ('injury_intel_config', :val)
        ON CONFLICT (key) DO UPDATE SET value = :val`,
-      { replacements: { val: JSON.stringify(_config) }, type: "RAW" as any },
+      { replacements: { val: JSON.stringify(_config) }, type: QueryTypes.RAW },
     );
   } catch {
     // silently ignore if table missing
@@ -178,7 +260,7 @@ export async function checkInjuryRecurrence(): Promise<{
   const cutoffDate = new Date();
   cutoffDate.setMonth(cutoffDate.getMonth() - windowMonths);
 
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<InjuryRecurrenceRow>(
     `
     SELECT
       i.player_id,
@@ -206,7 +288,7 @@ export async function checkInjuryRecurrence(): Promise<{
         cutoff: cutoffDate.toISOString().split("T")[0],
         minCount,
       },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
@@ -317,7 +399,7 @@ export async function checkReturnToPlay(): Promise<{
 
   // Find injuries that were recently marked Recovered but have no
   // medical clearance document linked to that injury
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<ReturnToPlayRow>(
     `
     SELECT
       i.id AS injury_id,
@@ -346,7 +428,7 @@ export async function checkReturnToPlay(): Promise<{
     `,
     {
       replacements: { cutoff: cutoff.toISOString() },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
@@ -416,7 +498,7 @@ export async function calculateInjuryRisk(): Promise<{
   twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
   // Calculate risk scores using SQL
-  const rows: any[] = await sequelize.query(
+  const rows = await sequelize.query<InjuryRiskRow>(
     `
     WITH player_injury_stats AS (
       SELECT
@@ -473,7 +555,7 @@ export async function calculateInjuryRisk(): Promise<{
         recurringWeight,
         recentWeight,
       },
-      type: "SELECT" as any,
+      type: QueryTypes.SELECT,
     },
   );
 
@@ -600,7 +682,7 @@ export async function checkSurgeryMilestones(): Promise<{
     targetDate.setDate(targetDate.getDate() - milestoneDays);
     const targetStr = targetDate.toISOString().split("T")[0];
 
-    const rows: any[] = await sequelize.query(
+    const rows = await sequelize.query<SurgeryMilestoneRow>(
       `
       SELECT
         i.id AS injury_id,
@@ -627,7 +709,7 @@ export async function checkSurgeryMilestones(): Promise<{
       `,
       {
         replacements: { targetDate: targetStr },
-        type: "SELECT" as any,
+        type: QueryTypes.SELECT,
       },
     );
 
@@ -666,11 +748,11 @@ export async function checkSurgeryMilestones(): Promise<{
   }
 
   // Count total active surgeries for stats
-  const [countRow] = (await sequelize.query(
+  const [countRow] = await sequelize.query<CountRow>(
     `SELECT COUNT(*) AS cnt FROM injuries
      WHERE is_surgery_required = true AND status IN ('UnderTreatment', 'Relapsed')`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  );
 
   return {
     surgeries: Number(countRow?.cnt ?? 0),
@@ -682,9 +764,9 @@ export async function checkSurgeryMilestones(): Promise<{
 // ── Utility ──
 
 async function getActivePlayerCount(): Promise<number> {
-  const [row] = (await sequelize.query(
+  const [row] = await sequelize.query<CountRow>(
     `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active'`,
-    { type: "SELECT" as any },
-  )) as any[];
+    { type: QueryTypes.SELECT },
+  );
   return Number(row?.cnt ?? 0);
 }
