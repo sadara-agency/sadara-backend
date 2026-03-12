@@ -32,7 +32,7 @@ import { PlayerAccount } from "@modules/portal/playerAccount.model";
 export async function getLinkedPlayer(userId: string): Promise<Player> {
   // ── Path 1: Check the users table ──
   const user = await User.findByPk(userId, {
-    attributes: ["id", "email", "role"],
+    attributes: ["id", "email", "role", "playerId"],
   });
 
   if (user) {
@@ -40,12 +40,13 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
       throw new AppError("This endpoint is for player accounts only", 403);
     }
 
-    const playerId = (user as any).playerId;
-    if (playerId) {
-      const player = await Player.findByPk(playerId);
+    if (user.playerId) {
+      const player = await Player.findByPk(user.playerId);
       if (player) return player;
     }
 
+    // Fallback: try to match by email (won't work for encrypted emails,
+    // but handles legacy accounts where playerId wasn't set)
     const player = await Player.findOne({ where: { email: user.email } });
     if (!player) {
       throw new AppError(
@@ -54,7 +55,7 @@ export async function getLinkedPlayer(userId: string): Promise<Player> {
       );
     }
 
-    await (user as any).update({ playerId: player.id });
+    await user.update({ playerId: player.id } as any);
     return player;
   }
 
