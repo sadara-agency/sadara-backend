@@ -180,7 +180,8 @@ export async function createMatch(input: any) {
     );
   }
 
-  return Match.create(input);
+  const match = await Match.create(input);
+  return getMatchById(match.id);
 }
 
 export async function updateMatch(id: string, input: any) {
