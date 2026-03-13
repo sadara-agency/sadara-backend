@@ -20,12 +20,14 @@ export function sendPaginated<T>(
   data: T[],
   meta: PaginationMeta,
   message?: string,
+  extras?: Record<string, unknown>,
 ): void {
   const response: ApiResponse<T[]> = {
     success: true,
     data,
     meta,
     message,
+    ...extras,
   };
   res.status(200).json(response);
 }
