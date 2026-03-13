@@ -8,7 +8,7 @@
  *  - createAutoTaskIfNotExists() — deduplicated task creation + notification
  */
 
-import { Op } from "sequelize";
+import { Op, Sequelize } from "sequelize";
 import { Task } from "@modules/tasks/task.model";
 import { User } from "@modules/users/user.model";
 import {
@@ -106,7 +106,11 @@ export async function createAutoTaskIfNotExists(
   const dupeWhere: any = {
     triggerRuleId: input.ruleId,
     isAutoCreated: true,
-    status: { [Op.notIn]: ["Completed", "Canceled"] },
+    // Cast status to text to avoid PostgreSQL enum validation errors
+    // if the DB enum doesn't yet include all values (e.g. "Canceled")
+    [Op.and]: [
+      Sequelize.literal(`"status"::text NOT IN ('Completed', 'Canceled')`),
+    ],
     createdAt: { [Op.gte]: sevenDaysAgo },
   };
 
@@ -116,7 +120,13 @@ export async function createAutoTaskIfNotExists(
   // For match-level tasks (no player), explicitly check null
   if (input.matchId && !input.playerId) dupeWhere.playerId = null;
 
-  const existing = await Task.findOne({ where: dupeWhere });
+  let existing: Task | null = null;
+  try {
+    existing = await Task.findOne({ where: dupeWhere });
+  } catch {
+    // If duplicate check fails (enum mismatch etc.), proceed to create
+    existing = null;
+  }
   if (existing) return null;
 
   // Determine due date
