@@ -68,8 +68,24 @@ export async function listMatches(queryParams: any) {
 
   if (search) {
     const like = { [Op.iLike]: `%${search}%` };
-    const existing = where[Op.or] || [];
-    where[Op.or] = [...existing, { competition: like }, { venue: like }];
+    const searchConditions = [
+      { competition: like },
+      { venue: like },
+      { "$homeClub.name$": like },
+      { "$homeClub.name_ar$": like },
+      { "$awayClub.name$": like },
+      { "$awayClub.name_ar$": like },
+    ];
+    if (where[Op.or]) {
+      // Combine club filter with search using Op.and
+      where[Op.and] = [
+        { [Op.or]: where[Op.or] },
+        { [Op.or]: searchConditions },
+      ];
+      delete where[Op.or];
+    } else {
+      where[Op.or] = searchConditions;
+    }
   }
 
   const { count, rows } = await Match.findAndCountAll({
@@ -314,6 +330,20 @@ export async function assignPlayers(
     );
   }
 
+  // Validate max 11 starters
+  const currentStarters = await MatchPlayer.count({
+    where: { matchId, availability: "starter" },
+  });
+  const newStarters = players.filter(
+    (p) => (p.availability || "starter") === "starter",
+  ).length;
+  if (currentStarters + newStarters > 11) {
+    throw new AppError(
+      `Cannot exceed 11 starters. Currently ${currentStarters}, trying to add ${newStarters}.`,
+      400,
+    );
+  }
+
   const records = players.map((p) => ({
     matchId,
     playerId: p.playerId,
@@ -343,6 +373,17 @@ export async function updateMatchPlayer(
 ) {
   const mp = await MatchPlayer.findOne({ where: { matchId, playerId } });
   if (!mp) throw new AppError("Player not assigned to this match", 404);
+
+  // Validate max 11 starters when changing to starter
+  if (input.availability === "starter" && mp.availability !== "starter") {
+    const currentStarters = await MatchPlayer.count({
+      where: { matchId, availability: "starter" },
+    });
+    if (currentStarters >= 11) {
+      throw new AppError("Cannot exceed 11 starters per match.", 400);
+    }
+  }
+
   return mp.update(input);
 }
 
