@@ -314,26 +314,39 @@ export async function convertOfferToContract(
       throw new AppError("This offer has already been converted", 400);
     }
 
-    const contract = await Contract.create(
-      {
-        playerId: offer.playerId,
+    let contract;
+    try {
+      contract = await Contract.create(
+        {
+          playerId: offer.playerId,
+          clubId,
+          category: "Club",
+          contractType,
+          status: "Draft",
+          startDate: today.toISOString().split("T")[0],
+          endDate: endDate.toISOString().split("T")[0],
+          baseSalary:
+            offer.salaryOffered != null ? String(offer.salaryOffered) : "0",
+          salaryCurrency: offer.feeCurrency || "SAR",
+          signingBonus: offer.transferFee ?? 0,
+          commissionPct: offer.agentFee != null ? String(offer.agentFee) : "10",
+          notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
+          createdBy,
+        } as any,
+        { transaction: t },
+      );
+    } catch (err) {
+      logger.error("Contract.create failed during offer conversion", {
+        offerId,
         clubId,
-        contractType,
-        status: "Draft",
-        startDate: today.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
-        baseSalary:
-          offer.salaryOffered != null ? String(offer.salaryOffered) : "0",
-        salaryCurrency: offer.feeCurrency || "SAR",
-        signingBonus: offer.transferFee || 0,
-        commissionPct: offer.agentFee != null ? String(offer.agentFee) : "10",
-        notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
-        createdBy,
-      } as any,
-      { transaction: t },
-    );
+        error: (err as Error).message,
+      });
+      throw new AppError(
+        `Failed to create contract: ${(err as Error).message}`,
+        500,
+      );
+    }
 
-    // Link offer to contract and mark as Converted
     await locked.update(
       {
         status: "Converted",
@@ -343,23 +356,25 @@ export async function convertOfferToContract(
       { transaction: t },
     );
 
-    // Notify Admin/Manager about conversion
+    // Notify outside the transaction (fire-and-forget)
     const playerName = (offer as any).player
       ? `${(offer as any).player.firstName} ${(offer as any).player.lastName || ""}`.trim()
       : "Unknown";
-    notifyByRole(["Admin", "Manager"], {
-      type: "contract",
-      title: `Offer converted to contract: ${playerName}`,
-      titleAr: `تم تحويل العرض إلى عقد: ${playerName}`,
-      link: `/dashboard/contracts/${contract.id}`,
-      sourceType: "contract",
-      sourceId: contract.id,
-      priority: "high",
-    }).catch((err) =>
-      logger.warn("Offer notification failed", {
-        error: (err as Error).message,
-      }),
-    );
+    setImmediate(() => {
+      notifyByRole(["Admin", "Manager"], {
+        type: "contract",
+        title: `Offer converted to contract: ${playerName}`,
+        titleAr: `تم تحويل العرض إلى عقد: ${playerName}`,
+        link: `/dashboard/contracts/${contract.id}`,
+        sourceType: "contract",
+        sourceId: contract.id,
+        priority: "high",
+      }).catch((notifErr) =>
+        logger.warn("Offer notification failed", {
+          error: (notifErr as Error).message,
+        }),
+      );
+    });
 
     return { offer: locked, contract };
   });
