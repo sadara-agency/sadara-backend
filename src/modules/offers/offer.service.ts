@@ -14,6 +14,10 @@ import {
 } from "@modules/approvals/approval.service";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { logger } from "@config/logger";
+import {
+  generateOfferCreationTask,
+  generateOfferAcceptedTask,
+} from "@modules/offers/offerAutoTasks";
 
 // ── List Offers ──
 
@@ -151,6 +155,14 @@ export async function createOffer(input: any, createdBy: string) {
     logger.warn("Offer notification failed", { error: (err as Error).message }),
   );
 
+  // Fire-and-forget: auto-create review task for Manager
+  generateOfferCreationTask(offer.id, createdBy).catch((err) =>
+    logger.warn("Offer auto-task generation failed", {
+      offerId: offer.id,
+      error: (err as Error).message,
+    }),
+  );
+
   return offer;
 }
 
@@ -214,6 +226,16 @@ export async function updateOfferStatus(
   }).catch((err) =>
     logger.warn("Offer notification failed", { error: (err as Error).message }),
   );
+
+  // Fire-and-forget: auto-create conversion task when accepted
+  if (input.status === "Accepted") {
+    generateOfferAcceptedTask(id, "system").catch((err) =>
+      logger.warn("Offer accepted auto-task failed", {
+        offerId: id,
+        error: (err as Error).message,
+      }),
+    );
+  }
 
   return offer;
 }

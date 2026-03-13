@@ -8,6 +8,7 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { CreateReportInput } from "@modules/reports/report.schema";
 import { generateReportPdf } from "@modules/reports/report.pdf";
 import { logger } from "@config/logger";
+import { generateReportFailedTask } from "@modules/reports/reportAutoTasks";
 
 // ── Shared includes ──
 const REPORT_INCLUDES = [
@@ -102,6 +103,13 @@ export async function createReport(
       status: "Failed",
       notes: `Generation error: ${err.message}`,
     });
+
+    // Auto-task: report failed → Creator (fire-and-forget)
+    generateReportFailedTask(report.id, createdBy).catch((e) =>
+      logger.warn("Auto-task report_generation_failed failed", {
+        error: (e as Error).message,
+      }),
+    );
   }
 
   return getReportById(report.id);

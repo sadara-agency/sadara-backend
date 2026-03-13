@@ -13,6 +13,7 @@ import {
 import { logger } from "@config/logger";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { generateApprovalRejectedTask } from "@modules/approvals/approvalAutoTasks";
 import {
   findActiveTemplate,
   createStepsForApproval,
@@ -220,6 +221,14 @@ export async function resolveApproval(
     priority: "normal",
   }).catch((err) =>
     logger.warn("Approval resolution notification failed", {
+      error: (err as Error).message,
+    }),
+  );
+
+  // Fire-and-forget: auto-create task on rejection
+  generateApprovalRejectedTask(id, decision).catch((err) =>
+    logger.warn("Approval rejection auto-task failed", {
+      approvalId: id,
       error: (err as Error).message,
     }),
   );

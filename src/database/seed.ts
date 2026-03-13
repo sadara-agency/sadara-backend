@@ -40,6 +40,7 @@ import {
 import { seedPermissions } from "./permissions.seed";
 import { seedApprovalChains } from "./approvalChains.seed";
 import { seedGymData } from "./gym.seed";
+import { seedAutoTaskTestData } from "./autoTaskSeed";
 
 export async function seedDatabase(): Promise<void> {
   // Permissions must always be seeded (all environments)
@@ -99,6 +100,9 @@ export async function seedDatabase(): Promise<void> {
     await seedPerformances();
     await seedMatchPlayers();
     await seedMatchStats();
+
+    // Auto-task trigger test data (contracts, offers, injuries, etc. in trigger-ready states)
+    await seedAutoTaskTestData();
 
     console.log("");
     console.log("🎉 Development seed complete!");

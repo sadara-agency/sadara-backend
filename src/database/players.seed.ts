@@ -177,8 +177,69 @@ export async function seedPlayers() {
       clubId: IDS.clubs.alFateh,
       value: 200000,
     },
+    // ── Additional players for auto-task testing ──
+    {
+      firstName: "Abdulaziz",
+      lastName: "Al-Bishi",
+      firstNameAr: "عبدالعزيز",
+      lastNameAr: "البيشي",
+      dob: "1996-04-10",
+      pos: "CDM",
+      type: "Pro" as const,
+      clubId: IDS.clubs.alNassr,
+      value: 5000000,
+      agent: "agent2" as const,
+    },
+    {
+      firstName: "Khalid",
+      lastName: "Al-Ghannam",
+      firstNameAr: "خالد",
+      lastNameAr: "الغنام",
+      dob: "1998-12-05",
+      pos: "RW",
+      type: "Pro" as const,
+      clubId: IDS.clubs.alIttihad,
+      value: 4500000,
+      agent: "agent2" as const,
+    },
+    {
+      firstName: "Saad",
+      lastName: "Al-Shehri",
+      firstNameAr: "سعد",
+      lastNameAr: "الشهري",
+      dob: "2000-02-18",
+      pos: "ST",
+      type: "Pro" as const,
+      clubId: IDS.clubs.alTaawoun,
+      value: 3000000,
+    },
+    {
+      firstName: "Talal",
+      lastName: "Al-Absi",
+      firstNameAr: "طلال",
+      lastNameAr: "العبسي",
+      dob: "2005-06-30",
+      pos: "CB",
+      type: "Youth" as const,
+      clubId: IDS.clubs.alHilal,
+      value: 400000,
+      agent: "agent2" as const,
+    },
+    {
+      firstName: "Ziyad",
+      lastName: "Al-Sahafi",
+      firstNameAr: "زياد",
+      lastNameAr: "الصحفي",
+      dob: "2006-09-14",
+      pos: "AM",
+      type: "Youth" as const,
+      clubId: IDS.clubs.alRaed,
+      value: 300000,
+    },
   ];
 
+  // Assign coach & analyst per-player for auto-task testing
+  // Odd-indexed → coach2/analyst2, even → coach/analyst
   const records = players.map((p, i) => ({
     id: IDS.players[i],
     firstName: p.firstName,
@@ -191,7 +252,9 @@ export async function seedPlayers() {
     playerType: p.type,
     position: p.pos,
     currentClubId: p.clubId,
-    agentId: IDS.users.agent,
+    agentId: (p as any).agent === "agent2" ? IDS.users.agent2 : IDS.users.agent,
+    coachId: i % 2 === 0 ? IDS.users.coach : IDS.users.coach2,
+    analystId: i % 2 === 0 ? IDS.users.analyst : IDS.users.analyst2,
     marketValue: p.value,
     marketValueCurrency: "SAR" as const,
     status: "active" as const,
@@ -205,5 +268,5 @@ export async function seedPlayers() {
   }));
 
   await Player.bulkCreate(records, { ignoreDuplicates: true });
-  console.log("✅ Players seeded (10 Pro + 5 Youth)");
+  console.log("✅ Players seeded (12 Pro + 8 Youth)");
 }
