@@ -219,6 +219,34 @@ export async function updateScore(
 
 export async function updateMatchStatus(id: string, status: string) {
   const match = await findOrThrow(Match, id, "Match");
+
+  // Status transition rules
+  const current = match.status;
+
+  // Cannot cancel a live match
+  if (status === "cancelled" && current === "live") {
+    throw new AppError("Cannot cancel a live match. End the match first.", 400);
+  }
+
+  // Going live requires at least 1 assigned player
+  if (status === "live" && current === "upcoming") {
+    const playerCount = await MatchPlayer.count({ where: { matchId: id } });
+    if (playerCount === 0) {
+      throw new AppError(
+        "Cannot start a match without any assigned players.",
+        400,
+      );
+    }
+    // Require a valid match time (not midnight default)
+    const matchDate = new Date(match.matchDate);
+    if (matchDate.getUTCHours() === 0 && matchDate.getUTCMinutes() === 0) {
+      throw new AppError(
+        "Cannot start a match without a valid match time. Please set the match time first.",
+        400,
+      );
+    }
+  }
+
   return match.update({ status: status as MatchAttributes["status"] });
 }
 
