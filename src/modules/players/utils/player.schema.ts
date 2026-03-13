@@ -4,13 +4,21 @@ export const createPlayerSchema = z.object({
   firstName: z
     .string()
     .min(1, "First name is required")
+    .max(50, "First name must be 50 characters or less")
     .regex(/^[\p{L}\p{M}\s'-]+$/u, "Name contains invalid characters"),
   lastName: z
     .string()
     .min(1, "Last name is required")
+    .max(50, "Last name must be 50 characters or less")
     .regex(/^[\p{L}\p{M}\s'-]+$/u, "Name contains invalid characters"),
-  firstNameAr: z.string().optional(),
-  lastNameAr: z.string().optional(),
+  firstNameAr: z
+    .string()
+    .max(50, "Arabic first name must be 50 characters or less")
+    .optional(),
+  lastNameAr: z
+    .string()
+    .max(50, "Arabic last name must be 50 characters or less")
+    .optional(),
   dateOfBirth: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
