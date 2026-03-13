@@ -6,7 +6,6 @@ import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { Contract } from "@modules/contracts/contract.model";
-import { transaction } from "@config/database";
 import { notifyByRole } from "@modules/notifications/notification.service";
 import {
   createApprovalRequest,
@@ -255,11 +254,13 @@ export async function deleteOffer(id: string) {
 }
 
 // ── Convert Offer to Contract ──
+// Uses atomic WHERE clause instead of a transaction to avoid the
+// PostgreSQL "current transaction is aborted" cascade problem.
 export async function convertOfferToContract(
   offerId: string,
   createdBy: string,
 ) {
-  // Pre-validate outside the transaction to avoid aborted-transaction cascading errors
+  // ── Step 1: Validate the offer ──
   const offer = await Offer.findByPk(offerId, {
     include: [
       {
@@ -303,79 +304,102 @@ export async function convertOfferToContract(
   // Map offer type → contract type
   const contractType = offer.offerType === "Loan" ? "Loan" : "Transfer";
 
-  return transaction(async (t) => {
-    // Re-check inside transaction with lock
-    const locked = await Offer.findByPk(offerId, {
-      lock: t.LOCK.UPDATE,
-      transaction: t,
+  const startDateStr = today.toISOString().split("T")[0];
+  const endDateStr = endDate.toISOString().split("T")[0];
+
+  // ── Step 2: Create the contract (outside any transaction) ──
+  let contract;
+  try {
+    contract = await Contract.create({
+      playerId: offer.playerId,
+      clubId,
+      category: "Club",
+      contractType,
+      status: "Draft",
+      startDate: startDateStr,
+      endDate: endDateStr,
+      baseSalary:
+        offer.salaryOffered != null ? String(offer.salaryOffered) : "0",
+      salaryCurrency: offer.feeCurrency || "SAR",
+      signingBonus: offer.transferFee ?? 0,
+      commissionPct: offer.agentFee != null ? String(offer.agentFee) : "10",
+      notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
+      createdBy,
+    } as any);
+  } catch (err) {
+    logger.error("Contract.create failed during offer conversion", {
+      offerId,
+      clubId,
+      contractType,
+      error: (err as Error).message,
+      stack: (err as Error).stack,
     });
-    if (!locked) throw new AppError("Offer not found", 404);
-    if (locked.convertedContractId) {
-      throw new AppError("This offer has already been converted", 400);
-    }
+    throw new AppError(
+      `Failed to create contract: ${(err as Error).message}`,
+      500,
+    );
+  }
 
-    let contract;
-    try {
-      contract = await Contract.create(
-        {
-          playerId: offer.playerId,
-          clubId,
-          category: "Club",
-          contractType,
-          status: "Draft",
-          startDate: today.toISOString().split("T")[0],
-          endDate: endDate.toISOString().split("T")[0],
-          baseSalary:
-            offer.salaryOffered != null ? String(offer.salaryOffered) : "0",
-          salaryCurrency: offer.feeCurrency || "SAR",
-          signingBonus: offer.transferFee ?? 0,
-          commissionPct: offer.agentFee != null ? String(offer.agentFee) : "10",
-          notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
-          createdBy,
-        } as any,
-        { transaction: t },
-      );
-    } catch (err) {
-      logger.error("Contract.create failed during offer conversion", {
-        offerId,
-        clubId,
-        error: (err as Error).message,
-      });
-      throw new AppError(
-        `Failed to create contract: ${(err as Error).message}`,
-        500,
-      );
-    }
-
-    await locked.update(
+  // ── Step 3: Atomically mark offer as converted ──
+  // WHERE convertedContractId IS NULL prevents double-conversion races.
+  try {
+    const [affectedRows] = await Offer.update(
       {
         status: "Converted",
         convertedContractId: contract.id,
         convertedAt: new Date(),
       },
-      { transaction: t },
+      {
+        where: {
+          id: offerId,
+          convertedContractId: null, // atomic guard
+        },
+      },
     );
 
-    // Notify outside the transaction (fire-and-forget)
-    const playerName = (offer as any).player
-      ? `${(offer as any).player.firstName} ${(offer as any).player.lastName || ""}`.trim()
-      : "Unknown";
-    setImmediate(() => {
-      notifyByRole(["Admin", "Manager"], {
-        type: "contract",
-        title: `Offer converted to contract: ${playerName}`,
-        titleAr: `تم تحويل العرض إلى عقد: ${playerName}`,
-        link: `/dashboard/contracts/${contract.id}`,
-        sourceType: "contract",
-        sourceId: contract.id,
-        priority: "high",
-      }).catch((notifErr) =>
-        logger.warn("Offer notification failed", {
-          error: (notifErr as Error).message,
-        }),
+    if (affectedRows === 0) {
+      // Another request already converted this offer — clean up our contract
+      await contract.destroy().catch(() => {});
+      throw new AppError(
+        "This offer has already been converted to a contract",
+        400,
       );
+    }
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    // Offer update failed — clean up the contract we just created
+    await contract.destroy().catch(() => {});
+    logger.error("Offer.update failed during conversion", {
+      offerId,
+      contractId: contract.id,
+      error: (err as Error).message,
     });
+    throw new AppError(
+      `Failed to update offer: ${(err as Error).message}`,
+      500,
+    );
+  }
 
-    return { offer: locked, contract };
-  });
+  // Reload the offer to get updated state
+  await offer.reload();
+
+  // ── Step 4: Notify (fire-and-forget) ──
+  const playerName = (offer as any).player
+    ? `${(offer as any).player.firstName} ${(offer as any).player.lastName || ""}`.trim()
+    : "Unknown";
+  notifyByRole(["Admin", "Manager"], {
+    type: "contract",
+    title: `Offer converted to contract: ${playerName}`,
+    titleAr: `تم تحويل العرض إلى عقد: ${playerName}`,
+    link: `/dashboard/contracts/${contract.id}`,
+    sourceType: "contract",
+    sourceId: contract.id,
+    priority: "high",
+  }).catch((notifErr) =>
+    logger.warn("Offer conversion notification failed", {
+      error: (notifErr as Error).message,
+    }),
+  );
+
+  return { offer, contract };
 }

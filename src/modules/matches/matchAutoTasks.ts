@@ -670,11 +670,13 @@ export async function generatePreMatchTasks(
   matchId: string,
   daysUntilMatch: number,
 ): Promise<{ created: number; rules: string[] }> {
-  // Find which pre-match rules fire at this day count
+  // Find which pre-match rules fire at this day count.
+  // Use >= so that if a cron run was missed, the task still gets created
+  // on subsequent days (deduplication prevents duplicates).
   const config = getTaskRuleConfig();
   const activeRules = PRE_MATCH_RULES.filter((rule) => {
     const rc = config[rule.id];
-    return rc?.enabled && rc.dueDays === daysUntilMatch;
+    return rc?.enabled && daysUntilMatch <= rc.dueDays && daysUntilMatch >= 0;
   });
 
   if (activeRules.length === 0) return { created: 0, rules: [] };
@@ -854,7 +856,7 @@ export async function generateMatchLevelPreTasks(
   const config = getTaskRuleConfig();
   const activeRules = MATCH_LEVEL_PRE_RULES.filter((rule) => {
     const rc = config[rule.id];
-    return rc?.enabled && rc.dueDays === daysUntilMatch;
+    return rc?.enabled && daysUntilMatch <= rc.dueDays && daysUntilMatch >= 0;
   });
 
   if (activeRules.length === 0) return { created: 0, rules: [] };
