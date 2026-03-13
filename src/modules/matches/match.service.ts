@@ -150,8 +150,36 @@ export async function getUpcomingMatches(days = 7, limit = 10) {
 }
 
 export async function createMatch(input: any) {
-  if (input.homeClubId) await findOrThrow(Club, input.homeClubId, "Home club");
-  if (input.awayClubId) await findOrThrow(Club, input.awayClubId, "Away club");
+  await findOrThrow(Club, input.homeClubId, "Home club");
+  await findOrThrow(Club, input.awayClubId, "Away club");
+
+  // Enforce minimum 3-day gap between matches for each club
+  const matchDate = new Date(input.matchDate);
+  const threeDaysBefore = new Date(matchDate.getTime() - 3 * 86_400_000);
+  const threeDaysAfter = new Date(matchDate.getTime() + 3 * 86_400_000);
+
+  const clubIds = [input.homeClubId, input.awayClubId];
+  const conflicting = await Match.findOne({
+    where: {
+      status: { [Op.ne]: "cancelled" },
+      matchDate: { [Op.between]: [threeDaysBefore, threeDaysAfter] },
+      [Op.or]: [
+        { homeClubId: { [Op.in]: clubIds } },
+        { awayClubId: { [Op.in]: clubIds } },
+      ],
+    },
+  });
+
+  if (conflicting) {
+    const conflictDate = new Date(conflicting.matchDate)
+      .toISOString()
+      .split("T")[0];
+    throw new AppError(
+      `One of the clubs already has a match on ${conflictDate}. There must be at least a 3-day gap between matches.`,
+      409,
+    );
+  }
+
   return Match.create(input);
 }
 

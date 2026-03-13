@@ -2,9 +2,9 @@ import { z } from "zod";
 
 // ── Create Match ──
 
-export const createMatchSchema = z.object({
-  homeClubId: z.string().uuid("Invalid club ID").optional(),
-  awayClubId: z.string().uuid("Invalid club ID").optional(),
+const createMatchBaseSchema = z.object({
+  homeClubId: z.string().uuid("Invalid club ID"),
+  awayClubId: z.string().uuid("Invalid club ID"),
   competition: z.string().min(1, "Competition is required").optional(),
   season: z.string().max(20).optional(),
   matchDate: z.string().min(1, "Match date is required"),
@@ -20,9 +20,27 @@ export const createMatchSchema = z.object({
   notes: z.string().optional(),
 });
 
+export const createMatchSchema = createMatchBaseSchema
+  .refine((data) => data.homeClubId !== data.awayClubId, {
+    message: "Home and away clubs must be different",
+    path: ["awayClubId"],
+  })
+  .refine(
+    (data) => {
+      const matchDate = new Date(data.matchDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return matchDate >= today;
+    },
+    {
+      message: "Match date must be today or in the future",
+      path: ["matchDate"],
+    },
+  );
+
 // ── Update Match ──
 
-export const updateMatchSchema = createMatchSchema.partial();
+export const updateMatchSchema = createMatchBaseSchema.partial();
 
 // ── Update Match Score ──
 
