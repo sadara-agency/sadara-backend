@@ -98,7 +98,29 @@ export async function listMatches(queryParams: any) {
     distinct: true,
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  // Build a where clause without the status filter to get global counts
+  const { status: _status, ...whereWithoutStatus } = where;
+  const statusCounts = (await Match.findAll({
+    attributes: [
+      "status",
+      [Sequelize.fn("COUNT", Sequelize.col("Match.id")), "count"],
+    ],
+    where:
+      Object.keys(whereWithoutStatus).length > 0
+        ? whereWithoutStatus
+        : undefined,
+    group: ["status"],
+    raw: true,
+  })) as unknown as { status: string; count: string }[];
+
+  const stats = { upcoming: 0, live: 0, completed: 0, cancelled: 0, total: 0 };
+  for (const row of statusCounts) {
+    const c = Number(row.count);
+    if (row.status in stats) stats[row.status as keyof typeof stats] = c;
+    stats.total += c;
+  }
+
+  return { data: rows, meta: buildMeta(count, page, limit), stats };
 }
 
 export async function getMatchById(id: string) {

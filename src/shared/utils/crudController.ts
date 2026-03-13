@@ -13,7 +13,10 @@ import { invalidateMultiple } from "@shared/utils/cache";
 type Handler = (req: AuthRequest, res: Response) => Promise<void>;
 
 interface CrudService {
-  list(query: any, ...args: any[]): Promise<{ data: any[]; meta: any }>;
+  list(
+    query: any,
+    ...args: any[]
+  ): Promise<{ data: any[]; meta: any; [key: string]: any }>;
   getById(id: string, ...args: any[]): Promise<any>;
   create(body: any, userId: string): Promise<any>;
   update(id: string, body: any, ...args: any[]): Promise<any>;
@@ -68,7 +71,14 @@ export function createCrudController(config: CrudConfig) {
 
   const list: Handler = async (req, res) => {
     const result = await service.list(req.query);
-    sendPaginated(res, result.data, result.meta);
+    const { data, meta, ...extras } = result;
+    sendPaginated(
+      res,
+      data,
+      meta,
+      undefined,
+      Object.keys(extras).length > 0 ? extras : undefined,
+    );
   };
 
   const getById: Handler = async (req, res) => {
