@@ -13,6 +13,7 @@ import {
   notifyUser,
 } from "@modules/notifications/notification.service";
 import { logger } from "@config/logger";
+import { generateCriticalReferralTask } from "@modules/referrals/referralAutoTasks";
 
 const PLAYER_ATTRS = [
   "id",
@@ -189,6 +190,13 @@ export async function createReferral(input: any, userId: string) {
       logger.error("Failed to send assignee notification", err),
     );
   }
+
+  // Auto-task: critical referral → Manager (fire-and-forget)
+  generateCriticalReferralTask(referral.id, userId).catch((err) =>
+    logger.warn("Auto-task referral_critical_created failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return refetchWithIncludes(referral.id);
 }

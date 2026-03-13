@@ -17,6 +17,7 @@ import type {
   UpdateInjuryInput,
   AddInjuryUpdateInput,
 } from "@modules/injuries/injury.schema";
+import { generateCriticalInjuryTask } from "@modules/injuries/injuryAutoTasks";
 
 const PLAYER_ATTRS = [
   "id",
@@ -150,6 +151,14 @@ export async function createInjury(
         ? "critical"
         : "normal",
   }).catch((err) => logger.error("Failed to send injury notification", err));
+
+  // Fire-and-forget: auto-create task for critical/severe injuries
+  generateCriticalInjuryTask(injury.id, createdBy).catch((err) =>
+    logger.warn("Injury auto-task generation failed", {
+      injuryId: injury.id,
+      error: (err as Error).message,
+    }),
+  );
 
   return getInjuryById(injury.id);
 }

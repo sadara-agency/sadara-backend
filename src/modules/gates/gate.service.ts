@@ -12,6 +12,8 @@ import { User } from "@modules/users/user.model";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { generateGateCompletedTask } from "@modules/gates/gateAutoTasks";
+import { logger } from "@config/logger";
 
 const PLAYER_ATTRS = [
   "id",
@@ -544,6 +546,13 @@ export async function advanceGate(
         });
       }
     }
+
+    // Auto-task: gate completed → Manager (fire-and-forget)
+    generateGateCompletedTask(gate.id, userId).catch((err) =>
+      logger.warn("Auto-task gate_completed_next failed", {
+        error: (err as Error).message,
+      }),
+    );
 
     return gate;
   }

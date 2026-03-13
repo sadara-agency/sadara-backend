@@ -19,6 +19,8 @@ import {
   CreateContractInput,
   UpdateContractInput,
 } from "@modules/contracts/contract.schema";
+import { generateContractCreationTask } from "@modules/contracts/contractAutoTasks";
+import { logger } from "@config/logger";
 
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
@@ -192,6 +194,14 @@ export async function createContract(
     notes: input.notes,
     createdBy,
   });
+
+  // Fire-and-forget: auto-create legal review task
+  generateContractCreationTask(contract.id, createdBy).catch((err) =>
+    logger.warn("Contract auto-task generation failed", {
+      contractId: contract.id,
+      error: (err as Error).message,
+    }),
+  );
 
   return getContractById(contract.id);
 }

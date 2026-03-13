@@ -22,6 +22,7 @@ import {
   isApprovalChainResolved,
 } from "@modules/approvals/approval.service";
 import { regenerateSignedPdf } from "@modules/contracts/contract.signing.service";
+import { generateContractTransitionTask } from "@modules/contracts/contractAutoTasks";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {
@@ -218,6 +219,15 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       }),
     );
   }
+
+  // Fire-and-forget: auto-create tasks based on new status
+  generateContractTransitionTask(id, nextStatus, req.user!.id).catch((err) =>
+    logger.warn("Contract transition auto-task failed", {
+      contractId: id,
+      nextStatus,
+      error: (err as Error).message,
+    }),
+  );
 
   sendSuccess(res, contract, `Contract transitioned to ${nextStatus}`);
 }

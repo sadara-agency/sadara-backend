@@ -18,6 +18,8 @@ import {
 } from "@modules/gym/gym.model";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
+import { generateWorkoutCompletedTask } from "@modules/gym/gymAutoTasks";
+import { logger } from "@config/logger";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   findOrThrow,
@@ -517,6 +519,16 @@ export async function logWorkoutSession(
     completionPct: pct,
     status: pct >= 100 ? "completed" : "active",
   });
+
+  // Fire-and-forget: auto-create task when workout completed
+  if (pct >= 100) {
+    generateWorkoutCompletedTask(assignmentId, playerId).catch((err) =>
+      logger.warn("Workout completed auto-task failed", {
+        assignmentId,
+        error: (err as Error).message,
+      }),
+    );
+  }
 
   return log;
 }

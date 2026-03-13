@@ -23,7 +23,11 @@ import { Match } from "@modules/matches/match.model";
 import { Club } from "@modules/clubs/club.model";
 import { sequelize } from "@config/database";
 import { Op } from "sequelize";
-import { notifyUser } from "@modules/notifications/notification.service";
+import {
+  notifyUser,
+  notifyByRole,
+} from "@modules/notifications/notification.service";
+import { User } from "@modules/users/user.model";
 import { logger } from "@config/logger";
 
 // ── Configurable thresholds ──
@@ -99,6 +103,56 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   stale_task_escalation: { enabled: true, dueDays: 7, threshold: 60 },
   risk_radar_inconsistency: { enabled: true, dueDays: 3 },
   duplicate_records: { enabled: true, dueDays: 7 },
+
+  // ── NEW: Real-time + cron auto-task rules ──
+
+  // Contract real-time triggers
+  contract_legal_review: { enabled: true, dueDays: 3 },
+  contract_submit_review: { enabled: true, dueDays: 3 },
+  contract_get_signatures: { enabled: true, dueDays: 5 },
+  contract_player_followup: { enabled: true, dueDays: 7 },
+
+  // Match-level pre-match tasks (cron, assigned by role)
+  pre_scout_opponent_report: { enabled: true, dueDays: 3 },
+  pre_analyst_match_analysis: { enabled: true, dueDays: 2 },
+  pre_analyst_postmatch_template: { enabled: true, dueDays: 1 },
+
+  // Offer triggers (real-time + cron)
+  offer_new_review: { enabled: true, dueDays: 3 },
+  offer_accepted_convert: { enabled: true, dueDays: 5 },
+  offer_deadline_approaching: { enabled: true, dueDays: 3, threshold: 3 },
+  offer_negotiation_stale: { enabled: true, dueDays: 3, threshold: 14 },
+
+  // Injury real-time + cron triggers
+  injury_new_critical: { enabled: true, dueDays: 1 },
+  injury_return_overdue: { enabled: true, dueDays: 2 },
+  injury_treatment_stale: { enabled: true, dueDays: 3, threshold: 14 },
+
+  // Training / Workout / Diet triggers
+  workout_assignment_expiring: { enabled: true, dueDays: 5, threshold: 7 },
+  workout_completed: { enabled: true, dueDays: 5 },
+  diet_plan_no_adherence: { enabled: true, dueDays: 2, threshold: 7 },
+  metric_target_achieved: { enabled: true, dueDays: 5 },
+  training_course_completed: { enabled: true, dueDays: 5 },
+
+  // Approval triggers
+  approval_step_overdue: { enabled: true, dueDays: 1 },
+  approval_rejected_action: { enabled: true, dueDays: 3 },
+
+  // Document triggers (cron)
+  document_expiry_30d: { enabled: true, dueDays: 14, threshold: 30 },
+  document_expiry_7d: { enabled: true, dueDays: 3, threshold: 7 },
+  player_missing_documents: { enabled: true, dueDays: 7 },
+
+  // Referral triggers
+  referral_critical_created: { enabled: true, dueDays: 1 },
+  referral_overdue: { enabled: true, dueDays: 1 },
+
+  // Gate triggers
+  gate_completed_next: { enabled: true, dueDays: 5 },
+
+  // Report triggers
+  report_generation_failed: { enabled: true, dueDays: 1 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
@@ -324,7 +378,7 @@ const RULE_ASSIGNEE_FIELD: Record<string, "agentId" | "coachId" | "analystId"> =
 
 // ── Helper: format due date ──
 
-function dueDate(days: number): string {
+export function dueDate(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().split("T")[0]; // YYYY-MM-DD
@@ -728,6 +782,165 @@ export async function generatePreMatchTasks(
 
       createdRules.push(`${rule.id}:${player.id}`);
     }
+  }
+
+  return { created: createdRules.length, rules: createdRules };
+}
+
+// ══════════════════════════════════════════════════════════════
+// Match-Level Pre-Match Auto-Tasks (assigned by ROLE, not per-player)
+// ══════════════════════════════════════════════════════════════
+
+interface MatchLevelPreRule {
+  id: string;
+  titleEn: string;
+  titleAr: string;
+  descriptionEn: (ctx: MatchLevelContext) => string;
+  descriptionAr: (ctx: MatchLevelContext) => string;
+  priority: "low" | "medium" | "high" | "critical";
+  targetRole: string;
+}
+
+interface MatchLevelContext {
+  matchLabel: string;
+  matchDate: string;
+}
+
+const MATCH_LEVEL_PRE_RULES: MatchLevelPreRule[] = [
+  {
+    id: "pre_scout_opponent_report",
+    titleEn: "Prepare opponent scouting report",
+    titleAr: "إعداد تقرير استكشاف الخصم",
+    descriptionEn: (ctx) =>
+      `Prepare a comprehensive scouting report on the opponent for ${ctx.matchLabel} on ${ctx.matchDate}. Include key players, tactical patterns, strengths, and weaknesses.`,
+    descriptionAr: (ctx) =>
+      `إعداد تقرير استكشاف شامل عن الخصم لمباراة ${ctx.matchLabel} بتاريخ ${ctx.matchDate}. يشمل اللاعبين الرئيسيين والأنماط التكتيكية ونقاط القوة والضعف.`,
+    priority: "high",
+    targetRole: "Scout",
+  },
+  {
+    id: "pre_analyst_match_analysis",
+    titleEn: "Prepare pre-match analysis",
+    titleAr: "إعداد تحليل ما قبل المباراة",
+    descriptionEn: (ctx) =>
+      `Prepare pre-match tactical analysis for ${ctx.matchLabel} on ${ctx.matchDate}. Include formation analysis, set-piece patterns, and key matchup insights.`,
+    descriptionAr: (ctx) =>
+      `إعداد التحليل التكتيكي قبل مباراة ${ctx.matchLabel} بتاريخ ${ctx.matchDate}. يشمل تحليل التشكيل وأنماط الكرات الثابتة والمواجهات الرئيسية.`,
+    priority: "high",
+    targetRole: "Analyst",
+  },
+  {
+    id: "pre_analyst_postmatch_template",
+    titleEn: "Prepare post-match analysis template",
+    titleAr: "إعداد قالب تحليل ما بعد المباراة",
+    descriptionEn: (ctx) =>
+      `Prepare the post-match analysis template and data collection framework for ${ctx.matchLabel} on ${ctx.matchDate}. Ensure KPIs and tracking metrics are configured.`,
+    descriptionAr: (ctx) =>
+      `إعداد قالب تحليل ما بعد المباراة وإطار جمع البيانات لمباراة ${ctx.matchLabel} بتاريخ ${ctx.matchDate}. التأكد من تكوين مؤشرات الأداء والمقاييس.`,
+    priority: "medium",
+    targetRole: "Analyst",
+  },
+];
+
+/**
+ * Generate match-level pre-match tasks for Scout and Analyst roles.
+ * Called by the cron scheduler alongside generatePreMatchTasks().
+ * Creates ONE task per rule per match (not per-player).
+ */
+export async function generateMatchLevelPreTasks(
+  matchId: string,
+  daysUntilMatch: number,
+): Promise<{ created: number; rules: string[] }> {
+  const config = getTaskRuleConfig();
+  const activeRules = MATCH_LEVEL_PRE_RULES.filter((rule) => {
+    const rc = config[rule.id];
+    return rc?.enabled && rc.dueDays === daysUntilMatch;
+  });
+
+  if (activeRules.length === 0) return { created: 0, rules: [] };
+
+  // Load match info
+  const match = await Match.findByPk(matchId, {
+    include: [
+      { model: Club, as: "homeClub", attributes: ["name", "nameAr"] },
+      { model: Club, as: "awayClub", attributes: ["name", "nameAr"] },
+    ],
+  });
+  if (!match) return { created: 0, rules: [] };
+
+  const homeClub = (match as any).homeClub;
+  const awayClub = (match as any).awayClub;
+  const matchLabel = `${homeClub?.name ?? "TBD"} vs ${awayClub?.name ?? "TBD"}`;
+  const matchDate = match.matchDate
+    ? new Date(match.matchDate).toISOString().split("T")[0]
+    : "TBD";
+
+  const ctx: MatchLevelContext = { matchLabel, matchDate };
+  const createdRules: string[] = [];
+
+  for (const rule of activeRules) {
+    // Duplicate check — match-level tasks have no playerId
+    const existing = await Task.findOne({
+      where: {
+        matchId,
+        triggerRuleId: rule.id,
+        isAutoCreated: true,
+        playerId: null,
+      },
+    });
+    if (existing) continue;
+
+    // Find first active user with the target role
+    const assignee = await User.findOne({
+      where: { role: rule.targetRole, isActive: true },
+      attributes: ["id"],
+      order: [["createdAt", "ASC"]],
+    });
+
+    await Task.create({
+      title: rule.titleEn,
+      titleAr: rule.titleAr,
+      description: rule.descriptionEn(ctx),
+      type: "Match",
+      priority: rule.priority,
+      status: "Open",
+      playerId: null,
+      matchId,
+      assignedTo: assignee?.id ?? null,
+      isAutoCreated: true,
+      triggerRuleId: rule.id,
+      dueDate: matchDate,
+      notes: rule.descriptionAr(ctx),
+    } as any);
+
+    // Notify all users with the target role
+    notifyByRole([rule.targetRole], {
+      type: "task",
+      title: rule.titleEn,
+      titleAr: rule.titleAr,
+      body: rule.descriptionEn(ctx),
+      bodyAr: rule.descriptionAr(ctx),
+      link: "/dashboard/tasks",
+      sourceType: "task",
+      priority: rule.priority === "critical" ? "critical" : "normal",
+    }).catch((err) =>
+      logger.warn("Match-level auto-task notification failed", {
+        ruleId: rule.id,
+        error: (err as Error).message,
+      }),
+    );
+
+    if (!assignee) {
+      logger.warn(
+        `No active ${rule.targetRole} user found for match-level task`,
+        {
+          matchId,
+          ruleId: rule.id,
+        },
+      );
+    }
+
+    createdRules.push(rule.id);
   }
 
   return { created: createdRules.length, rules: createdRules };

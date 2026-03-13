@@ -146,7 +146,7 @@ Task.init(
       defaultValue: false,
     },
     triggerRuleId: {
-      type: DataTypes.UUID,
+      type: DataTypes.STRING,
       field: "trigger_rule_id",
     },
     notes: {

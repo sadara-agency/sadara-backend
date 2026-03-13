@@ -68,8 +68,24 @@ export async function listMatches(queryParams: any) {
 
   if (search) {
     const like = { [Op.iLike]: `%${search}%` };
-    const existing = where[Op.or] || [];
-    where[Op.or] = [...existing, { competition: like }, { venue: like }];
+    const searchConditions = [
+      { competition: like },
+      { venue: like },
+      { "$homeClub.name$": like },
+      { "$homeClub.name_ar$": like },
+      { "$awayClub.name$": like },
+      { "$awayClub.name_ar$": like },
+    ];
+    if (where[Op.or]) {
+      // Combine club filter with search using Op.and
+      where[Op.and] = [
+        { [Op.or]: where[Op.or] },
+        { [Op.or]: searchConditions },
+      ];
+      delete where[Op.or];
+    } else {
+      where[Op.or] = searchConditions;
+    }
   }
 
   const { count, rows } = await Match.findAndCountAll({
@@ -150,9 +166,38 @@ export async function getUpcomingMatches(days = 7, limit = 10) {
 }
 
 export async function createMatch(input: any) {
-  if (input.homeClubId) await findOrThrow(Club, input.homeClubId, "Home club");
-  if (input.awayClubId) await findOrThrow(Club, input.awayClubId, "Away club");
-  return Match.create(input);
+  await findOrThrow(Club, input.homeClubId, "Home club");
+  await findOrThrow(Club, input.awayClubId, "Away club");
+
+  // Enforce minimum 3-day gap between matches for each club
+  const matchDate = new Date(input.matchDate);
+  const threeDaysBefore = new Date(matchDate.getTime() - 3 * 86_400_000);
+  const threeDaysAfter = new Date(matchDate.getTime() + 3 * 86_400_000);
+
+  const clubIds = [input.homeClubId, input.awayClubId];
+  const conflicting = await Match.findOne({
+    where: {
+      status: { [Op.ne]: "cancelled" },
+      matchDate: { [Op.between]: [threeDaysBefore, threeDaysAfter] },
+      [Op.or]: [
+        { homeClubId: { [Op.in]: clubIds } },
+        { awayClubId: { [Op.in]: clubIds } },
+      ],
+    },
+  });
+
+  if (conflicting) {
+    const conflictDate = new Date(conflicting.matchDate)
+      .toISOString()
+      .split("T")[0];
+    throw new AppError(
+      `One of the clubs already has a match on ${conflictDate}. There must be at least a 3-day gap between matches.`,
+      409,
+    );
+  }
+
+  const match = await Match.create(input);
+  return getMatchById(match.id);
 }
 
 export async function updateMatch(id: string, input: any) {
@@ -174,6 +219,34 @@ export async function updateScore(
 
 export async function updateMatchStatus(id: string, status: string) {
   const match = await findOrThrow(Match, id, "Match");
+
+  // Status transition rules
+  const current = match.status;
+
+  // Cannot cancel a live match
+  if (status === "cancelled" && current === "live") {
+    throw new AppError("Cannot cancel a live match. End the match first.", 400);
+  }
+
+  // Going live requires at least 1 assigned player
+  if (status === "live" && current === "upcoming") {
+    const playerCount = await MatchPlayer.count({ where: { matchId: id } });
+    if (playerCount === 0) {
+      throw new AppError(
+        "Cannot start a match without any assigned players.",
+        400,
+      );
+    }
+    // Require a valid match time (not midnight default)
+    const matchDate = new Date(match.matchDate);
+    if (matchDate.getUTCHours() === 0 && matchDate.getUTCMinutes() === 0) {
+      throw new AppError(
+        "Cannot start a match without a valid match time. Please set the match time first.",
+        400,
+      );
+    }
+  }
+
   return match.update({ status: status as MatchAttributes["status"] });
 }
 
@@ -285,6 +358,20 @@ export async function assignPlayers(
     );
   }
 
+  // Validate max 11 starters
+  const currentStarters = await MatchPlayer.count({
+    where: { matchId, availability: "starter" },
+  });
+  const newStarters = players.filter(
+    (p) => (p.availability || "starter") === "starter",
+  ).length;
+  if (currentStarters + newStarters > 11) {
+    throw new AppError(
+      `Cannot exceed 11 starters. Currently ${currentStarters}, trying to add ${newStarters}.`,
+      400,
+    );
+  }
+
   const records = players.map((p) => ({
     matchId,
     playerId: p.playerId,
@@ -314,6 +401,17 @@ export async function updateMatchPlayer(
 ) {
   const mp = await MatchPlayer.findOne({ where: { matchId, playerId } });
   if (!mp) throw new AppError("Player not assigned to this match", 404);
+
+  // Validate max 11 starters when changing to starter
+  if (input.availability === "starter" && mp.availability !== "starter") {
+    const currentStarters = await MatchPlayer.count({
+      where: { matchId, availability: "starter" },
+    });
+    if (currentStarters >= 11) {
+      throw new AppError("Cannot exceed 11 starters per match.", 400);
+    }
+  }
+
   return mp.update(input);
 }
 

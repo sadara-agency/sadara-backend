@@ -11,7 +11,10 @@ import {
   notifyUser,
   cleanupOldNotifications,
 } from "@modules/notifications/notification.service";
-import { generatePreMatchTasks } from "@modules/matches/matchAutoTasks";
+import {
+  generatePreMatchTasks,
+  generateMatchLevelPreTasks,
+} from "@modules/matches/matchAutoTasks";
 import {
   checkPerformanceTrends,
   checkFatigueRisk,
@@ -67,6 +70,23 @@ import {
   checkRiskRadarConsistency,
   detectDuplicateRecords,
 } from "./engines/systemhealth.engine";
+import { checkOfferDeadlines } from "@modules/offers/offerAutoTasks";
+import {
+  checkInjuryReturnOverdue,
+  checkInjuryTreatmentStale,
+} from "@modules/injuries/injuryAutoTasks";
+import {
+  checkWorkoutAssignmentExpiring,
+  checkDietPlanNoAdherence,
+  checkMetricTargetAchieved,
+  checkTrainingCourseCompleted,
+} from "@modules/gym/gymAutoTasks";
+import { checkApprovalStepOverdue } from "@modules/approvals/approvalAutoTasks";
+import {
+  checkDocumentExpiryTasks,
+  checkPlayerMissingDocuments,
+} from "@modules/documents/documentAutoTasks";
+import { checkReferralOverdue } from "@modules/referrals/referralAutoTasks";
 
 // ── Query result interfaces ──
 
@@ -552,6 +572,16 @@ async function checkUpcomingMatches() {
       );
     }
 
+    // Generate match-level tasks for Scout/Analyst roles
+    try {
+      const mlResult = await generateMatchLevelPreTasks(m.id, daysUntil);
+      totalPreMatchTasks += mlResult.created;
+    } catch (err: any) {
+      logger.error(
+        `[Cron] Match-level pre-tasks failed for match ${m.id}: ${err.message}`,
+      );
+    }
+
     // Send notification for matches 2 days out (existing behavior)
     if (daysUntil === 2) {
       await notifyByRole(
@@ -644,6 +674,29 @@ registerJob("workout-adherence-check", checkWorkoutAdherence);
 registerJob("body-metric-target-deadline", checkMetricTargetDeadlines);
 registerJob("diet-adherence-monitor", checkDietAdherence);
 registerJob("training-no-plan", checkNoTrainingPlan);
+
+// ── Offer Pipeline Engine ──
+registerJob("offer-deadlines", checkOfferDeadlines);
+
+// ── Injury Auto-Tasks (return overdue + treatment stale) ──
+registerJob("injury-return-overdue", checkInjuryReturnOverdue);
+registerJob("injury-treatment-stale", checkInjuryTreatmentStale);
+
+// ── Gym / Training Auto-Tasks ──
+registerJob("workout-assignment-expiring", checkWorkoutAssignmentExpiring);
+registerJob("diet-plan-no-adherence", checkDietPlanNoAdherence);
+registerJob("metric-target-achieved", checkMetricTargetAchieved);
+registerJob("training-course-completed", checkTrainingCourseCompleted);
+
+// ── Approval Auto-Tasks ──
+registerJob("approval-step-overdue", checkApprovalStepOverdue);
+
+// ── Document Auto-Tasks ──
+registerJob("document-expiry-tasks", checkDocumentExpiryTasks);
+registerJob("player-missing-documents", checkPlayerMissingDocuments);
+
+// ── Referral Auto-Tasks ──
+registerJob("referral-overdue", checkReferralOverdue);
 
 // ── System Health & Data Quality Engine ──
 registerJob("orphan-record-detector", detectOrphanRecords);
@@ -754,6 +807,29 @@ export function startCronJobs() {
   cron.schedule("30 9 * * 6", safeJob("diet-adherence-monitor")); // Saturday 9:30 AM
   cron.schedule("30 8 * * 1", safeJob("training-no-plan")); // Monday 8:30 AM
 
+  // ── Offer Pipeline Engine ──
+  cron.schedule("0 8 * * *", safeJob("offer-deadlines")); // Daily 8:00 AM
+
+  // ── Injury Auto-Tasks ──
+  cron.schedule("45 8 * * *", safeJob("injury-return-overdue")); // Daily 8:45 AM
+  cron.schedule("0 9 * * 1", safeJob("injury-treatment-stale")); // Monday 9:00 AM
+
+  // ── Gym / Training Auto-Tasks ──
+  cron.schedule("0 8 * * 1", safeJob("workout-assignment-expiring")); // Monday 8:00 AM
+  cron.schedule("0 10 * * 6", safeJob("diet-plan-no-adherence")); // Saturday 10:00 AM
+  cron.schedule("0 11 * * 3", safeJob("metric-target-achieved")); // Wednesday 11:00 AM
+  cron.schedule("30 8 * * *", safeJob("training-course-completed")); // Daily 8:30 AM
+
+  // ── Approval Auto-Tasks ──
+  cron.schedule("0 9 * * *", safeJob("approval-step-overdue")); // Daily 9:00 AM
+
+  // ── Document Auto-Tasks ──
+  cron.schedule("0 10 * * *", safeJob("document-expiry-tasks")); // Daily 10:00 AM
+  cron.schedule("0 7 * * 2", safeJob("player-missing-documents")); // Tuesday 7:00 AM
+
+  // ── Referral Auto-Tasks ──
+  cron.schedule("30 8 * * *", safeJob("referral-overdue")); // Daily 8:30 AM
+
   // ── System Health & Data Quality Engine ──
   cron.schedule("0 4 * * 0", safeJob("orphan-record-detector")); // Sunday 4:00 AM
   cron.schedule("0 7 * * 1", safeJob("player-data-completeness")); // Monday 7:00 AM
@@ -761,5 +837,5 @@ export function startCronJobs() {
   cron.schedule("0 5 * * 0", safeJob("risk-radar-consistency")); // Sunday 5:00 AM
   cron.schedule("0 6 * * 0", safeJob("duplicate-record-detector")); // Sunday 6:00 AM
 
-  logger.info("[CRON] 46 jobs scheduled ✓");
+  logger.info("[CRON] 58 jobs scheduled ✓");
 }
