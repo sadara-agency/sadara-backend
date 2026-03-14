@@ -51,6 +51,11 @@ jest.mock('../../../src/modules/audit/AuditLog.model', () => ({
   },
 }));
 
+jest.mock('../../../src/modules/contracts/contractAutoTasks', () => ({
+  generateContractCreationTask: jest.fn().mockResolvedValue(null),
+  generateContractTransitionTask: jest.fn().mockResolvedValue(null),
+}));
+
 import * as contractService from '../../../src/modules/contracts/contract.service';
 
 describe('Contract Service', () => {

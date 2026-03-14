@@ -154,6 +154,14 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/gym/gymAutoTasks', () => ({
+  generateWorkoutCompletedTask: jest.fn().mockResolvedValue(null),
+  checkWorkoutAssignmentExpiring: jest.fn().mockResolvedValue(undefined),
+  checkDietPlanNoAdherence: jest.fn().mockResolvedValue(undefined),
+  checkMetricTargetAchieved: jest.fn().mockResolvedValue(undefined),
+  checkTrainingCourseCompleted: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as svc from '../../../src/modules/gym/gym.service';
 
 // ── Helpers ──

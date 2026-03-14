@@ -28,6 +28,9 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
 jest.mock('../../../src/modules/reports/report.pdf', () => ({
   generateReportPdf: jest.fn().mockResolvedValue('/reports/report-001.pdf'),
 }));
+jest.mock('../../../src/modules/reports/reportAutoTasks', () => ({
+  generateReportFailedTask: jest.fn().mockResolvedValue(null),
+}));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));

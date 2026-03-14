@@ -9,7 +9,11 @@ import { mockUser, mockModelInstance } from '../../setup/test-helpers';
 
 // ── Mock dependencies ──
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { authenticate: jest.fn(), query: jest.fn() },
+  sequelize: {
+    authenticate: jest.fn(),
+    query: jest.fn(),
+    literal: jest.fn((val: string) => val),
+  },
 }));
 
 jest.mock('../../../src/shared/utils/mail', () => ({
@@ -21,12 +25,14 @@ jest.mock('../../../src/shared/utils/mail', () => ({
 const mockFindOne = jest.fn();
 const mockFindByPk = jest.fn();
 const mockCreate = jest.fn();
+const mockUserUpdate = jest.fn();
 
 jest.mock('../../../src/modules/users/user.model', () => ({
   User: {
     findOne: (...args: unknown[]) => mockFindOne(...args),
     findByPk: (...args: unknown[]) => mockFindByPk(...args),
     create: (...args: unknown[]) => mockCreate(...args),
+    update: (...args: unknown[]) => mockUserUpdate(...args),
   },
 }));
 
@@ -91,6 +97,7 @@ describe('Auth Service', () => {
         passwordHash: await bcrypt.hash('correct', 10),
       });
       mockFindOne.mockResolvedValue(user);
+      mockUserUpdate.mockResolvedValue([1]);
 
       await expect(
         authService.login({ email: 'admin@sadara.com', password: 'wrong' }),
@@ -141,7 +148,9 @@ describe('Auth Service', () => {
     });
 
     it('should throw 409 if email already exists', async () => {
-      mockFindOne.mockResolvedValue(mockModelInstance(mockUser()));
+      const uniqueError = new Error('Validation error') as any;
+      uniqueError.name = 'SequelizeUniqueConstraintError';
+      mockCreate.mockRejectedValue(uniqueError);
 
       await expect(
         authService.register({

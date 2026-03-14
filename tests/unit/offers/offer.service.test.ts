@@ -6,6 +6,7 @@ const mockFindAndCountAll = jest.fn();
 const mockFindByPk = jest.fn();
 const mockFindAll = jest.fn();
 const mockOfferCreate = jest.fn();
+const mockOfferUpdate = jest.fn();
 const mockPlayerFindByPk = jest.fn();
 const mockClubFindByPk = jest.fn();
 const mockContractCreate = jest.fn();
@@ -26,6 +27,7 @@ jest.mock('../../../src/modules/offers/offer.model', () => ({
     findByPk: (...a: unknown[]) => mockFindByPk(...a),
     findAll: (...a: unknown[]) => mockFindAll(...a),
     create: (...a: unknown[]) => mockOfferCreate(...a),
+    update: (...a: unknown[]) => mockOfferUpdate(...a),
   },
 }));
 
@@ -60,6 +62,12 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
 jest.mock('../../../src/modules/approvals/approval.service', () => ({
   createApprovalRequest: jest.fn().mockResolvedValue({}),
   resolveApprovalByEntity: jest.fn().mockResolvedValue({}),
+}));
+
+jest.mock('../../../src/modules/offers/offerAutoTasks', () => ({
+  generateOfferCreationTask: jest.fn().mockResolvedValue(null),
+  generateOfferAcceptedTask: jest.fn().mockResolvedValue(null),
+  checkOfferDeadlines: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../../../src/config/logger', () => ({
@@ -291,6 +299,7 @@ describe('Offer Service', () => {
       mockFindByPk.mockResolvedValue(offer);
       const contract = mockModelInstance(mockContract({ id: 'contract-new' }));
       mockContractCreate.mockResolvedValue(contract);
+      mockOfferUpdate.mockResolvedValue([1]);
 
       const result = await offerService.convertOfferToContract('offer-001', 'user-001');
 

@@ -30,6 +30,10 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
   notifyUser: jest.fn().mockResolvedValue(null),
 }));
+jest.mock('../../../src/modules/referrals/referralAutoTasks', () => ({
+  generateCriticalReferralTask: jest.fn().mockResolvedValue(null),
+  checkReferralOverdue: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));

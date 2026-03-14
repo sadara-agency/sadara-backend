@@ -38,6 +38,9 @@ jest.mock('../../../src/modules/players/player.model', () => ({
   Player: { findByPk: (...a: unknown[]) => mockPlayerFindByPk(...a), name: 'Player' },
 }));
 jest.mock('../../../src/modules/users/user.model', () => ({ User: { name: 'User' } }));
+jest.mock('../../../src/modules/gates/gateAutoTasks', () => ({
+  generateGateCompletedTask: jest.fn().mockResolvedValue(null),
+}));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));

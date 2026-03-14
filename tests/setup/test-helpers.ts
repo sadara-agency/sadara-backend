@@ -402,6 +402,7 @@ export function mockModelInstance(data: Record<string, any>) {
       return { ...data, get: jest.fn(() => data) };
     }),
     destroy: jest.fn(async () => undefined),
+    reload: jest.fn(async function (this: any) { return this; }),
     toJSON: jest.fn(() => ({ ...data })),
   };
 }
