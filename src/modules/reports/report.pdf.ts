@@ -1,5 +1,6 @@
 import path from "path";
 import fs from "fs";
+import { writeFile } from "fs/promises";
 import puppeteer from "puppeteer";
 import { PDFDocument } from "pdf-lib";
 
@@ -274,7 +275,7 @@ export async function generateReportPdf(
     const finalBytes = await merged.save();
     const fileName = `report_${reportId}.pdf`;
     const filePath = path.join(TMP, fileName);
-    fs.writeFileSync(filePath, Buffer.from(finalBytes));
+    await writeFile(filePath, Buffer.from(finalBytes));
 
     return filePath;
   } catch (err: any) {
