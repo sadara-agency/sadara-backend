@@ -1,39 +1,12 @@
-import path from "path";
-import fs from "fs";
-import puppeteer from "puppeteer";
-import { PDFDocument } from "pdf-lib";
-
-const TMP = path.resolve(process.cwd(), "tmp");
-if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
-
-const ASSETS_DIR = path.resolve(process.cwd(), "src", "assets", "pdf");
-const COVER_PDF = path.join(ASSETS_DIR, "cover_page.pdf");
-const BACK_PDF = path.join(ASSETS_DIR, "back_page.pdf");
-
-// ── Helpers ──
-
-function fmtDate(s: string | Date | null): string {
-  if (!s) return "—";
-  try {
-    const d = new Date(s);
-    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-  } catch {
-    return String(s);
-  }
-}
-
-function calcAge(dob: string | null): number {
-  if (!dob) return 0;
-  const birth = new Date(dob);
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  if (
-    now.getMonth() < birth.getMonth() ||
-    (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())
-  )
-    age--;
-  return age;
-}
+import {
+  escHtml,
+  fmtDate,
+  calcAge,
+  wrapHtml,
+  makeSadaraHeader,
+  renderPagesToBuffers,
+  mergeWithBrandPages,
+} from "@shared/utils/pdf";
 
 // ── CSS ──
 
@@ -66,12 +39,11 @@ tr:nth-child(even){background:#f8f9fc}
 .radar-wrap{display:flex;justify-content:center;margin:10px 0}
 `;
 
-const HD = `<div class="hd">
-  <div class="hd-r"><div class="lt">شـركــة صـــدارة الـريـاضـيـة</div><div class="ls">SADARA SPORTS COMPANY</div></div>
-  <div class="hd-l">Scouting Pack Report<br>Generated: ${new Date().toISOString().split("T")[0]}</div>
-</div>`;
+const HD = () => makeSadaraHeader("Scouting Pack Report");
 
 const FOOTER = `<div class="footer">شركة صدارة المواهب الرياضية المحدودة — ملف استكشاف سري — Sadara Sports Company — Confidential Scouting Pack</div>`;
+
+const dateFmt = (s: string | Date | null) => fmtDate(s, { fallback: "\u2014" });
 
 // ── SVG Radar Chart ──
 
@@ -116,7 +88,7 @@ function buildRadarSvg(
   const labels = ratings
     .map((r, i) => {
       const [x, y] = polar(i, maxR + 18);
-      return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="#333">${r.labelAr} ${r.value || "—"}</text>`;
+      return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="7" fill="#333">${escHtml(r.labelAr)} ${r.value || "\u2014"}</text>`;
     })
     .join("");
 
@@ -128,9 +100,9 @@ function buildRadarSvg(
 // ── Page 1: Prospect Profile ──
 
 function buildProfilePage(watchlist: any): string {
-  const name = watchlist.prospectNameAr || watchlist.prospectName || "—";
+  const name = watchlist.prospectNameAr || watchlist.prospectName || "\u2014";
   const nameEn = watchlist.prospectName || "";
-  const age = watchlist.dateOfBirth ? calcAge(watchlist.dateOfBirth) : "—";
+  const age = watchlist.dateOfBirth ? calcAge(watchlist.dateOfBirth) : "\u2014";
 
   const ratings = [
     {
@@ -157,7 +129,7 @@ function buildProfilePage(watchlist: any): string {
     <div class="bar-wrap">
       <span class="bar-label">${r.labelAr}</span>
       <div class="bar-track"><div class="bar-fill" style="width:${(r.value / 10) * 100}%"></div></div>
-      <span class="bar-val">${r.value || "—"}</span>
+      <span class="bar-val">${r.value || "\u2014"}</span>
     </div>`,
     )
     .join("");
@@ -166,22 +138,22 @@ function buildProfilePage(watchlist: any): string {
   const avg =
     vals.length > 0
       ? (vals.reduce((s, r) => s + r.value, 0) / vals.length).toFixed(1)
-      : "—";
+      : "\u2014";
 
   const radarSvg = buildRadarSvg(ratings);
 
-  return `<div class="pg">${HD}
-    <div class="title">ملف الاستكشاف — ${name}</div>
+  return `<div class="pg">${HD()}
+    <div class="title">ملف الاستكشاف — ${escHtml(name)}</div>
     <div class="sub">بيانات المرشح — Prospect Bio</div>
     <div class="bio-grid">
-      <div><span class="label">الاسم:</span> <span class="val">${name}</span></div>
-      <div><span class="label">Name:</span> <span class="val">${nameEn}</span></div>
-      <div><span class="label">العمر:</span> <span class="val">${age}</span></div>
-      <div><span class="label">الجنسية:</span> <span class="val">${watchlist.nationality || "—"}</span></div>
-      <div><span class="label">المركز:</span> <span class="val">${watchlist.position || "—"}</span></div>
-      <div><span class="label">النادي:</span> <span class="val">${watchlist.currentClub || "—"}</span></div>
-      <div><span class="label">الدوري:</span> <span class="val">${watchlist.currentLeague || "—"}</span></div>
-      <div><span class="label">الأولوية:</span> <span class="val">${watchlist.priority || "—"}</span></div>
+      <div><span class="label">الاسم:</span> <span class="val">${escHtml(name)}</span></div>
+      <div><span class="label">Name:</span> <span class="val">${escHtml(nameEn)}</span></div>
+      <div><span class="label">العمر:</span> <span class="val">${escHtml(age)}</span></div>
+      <div><span class="label">الجنسية:</span> <span class="val">${escHtml(watchlist.nationality || "\u2014")}</span></div>
+      <div><span class="label">المركز:</span> <span class="val">${escHtml(watchlist.position || "\u2014")}</span></div>
+      <div><span class="label">النادي:</span> <span class="val">${escHtml(watchlist.currentClub || "\u2014")}</span></div>
+      <div><span class="label">الدوري:</span> <span class="val">${escHtml(watchlist.currentLeague || "\u2014")}</span></div>
+      <div><span class="label">الأولوية:</span> <span class="val">${escHtml(watchlist.priority || "\u2014")}</span></div>
     </div>
 
     <div class="sub">التقييمات — Ratings</div>
@@ -189,14 +161,14 @@ function buildProfilePage(watchlist: any): string {
       <div style="flex:1">${ratingBars}
         <div class="bar-wrap" style="margin-top:6px;border-top:1px solid #ddd;padding-top:4px">
           <span class="bar-label" style="font-weight:700">المتوسط</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${avg !== "—" ? (Number(avg) / 10) * 100 : 0}%;background:#22c55e"></div></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${avg !== "\u2014" ? (Number(avg) / 10) * 100 : 0}%;background:#22c55e"></div></div>
           <span class="bar-val" style="color:#22c55e">${avg}</span>
         </div>
       </div>
       <div class="radar-wrap">${radarSvg}</div>
     </div>
 
-    ${watchlist.notes ? `<div class="note-box"><strong>ملاحظات الكشاف:</strong> ${watchlist.notes}</div>` : ""}
+    ${watchlist.notes ? `<div class="note-box"><strong>ملاحظات الكشاف:</strong> ${escHtml(watchlist.notes)}</div>` : ""}
     ${FOOTER}
   </div>`;
 }
@@ -204,7 +176,7 @@ function buildProfilePage(watchlist: any): string {
 // ── Page 2: Screening Report ──
 
 function buildScreeningPage(screening: any, watchlist: any): string {
-  const name = watchlist.prospectNameAr || watchlist.prospectName || "—";
+  const name = watchlist.prospectNameAr || watchlist.prospectName || "\u2014";
 
   const boolCell = (v: boolean) =>
     v ? '<span class="ok">✓ نعم</span>' : '<span class="nok">✗ لا</span>';
@@ -232,16 +204,16 @@ function buildScreeningPage(screening: any, watchlist: any): string {
           : '<span class="nok">حرج</span>';
 
   const preparerName =
-    screening.preparer?.fullNameAr || screening.preparer?.fullName || "—";
+    screening.preparer?.fullNameAr || screening.preparer?.fullName || "\u2014";
 
-  return `<div class="pg">${HD}
-    <div class="title">تقرير الفحص — ${name}</div>
+  return `<div class="pg">${HD()}
+    <div class="title">تقرير الفحص — ${escHtml(name)}</div>
     <div class="sub">بيانات الفحص — Screening Summary</div>
     <div class="bio-grid">
-      <div><span class="label">رقم القضية:</span> <span class="val">${screening.caseNumber}</span></div>
+      <div><span class="label">رقم القضية:</span> <span class="val">${escHtml(screening.caseNumber)}</span></div>
       <div><span class="label">الحالة:</span> <span class="val">${screening.status === "PackReady" ? "جاهز للاختيار" : screening.status === "Closed" ? "مغلق" : "قيد التنفيذ"}</span></div>
-      <div><span class="label">تاريخ التجهيز:</span> <span class="val">${fmtDate(screening.packPreparedAt)}</span></div>
-      <div><span class="label">أعدّه:</span> <span class="val">${preparerName}</span></div>
+      <div><span class="label">تاريخ التجهيز:</span> <span class="val">${dateFmt(screening.packPreparedAt)}</span></div>
+      <div><span class="label">أعدّه:</span> <span class="val">${escHtml(preparerName)}</span></div>
     </div>
 
     <div class="sub">قائمة الفحوصات — Verification Checklist</div>
@@ -257,7 +229,7 @@ function buildScreeningPage(screening: any, watchlist: any): string {
       </tbody>
     </table>
 
-    ${screening.notes ? `<div class="note-box"><strong>ملاحظات الفحص:</strong> ${screening.notes}</div>` : ""}
+    ${screening.notes ? `<div class="note-box"><strong>ملاحظات الفحص:</strong> ${escHtml(screening.notes)}</div>` : ""}
     ${FOOTER}
   </div>`;
 }
@@ -268,78 +240,13 @@ export async function generateScoutingPackPdf(
   watchlist: any,
   screening: any,
 ): Promise<Buffer> {
-  const wrap = (body: string) =>
-    `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${CSS}</style></head><body>${body}</body></html>`;
-
   const pages = [
-    wrap(buildProfilePage(watchlist)),
-    wrap(buildScreeningPage(screening, watchlist)),
+    wrapHtml(buildProfilePage(watchlist), CSS),
+    wrapHtml(buildScreeningPage(screening, watchlist), CSS),
   ];
 
-  let browser: any = null;
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--font-render-hinting=none",
-      ],
-    });
-
-    const page = await browser.newPage();
-    const contentBuffers: Uint8Array[] = [];
-
-    for (const html of pages) {
-      await page.setContent(html, {
-        waitUntil: "domcontentloaded",
-        timeout: 10000,
-      });
-      await page.evaluate(() => new Promise((r) => setTimeout(r, 200)));
-      const buf = await page.pdf({
-        width: "595px",
-        height: "842px",
-        margin: { top: "0", bottom: "0", left: "0", right: "0" },
-        printBackground: true,
-      });
-      contentBuffers.push(buf);
-    }
-
-    await page.close();
-    await browser.close();
-    browser = null;
-
-    // ── Merge pages ──
-    const merged = await PDFDocument.create();
-
-    if (fs.existsSync(COVER_PDF)) {
-      const coverDoc = await PDFDocument.load(fs.readFileSync(COVER_PDF));
-      const [coverPage] = await merged.copyPages(coverDoc, [0]);
-      merged.addPage(coverPage);
-    }
-
-    for (const buf of contentBuffers) {
-      const doc = await PDFDocument.load(buf);
-      const docPages = await merged.copyPages(doc, doc.getPageIndices());
-      docPages.forEach((p) => merged.addPage(p));
-    }
-
-    if (fs.existsSync(BACK_PDF)) {
-      const backDoc = await PDFDocument.load(fs.readFileSync(BACK_PDF));
-      const [backPage] = await merged.copyPages(backDoc, [0]);
-      merged.addPage(backPage);
-    }
-
-    const finalBytes = await merged.save();
-    return Buffer.from(finalBytes);
-  } catch (err: any) {
-    if (browser)
-      try {
-        await browser.close();
-      } catch {}
-    throw err;
-  }
+  const contentBuffers = await renderPagesToBuffers(pages, {
+    extraArgs: ["--font-render-hinting=none"],
+  });
+  return mergeWithBrandPages(contentBuffers);
 }

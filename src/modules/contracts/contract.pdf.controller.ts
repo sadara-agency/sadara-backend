@@ -1,37 +1,22 @@
 import { Response } from "express";
-import path from "path";
 import fs from "fs";
-import puppeteer from "puppeteer";
-import { PDFDocument } from "pdf-lib";
 import { AuthRequest } from "@shared/types";
 import { AppError } from "@middleware/errorHandler";
 import { logger } from "@config/logger";
 import * as contractService from "@modules/contracts/contract.service";
-
-// ── Asset paths (brand template pages) ──
-// In production the compiled JS runs from dist/, so __dirname is dist/modules/contracts.
-// Assets are copied to dist/assets/pdf/ during build. Fall back to src/ for local dev.
-const ASSETS_DIR_DIST = path.resolve(__dirname, "..", "..", "assets", "pdf");
-const ASSETS_DIR_SRC = path.resolve(process.cwd(), "src", "assets", "pdf");
-const ASSETS_DIR = fs.existsSync(ASSETS_DIR_DIST)
-  ? ASSETS_DIR_DIST
-  : ASSETS_DIR_SRC;
-const COVER_PDF = path.join(ASSETS_DIR, "cover_page.pdf");
-const BACK_PDF = path.join(ASSETS_DIR, "back_page.pdf");
-
-const TMP = path.resolve(process.cwd(), "tmp");
-if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
+import {
+  fmtDate as sharedFmtDate,
+  wrapHtml,
+  renderPagesToBuffers,
+  mergeWithBrandPages,
+  COVER_PDF_PATH,
+  BACK_PDF_PATH,
+} from "@shared/utils/pdf";
 
 // ─── Helpers ────────────────────────────────────────────────
 
 function fmtDate(s: string): string {
-  if (!s) return "";
-  try {
-    const d = new Date(s);
-    return `${String(d.getDate()).padStart(2, "0")} / ${String(d.getMonth() + 1).padStart(2, "0")} / ${d.getFullYear()}م`;
-  } catch {
-    return s;
-  }
+  return sharedFmtDate(s, { fallback: "", suffix: "\u0645", separator: " / " });
 }
 
 function calcDur(a: string, b: string): string {
@@ -151,14 +136,12 @@ const HD = `<div class="hd">
 
 // ─── Page Builders ──────────────────────────────────────────
 
-const wrap = (body: string) =>
-  `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${CSS}</style></head><body>${body}</body></html>`;
-
 function pg2(d: any) {
   const sd = fmtDate(d.sd),
     ed = fmtDate(d.ed),
     dur = calcDur(d.sd, d.ed);
-  return wrap(`<div class="pg">${HD}<div class="ct">
+  return wrapHtml(
+    `<div class="pg">${HD}<div class="ct">
 <div class="tt">عقد تمثيل رياضي حصري</div>
 <div class="stb">التمهيــد</div>
 <p>حيث إن شركة صدارة المواهب الرياضية المحدودة (الطرف الأول) تعمل في المجال الرياضي وفي أنشطة إدارة وتمثيل لاعبي كرة القدم والتفاوض بشأن عقودهم الرياضية والتجارية داخل المملكة العربية السعودية وخارجها، وفق الأنظمة واللوائح المعمول بها؛</p>
@@ -191,7 +174,9 @@ function pg2(d: any) {
 <div class="ni"><span class="nc">5</span><span>إبلاغ اللاعب بأي عرض رسمي يصل للشركة فور استلامه</span></div>
 <div class="ni"><span class="nc">6</span><span>تمثيل اللاعب أمام الأندية والجهات المختصة</span></div>
 <div class="ni"><span class="nc">7</span><span>الحفاظ على سرية جميع البيانات والمعلومات</span></div>
-</div></div>`);
+</div></div>`,
+    CSS,
+  );
 }
 
 function pg3(d: any) {
@@ -211,7 +196,8 @@ function pg3(d: any) {
     ? `<span class="dx">${fmtDate(d.sigDt)}</span>`
     : "";
 
-  return wrap(`<div class="pg">${HD}<div class="ct">
+  return wrapHtml(
+    `<div class="pg">${HD}<div class="ct">
 <div class="st">المادة (6): التزامات الطرف الثاني (اللاعب)</div>
 <div class="ni"><span class="nc">1</span><span>الالتزام بالحصرية وعدم التعامل أو التفاوض مع أي وسيط آخر</span></div>
 <div class="ni"><span class="nc">2</span><span>إبلاغ الشركة فوراً بأي عرض أو تواصل من أي نادٍ أو جهة تجارية</span></div>
@@ -264,24 +250,9 @@ ${d.pnEn ? `<p style="direction:ltr;text-align:left;font-size:8pt">${d.pnEn}</p>
 <p>أقر بموافقتي على هذا العقد والتزام اللاعب بجميع بنوده:</p>
 <table class="gt" style="width:150px"><tr><td>الاسم</td><td style="min-width:60px"></td></tr><tr><td>صلة القرابة</td><td></td></tr><tr><td>التاريخ</td><td></td></tr><tr><td>التوقيع</td><td></td></tr></table>
 </div>
-</div></div>`);
-}
-
-// ─── Render a single HTML page to PDF buffer ────────────────
-
-async function renderHtmlPage(page: any, html: string): Promise<Uint8Array> {
-  await page.setContent(html, {
-    waitUntil: "domcontentloaded",
-    timeout: 10000,
-  });
-  // Wait for base64 images to decode + render
-  await page.evaluate(`new Promise(r => setTimeout(r, 500))`);
-  return page.pdf({
-    width: "595px",
-    height: "842px",
-    margin: { top: "0", bottom: "0", left: "0", right: "0" },
-    printBackground: true,
-  });
+</div></div>`,
+    CSS,
+  );
 }
 
 // ─── Reusable: generate full contract PDF as Buffer ─────────
@@ -295,13 +266,13 @@ export async function generateContractPdfBuffer(
       : contractOrId;
   if (!contract) throw new AppError("Contract not found", 404);
 
-  if (!fs.existsSync(COVER_PDF)) {
+  if (!fs.existsSync(COVER_PDF_PATH)) {
     throw new AppError(
       "Brand asset cover_page.pdf not found. Place it in src/assets/pdf/",
       500,
     );
   }
-  if (!fs.existsSync(BACK_PDF)) {
+  if (!fs.existsSync(BACK_PDF_PATH)) {
     throw new AppError(
       "Brand asset back_page.pdf not found. Place it in src/assets/pdf/",
       500,
@@ -309,61 +280,15 @@ export async function generateContractPdfBuffer(
   }
 
   const d = getData(contract);
-  let browser: any = null;
 
   try {
-    const coverBytes = fs.readFileSync(COVER_PDF);
-    const backBytes = fs.readFileSync(BACK_PDF);
-
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--font-render-hinting=none",
-      ],
+    const contentBuffers = await renderPagesToBuffers([pg2(d), pg3(d)], {
+      extraArgs: ["--font-render-hinting=none"],
+      settleMs: 500,
     });
-
-    const page = await browser.newPage();
-    const contentBuffers: Uint8Array[] = [];
-    for (const html of [pg2(d), pg3(d)]) {
-      contentBuffers.push(await renderHtmlPage(page, html));
-    }
-
-    await page.close();
-    await browser.close();
-    browser = null;
-
-    const merged = await PDFDocument.create();
-
-    const coverDoc = await PDFDocument.load(coverBytes);
-    const [coverPage] = await merged.copyPages(coverDoc, [0]);
-    merged.addPage(coverPage);
-
-    for (const buf of contentBuffers) {
-      const doc = await PDFDocument.load(buf);
-      const pages = await merged.copyPages(doc, doc.getPageIndices());
-      pages.forEach((p) => merged.addPage(p));
-    }
-
-    const backDoc = await PDFDocument.load(backBytes);
-    const [backPage] = await merged.copyPages(backDoc, [0]);
-    merged.addPage(backPage);
-
-    const final = await merged.save();
-    return { buffer: Buffer.from(final), playerName: d.pn };
+    const buffer = await mergeWithBrandPages(contentBuffers);
+    return { buffer, playerName: d.pn };
   } catch (err: any) {
-    if (browser)
-      try {
-        await browser.close();
-      } catch (closeErr) {
-        logger.warn("Failed to close Puppeteer browser during cleanup", {
-          error: (closeErr as Error).message,
-        });
-      }
     logger.error("PDF generation error", { error: err.message });
     throw new AppError(
       "PDF generation failed. Please try again or contact support.",
