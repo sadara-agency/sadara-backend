@@ -7,73 +7,31 @@
 
 import { QueryInterface } from "sequelize";
 
-export async function up(queryInterface: QueryInterface) {
-  const t = await queryInterface.sequelize.transaction();
-  try {
-    // Tasks: cron dedup check (player + trigger_rule + auto + date + status)
-    await queryInterface.addIndex(
-      "tasks",
-      ["player_id", "trigger_rule_id", "is_auto_created", "created_at"],
-      {
-        name: "idx_tasks_cron_dedup",
-        where: { is_auto_created: true },
-        transaction: t,
-      },
-    );
-
-    // Tasks: list filtered by assignee + status
-    await queryInterface.addIndex("tasks", ["assigned_to", "status"], {
-      name: "idx_tasks_assignee_status",
-      transaction: t,
-    });
-
-    // Contracts: player contract lookups by status
-    await queryInterface.addIndex("contracts", ["player_id", "status"], {
-      name: "idx_contracts_player_status",
-      transaction: t,
-    });
-
-    // Performances / player_match_stats: dashboard top players trend
-    await queryInterface.addIndex(
-      "player_match_stats",
-      ["player_id", "created_at"],
-      {
-        name: "idx_pms_player_created",
-        transaction: t,
-      },
-    );
-
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
+export async function up({ sequelize }: QueryInterface) {
+  // Each index created independently — if one fails, others still succeed.
+  // Using raw SQL with IF NOT EXISTS for full idempotency.
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_tasks_cron_dedup
+     ON tasks (player_id, trigger_rule_id, is_auto_created, created_at)
+     WHERE is_auto_created = true`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_tasks_assignee_status
+     ON tasks (assigned_to, status)`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_contracts_player_status
+     ON contracts (player_id, status)`,
+  );
+  await sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_pms_player_created
+     ON player_match_stats (player_id, created_at)`,
+  );
 }
 
-export async function down(queryInterface: QueryInterface) {
-  const t = await queryInterface.sequelize.transaction();
-  try {
-    await queryInterface.removeIndex("tasks", "idx_tasks_cron_dedup", {
-      transaction: t,
-    });
-    await queryInterface.removeIndex("tasks", "idx_tasks_assignee_status", {
-      transaction: t,
-    });
-    await queryInterface.removeIndex(
-      "contracts",
-      "idx_contracts_player_status",
-      {
-        transaction: t,
-      },
-    );
-    await queryInterface.removeIndex(
-      "player_match_stats",
-      "idx_pms_player_created",
-      { transaction: t },
-    );
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
+export async function down({ sequelize }: QueryInterface) {
+  await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_cron_dedup`);
+  await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_assignee_status`);
+  await sequelize.query(`DROP INDEX IF EXISTS idx_contracts_player_status`);
+  await sequelize.query(`DROP INDEX IF EXISTS idx_pms_player_created`);
 }
