@@ -12,9 +12,9 @@
     "test": "jest --config jest.config.ts",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "migrate": "ts-node src/database/migrate-cli.ts up",
-    "migrate:down": "ts-node src/database/migrate-cli.ts down",
-    "migrate:status": "ts-node src/database/migrate-cli.ts status",
+    "migrate": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts up",
+    "migrate:down": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts down",
+    "migrate:status": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts status",
     "prepare": "husky || true"
   },
   "dependencies": {

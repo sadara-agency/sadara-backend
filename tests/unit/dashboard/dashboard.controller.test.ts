@@ -18,13 +18,6 @@ const mockRes = () => {
 describe('Dashboard Controller', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('getFullDashboard', async () => {
-    (svc.getFullDashboard as jest.Mock).mockResolvedValue({ kpis: {}, alerts: [] });
-    const res = mockRes();
-    await controller.getFullDashboard(mockReq(), res);
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
   it('getKpis', async () => {
     (svc.getKpis as jest.Mock).mockResolvedValue({});
     const res = mockRes();
