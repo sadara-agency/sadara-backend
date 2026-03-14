@@ -54,7 +54,12 @@ ExerciseLibrary.init(
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
     },
-    nameEn: { type: DataTypes.STRING(200), allowNull: false, field: "name_en" },
+    nameEn: {
+      type: DataTypes.STRING(200),
+      allowNull: false,
+      unique: true,
+      field: "name_en",
+    },
     nameAr: { type: DataTypes.STRING(200), field: "name_ar" },
     muscleGroup: {
       type: DataTypes.STRING(50),
