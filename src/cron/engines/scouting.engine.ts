@@ -7,6 +7,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 import { sequelize } from "@config/database";
+import { Op } from "sequelize";
 import { logger } from "@config/logger";
 import { Task } from "@modules/tasks/task.model";
 import {
@@ -107,13 +108,13 @@ async function createScoutingTask(opts: {
 
   // Dedup on triggerRuleId + notes containing reference ID (no playerId for prospects)
   const existing = await Task.findOne({
-    where: sequelize.literal(`
-      trigger_rule_id = '${opts.triggerRuleId}'
-      AND is_auto_created = true
-      AND created_at > '${sevenDaysAgo.toISOString()}'
-      AND status NOT IN ('Completed', 'Canceled')
-      AND description LIKE '%${opts.referenceId}%'
-    `),
+    where: {
+      triggerRuleId: opts.triggerRuleId,
+      isAutoCreated: true,
+      createdAt: { [Op.gt]: sevenDaysAgo },
+      status: { [Op.notIn]: ["Completed", "Canceled"] },
+      description: { [Op.like]: `%${opts.referenceId}%` },
+    },
   });
   if (existing) return false;
 

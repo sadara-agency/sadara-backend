@@ -89,11 +89,11 @@ const MAGIC_BYTES: Record<string, { bytes: number[]; offset?: number }[]> = {
 
 import { Request, Response, NextFunction } from "express";
 
-export function verifyFileType(
+export async function verifyFileType(
   req: Request,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const file = req.file;
   if (!file) return next();
 
@@ -104,29 +104,33 @@ export function verifyFileType(
   if (!signatures) return next();
 
   try {
-    const fd = fs.openSync(file.path, "r");
-    const buf = Buffer.alloc(8);
-    fs.readSync(fd, buf, 0, 8, 0);
-    fs.closeSync(fd);
+    const handle = await fs.promises.open(file.path, "r");
+    try {
+      const buf = Buffer.alloc(8);
+      await handle.read(buf, 0, 8, 0);
 
-    const match = signatures.some((sig) => {
-      const offset = sig.offset || 0;
-      return sig.bytes.every((b, i) => buf[offset + i] === b);
-    });
-
-    if (!match) {
-      // Delete the spoofed file
-      fs.unlinkSync(file.path);
-      res.status(400).json({
-        success: false,
-        message: "File content does not match its declared type.",
+      const match = signatures.some((sig) => {
+        const offset = sig.offset || 0;
+        return sig.bytes.every((b, i) => buf[offset + i] === b);
       });
-      return;
+
+      if (!match) {
+        await handle.close();
+        // Delete the spoofed file
+        await fs.promises.unlink(file.path);
+        res.status(400).json({
+          success: false,
+          message: "File content does not match its declared type.",
+        });
+        return;
+      }
+    } finally {
+      await handle.close();
     }
   } catch {
     // Fail closed — if we can't verify, reject the upload
     try {
-      fs.unlinkSync(file.path);
+      await fs.promises.unlink(file.path);
     } catch {
       // Best-effort cleanup
     }

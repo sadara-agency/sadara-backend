@@ -105,19 +105,24 @@ export async function revokeAllUserTokens(
 
 // ── Public Register (default role, no role selection) ──
 export async function register(input: RegisterInput) {
-  const existing = await User.findOne({ where: { email: input.email } });
-  if (existing) throw new AppError("Email already registered", 409);
-
   const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
 
-  const user = await User.create({
-    email: input.email,
-    passwordHash,
-    fullName: input.fullName,
-    fullNameAr: input.fullNameAr,
-    role: DEFAULT_ROLE,
-    isActive: false,
-  });
+  let user: User;
+  try {
+    user = await User.create({
+      email: input.email,
+      passwordHash,
+      fullName: input.fullName,
+      fullNameAr: input.fullNameAr,
+      role: DEFAULT_ROLE,
+      isActive: false,
+    });
+  } catch (err: any) {
+    if (err.name === "SequelizeUniqueConstraintError") {
+      throw new AppError("Email already registered", 409);
+    }
+    throw err;
+  }
 
   const { passwordHash: _, ...safe } = user.get({ plain: true });
 
@@ -135,19 +140,24 @@ export async function register(input: RegisterInput) {
 
 // ── Admin Invite (Admin assigns role) ──
 export async function invite(input: InviteInput) {
-  const existing = await User.findOne({ where: { email: input.email } });
-  if (existing) throw new AppError("Email already registered", 409);
-
   const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
 
-  const user = await User.create({
-    email: input.email,
-    passwordHash,
-    fullName: input.fullName,
-    fullNameAr: input.fullNameAr,
-    role: input.role as any,
-    isActive: true,
-  });
+  let user: User;
+  try {
+    user = await User.create({
+      email: input.email,
+      passwordHash,
+      fullName: input.fullName,
+      fullNameAr: input.fullNameAr,
+      role: input.role as any,
+      isActive: true,
+    });
+  } catch (err: any) {
+    if (err.name === "SequelizeUniqueConstraintError") {
+      throw new AppError("Email already registered", 409);
+    }
+    throw err;
+  }
 
   const { passwordHash: _, ...safe } = user.get({ plain: true });
   return { user: safe };
@@ -170,13 +180,20 @@ export async function login(input: LoginInput) {
     }
 
     if (!(await bcrypt.compare(input.password, user.passwordHash))) {
-      // Increment failed attempts and possibly lock
-      const attempts = (user.failedLoginAttempts || 0) + 1;
-      const updateData: any = { failedLoginAttempts: attempts };
-      if (attempts >= MAX_FAILED_ATTEMPTS) {
-        updateData.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
-      }
-      await user.update(updateData);
+      // Atomic increment to prevent race condition on concurrent failed logins
+      await User.update(
+        {
+          failedLoginAttempts: sequelize.literal(
+            "COALESCE(failed_login_attempts, 0) + 1",
+          ),
+          lockedUntil: sequelize.literal(
+            `CASE WHEN COALESCE(failed_login_attempts, 0) + 1 >= ${MAX_FAILED_ATTEMPTS} ` +
+              `THEN NOW() + INTERVAL '${LOCKOUT_DURATION_MS / 1000} seconds' ` +
+              `ELSE locked_until END`,
+          ),
+        } as any,
+        { where: { id: user.id } },
+      );
       throw new AppError("Invalid email or password", 401);
     }
 
@@ -238,16 +255,20 @@ export async function login(input: LoginInput) {
   }
 
   if (!(await bcrypt.compare(input.password, playerAccount.passwordHash))) {
-    // Increment failed attempts and possibly lock
-    const attempts = (playerAccount.failedLoginAttempts || 0) + 1;
-    const lockUntil =
-      attempts >= MAX_FAILED_ATTEMPTS
-        ? new Date(Date.now() + LOCKOUT_DURATION_MS)
-        : null;
-    await playerAccount.update({
-      failedLoginAttempts: attempts,
-      lockedUntil: lockUntil ? new Date(lockUntil) : null,
-    });
+    // Atomic increment to prevent race condition on concurrent failed logins
+    await PlayerAccount.update(
+      {
+        failedLoginAttempts: sequelize.literal(
+          "COALESCE(failed_login_attempts, 0) + 1",
+        ),
+        lockedUntil: sequelize.literal(
+          `CASE WHEN COALESCE(failed_login_attempts, 0) + 1 >= ${MAX_FAILED_ATTEMPTS} ` +
+            `THEN NOW() + INTERVAL '${LOCKOUT_DURATION_MS / 1000} seconds' ` +
+            `ELSE locked_until END`,
+        ),
+      } as any,
+      { where: { id: playerAccount.id } },
+    );
     throw new AppError("Invalid email or password", 401);
   }
 
