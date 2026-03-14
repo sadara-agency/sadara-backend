@@ -5,9 +5,9 @@
 // identified during the performance audit.
 // ═══════════════════════════════════════════════════════════════
 
-import { QueryInterface } from "sequelize";
+import { sequelize } from "@config/database";
 
-export async function up({ sequelize }: QueryInterface) {
+export async function up() {
   // Each index created independently — if one fails, others still succeed.
   // Using raw SQL with IF NOT EXISTS for full idempotency.
   await sequelize.query(
@@ -29,7 +29,7 @@ export async function up({ sequelize }: QueryInterface) {
   );
 }
 
-export async function down({ sequelize }: QueryInterface) {
+export async function down() {
   await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_cron_dedup`);
   await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_assignee_status`);
   await sequelize.query(`DROP INDEX IF EXISTS idx_contracts_player_status`);
