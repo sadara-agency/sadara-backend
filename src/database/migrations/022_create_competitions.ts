@@ -1,5 +1,4 @@
 import { sequelize } from "@config/database";
-import { QueryTypes } from "sequelize";
 
 // ── Tournament seed (from saff.service.ts TOURNAMENT_SEED) ──
 
@@ -394,51 +393,52 @@ function deriveCompetitionFields(t: (typeof TOURNAMENT_SEED)[0]) {
 }
 
 export async function up() {
-  const t = await sequelize.transaction();
+  // ── DDL (each statement auto-commits; all are idempotent) ──
 
-  try {
-    // 1. Create enum types
-    await sequelize.query(
-      `DO $$ BEGIN
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_type') THEN
-          CREATE TYPE "enum_competitions_type" AS ENUM ('league','cup','super_cup','friendly');
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_gender') THEN
-          CREATE TYPE "enum_competitions_gender" AS ENUM ('men','women');
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_format') THEN
-          CREATE TYPE "enum_competitions_format" AS ENUM ('outdoor','futsal','beach','esports');
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_agency_value') THEN
-          CREATE TYPE "enum_competitions_agency_value" AS ENUM ('Critical','High','Medium','Low','Scouting','Niche');
-        END IF;
-      END $$;`,
-      { transaction: t },
-    );
+  // 1. Create enum types
+  await sequelize.query(
+    `DO $$ BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_type') THEN
+        CREATE TYPE "enum_competitions_type" AS ENUM ('league','cup','super_cup','friendly');
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_gender') THEN
+        CREATE TYPE "enum_competitions_gender" AS ENUM ('men','women');
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_format') THEN
+        CREATE TYPE "enum_competitions_format" AS ENUM ('outdoor','futsal','beach','esports');
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_competitions_agency_value') THEN
+        CREATE TYPE "enum_competitions_agency_value" AS ENUM ('Critical','High','Medium','Low','Scouting','Niche');
+      END IF;
+    END $$;`,
+  );
 
-    // 2. Create competitions table
-    await sequelize.query(
-      `CREATE TABLE IF NOT EXISTS competitions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        name VARCHAR(255) NOT NULL,
-        name_ar VARCHAR(255),
-        country VARCHAR(255) DEFAULT 'Saudi Arabia',
-        type enum_competitions_type NOT NULL DEFAULT 'league',
-        tier INTEGER NOT NULL DEFAULT 1,
-        age_group VARCHAR(20),
-        gender enum_competitions_gender DEFAULT 'men',
-        format enum_competitions_format DEFAULT 'outdoor',
-        agency_value enum_competitions_agency_value DEFAULT 'Medium',
-        sportmonks_league_id INTEGER UNIQUE,
-        saff_id INTEGER UNIQUE,
-        is_active BOOLEAN DEFAULT true,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );`,
-      { transaction: t },
-    );
+  // 2. Create competitions table
+  await sequelize.query(
+    `CREATE TABLE IF NOT EXISTS competitions (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      name VARCHAR(255) NOT NULL,
+      name_ar VARCHAR(255),
+      country VARCHAR(255) DEFAULT 'Saudi Arabia',
+      type enum_competitions_type NOT NULL DEFAULT 'league',
+      tier INTEGER NOT NULL DEFAULT 1,
+      age_group VARCHAR(20),
+      gender enum_competitions_gender DEFAULT 'men',
+      format enum_competitions_format DEFAULT 'outdoor',
+      agency_value enum_competitions_agency_value DEFAULT 'Medium',
+      sportmonks_league_id INTEGER UNIQUE,
+      saff_id INTEGER UNIQUE,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );`,
+  );
 
-    // 3. Create club_competitions junction table
+  // 3. Create club_competitions junction table (guard against missing clubs table)
+  const [clubsExists] = await sequelize.query(
+    `SELECT to_regclass('public.clubs') AS tbl`,
+  );
+  if ((clubsExists[0] as any)?.tbl) {
     await sequelize.query(
       `CREATE TABLE IF NOT EXISTS club_competitions (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -448,69 +448,81 @@ export async function up() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(club_id, competition_id, season)
-      );
-      CREATE INDEX IF NOT EXISTS idx_club_competitions_club ON club_competitions(club_id);
-      CREATE INDEX IF NOT EXISTS idx_club_competitions_competition ON club_competitions(competition_id);`,
-      { transaction: t },
+      );`,
     );
+    await sequelize.query(
+      `CREATE INDEX IF NOT EXISTS idx_club_competitions_club ON club_competitions(club_id)`,
+    );
+    await sequelize.query(
+      `CREATE INDEX IF NOT EXISTS idx_club_competitions_competition ON club_competitions(competition_id)`,
+    );
+  }
 
-    // 4. Add competition_id to matches
+  // 4. Add competition_id to matches (if matches table exists)
+  const [matchesExists] = await sequelize.query(
+    `SELECT to_regclass('public.matches') AS tbl`,
+  );
+  if ((matchesExists[0] as any)?.tbl) {
     const [cols] = await sequelize.query(
       `SELECT column_name FROM information_schema.columns
        WHERE table_name = 'matches' AND column_name = 'competition_id'`,
-      { transaction: t },
     );
     if (!(cols as any[]).length) {
       await sequelize.query(
-        `ALTER TABLE matches ADD COLUMN competition_id UUID REFERENCES competitions(id);
-         CREATE INDEX IF NOT EXISTS idx_matches_competition_id ON matches(competition_id);`,
-        { transaction: t },
+        `ALTER TABLE matches ADD COLUMN competition_id UUID REFERENCES competitions(id)`,
       );
-    }
-
-    // 5. Seed competitions from TOURNAMENT_SEED
-    for (const entry of TOURNAMENT_SEED) {
-      const { type, gender, format, ageGroup } = deriveCompetitionFields(entry);
       await sequelize.query(
-        `INSERT INTO competitions (name, name_ar, type, tier, age_group, gender, format, agency_value, saff_id)
-         VALUES (:name, :nameAr, :type, :tier, :ageGroup, :gender, :format, :agencyValue, :saffId)
-         ON CONFLICT (saff_id) DO UPDATE SET
-           name = EXCLUDED.name,
-           name_ar = EXCLUDED.name_ar,
-           type = EXCLUDED.type,
-           tier = EXCLUDED.tier,
-           age_group = EXCLUDED.age_group,
-           gender = EXCLUDED.gender,
-           format = EXCLUDED.format,
-           agency_value = EXCLUDED.agency_value`,
-        {
-          replacements: {
-            name: entry.name,
-            nameAr: entry.nameAr,
-            type,
-            tier: entry.tier,
-            ageGroup,
-            gender,
-            format,
-            agencyValue: entry.agencyValue,
-            saffId: entry.saffId,
-          },
-          transaction: t,
-        },
+        `CREATE INDEX IF NOT EXISTS idx_matches_competition_id ON matches(competition_id)`,
       );
     }
+  }
 
-    // 6. Backfill matches.competition_id from competition name
+  // ── DML (seed data — all idempotent via ON CONFLICT) ──
+
+  // 5. Seed competitions from TOURNAMENT_SEED
+  for (const entry of TOURNAMENT_SEED) {
+    const { type, gender, format, ageGroup } = deriveCompetitionFields(entry);
+    await sequelize.query(
+      `INSERT INTO competitions (name, name_ar, type, tier, age_group, gender, format, agency_value, saff_id)
+       VALUES (:name, :nameAr, :type, :tier, :ageGroup, :gender, :format, :agencyValue, :saffId)
+       ON CONFLICT (saff_id) DO UPDATE SET
+         name = EXCLUDED.name,
+         name_ar = EXCLUDED.name_ar,
+         type = EXCLUDED.type,
+         tier = EXCLUDED.tier,
+         age_group = EXCLUDED.age_group,
+         gender = EXCLUDED.gender,
+         format = EXCLUDED.format,
+         agency_value = EXCLUDED.agency_value`,
+      {
+        replacements: {
+          name: entry.name,
+          nameAr: entry.nameAr,
+          type,
+          tier: entry.tier,
+          ageGroup,
+          gender,
+          format,
+          agencyValue: entry.agencyValue,
+          saffId: entry.saffId,
+        },
+      },
+    );
+  }
+
+  // 6. Backfill matches.competition_id from competition name
+  if ((matchesExists[0] as any)?.tbl) {
     await sequelize.query(
       `UPDATE matches m
        SET competition_id = c.id
        FROM competitions c
        WHERE m.competition = c.name
          AND m.competition_id IS NULL`,
-      { transaction: t },
     );
+  }
 
-    // 7. Populate club_competitions from SPL clubs (clubs with spl_team_id)
+  // 7. Populate club_competitions from SPL clubs (clubs with spl_team_id)
+  if ((clubsExists[0] as any)?.tbl) {
     await sequelize.query(
       `INSERT INTO club_competitions (club_id, competition_id, season)
        SELECT cl.id, co.id, '2025-2026'
@@ -519,13 +531,11 @@ export async function up() {
        WHERE cl.spl_team_id IS NOT NULL
          AND co.name = 'Roshn Saudi League'
        ON CONFLICT (club_id, competition_id, season) DO NOTHING`,
-      { transaction: t },
     );
 
     // 8. Populate club_competitions from saff_team_maps (if table exists)
     const [saffTableExists] = await sequelize.query(
       `SELECT 1 FROM information_schema.tables WHERE table_name = 'saff_team_maps'`,
-      { transaction: t },
     );
     if ((saffTableExists as any[]).length) {
       await sequelize.query(
@@ -539,46 +549,19 @@ export async function up() {
          JOIN competitions co ON co.saff_id = st.saff_id
          WHERE stm.club_id IS NOT NULL
          ON CONFLICT (club_id, competition_id, season) DO NOTHING`,
-        { transaction: t },
       );
     }
-
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
   }
 }
 
 export async function down() {
-  const t = await sequelize.transaction();
-  try {
-    await sequelize.query(
-      `ALTER TABLE matches DROP COLUMN IF EXISTS competition_id`,
-      { transaction: t },
-    );
-    await sequelize.query(`DROP TABLE IF EXISTS club_competitions`, {
-      transaction: t,
-    });
-    await sequelize.query(`DROP TABLE IF EXISTS competitions`, {
-      transaction: t,
-    });
-    await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_type`, {
-      transaction: t,
-    });
-    await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_gender`, {
-      transaction: t,
-    });
-    await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_format`, {
-      transaction: t,
-    });
-    await sequelize.query(
-      `DROP TYPE IF EXISTS enum_competitions_agency_value`,
-      { transaction: t },
-    );
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
-  }
+  await sequelize.query(
+    `ALTER TABLE matches DROP COLUMN IF EXISTS competition_id`,
+  );
+  await sequelize.query(`DROP TABLE IF EXISTS club_competitions`);
+  await sequelize.query(`DROP TABLE IF EXISTS competitions`);
+  await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_type`);
+  await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_gender`);
+  await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_format`);
+  await sequelize.query(`DROP TYPE IF EXISTS enum_competitions_agency_value`);
 }
