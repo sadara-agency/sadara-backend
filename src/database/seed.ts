@@ -61,7 +61,15 @@ export async function seedDatabase(): Promise<void> {
   try {
     await seedGymData();
   } catch (err) {
-    console.error("❌ Gym seed failed:", (err as Error).message);
+    const e = err as any;
+    console.error("❌ Gym seed failed:", e.message);
+    if (e.errors)
+      console.error(
+        "   Details:",
+        JSON.stringify(e.errors.map((v: any) => v.message)),
+      );
+    if (e.original) console.error("   DB error:", e.original.message);
+    if (e.sql) console.error("   SQL:", e.sql?.substring(0, 300));
   }
 
   if (env.nodeEnv !== "development") {
