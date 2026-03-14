@@ -101,21 +101,25 @@ export function authorizeModule(module: string, action: CrudAction) {
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
-    if (!req.user) {
-      sendUnauthorized(res);
-      return;
-    }
+    try {
+      if (!req.user) {
+        sendUnauthorized(res);
+        return;
+      }
 
-    const allowed = await hasPermission(req.user.role, module, action);
-    if (!allowed) {
-      sendForbidden(
-        res,
-        `Role '${req.user.role}' does not have '${action}' access to '${module}'`,
-      );
-      return;
-    }
+      const allowed = await hasPermission(req.user.role, module, action);
+      if (!allowed) {
+        sendForbidden(
+          res,
+          `Role '${req.user.role}' does not have '${action}' access to '${module}'`,
+        );
+        return;
+      }
 
-    next();
+      next();
+    } catch (err) {
+      next(err);
+    }
   };
 }
 
