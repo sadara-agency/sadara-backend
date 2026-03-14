@@ -10,6 +10,9 @@ const command = args.find((a) => !a.startsWith("--")) || "up";
 
 async function run() {
   if (syncFirst) {
+    // Import associations to register all models with Sequelize
+    const { setupAssociations } = await import("../models/associations");
+    setupAssociations();
     console.log("Syncing models to create core tables...");
     await sequelize.sync({ alter: false });
     console.log("Core tables synced.");
