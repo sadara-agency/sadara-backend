@@ -10,9 +10,11 @@ const command = args.find((a) => !a.startsWith("--")) || "up";
 
 async function run() {
   if (syncFirst) {
-    // Import associations to register all models with Sequelize
-    const { setupAssociations } = await import("../models/associations");
-    setupAssociations();
+    // Import associations module to register all models with Sequelize
+    // (model files register themselves on import). Do NOT call
+    // setupAssociations() — FK constraints cause invalid ALTER TABLE SQL
+    // on a fresh DB. The baseline migration handles constraints.
+    await import("../models/associations");
     console.log("Syncing models to create core tables...");
     await sequelize.sync({ alter: false });
     console.log("Core tables synced.");
