@@ -1,11 +1,20 @@
 // migrate-cli.ts
-// Usage: npx ts-node src/database/migrate-cli.ts [up|down|status]
+// Usage: npx ts-node src/database/migrate-cli.ts [up|down|status] [--sync-first]
 
 import { migrator } from "@config/migrator";
+import { sequelize } from "@config/database";
 
-const command = process.argv[2] || "up";
+const args = process.argv.slice(2);
+const syncFirst = args.includes("--sync-first");
+const command = args.find((a) => !a.startsWith("--")) || "up";
 
 async function run() {
+  if (syncFirst) {
+    console.log("Syncing models to create core tables...");
+    await sequelize.sync({ alter: false });
+    console.log("Core tables synced.");
+  }
+
   switch (command) {
     case "up":
       await migrator.up();

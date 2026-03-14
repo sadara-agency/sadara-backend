@@ -112,8 +112,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run database migrations
-        run: npm run migrate
+      - name: Sync models & run migrations
+        run: npm run migrate -- --sync-first
 
       - name: Run tests with coverage
         run: npm run test:coverage
