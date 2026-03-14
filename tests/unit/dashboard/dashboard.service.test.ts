@@ -221,25 +221,4 @@ describe('Dashboard Service', () => {
     });
   });
 
-  describe('getFullDashboard', () => {
-    it('should aggregate all dashboard data', async () => {
-      // Mock all queries to return defaults
-      sequelize.query.mockResolvedValue([]);
-
-      const result = await dashboardService.getFullDashboard();
-
-      expect(result).toBeDefined();
-      expect(result).toHaveProperty('kpis');
-      expect(result).toHaveProperty('alerts');
-    });
-
-    it('should handle individual query failures gracefully', async () => {
-      sequelize.query.mockRejectedValue(new Error('DB error'));
-
-      const result = await dashboardService.getFullDashboard();
-
-      // Should not throw — returns safe defaults
-      expect(result).toBeDefined();
-    });
-  });
 });

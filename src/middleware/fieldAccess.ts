@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest, UserRole } from "@shared/types";
 import { getHiddenFields } from "@modules/permissions/permission.service";
+import { logger } from "@config/logger";
 
 /**
  * Field-level access control middleware.
@@ -87,30 +88,37 @@ function removeKeys(obj: any, fields: string[]): void {
  * Replaces the static fieldAccess() for DB-driven field-level permissions.
  */
 export function dynamicFieldAccess(module: string) {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
+  return async (
+    req: AuthRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> => {
     const role = req.user?.role;
     if (!role || role === "Admin") {
       next();
       return;
     }
 
-    getHiddenFields(role, module)
-      .then((fieldsToStrip) => {
-        if (fieldsToStrip.length > 0) {
-          const originalJson = res.json.bind(res);
-          res.json = function (body: any) {
-            if (body && typeof body === "object") {
-              stripFields(body, fieldsToStrip);
-            }
-            return originalJson(body);
-          };
-        }
-        next();
-      })
-      .catch(() => {
-        // If permission lookup fails, allow request through without field stripping
-        next();
+    try {
+      const fieldsToStrip = await getHiddenFields(role, module);
+      if (fieldsToStrip.length > 0) {
+        const originalJson = res.json.bind(res);
+        res.json = function (body: any) {
+          if (body && typeof body === "object") {
+            stripFields(body, fieldsToStrip);
+          }
+          return originalJson(body);
+        };
+      }
+      next();
+    } catch (err) {
+      logger.warn("Field permission lookup failed — allowing request through", {
+        module,
+        role,
+        error: (err as Error).message,
       });
+      next();
+    }
   };
 }
 

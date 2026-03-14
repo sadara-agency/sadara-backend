@@ -20,6 +20,8 @@ export type PermissionMap = Record<string, Record<string, ModulePermission>>;
 
 const CACHE_KEY = "rbac:permissions";
 let memoryCache: PermissionMap | null = null;
+let memoryCacheTimestamp = 0;
+const MEMORY_TTL_MS = 60 * 60 * 1000; // 1 hour — matches Redis TTL
 
 // ── Public API ──
 
@@ -39,13 +41,16 @@ export async function loadPermissions(): Promise<PermissionMap> {
   }
 
   memoryCache = map;
+  memoryCacheTimestamp = Date.now();
   await cacheSet(CACHE_KEY, map, CacheTTL.HOUR);
   return map;
 }
 
 /** Get the full permission map (memory → Redis → DB). */
 export async function getPermissions(): Promise<PermissionMap> {
-  if (memoryCache) return memoryCache;
+  if (memoryCache && Date.now() - memoryCacheTimestamp < MEMORY_TTL_MS) {
+    return memoryCache;
+  }
 
   const cached = await cacheGet<PermissionMap>(CACHE_KEY);
   if (cached) {
@@ -86,7 +91,9 @@ export async function hasPermission(
 /** Clear both in-memory and Redis caches (module + field permissions). */
 export async function invalidatePermissionCache(): Promise<void> {
   memoryCache = null;
+  memoryCacheTimestamp = 0;
   fieldMemoryCache = null;
+  fieldMemoryCacheTimestamp = 0;
   await cacheDel(CACHE_KEY);
   await cacheDel(FIELD_CACHE_KEY);
 }
@@ -100,6 +107,7 @@ export type FieldPermissionMap = Record<string, Record<string, string[]>>;
 
 const FIELD_CACHE_KEY = "rbac:field-permissions";
 let fieldMemoryCache: FieldPermissionMap | null = null;
+let fieldMemoryCacheTimestamp = 0;
 
 /** Load all field permissions from DB → memory + Redis cache. */
 export async function loadFieldPermissions(): Promise<FieldPermissionMap> {
@@ -116,13 +124,19 @@ export async function loadFieldPermissions(): Promise<FieldPermissionMap> {
   }
 
   fieldMemoryCache = map;
+  fieldMemoryCacheTimestamp = Date.now();
   await cacheSet(FIELD_CACHE_KEY, map, CacheTTL.HOUR);
   return map;
 }
 
 /** Get the full field permission map (memory → Redis → DB). */
 export async function getFieldPermissions(): Promise<FieldPermissionMap> {
-  if (fieldMemoryCache) return fieldMemoryCache;
+  if (
+    fieldMemoryCache &&
+    Date.now() - fieldMemoryCacheTimestamp < MEMORY_TTL_MS
+  ) {
+    return fieldMemoryCache;
+  }
 
   const cached = await cacheGet<FieldPermissionMap>(FIELD_CACHE_KEY);
   if (cached) {

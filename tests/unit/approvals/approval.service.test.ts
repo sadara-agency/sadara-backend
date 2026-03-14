@@ -54,6 +54,11 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/modules/approvals/approvalAutoTasks', () => ({
+  generateApprovalRejectedTask: jest.fn().mockResolvedValue(null),
+  checkApprovalStepOverdue: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
 }));

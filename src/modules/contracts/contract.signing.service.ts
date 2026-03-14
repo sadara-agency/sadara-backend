@@ -39,21 +39,17 @@ export async function regenerateSignedPdf(contractId: string): Promise<string> {
   // Save to disk with a unique filename
   const fileName = `contract-${contractId}-${crypto.randomUUID().slice(0, 8)}.pdf`;
   const filePath = path.join(SIGNED_DIR, fileName);
-  fs.writeFileSync(filePath, buffer);
+  await fs.promises.writeFile(filePath, buffer);
 
   // Clean up previous signed PDF for this contract (avoid file accumulation)
   const existingUrl = contract.documentUrl || "";
   if (existingUrl.includes("/signed-contracts/")) {
     const oldFile = path.join(SIGNED_DIR, path.basename(existingUrl));
-    if (fs.existsSync(oldFile) && oldFile !== filePath) {
+    if (oldFile !== filePath) {
       try {
-        fs.unlinkSync(oldFile);
-      } catch (unlinkErr) {
-        // Log but don't fail — old file cleanup is best-effort
-        console.warn(
-          `[SigningService] Failed to remove old signed PDF: ${oldFile}`,
-          (unlinkErr as Error).message,
-        );
+        await fs.promises.unlink(oldFile);
+      } catch {
+        // Best-effort cleanup — old file may not exist
       }
     }
   }

@@ -91,6 +91,7 @@ export async function notifyByRole(
   const users = await User.findAll({
     where: { role: { [Op.in]: roles }, isActive: true },
     attributes: ["id", "notificationPreferences"],
+    limit: 500, // Safety cap to prevent memory spike with many users
   });
 
   if (users.length === 0) return 0;

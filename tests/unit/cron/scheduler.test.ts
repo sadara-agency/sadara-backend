@@ -99,6 +99,35 @@ jest.mock('../../../src/cron/engines/systemhealth.engine', () => ({
   checkRiskRadarConsistency: jest.fn(),
   detectDuplicateRecords: jest.fn(),
 }));
+jest.mock('../../../src/modules/offers/offerAutoTasks', () => ({
+  checkOfferDeadlines: jest.fn(),
+  generateOfferCreationTask: jest.fn(),
+  generateOfferAcceptedTask: jest.fn(),
+}));
+jest.mock('../../../src/modules/injuries/injuryAutoTasks', () => ({
+  checkInjuryReturnOverdue: jest.fn(),
+  checkInjuryTreatmentStale: jest.fn(),
+  generateCriticalInjuryTask: jest.fn(),
+}));
+jest.mock('../../../src/modules/gym/gymAutoTasks', () => ({
+  checkWorkoutAssignmentExpiring: jest.fn(),
+  checkDietPlanNoAdherence: jest.fn(),
+  checkMetricTargetAchieved: jest.fn(),
+  checkTrainingCourseCompleted: jest.fn(),
+  generateWorkoutCompletedTask: jest.fn(),
+}));
+jest.mock('../../../src/modules/approvals/approvalAutoTasks', () => ({
+  checkApprovalStepOverdue: jest.fn(),
+  generateApprovalRejectedTask: jest.fn(),
+}));
+jest.mock('../../../src/modules/documents/documentAutoTasks', () => ({
+  checkDocumentExpiryTasks: jest.fn(),
+  checkPlayerMissingDocuments: jest.fn(),
+}));
+jest.mock('../../../src/modules/referrals/referralAutoTasks', () => ({
+  checkReferralOverdue: jest.fn(),
+  generateCriticalReferralTask: jest.fn(),
+}));
 
 import { getJobNames, runJob, runAllJobs, startCronJobs } from '../../../src/cron/scheduler';
 import { isRedisConnected } from '../../../src/config/redis';
@@ -118,7 +147,7 @@ describe('Cron Scheduler', () => {
     it('should return all registered job names', () => {
       const names = getJobNames();
       expect(names).toBeInstanceOf(Array);
-      expect(names.length).toBeGreaterThan(40); // 46 jobs registered
+      expect(names.length).toBeGreaterThan(40); // 57 jobs registered
     });
 
     it('should include core job names', () => {
@@ -201,10 +230,10 @@ describe('Cron Scheduler', () => {
   });
 
   describe('startCronJobs', () => {
-    it('should schedule all 46 cron jobs', () => {
+    it('should schedule all 57 cron jobs', () => {
       startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(46);
+      expect(cron.schedule).toHaveBeenCalledTimes(57);
     });
 
     it('should log initialization', () => {

@@ -13,7 +13,14 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
-  // Drop the FK if it exists (constraint name from the error: audit_logs_user_id_fkey)
+  // Only drop the FK if the audit_logs table exists (it may not on fresh DBs
+  // where the table is created later by sequelize.sync or a future migration).
+  const [results] = await sequelize.query(`
+    SELECT to_regclass('public.audit_logs') AS tbl
+  `);
+  const row = results[0] as { tbl: string | null } | undefined;
+  if (!row?.tbl) return; // table doesn't exist yet — nothing to drop
+
   await sequelize.query(`
     ALTER TABLE audit_logs
     DROP CONSTRAINT IF EXISTS audit_logs_user_id_fkey

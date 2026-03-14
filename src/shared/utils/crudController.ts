@@ -7,6 +7,7 @@ import {
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext, buildChanges } from "@shared/utils/audit";
 import { invalidateMultiple } from "@shared/utils/cache";
+import { logger } from "@config/logger";
 
 // ── Types ──
 
@@ -88,50 +89,74 @@ export function createCrudController(config: CrudConfig) {
 
   const create: Handler = async (req, res) => {
     const item = await service.create(req.body, req.user!.id);
-    await logAudit(
-      "CREATE",
-      entity,
-      item.id,
-      buildAuditContext(req.user!, req.ip),
-      `Created ${entity.slice(0, -1)}: ${getLabel(item)}`,
-    );
-    await invalidateMultiple(cachePrefixes);
     sendCreated(res, item);
+    // Fire-and-forget: audit + cache invalidation (don't block response)
+    Promise.all([
+      logAudit(
+        "CREATE",
+        entity,
+        item.id,
+        buildAuditContext(req.user!, req.ip),
+        `Created ${entity.slice(0, -1)}: ${getLabel(item)}`,
+      ),
+      invalidateMultiple(cachePrefixes),
+    ]).catch((err) =>
+      logger.warn("Post-create side-effects failed", {
+        entity,
+        error: (err as Error).message,
+      }),
+    );
   };
 
   const update: Handler = async (req, res) => {
     const oldItem = await service.getById(req.params.id);
     const item = await service.update(req.params.id, req.body);
+    sendSuccess(res, item, `${entityLabel.slice(0, -1)} updated`);
 
+    // Fire-and-forget: audit + cache invalidation (don't block response)
     const oldPlain =
       oldItem instanceof Object
         ? ((oldItem as any).get?.({ plain: true }) ?? oldItem)
         : oldItem;
     const changes = buildChanges(oldPlain, req.body);
 
-    await logAudit(
-      "UPDATE",
-      entity,
-      item.id ?? req.params.id,
-      buildAuditContext(req.user!, req.ip),
-      `Updated ${entity.slice(0, -1)}: ${getLabel(item)}`,
-      changes ?? undefined,
+    Promise.all([
+      logAudit(
+        "UPDATE",
+        entity,
+        item.id ?? req.params.id,
+        buildAuditContext(req.user!, req.ip),
+        `Updated ${entity.slice(0, -1)}: ${getLabel(item)}`,
+        changes ?? undefined,
+      ),
+      invalidateMultiple(cachePrefixes),
+    ]).catch((err) =>
+      logger.warn("Post-update side-effects failed", {
+        entity,
+        error: (err as Error).message,
+      }),
     );
-    await invalidateMultiple(cachePrefixes);
-    sendSuccess(res, item, `${entityLabel.slice(0, -1)} updated`);
   };
 
   const remove: Handler = async (req, res) => {
     const result = await service.delete(req.params.id);
-    await logAudit(
-      "DELETE",
-      entity,
-      result.id,
-      buildAuditContext(req.user!, req.ip),
-      `${entityLabel.slice(0, -1)} deleted`,
-    );
-    await invalidateMultiple(deleteCachePrefixes ?? cachePrefixes);
     sendSuccess(res, result, `${entityLabel.slice(0, -1)} deleted`);
+    // Fire-and-forget: audit + cache invalidation (don't block response)
+    Promise.all([
+      logAudit(
+        "DELETE",
+        entity,
+        result.id,
+        buildAuditContext(req.user!, req.ip),
+        `${entityLabel.slice(0, -1)} deleted`,
+      ),
+      invalidateMultiple(deleteCachePrefixes ?? cachePrefixes),
+    ]).catch((err) =>
+      logger.warn("Post-delete side-effects failed", {
+        entity,
+        error: (err as Error).message,
+      }),
+    );
   };
 
   return { list, getById, create, update, remove };

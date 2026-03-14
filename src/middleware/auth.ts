@@ -14,12 +14,21 @@ import { logger } from "@config/logger";
 // Throttle activity updates — at most once per 5 minutes per user
 const activityCache = new Map<string, number>();
 const ACTIVITY_THROTTLE_MS = 5 * 60 * 1000;
+const MAX_ACTIVITY_CACHE_SIZE = 5000;
 
 function trackActivity(userId: string) {
   const now = Date.now();
   const last = activityCache.get(userId) || 0;
   if (now - last < ACTIVITY_THROTTLE_MS) return;
   activityCache.set(userId, now);
+
+  // Evict stale entries when cache grows too large
+  if (activityCache.size > MAX_ACTIVITY_CACHE_SIZE) {
+    const cutoff = now - ACTIVITY_THROTTLE_MS;
+    for (const [key, ts] of activityCache) {
+      if (ts < cutoff) activityCache.delete(key);
+    }
+  }
   // Fire-and-forget — don't block the request
   sequelize
     .query("UPDATE users SET last_activity = NOW() WHERE id = :id", {

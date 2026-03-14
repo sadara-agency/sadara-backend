@@ -1,39 +1,20 @@
 import path from "path";
 import fs from "fs";
 import { writeFile } from "fs/promises";
-import puppeteer from "puppeteer";
-import { PDFDocument } from "pdf-lib";
+import {
+  escHtml,
+  fmtDate,
+  calcAge,
+  wrapHtml,
+  makeSadaraHeader,
+  renderPagesToBuffers,
+  mergeWithBrandPages,
+} from "@shared/utils/pdf";
 
 const TMP = path.resolve(process.cwd(), "tmp");
 if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
 
-const ASSETS_DIR = path.resolve(process.cwd(), "src", "assets", "pdf");
-const COVER_PDF = path.join(ASSETS_DIR, "cover_page.pdf");
-const BACK_PDF = path.join(ASSETS_DIR, "back_page.pdf");
-
 // ── Helpers ──
-
-function fmtDate(s: string | null): string {
-  if (!s) return "-";
-  try {
-    const d = new Date(s);
-    return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
-  } catch {
-    return s;
-  }
-}
-
-function calcAge(dob: string): number {
-  const birth = new Date(dob);
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  if (
-    now.getMonth() < birth.getMonth() ||
-    (now.getMonth() === birth.getMonth() && now.getDate() < birth.getDate())
-  )
-    age--;
-  return age;
-}
 
 function pct(a: number, b: number): string {
   if (!b) return "0%";
@@ -67,10 +48,7 @@ tr:nth-child(even){background:#f8f9fc}
 .note-box{background:#fffbe6;border:1px solid #fde68a;border-radius:4px;padding:6px 10px;font-size:8pt;margin-top:8px}
 `;
 
-const HD = `<div class="hd">
-  <div class="hd-r"><div class="lt">شـركــة صـــدارة الـريـاضـيـة</div><div class="ls">SADARA SPORTS COMPANY</div></div>
-  <div class="hd-l">Technical Player Report<br>Generated: ${new Date().toISOString().split("T")[0]}</div>
-</div>`;
+const HD = () => makeSadaraHeader("Technical Player Report");
 
 const FOOTER = `<div class="footer">شركة صدارة المواهب الرياضية المحدودة — تقرير فني سري — Sadara Sports Company — Confidential Technical Report</div>`;
 
@@ -96,20 +74,20 @@ function buildProfilePage(player: any, statsAgg: any): string {
     statsAgg?.total_dribbles_attempted || 0,
   );
 
-  return `<div class="pg">${HD}
-    <div class="title">تقرير فني — ${name}</div>
+  return `<div class="pg">${HD()}
+    <div class="title">تقرير فني — ${escHtml(name)}</div>
     <div class="sub">بيانات اللاعب — Player Bio</div>
     <div class="bio-grid">
-      <div><span class="label">الاسم:</span> <span class="val">${name}</span></div>
-      <div><span class="label">Name:</span> <span class="val">${nameEn}</span></div>
-      <div><span class="label">العمر:</span> <span class="val">${age}</span></div>
-      <div><span class="label">الجنسية:</span> <span class="val">${player.nationality || "-"}</span></div>
-      <div><span class="label">المركز:</span> <span class="val">${player.position || "-"}</span></div>
-      <div><span class="label">النادي:</span> <span class="val">${player.club_name_ar || player.club_name || "-"}</span></div>
-      <div><span class="label">الطول:</span> <span class="val">${player.height_cm ? player.height_cm + " cm" : "-"}</span></div>
-      <div><span class="label">الوزن:</span> <span class="val">${player.weight_kg ? player.weight_kg + " kg" : "-"}</span></div>
-      <div><span class="label">القدم:</span> <span class="val">${player.preferred_foot || "-"}</span></div>
-      <div><span class="label">الرقم:</span> <span class="val">${player.jersey_number || "-"}</span></div>
+      <div><span class="label">الاسم:</span> <span class="val">${escHtml(name)}</span></div>
+      <div><span class="label">Name:</span> <span class="val">${escHtml(nameEn)}</span></div>
+      <div><span class="label">العمر:</span> <span class="val">${escHtml(age)}</span></div>
+      <div><span class="label">الجنسية:</span> <span class="val">${escHtml(player.nationality || "-")}</span></div>
+      <div><span class="label">المركز:</span> <span class="val">${escHtml(player.position || "-")}</span></div>
+      <div><span class="label">النادي:</span> <span class="val">${escHtml(player.club_name_ar || player.club_name || "-")}</span></div>
+      <div><span class="label">الطول:</span> <span class="val">${player.height_cm ? escHtml(player.height_cm) + " cm" : "-"}</span></div>
+      <div><span class="label">الوزن:</span> <span class="val">${player.weight_kg ? escHtml(player.weight_kg) + " kg" : "-"}</span></div>
+      <div><span class="label">القدم:</span> <span class="val">${escHtml(player.preferred_foot || "-")}</span></div>
+      <div><span class="label">الرقم:</span> <span class="val">${escHtml(player.jersey_number || "-")}</span></div>
     </div>
 
     <div class="sub">ملخص الأداء — Performance Summary</div>
@@ -140,20 +118,20 @@ function buildMatchListPage(matchList: any[]): string {
       (m) => `
     <tr>
       <td>${fmtDate(m.match_date)}</td>
-      <td>${m.home_club_ar || m.home_club || "-"}</td>
+      <td>${escHtml(m.home_club_ar || m.home_club || "-")}</td>
       <td style="text-align:center">${m.home_score ?? "-"} - ${m.away_score ?? "-"}</td>
-      <td>${m.away_club_ar || m.away_club || "-"}</td>
+      <td>${escHtml(m.away_club_ar || m.away_club || "-")}</td>
       <td style="text-align:center">${m.minutes_played || 0}'</td>
       <td style="text-align:center">${m.goals || 0}</td>
       <td style="text-align:center">${m.assists || 0}</td>
       <td style="text-align:center">${m.rating || "-"}</td>
-      <td>${m.position_in_match || "-"}</td>
+      <td>${escHtml(m.position_in_match || "-")}</td>
     </tr>
   `,
     )
     .join("");
 
-  return `<div class="pg">${HD}
+  return `<div class="pg">${HD()}
     <div class="sub">سجل المباريات — Match History</div>
     <table>
       <thead><tr>
@@ -172,23 +150,23 @@ function buildInjuryPage(injuries: any[], notes?: string | null): string {
         .map(
           (i) => `
       <div class="inj-row">
-        <span class="inj-type">${i.injury_type_ar || i.injury_type}</span>
-        <span class="inj-body">${i.body_part_ar || i.body_part}</span>
-        <span class="sev-${i.severity}">${i.severity}</span>
+        <span class="inj-type">${escHtml(i.injury_type_ar || i.injury_type)}</span>
+        <span class="inj-body">${escHtml(i.body_part_ar || i.body_part)}</span>
+        <span class="sev-${escHtml(i.severity)}">${escHtml(i.severity)}</span>
         <span>${fmtDate(i.injury_date)}</span>
         <span>${i.days_out ? i.days_out + " يوم" : "-"}</span>
         <span>${i.is_surgery_required ? "جراحة" : "-"}</span>
-        <span>${i.status}</span>
+        <span>${escHtml(i.status)}</span>
       </div>`,
         )
         .join("")
     : '<p style="color:#999;font-size:8.5pt">لا توجد إصابات مسجلة في هذه الفترة</p>';
 
   const noteSection = notes
-    ? `<div class="note-box"><strong>ملاحظات:</strong> ${notes}</div>`
+    ? `<div class="note-box"><strong>ملاحظات:</strong> ${escHtml(notes)}</div>`
     : "";
 
-  return `<div class="pg">${HD}
+  return `<div class="pg">${HD()}
     <div class="sub">سجل الإصابات — Injury Timeline</div>
     ${injRows}
     ${noteSection}
@@ -203,86 +181,26 @@ export async function generateReportPdf(
   player: any,
   data: { profile: any; statsAgg: any; matchList: any[]; injuries: any[] },
 ): Promise<string> {
-  const wrap = (body: string) =>
-    `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>${CSS}</style></head><body>${body}</body></html>`;
-
   const pages = [
-    wrap(buildProfilePage(data.profile, data.statsAgg)),
-    wrap(buildMatchListPage(data.matchList)),
-    wrap(buildInjuryPage(data.injuries)),
+    wrapHtml(buildProfilePage(data.profile, data.statsAgg), CSS),
+    wrapHtml(buildMatchListPage(data.matchList), CSS),
+    wrapHtml(buildInjuryPage(data.injuries), CSS),
   ];
 
-  let browser: any = null;
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-      ],
-    });
+  const contentBuffers = await renderPagesToBuffers(pages);
+  const merged = await mergeWithBrandPages(contentBuffers);
 
-    const page = await browser.newPage();
-    const contentBuffers: Uint8Array[] = [];
+  const fileName = `report_${reportId}.pdf`;
+  const filePath = path.join(TMP, fileName);
+  await writeFile(filePath, merged);
 
-    for (const html of pages) {
-      await page.setContent(html, {
-        waitUntil: "domcontentloaded",
-        timeout: 10000,
-      });
-      await page.evaluate(() => new Promise((r) => setTimeout(r, 200)));
-      const buf = await page.pdf({
-        width: "595px",
-        height: "842px",
-        margin: { top: "0", bottom: "0", left: "0", right: "0" },
-        printBackground: true,
-      });
-      contentBuffers.push(buf);
-    }
+  // Clean up tmp file after 5 minutes
+  setTimeout(
+    () => {
+      fs.unlink(filePath, () => {});
+    },
+    5 * 60 * 1000,
+  ).unref();
 
-    await page.close();
-    await browser.close();
-    browser = null;
-
-    // ── Merge pages ──
-    const merged = await PDFDocument.create();
-
-    // Add brand cover if available
-    if (fs.existsSync(COVER_PDF)) {
-      const coverDoc = await PDFDocument.load(fs.readFileSync(COVER_PDF));
-      const [coverPage] = await merged.copyPages(coverDoc, [0]);
-      merged.addPage(coverPage);
-    }
-
-    // Add content pages
-    for (const buf of contentBuffers) {
-      const doc = await PDFDocument.load(buf);
-      const docPages = await merged.copyPages(doc, doc.getPageIndices());
-      docPages.forEach((p) => merged.addPage(p));
-    }
-
-    // Add brand back page if available
-    if (fs.existsSync(BACK_PDF)) {
-      const backDoc = await PDFDocument.load(fs.readFileSync(BACK_PDF));
-      const [backPage] = await merged.copyPages(backDoc, [0]);
-      merged.addPage(backPage);
-    }
-
-    // Save to disk
-    const finalBytes = await merged.save();
-    const fileName = `report_${reportId}.pdf`;
-    const filePath = path.join(TMP, fileName);
-    await writeFile(filePath, Buffer.from(finalBytes));
-
-    return filePath;
-  } catch (err: any) {
-    if (browser)
-      try {
-        await browser.close();
-      } catch {}
-    throw err;
-  }
+  return filePath;
 }

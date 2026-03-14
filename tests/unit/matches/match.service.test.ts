@@ -5,6 +5,7 @@ import { mockMatch, mockClub, mockPlayer, mockModelInstance } from '../../setup/
 const mockMatchFindAndCountAll = jest.fn();
 const mockMatchFindByPk = jest.fn();
 const mockMatchFindAll = jest.fn();
+const mockMatchFindOne = jest.fn();
 const mockMatchCreate = jest.fn();
 const mockMatchDestroy = jest.fn();
 const mockMatchCount = jest.fn();
@@ -12,6 +13,7 @@ const mockPlayerFindAndCountAll = jest.fn();
 const mockMPFindAll = jest.fn();
 const mockMPFindOne = jest.fn();
 const mockMPBulkCreate = jest.fn();
+const mockMPCount = jest.fn();
 const mockStatsFindAll = jest.fn();
 const mockStatsFindOne = jest.fn();
 const mockStatsBulkCreate = jest.fn();
@@ -32,6 +34,7 @@ jest.mock('../../../src/modules/matches/match.model', () => ({
     findAndCountAll: (...a: unknown[]) => mockMatchFindAndCountAll(...a),
     findByPk: (...a: unknown[]) => mockMatchFindByPk(...a),
     findAll: (...a: unknown[]) => mockMatchFindAll(...a),
+    findOne: (...a: unknown[]) => mockMatchFindOne(...a),
     create: (...a: unknown[]) => mockMatchCreate(...a),
     destroy: (...a: unknown[]) => mockMatchDestroy(...a),
     count: (...a: unknown[]) => mockMatchCount(...a),
@@ -43,6 +46,7 @@ jest.mock('../../../src/modules/matches/matchPlayer.model', () => ({
     findAll: (...a: unknown[]) => mockMPFindAll(...a),
     findOne: (...a: unknown[]) => mockMPFindOne(...a),
     bulkCreate: (...a: unknown[]) => mockMPBulkCreate(...a),
+    count: (...a: unknown[]) => mockMPCount(...a),
   },
 }));
 
@@ -105,6 +109,11 @@ describe('Match Service', () => {
   // LIST MATCHES
   // ════════════════════════════════════════════════════════
   describe('listMatches', () => {
+    beforeEach(() => {
+      // Mock the second findAll call used for statusCounts
+      mockMatchFindAll.mockResolvedValue([]);
+    });
+
     it('should return paginated matches', async () => {
       mockMatchFindAndCountAll.mockResolvedValue({
         count: 1,
@@ -190,8 +199,12 @@ describe('Match Service', () => {
   describe('createMatch', () => {
     it('should create match', async () => {
       mockClubFindByPk.mockResolvedValue(mockModelInstance(mockClub()));
+      mockMatchFindOne.mockResolvedValue(null); // no conflicting match within 3-day window
       const created = mockModelInstance(mockMatch());
       mockMatchCreate.mockResolvedValue(created);
+      // createMatch calls getMatchById internally, which uses findByPk + Task.count
+      mockMatchFindByPk.mockResolvedValue(created);
+      mockTaskCount.mockResolvedValue(0);
 
       const result = await matchService.createMatch({
         homeClubId: 'club-001',
@@ -267,8 +280,10 @@ describe('Match Service', () => {
   // ════════════════════════════════════════════════════════
   describe('updateMatchStatus', () => {
     it('should update status', async () => {
-      const match = mockModelInstance(mockMatch());
+      // Use a match with a non-midnight time so the time validation passes
+      const match = mockModelInstance(mockMatch({ matchDate: '2025-06-15T18:00:00Z' }));
       mockMatchFindByPk.mockResolvedValue(match);
+      mockMPCount.mockResolvedValue(5); // at least 1 player assigned
 
       await matchService.updateMatchStatus('match-001', 'live');
 
@@ -333,6 +348,7 @@ describe('Match Service', () => {
     it('should assign players to match', async () => {
       mockMatchFindByPk.mockResolvedValue(mockModelInstance(mockMatch()));
       mockPlayerFindAll.mockResolvedValue([mockModelInstance(mockPlayer())]);
+      mockMPCount.mockResolvedValue(0); // no current starters
       mockMPBulkCreate.mockResolvedValue([]);
       mockMPFindAll.mockResolvedValue([]);
 

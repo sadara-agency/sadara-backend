@@ -100,36 +100,37 @@ const OLD_TO_NEW_MAP: Record<string, Record<string, string>> = {
 };
 
 export async function up() {
-  const t = await sequelize.transaction();
+  // 1. Add new physical attribute columns
+  await sequelize.query(
+    `ALTER TABLE players
+       ADD COLUMN IF NOT EXISTS pace INTEGER NOT NULL DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS stamina INTEGER NOT NULL DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS strength INTEGER NOT NULL DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS agility INTEGER NOT NULL DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS jumping INTEGER NOT NULL DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS technical_attributes JSONB;`,
+  );
 
-  try {
-    // 1. Add new physical attribute columns
-    await sequelize.query(
-      `ALTER TABLE players
-         ADD COLUMN IF NOT EXISTS pace INTEGER NOT NULL DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS stamina INTEGER NOT NULL DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS strength INTEGER NOT NULL DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS agility INTEGER NOT NULL DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS jumping INTEGER NOT NULL DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS technical_attributes JSONB;`,
-      { transaction: t },
-    );
+  // Check if old columns exist (sync-created tables won't have them)
+  const [oldCols] = await sequelize.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'players' AND column_name = 'speed'`,
+  );
+  const hasOldColumns = (oldCols as any[]).length > 0;
 
+  if (hasOldColumns) {
     // 2. Migrate old physical data: speed → pace, fitness → stamina
     await sequelize.query(
       `UPDATE players SET
          pace = COALESCE(speed, 0),
          stamina = COALESCE(fitness, 0);`,
-      { transaction: t },
     );
 
     // 3. Migrate technical attributes based on position group
-    // Fetch all players with their old stats
     const [players] = await sequelize.query(
       `SELECT id, position, speed, passing, shooting, defense, fitness, tactical
        FROM players
        WHERE position IS NOT NULL`,
-      { transaction: t },
     );
 
     for (const player of players as any[]) {
@@ -139,13 +140,11 @@ export async function up() {
       const keys = TECHNICAL_KEYS[group];
       const mapping = OLD_TO_NEW_MAP[group] || {};
 
-      // Build attributes object with zeros, then overlay mapped values
       const attributes: Record<string, number> = {};
       for (const key of keys) {
         attributes[key] = 0;
       }
 
-      // Map old values where applicable
       for (const [oldCol, newKey] of Object.entries(mapping)) {
         if (player[oldCol] != null && attributes[newKey] !== undefined) {
           attributes[newKey] = Number(player[oldCol]) || 0;
@@ -156,10 +155,7 @@ export async function up() {
 
       await sequelize.query(
         `UPDATE players SET technical_attributes = :jsonValue::jsonb WHERE id = :id`,
-        {
-          replacements: { jsonValue, id: player.id },
-          transaction: t,
-        },
+        { replacements: { jsonValue, id: player.id } },
       );
     }
 
@@ -172,38 +168,34 @@ export async function up() {
          DROP COLUMN IF EXISTS defense,
          DROP COLUMN IF EXISTS fitness,
          DROP COLUMN IF EXISTS tactical;`,
-      { transaction: t },
     );
-
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
   }
 }
 
 export async function down() {
-  const t = await sequelize.transaction();
+  // 1. Re-add old columns
+  await sequelize.query(
+    `ALTER TABLE players
+       ADD COLUMN IF NOT EXISTS speed INTEGER DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS passing INTEGER DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS shooting INTEGER DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS defense INTEGER DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS fitness INTEGER DEFAULT 0,
+       ADD COLUMN IF NOT EXISTS tactical INTEGER DEFAULT 0;`,
+  );
 
-  try {
-    // 1. Re-add old columns
-    await sequelize.query(
-      `ALTER TABLE players
-         ADD COLUMN IF NOT EXISTS speed INTEGER DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS passing INTEGER DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS shooting INTEGER DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS defense INTEGER DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS fitness INTEGER DEFAULT 0,
-         ADD COLUMN IF NOT EXISTS tactical INTEGER DEFAULT 0;`,
-      { transaction: t },
-    );
+  // Check if new columns exist before reverse-migrating
+  const [newCols] = await sequelize.query(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'players' AND column_name = 'pace'`,
+  );
 
+  if ((newCols as any[]).length > 0) {
     // 2. Reverse-migrate: pace → speed, stamina → fitness
     await sequelize.query(
       `UPDATE players SET
          speed = COALESCE(pace, 0),
          fitness = COALESCE(stamina, 0);`,
-      { transaction: t },
     );
 
     // 3. Reverse-migrate technical attributes back to flat columns
@@ -228,24 +220,17 @@ export async function down() {
                              (technical_attributes->'attributes'->>'vision')::int,
                              (technical_attributes->'attributes'->>'composure')::int, 0)
        WHERE technical_attributes IS NOT NULL;`,
-      { transaction: t },
     );
-
-    // 4. Drop new columns
-    await sequelize.query(
-      `ALTER TABLE players
-         DROP COLUMN IF EXISTS pace,
-         DROP COLUMN IF EXISTS stamina,
-         DROP COLUMN IF EXISTS strength,
-         DROP COLUMN IF EXISTS agility,
-         DROP COLUMN IF EXISTS jumping,
-         DROP COLUMN IF EXISTS technical_attributes;`,
-      { transaction: t },
-    );
-
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
   }
+
+  // 4. Drop new columns
+  await sequelize.query(
+    `ALTER TABLE players
+       DROP COLUMN IF EXISTS pace,
+       DROP COLUMN IF EXISTS stamina,
+       DROP COLUMN IF EXISTS strength,
+       DROP COLUMN IF EXISTS agility,
+       DROP COLUMN IF EXISTS jumping,
+       DROP COLUMN IF EXISTS technical_attributes;`,
+  );
 }

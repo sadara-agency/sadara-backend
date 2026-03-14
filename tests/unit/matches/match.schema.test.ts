@@ -7,21 +7,61 @@ import {
   createMatchAnalysisSchema,
 } from '../../../src/modules/matches/match.schema';
 
-const UUID = '550e8400-e29b-41d4-a716-446655440001';
+const UUID_HOME = '550e8400-e29b-41d4-a716-446655440001';
+const UUID_AWAY = '550e8400-e29b-41d4-a716-446655440002';
+
+// Use a date far in the future to satisfy the "today or future" refinement
+const FUTURE_DATE = '2099-06-15T18:00:00Z';
 
 describe('Match Schemas', () => {
   describe('createMatchSchema', () => {
     it('should accept valid match', () => {
-      expect(createMatchSchema.safeParse({ matchDate: '2025-06-15T18:00:00Z' }).success).toBe(true);
+      expect(createMatchSchema.safeParse({
+        homeClubId: UUID_HOME,
+        awayClubId: UUID_AWAY,
+        matchDate: FUTURE_DATE,
+      }).success).toBe(true);
     });
     it('should reject missing matchDate', () => {
-      expect(createMatchSchema.safeParse({}).success).toBe(false);
+      expect(createMatchSchema.safeParse({
+        homeClubId: UUID_HOME,
+        awayClubId: UUID_AWAY,
+      }).success).toBe(false);
+    });
+    it('should reject missing homeClubId', () => {
+      expect(createMatchSchema.safeParse({
+        awayClubId: UUID_AWAY,
+        matchDate: FUTURE_DATE,
+      }).success).toBe(false);
+    });
+    it('should reject missing awayClubId', () => {
+      expect(createMatchSchema.safeParse({
+        homeClubId: UUID_HOME,
+        matchDate: FUTURE_DATE,
+      }).success).toBe(false);
+    });
+    it('should reject same home and away club', () => {
+      expect(createMatchSchema.safeParse({
+        homeClubId: UUID_HOME,
+        awayClubId: UUID_HOME,
+        matchDate: FUTURE_DATE,
+      }).success).toBe(false);
     });
     it('should default status to upcoming', () => {
-      expect(createMatchSchema.parse({ matchDate: '2025-06-15' }).status).toBe('upcoming');
+      const result = createMatchSchema.parse({
+        homeClubId: UUID_HOME,
+        awayClubId: UUID_AWAY,
+        matchDate: FUTURE_DATE,
+      });
+      expect(result.status).toBe('upcoming');
     });
     it('should reject negative score', () => {
-      expect(createMatchSchema.safeParse({ matchDate: '2025-06-15', homeScore: -1 }).success).toBe(false);
+      expect(createMatchSchema.safeParse({
+        homeClubId: UUID_HOME,
+        awayClubId: UUID_AWAY,
+        matchDate: FUTURE_DATE,
+        homeScore: -1,
+      }).success).toBe(false);
     });
   });
 
@@ -57,13 +97,13 @@ describe('Match Schemas', () => {
 
   describe('assignPlayersSchema', () => {
     it('should accept valid player list', () => {
-      expect(assignPlayersSchema.safeParse({ players: [{ playerId: UUID }] }).success).toBe(true);
+      expect(assignPlayersSchema.safeParse({ players: [{ playerId: UUID_HOME }] }).success).toBe(true);
     });
     it('should reject empty player list', () => {
       expect(assignPlayersSchema.safeParse({ players: [] }).success).toBe(false);
     });
     it('should default availability to starter', () => {
-      const result = assignPlayersSchema.parse({ players: [{ playerId: UUID }] });
+      const result = assignPlayersSchema.parse({ players: [{ playerId: UUID_HOME }] });
       expect(result.players[0].availability).toBe('starter');
     });
   });

@@ -47,6 +47,12 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/modules/injuries/injuryAutoTasks', () => ({
+  generateCriticalInjuryTask: jest.fn().mockResolvedValue(null),
+  checkInjuryReturnOverdue: jest.fn().mockResolvedValue(undefined),
+  checkInjuryTreatmentStale: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
