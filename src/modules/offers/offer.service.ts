@@ -296,6 +296,15 @@ export async function convertOfferToContract(
     );
   }
 
+  // Validate that the referenced club actually exists in the DB
+  const clubExists = await Club.findByPk(clubId, { attributes: ["id"] });
+  if (!clubExists) {
+    throw new AppError(
+      `Cannot convert: the resolved club (${clubId}) no longer exists`,
+      400,
+    );
+  }
+
   // Build contract dates
   const today = new Date();
   const endDate = new Date(today);
