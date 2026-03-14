@@ -483,8 +483,8 @@ export async function up() {
   for (const entry of TOURNAMENT_SEED) {
     const { type, gender, format, ageGroup } = deriveCompetitionFields(entry);
     await sequelize.query(
-      `INSERT INTO competitions (id, name, name_ar, type, tier, age_group, gender, format, agency_value, saff_id)
-       VALUES (gen_random_uuid(), :name, :nameAr, :type, :tier, :ageGroup, :gender, :format, :agencyValue, :saffId)
+      `INSERT INTO competitions (id, name, name_ar, type, tier, age_group, gender, format, agency_value, saff_id, created_at, updated_at)
+       VALUES (gen_random_uuid(), :name, :nameAr, :type, :tier, :ageGroup, :gender, :format, :agencyValue, :saffId, NOW(), NOW())
        ON CONFLICT (saff_id) DO UPDATE SET
          name = EXCLUDED.name,
          name_ar = EXCLUDED.name_ar,
