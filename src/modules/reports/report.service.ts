@@ -30,33 +30,53 @@ const REPORT_INCLUDES = [
 // List Reports
 // ────────────────────────────────────────────────────────────
 export async function listReports(queryParams: any) {
-  const { limit, offset, page } = parsePagination(queryParams, "createdAt");
+  try {
+    const { limit, offset, page } = parsePagination(queryParams, "createdAt");
 
-  const where: any = {};
-  if (queryParams.playerId) where.playerId = queryParams.playerId;
-  if (queryParams.status) where.status = queryParams.status;
+    const where: any = {};
+    if (queryParams.playerId) where.playerId = queryParams.playerId;
+    if (queryParams.status) where.status = queryParams.status;
 
-  const { count, rows } = await TechnicalReport.findAndCountAll({
-    where,
-    include: REPORT_INCLUDES,
-    limit,
-    offset,
-    order: [["createdAt", "DESC"]],
-    distinct: true,
-  });
+    const { count, rows } = await TechnicalReport.findAndCountAll({
+      where,
+      include: REPORT_INCLUDES,
+      limit,
+      offset,
+      order: [["createdAt", "DESC"]],
+      distinct: true,
+    });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+    return { data: rows, meta: buildMeta(count, page, limit) };
+  } catch (err: any) {
+    logger.error("listReports failed", {
+      error: err.message,
+      stack: err.stack,
+      playerId: queryParams.playerId,
+      status: queryParams.status,
+    });
+    throw new AppError("Failed to list reports", 500);
+  }
 }
 
 // ────────────────────────────────────────────────────────────
 // Get Report by ID
 // ────────────────────────────────────────────────────────────
 export async function getReportById(id: string) {
-  const report = await TechnicalReport.findByPk(id, {
-    include: REPORT_INCLUDES,
-  });
-  if (!report) throw new AppError("Report not found", 404);
-  return report;
+  try {
+    const report = await TechnicalReport.findByPk(id, {
+      include: REPORT_INCLUDES,
+    });
+    if (!report) throw new AppError("Report not found", 404);
+    return report;
+  } catch (err: any) {
+    if (err instanceof AppError) throw err;
+    logger.error("getReportById failed", {
+      error: err.message,
+      stack: err.stack,
+      reportId: id,
+    });
+    throw new AppError("Failed to retrieve report", 500);
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -119,10 +139,20 @@ export async function createReport(
 // Delete Report
 // ────────────────────────────────────────────────────────────
 export async function deleteReport(id: string) {
-  const report = await TechnicalReport.findByPk(id);
-  if (!report) throw new AppError("Report not found", 404);
-  await report.destroy();
-  return { id };
+  try {
+    const report = await TechnicalReport.findByPk(id);
+    if (!report) throw new AppError("Report not found", 404);
+    await report.destroy();
+    return { id };
+  } catch (err: any) {
+    if (err instanceof AppError) throw err;
+    logger.error("deleteReport failed", {
+      error: err.message,
+      stack: err.stack,
+      reportId: id,
+    });
+    throw new AppError("Failed to delete report", 500);
+  }
 }
 
 // ────────────────────────────────────────────────────────────
