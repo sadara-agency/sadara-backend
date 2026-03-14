@@ -488,6 +488,7 @@ export async function seedExerciseLibrary(): Promise<void> {
       "movementType",
       "difficulty",
     ],
+    conflictAttributes: ["nameEn"],
   });
   console.log(`  ✅ Seeded ${exercises.length} exercises`);
 }
@@ -1019,6 +1020,7 @@ export async function seedFoodDatabase(): Promise<void> {
       "carbsPer100g",
       "fatPer100g",
     ],
+    conflictAttributes: ["nameEn"],
   });
   console.log(`  ✅ Seeded ${foods.length} food items`);
 }
