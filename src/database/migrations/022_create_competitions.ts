@@ -524,8 +524,8 @@ export async function up() {
   // 7. Populate club_competitions from SPL clubs (clubs with spl_team_id)
   if ((clubsExists[0] as any)?.tbl) {
     await sequelize.query(
-      `INSERT INTO club_competitions (club_id, competition_id, season)
-       SELECT cl.id, co.id, '2025-2026'
+      `INSERT INTO club_competitions (id, club_id, competition_id, season, created_at, updated_at)
+       SELECT gen_random_uuid(), cl.id, co.id, '2025-2026', NOW(), NOW()
        FROM clubs cl
        CROSS JOIN competitions co
        WHERE cl.spl_team_id IS NOT NULL
@@ -539,8 +539,8 @@ export async function up() {
     );
     if ((saffTableExists as any[]).length) {
       await sequelize.query(
-        `INSERT INTO club_competitions (club_id, competition_id, season)
-         SELECT stm.club_id, co.id, stm.season
+        `INSERT INTO club_competitions (id, club_id, competition_id, season, created_at, updated_at)
+         SELECT gen_random_uuid(), stm.club_id, co.id, stm.season, NOW(), NOW()
          FROM saff_team_maps stm
          JOIN saff_tournaments st ON st.saff_id = (
            SELECT st2.saff_id FROM saff_tournaments st2
