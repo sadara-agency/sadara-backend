@@ -99,7 +99,7 @@ function startServer(): Promise<void> {
       printBanner();
       resolve();
     });
-    server.timeout = 30000;
+    server.timeout = 120000;
     server.keepAliveTimeout = 65000;
   });
 }
