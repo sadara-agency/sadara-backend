@@ -3,7 +3,6 @@ import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import {
   notifyUser,
-  notifyByRole,
 } from "@modules/notifications/notification.service";
 import { CalendarEvent, EventAttendee } from "@modules/calendar/event.model";
 import { Notification } from "@modules/notifications/notification.model";
