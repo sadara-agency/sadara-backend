@@ -87,6 +87,10 @@ import {
   checkPlayerMissingDocuments,
 } from "@modules/documents/documentAutoTasks";
 import { checkReferralOverdue } from "@modules/referrals/referralAutoTasks";
+import {
+  checkCalendarReminders,
+  syncAutoCalendarEvents,
+} from "@modules/calendar/calendarAutoTasks";
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
 
 // ── Disabled-state management ──
@@ -890,6 +894,10 @@ registerJob("player-missing-documents", checkPlayerMissingDocuments);
 // ── Referral Auto-Tasks ──
 registerJob("referral-overdue", checkReferralOverdue);
 
+// ── Calendar Auto-Tasks ──
+registerJob("calendar-reminders", checkCalendarReminders);
+registerJob("calendar-auto-sync", syncAutoCalendarEvents);
+
 // ── System Health & Data Quality Engine ──
 registerJob("orphan-record-detector", detectOrphanRecords);
 registerJob("player-data-completeness", checkPlayerDataCompleteness);
@@ -1030,6 +1038,10 @@ export async function startCronJobs() {
   // ── Referral Auto-Tasks ──
   schedule("30 8 * * *", "referral-overdue"); // Daily 8:30 AM
 
+  // ── Calendar Auto-Tasks ──
+  schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes
+  schedule("0 6 * * *", "calendar-auto-sync"); // Daily 6:00 AM
+
   // ── System Health & Data Quality Engine ──
   schedule("0 4 * * 0", "orphan-record-detector"); // Sunday 4:00 AM
   schedule("0 7 * * 1", "player-data-completeness"); // Monday 7:00 AM
@@ -1037,5 +1049,5 @@ export async function startCronJobs() {
   schedule("0 5 * * 0", "risk-radar-consistency"); // Sunday 5:00 AM
   schedule("0 6 * * 0", "duplicate-record-detector"); // Sunday 6:00 AM
 
-  logger.info("[CRON] 58 jobs scheduled ✓");
+  logger.info("[CRON] 60 jobs scheduled ✓");
 }

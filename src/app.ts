@@ -49,6 +49,7 @@ import sportmonksRoutes from "@modules/sportmonks/sportmonks.routes";
 import gymRoutes from "@modules/gym/gym.routes";
 import competitionRoutes from "@modules/competitions/competition.routes";
 import clearanceRoutes from "@modules/clearances/clearance.routes";
+import calendarRoutes from "@modules/calendar/event.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -237,6 +238,7 @@ app.use("/api/v1/sportmonks", sportmonksRoutes);
 app.use("/api/v1/gym", gymRoutes);
 app.use("/api/v1/competitions", competitionRoutes);
 app.use("/api/v1/clearances", clearanceRoutes);
+app.use("/api/v1/calendar", calendarRoutes);
 
 // ── Swagger UI ──
 setupSwagger(app);

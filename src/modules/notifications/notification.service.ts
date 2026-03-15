@@ -79,6 +79,7 @@ const TYPE_TO_PREF: Record<string, string> = {
   referral: "referrals",
   document: "documents",
   task: "tasks",
+  calendar: "calendar",
   system: "system",
 };
 

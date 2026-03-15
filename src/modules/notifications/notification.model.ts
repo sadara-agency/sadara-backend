@@ -9,6 +9,7 @@ export type NotificationType =
   | "referral"
   | "document"
   | "task"
+  | "calendar"
   | "system";
 export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
