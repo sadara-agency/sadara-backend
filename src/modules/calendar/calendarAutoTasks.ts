@@ -1,6 +1,5 @@
 import { QueryTypes, Op } from "sequelize";
 import { sequelize } from "@config/database";
-import { logger } from "@config/logger";
 import {
   notifyUser,
 } from "@modules/notifications/notification.service";
