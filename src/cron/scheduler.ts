@@ -87,6 +87,192 @@ import {
   checkPlayerMissingDocuments,
 } from "@modules/documents/documentAutoTasks";
 import { checkReferralOverdue } from "@modules/referrals/referralAutoTasks";
+import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
+
+// ── Disabled-state management ──
+
+interface DisabledJobEntry {
+  disabledBy?: string;
+  disabledAt?: string;
+}
+
+const DISABLED_SETTINGS_KEY = "cron_disabled_jobs";
+
+/** In-memory fallback when Redis is unavailable */
+const disabledJobsCache = new Set<string>();
+
+/** Persistent disabled-jobs map (mirrors app_settings) */
+let disabledJobsMap: Record<string, DisabledJobEntry> = {};
+
+async function isJobDisabled(name: string): Promise<boolean> {
+  if (isRedisConnected()) {
+    const client = getRedisClient();
+    if (client) {
+      try {
+        const val = await client.get(`cron:disabled:${name}`);
+        return val === "1";
+      } catch {
+        // Redis error — fall through to in-memory
+      }
+    }
+  }
+  return disabledJobsCache.has(name);
+}
+
+export async function setJobDisabled(
+  name: string,
+  disabled: boolean,
+  actor?: { userId: string; userName: string },
+): Promise<void> {
+  // 1. Update Redis
+  if (isRedisConnected()) {
+    const client = getRedisClient();
+    if (client) {
+      try {
+        if (disabled) {
+          await client.set(`cron:disabled:${name}`, "1");
+        } else {
+          await client.del(`cron:disabled:${name}`);
+        }
+      } catch (err) {
+        logger.warn(
+          `[CRON] Failed to update Redis disabled state for ${name}`,
+          err,
+        );
+      }
+    }
+  }
+
+  // 2. Update in-memory cache
+  if (disabled) {
+    disabledJobsCache.add(name);
+  } else {
+    disabledJobsCache.delete(name);
+  }
+
+  // 3. Update persistent map
+  if (disabled) {
+    disabledJobsMap[name] = {
+      disabledBy: actor?.userName || "system",
+      disabledAt: new Date().toISOString(),
+    };
+  } else {
+    delete disabledJobsMap[name];
+  }
+
+  // 4. Persist to app_settings
+  try {
+    await setAppSetting(DISABLED_SETTINGS_KEY, disabledJobsMap);
+  } catch (err) {
+    logger.warn("[CRON] Failed to persist disabled jobs to app_settings", err);
+  }
+
+  // 5. Release any held lock when disabling
+  if (disabled) {
+    await releaseLock(name);
+  }
+}
+
+export async function setAllJobsDisabled(
+  disabled: boolean,
+  actor?: { userId: string; userName: string },
+): Promise<number> {
+  const names = Object.keys(jobs);
+
+  // Batch update: build full map first, then single DB write
+  if (disabled) {
+    const entry: DisabledJobEntry = {
+      disabledBy: actor?.userName || "system",
+      disabledAt: new Date().toISOString(),
+    };
+    disabledJobsMap = {};
+    for (const name of names) {
+      disabledJobsMap[name] = entry;
+      disabledJobsCache.add(name);
+    }
+  } else {
+    disabledJobsMap = {};
+    disabledJobsCache.clear();
+  }
+
+  // Single DB write
+  try {
+    await setAppSetting(DISABLED_SETTINGS_KEY, disabledJobsMap);
+  } catch (err) {
+    logger.warn("[CRON] Failed to persist bulk disabled state", err);
+  }
+
+  // Update Redis for all jobs
+  if (isRedisConnected()) {
+    const client = getRedisClient();
+    if (client) {
+      try {
+        for (const name of names) {
+          if (disabled) {
+            await client.set(`cron:disabled:${name}`, "1");
+          } else {
+            await client.del(`cron:disabled:${name}`);
+          }
+        }
+      } catch (err) {
+        logger.warn("[CRON] Failed to bulk update Redis disabled state", err);
+      }
+    }
+  }
+
+  // Release locks if disabling
+  if (disabled) {
+    for (const name of names) {
+      await releaseLock(name);
+    }
+  }
+
+  return names.length;
+}
+
+export async function getDisabledJobs(): Promise<
+  Record<string, DisabledJobEntry>
+> {
+  return { ...disabledJobsMap };
+}
+
+export async function syncDisabledJobsToRedis(): Promise<void> {
+  try {
+    const persisted = await getAppSetting(DISABLED_SETTINGS_KEY);
+    if (persisted && typeof persisted === "object") {
+      disabledJobsMap = persisted;
+      disabledJobsCache.clear();
+
+      for (const name of Object.keys(persisted)) {
+        disabledJobsCache.add(name);
+      }
+
+      // Populate Redis
+      if (isRedisConnected()) {
+        const client = getRedisClient();
+        if (client) {
+          for (const name of Object.keys(persisted)) {
+            await client.set(`cron:disabled:${name}`, "1");
+          }
+        }
+      }
+
+      logger.info(
+        `[CRON] Synced ${Object.keys(persisted).length} disabled jobs from DB`,
+      );
+    }
+  } catch (err) {
+    logger.warn("[CRON] Failed to sync disabled jobs from app_settings", err);
+  }
+}
+
+// ── Schedule metadata ──
+
+const jobSchedules: Record<string, string> = {};
+
+export function getJobSchedules(): Record<string, string> {
+  return { ...jobSchedules };
+}
 
 // ── Query result interfaces ──
 
@@ -184,6 +370,12 @@ const LOCK_TTL_SECONDS = 300; // 5 min — prevents overlapping runs
 
 function safeJob(name: string) {
   return async () => {
+    // Check if job is disabled before doing any work
+    if (await isJobDisabled(name)) {
+      logger.info(`[CRON] Skipped (disabled): ${name}`);
+      return;
+    }
+
     // Acquire distributed lock (prevents concurrent execution across instances)
     if (!(await acquireLock(name, LOCK_TTL_SECONDS))) {
       logger.info(`[CRON] Skipped (locked): ${name}`);
@@ -748,94 +940,102 @@ export async function runAllJobs() {
 // SCHEDULER — call startCronJobs() once in index.ts
 // ══════════════════════════════════════════════════════════════
 
-export function startCronJobs() {
+export async function startCronJobs() {
   logger.info("[CRON] Initializing cron scheduler...");
 
-  cron.schedule("0 7 * * *", safeJob("upcoming-matches")); // 7:00 AM
-  cron.schedule("0 7,19 * * *", safeJob("contract-status")); // 7:00 AM & 7:00 PM
-  cron.schedule("0 8 * * *", safeJob("contract-expiry")); // 8:00 AM
-  cron.schedule("30 8 * * *", safeJob("injury-followups")); // 8:30 AM
-  cron.schedule("0 9 * * *", safeJob("payment-reminders")); // 9:00 AM
-  cron.schedule("30 9 * * *", safeJob("document-expiry")); // 9:30 AM
-  cron.schedule("0 3 * * *", safeJob("cleanup")); // 3:00 AM
+  // Sync disabled state from DB → Redis + in-memory before scheduling
+  await syncDisabledJobsToRedis();
+
+  function schedule(expr: string, name: string) {
+    jobSchedules[name] = expr;
+    cron.schedule(expr, safeJob(name));
+  }
+
+  schedule("0 7 * * *", "upcoming-matches"); // 7:00 AM
+  schedule("0 7,19 * * *", "contract-status"); // 7:00 AM & 7:00 PM
+  schedule("0 8 * * *", "contract-expiry"); // 8:00 AM
+  schedule("30 8 * * *", "injury-followups"); // 8:30 AM
+  schedule("0 9 * * *", "payment-reminders"); // 9:00 AM
+  schedule("30 9 * * *", "document-expiry"); // 9:30 AM
+  schedule("0 3 * * *", "cleanup"); // 3:00 AM
 
   // ── Performance Trend Engine ──
-  cron.schedule("0 10 * * 1", safeJob("performance-trends")); // Monday 10:00 AM
-  cron.schedule("15 7 * * *", safeJob("fatigue-risk")); // Daily 7:15 AM
-  cron.schedule("30 10 * * 1", safeJob("breakout-players")); // Monday 10:30 AM
-  cron.schedule("0 10 * * 1", safeJob("minutes-drought")); // Monday 10:00 AM
-  cron.schedule("0 10 * * *", safeJob("consecutive-low-ratings")); // Daily 10:00 AM
+  schedule("0 10 * * 1", "performance-trends"); // Monday 10:00 AM
+  schedule("15 7 * * *", "fatigue-risk"); // Daily 7:15 AM
+  schedule("30 10 * * 1", "breakout-players"); // Monday 10:30 AM
+  schedule("0 10 * * 1", "minutes-drought"); // Monday 10:00 AM
+  schedule("0 10 * * *", "consecutive-low-ratings"); // Daily 10:00 AM
 
   // ── Injury Intelligence Engine ──
-  cron.schedule("0 11 * * *", safeJob("injury-recurrence")); // Daily 11:00 AM
-  cron.schedule("30 7 * * *", safeJob("return-to-play")); // Daily 7:30 AM
-  cron.schedule("0 6 * * 1", safeJob("injury-risk-scoring")); // Monday 6:00 AM
-  cron.schedule("0 8 * * *", safeJob("surgery-milestones")); // Daily 8:00 AM
+  schedule("0 11 * * *", "injury-recurrence"); // Daily 11:00 AM
+  schedule("30 7 * * *", "return-to-play"); // Daily 7:30 AM
+  schedule("0 6 * * 1", "injury-risk-scoring"); // Monday 6:00 AM
+  schedule("0 8 * * *", "surgery-milestones"); // Daily 8:00 AM
 
   // ── Contract Lifecycle Engine ──
-  cron.schedule("0 9 * * 2", safeJob("contract-renewal-window")); // Tuesday 9:00 AM
-  cron.schedule("30 9 * * 2", safeJob("contract-value-mismatch")); // Tuesday 9:30 AM
-  cron.schedule("30 8 * * *", safeJob("loan-return-tracker")); // Daily 8:30 AM
-  cron.schedule("30 11 * * *", safeJob("draft-contract-stale")); // Daily 11:30 AM
-  cron.schedule("0 9 * * 3", safeJob("commission-due-calculator")); // Wednesday 9:00 AM
+  schedule("0 9 * * 2", "contract-renewal-window"); // Tuesday 9:00 AM
+  schedule("30 9 * * 2", "contract-value-mismatch"); // Tuesday 9:30 AM
+  schedule("30 8 * * *", "loan-return-tracker"); // Daily 8:30 AM
+  schedule("30 11 * * *", "draft-contract-stale"); // Daily 11:30 AM
+  schedule("0 9 * * 3", "commission-due-calculator"); // Wednesday 9:00 AM
 
   // ── Financial Intelligence Engine ──
-  cron.schedule("0 11 * * *", safeJob("invoice-aging-tracker")); // Daily 11:00 AM
-  cron.schedule("0 10 * * 4", safeJob("revenue-anomaly-detector")); // Thursday 10:00 AM
-  cron.schedule("0 9 1 * *", safeJob("expense-budget-monitor")); // 1st of month 9:00 AM
-  cron.schedule("30 10 * * 4", safeJob("player-roi-calculator")); // Thursday 10:30 AM
-  cron.schedule("0 11 * * 1", safeJob("valuation-staleness-check")); // Monday 11:00 AM
+  schedule("0 11 * * *", "invoice-aging-tracker"); // Daily 11:00 AM
+  schedule("0 10 * * 4", "revenue-anomaly-detector"); // Thursday 10:00 AM
+  schedule("0 9 1 * *", "expense-budget-monitor"); // 1st of month 9:00 AM
+  schedule("30 10 * * 4", "player-roi-calculator"); // Thursday 10:30 AM
+  schedule("0 11 * * 1", "valuation-staleness-check"); // Monday 11:00 AM
 
   // ── Gate & Onboarding Engine ──
-  cron.schedule("30 6 * * *", safeJob("gate-auto-verify")); // Daily 6:30 AM
-  cron.schedule("30 10 * * *", safeJob("gate-stale-detector")); // Daily 10:30 AM
-  cron.schedule("30 9 * * *", safeJob("checklist-follow-up")); // Daily 9:30 AM
-  cron.schedule("0 10 * * 5", safeJob("gate-progression-nudge")); // Friday 10:00 AM
-  cron.schedule("0 10 * * *", safeJob("clearance-follow-up")); // Daily 10:00 AM
+  schedule("30 6 * * *", "gate-auto-verify"); // Daily 6:30 AM
+  schedule("30 10 * * *", "gate-stale-detector"); // Daily 10:30 AM
+  schedule("30 9 * * *", "checklist-follow-up"); // Daily 9:30 AM
+  schedule("0 10 * * 5", "gate-progression-nudge"); // Friday 10:00 AM
+  schedule("0 10 * * *", "clearance-follow-up"); // Daily 10:00 AM
 
   // ── Scouting Pipeline Engine ──
-  cron.schedule("0 10 * * 3", safeJob("watchlist-staleness")); // Wednesday 10:00 AM
-  cron.schedule("30 10 * * 3", safeJob("screening-incomplete")); // Wednesday 10:30 AM
-  cron.schedule("30 11 * * 1", safeJob("prospect-unrated")); // Monday 11:30 AM
-  cron.schedule("0 11 * * 5", safeJob("deferred-decision-followup")); // Friday 11:00 AM
-  cron.schedule("30 11 * * 5", safeJob("approved-not-actioned")); // Friday 11:30 AM
+  schedule("0 10 * * 3", "watchlist-staleness"); // Wednesday 10:00 AM
+  schedule("30 10 * * 3", "screening-incomplete"); // Wednesday 10:30 AM
+  schedule("30 11 * * 1", "prospect-unrated"); // Monday 11:30 AM
+  schedule("0 11 * * 5", "deferred-decision-followup"); // Friday 11:00 AM
+  schedule("30 11 * * 5", "approved-not-actioned"); // Friday 11:30 AM
 
   // ── Training & Development Engine ──
-  cron.schedule("15 8 * * *", safeJob("training-enrollment-stale")); // Daily 8:15 AM
-  cron.schedule("0 9 * * 6", safeJob("workout-adherence-check")); // Saturday 9:00 AM
-  cron.schedule("15 9 * * *", safeJob("body-metric-target-deadline")); // Daily 9:15 AM
-  cron.schedule("30 9 * * 6", safeJob("diet-adherence-monitor")); // Saturday 9:30 AM
-  cron.schedule("30 8 * * 1", safeJob("training-no-plan")); // Monday 8:30 AM
+  schedule("15 8 * * *", "training-enrollment-stale"); // Daily 8:15 AM
+  schedule("0 9 * * 6", "workout-adherence-check"); // Saturday 9:00 AM
+  schedule("15 9 * * *", "body-metric-target-deadline"); // Daily 9:15 AM
+  schedule("30 9 * * 6", "diet-adherence-monitor"); // Saturday 9:30 AM
+  schedule("30 8 * * 1", "training-no-plan"); // Monday 8:30 AM
 
   // ── Offer Pipeline Engine ──
-  cron.schedule("0 8 * * *", safeJob("offer-deadlines")); // Daily 8:00 AM
+  schedule("0 8 * * *", "offer-deadlines"); // Daily 8:00 AM
 
   // ── Injury Auto-Tasks ──
-  cron.schedule("45 8 * * *", safeJob("injury-return-overdue")); // Daily 8:45 AM
-  cron.schedule("0 9 * * 1", safeJob("injury-treatment-stale")); // Monday 9:00 AM
+  schedule("45 8 * * *", "injury-return-overdue"); // Daily 8:45 AM
+  schedule("0 9 * * 1", "injury-treatment-stale"); // Monday 9:00 AM
 
   // ── Gym / Training Auto-Tasks ──
-  cron.schedule("0 8 * * 1", safeJob("workout-assignment-expiring")); // Monday 8:00 AM
-  cron.schedule("0 10 * * 6", safeJob("diet-plan-no-adherence")); // Saturday 10:00 AM
-  cron.schedule("0 11 * * 3", safeJob("metric-target-achieved")); // Wednesday 11:00 AM
-  cron.schedule("30 8 * * *", safeJob("training-course-completed")); // Daily 8:30 AM
+  schedule("0 8 * * 1", "workout-assignment-expiring"); // Monday 8:00 AM
+  schedule("0 10 * * 6", "diet-plan-no-adherence"); // Saturday 10:00 AM
+  schedule("0 11 * * 3", "metric-target-achieved"); // Wednesday 11:00 AM
+  schedule("30 8 * * *", "training-course-completed"); // Daily 8:30 AM
 
   // ── Approval Auto-Tasks ──
-  cron.schedule("0 9 * * *", safeJob("approval-step-overdue")); // Daily 9:00 AM
+  schedule("0 9 * * *", "approval-step-overdue"); // Daily 9:00 AM
 
   // ── Document Auto-Tasks ──
-  cron.schedule("0 10 * * *", safeJob("document-expiry-tasks")); // Daily 10:00 AM
-  cron.schedule("0 7 * * 2", safeJob("player-missing-documents")); // Tuesday 7:00 AM
+  schedule("0 10 * * *", "document-expiry-tasks"); // Daily 10:00 AM
+  schedule("0 7 * * 2", "player-missing-documents"); // Tuesday 7:00 AM
 
   // ── Referral Auto-Tasks ──
-  cron.schedule("30 8 * * *", safeJob("referral-overdue")); // Daily 8:30 AM
+  schedule("30 8 * * *", "referral-overdue"); // Daily 8:30 AM
 
   // ── System Health & Data Quality Engine ──
-  cron.schedule("0 4 * * 0", safeJob("orphan-record-detector")); // Sunday 4:00 AM
-  cron.schedule("0 7 * * 1", safeJob("player-data-completeness")); // Monday 7:00 AM
-  cron.schedule("45 7 * * *", safeJob("stale-task-escalator")); // Daily 7:45 AM
-  cron.schedule("0 5 * * 0", safeJob("risk-radar-consistency")); // Sunday 5:00 AM
-  cron.schedule("0 6 * * 0", safeJob("duplicate-record-detector")); // Sunday 6:00 AM
+  schedule("0 4 * * 0", "orphan-record-detector"); // Sunday 4:00 AM
+  schedule("0 7 * * 1", "player-data-completeness"); // Monday 7:00 AM
+  schedule("45 7 * * *", "stale-task-escalator"); // Daily 7:45 AM
+  schedule("0 5 * * 0", "risk-radar-consistency"); // Sunday 5:00 AM
+  schedule("0 6 * * 0", "duplicate-record-detector"); // Sunday 6:00 AM
 
   logger.info("[CRON] 58 jobs scheduled ✓");
 }

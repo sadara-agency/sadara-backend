@@ -84,9 +84,9 @@ function registerProviders(): void {
 // Phase 3 — Background Jobs
 // ─────────────────────────────────────────────
 
-function startSchedulers(): void {
+async function startSchedulers(): Promise<void> {
   startSaffScheduler();
-  startCronJobs();
+  await startCronJobs();
 }
 
 // ─────────────────────────────────────────────
@@ -144,7 +144,7 @@ async function bootstrap(): Promise<void> {
   try {
     await initInfrastructure();
     await initApplication();
-    startSchedulers();
+    await startSchedulers();
     await startServer();
   } catch (err: unknown) {
     const e = err instanceof Error ? err : new Error(String(err));

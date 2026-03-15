@@ -129,6 +129,12 @@ jest.mock('../../../src/modules/referrals/referralAutoTasks', () => ({
   generateCriticalReferralTask: jest.fn(),
 }));
 
+// Mock appSettings to prevent DB call in syncDisabledJobsToRedis
+jest.mock('../../../src/shared/utils/appSettings', () => ({
+  getAppSetting: jest.fn().mockResolvedValue(null),
+  setAppSetting: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { getJobNames, runJob, runAllJobs, startCronJobs } from '../../../src/cron/scheduler';
 import { isRedisConnected } from '../../../src/config/redis';
 import { logger } from '../../../src/config/logger';
@@ -230,14 +236,14 @@ describe('Cron Scheduler', () => {
   });
 
   describe('startCronJobs', () => {
-    it('should schedule all 57 cron jobs', () => {
-      startCronJobs();
+    it('should schedule all 57 cron jobs', async () => {
+      await startCronJobs();
       // node-cron.schedule should be called once per job
       expect(cron.schedule).toHaveBeenCalledTimes(57);
     });
 
-    it('should log initialization', () => {
-      startCronJobs();
+    it('should log initialization', async () => {
+      await startCronJobs();
       expect(logger.info).toHaveBeenCalledWith(
         expect.stringContaining('Initializing cron scheduler'),
       );
@@ -250,7 +256,7 @@ describe('Cron Scheduler', () => {
       mockRedisSet.mockResolvedValueOnce(null);
 
       // Start the cron jobs so safeJob wrappers are created
-      startCronJobs();
+      await startCronJobs();
 
       // Get the wrapped function passed to the first cron.schedule call
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
@@ -273,7 +279,7 @@ describe('Cron Scheduler', () => {
     it('should proceed when lock is acquired', async () => {
       mockRedisSet.mockResolvedValue('OK');
 
-      startCronJobs();
+      await startCronJobs();
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       // cleanup job — uses simple mock
       const cleanupCall = scheduleCalls.find(
@@ -293,7 +299,7 @@ describe('Cron Scheduler', () => {
     it('should fall through when Redis is not connected', async () => {
       (isRedisConnected as jest.Mock).mockReturnValue(false);
 
-      startCronJobs();
+      await startCronJobs();
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       const cleanupCall = scheduleCalls.find(
         (call: [string, () => Promise<void>]) => call[0] === '0 3 * * *',
@@ -316,7 +322,7 @@ describe('Cron Scheduler', () => {
         .mockRejectedValueOnce(new Error('Transient error 2'))
         .mockRejectedValueOnce(new Error('Transient error 3'));
 
-      startCronJobs();
+      await startCronJobs();
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       const fatigueCall = scheduleCalls.find(
         (call: [string, () => Promise<void>]) => call[0] === '15 7 * * *',
@@ -355,7 +361,7 @@ describe('Cron Scheduler', () => {
         .mockRejectedValueOnce(new Error('Transient error'))
         .mockResolvedValueOnce({ checked: 10 });
 
-      startCronJobs();
+      await startCronJobs();
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       const fatigueCall = scheduleCalls.find(
         (call: [string, () => Promise<void>]) => call[0] === '15 7 * * *',
