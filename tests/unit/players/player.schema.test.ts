@@ -8,7 +8,20 @@ const UUID = '550e8400-e29b-41d4-a716-446655440001';
 
 describe('Player Schemas', () => {
   describe('createPlayerSchema', () => {
-    const valid = { firstName: 'Ahmed', lastName: 'Ali', dateOfBirth: '1998-05-15' };
+    const valid = {
+      firstName: 'Ahmed',
+      lastName: 'Ali',
+      firstNameAr: 'أحمد',
+      lastNameAr: 'علي',
+      dateOfBirth: '1998-05-15',
+      nationality: 'Saudi',
+      position: 'Forward',
+      preferredFoot: 'Right' as const,
+      heightCm: 180,
+      weightKg: 75,
+      email: 'ahmed@example.com',
+      phone: '+966501234567',
+    };
 
     it('should accept valid input', () => {
       expect(createPlayerSchema.safeParse(valid).success).toBe(true);
