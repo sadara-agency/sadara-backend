@@ -224,10 +224,7 @@ app.use("/api/v1/injuries", injuryRoutes);
 app.use("/api/v1/training", trainingRoutes);
 app.use("/api/v1/saff", saffRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
-// Cron test routes — development only
-if (env.nodeEnv !== "production") {
-  app.use("/api/v1/cron", cronRoutes);
-}
+app.use("/api/v1/cron", cronRoutes);
 app.use("/api/v1/portal", portalRoutes);
 app.use("/api/v1/audit", auditRoutes);
 app.use("/api/v1/spl", splRoutes);
