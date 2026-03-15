@@ -1,10 +1,6 @@
 import { QueryTypes, Op } from "sequelize";
 import { sequelize } from "@config/database";
-import {
-  notifyUser,
-} from "@modules/notifications/notification.service";
-import { CalendarEvent, EventAttendee } from "@modules/calendar/event.model";
-import { Notification } from "@modules/notifications/notification.model";
+import { notifyUser } from "@modules/notifications/notification.service";
 
 // ══════════════════════════════════════════════════════════════
 // Calendar Reminder Notifications
@@ -13,6 +9,11 @@ import { Notification } from "@modules/notifications/notification.model";
 // ══════════════════════════════════════════════════════════════
 
 export async function checkCalendarReminders() {
+  const { CalendarEvent, EventAttendee } =
+    await import("@modules/calendar/event.model");
+  const { Notification } =
+    await import("@modules/notifications/notification.model");
+
   const now = new Date();
   let sent = 0;
 
@@ -119,6 +120,8 @@ interface GateDeadlineRow {
 }
 
 export async function syncAutoCalendarEvents() {
+  const { CalendarEvent } = await import("@modules/calendar/event.model");
+
   let created = 0;
 
   // ── Contract deadlines (next 90 days) ──

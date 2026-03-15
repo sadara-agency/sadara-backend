@@ -1049,5 +1049,5 @@ export async function startCronJobs() {
   schedule("0 5 * * 0", "risk-radar-consistency"); // Sunday 5:00 AM
   schedule("0 6 * * 0", "duplicate-record-detector"); // Sunday 6:00 AM
 
-  logger.info("[CRON] 60 jobs scheduled ✓");
+  logger.info("[CRON] 59 jobs scheduled ✓");
 }
