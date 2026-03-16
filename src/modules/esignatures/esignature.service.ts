@@ -18,7 +18,6 @@ import {
   sendSignatureReminderEmail,
 } from "@shared/utils/mail";
 import { env } from "@config/env";
-import { logAudit } from "@shared/utils/auditLogger";
 import type {
   CreateSignatureRequestInput,
   SubmitSignatureInput,
@@ -152,11 +151,6 @@ export async function createSignatureRequest(
         doc.name,
         input.message,
       );
-    });
-
-    logAudit(userId, "CREATE", "esignature", request.id, {
-      title: input.title,
-      signerCount: input.signers.length,
     });
 
     return SignatureRequest.findByPk(request.id, {
