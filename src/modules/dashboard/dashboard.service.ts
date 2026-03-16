@@ -46,17 +46,39 @@ export async function getAlerts() {
         injuryConflicts,
         openReferrals,
       ] = await Promise.all([
-        sequelize.query("SELECT * FROM vw_expiring_contracts LIMIT 5", {
-          type: QueryTypes.SELECT,
-        }),
-        sequelize.query("SELECT * FROM vw_overdue_payments LIMIT 5", {
-          type: QueryTypes.SELECT,
-        }),
-        sequelize.query("SELECT * FROM vw_injury_match_conflicts LIMIT 5", {
-          type: QueryTypes.SELECT,
-        }),
         sequelize.query(
-          `SELECT r.*, p.first_name || ' ' || p.last_name AS player_name
+          `SELECT vc.*, COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
+           FROM vw_expiring_contracts vc
+           JOIN contracts c ON vc.contract_id = c.id
+           JOIN players p ON c.player_id = p.id
+           LIMIT 5`,
+          { type: QueryTypes.SELECT },
+        ),
+        sequelize.query(
+          `SELECT vp.*, COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
+           FROM vw_overdue_payments vp
+           LEFT JOIN payments py ON vp.payment_id = py.id
+           LEFT JOIN players p ON py.player_id = p.id
+           LIMIT 5`,
+          { type: QueryTypes.SELECT },
+        ),
+        sequelize.query(
+          `SELECT vi.*,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar,
+                  hc.name_ar AS home_team_ar, ac.name_ar AS away_team_ar
+           FROM vw_injury_match_conflicts vi
+           JOIN match_players mp2 ON mp2.match_id = vi.match_id AND mp2.availability = 'injured'
+           JOIN players p ON mp2.player_id = p.id
+           LEFT JOIN matches m ON vi.match_id = m.id
+           LEFT JOIN clubs hc ON m.home_club_id = hc.id
+           LEFT JOIN clubs ac ON m.away_club_id = ac.id
+           LIMIT 5`,
+          { type: QueryTypes.SELECT },
+        ),
+        sequelize.query(
+          `SELECT r.*,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
              FROM referrals r
              JOIN players p ON r.player_id = p.id
              WHERE r.status IN ('Open', 'InProgress')
@@ -136,6 +158,7 @@ export async function getTopPlayers(limit = 5) {
            p.market_value,
            p.photo_url,
            c.name AS club_name,
+           c.name_ar AS club_name_ar,
            c.logo_url AS club_logo_url,
            rr.overall_risk,
            perf_agg.avg_rating,
@@ -242,8 +265,8 @@ export async function getUpcomingMatches(
         return sequelize.query(
           `SELECT
              m.id, m.match_date, m.venue, m.competition, m.status,
-             hc.name AS home_team,
-             ac.name AS away_team,
+             hc.name AS home_team, hc.name_ar AS home_team_ar,
+             ac.name AS away_team, ac.name_ar AS away_team_ar,
              (SELECT COUNT(*) FROM match_players mp WHERE mp.match_id = m.id) AS managed_players
            FROM matches m
            LEFT JOIN clubs hc ON m.home_club_id = hc.id
@@ -260,8 +283,8 @@ export async function getUpcomingMatches(
         return sequelize.query(
           `SELECT DISTINCT ON (m.id)
              m.id, m.match_date, m.venue, m.competition, m.status,
-             hc.name AS home_team,
-             ac.name AS away_team,
+             hc.name AS home_team, hc.name_ar AS home_team_ar,
+             ac.name AS away_team, ac.name_ar AS away_team_ar,
              1 AS managed_players
            FROM matches m
            LEFT JOIN clubs hc ON m.home_club_id = hc.id
@@ -279,8 +302,8 @@ export async function getUpcomingMatches(
       return sequelize.query(
         `SELECT DISTINCT ON (m.id)
            m.id, m.match_date, m.venue, m.competition, m.status,
-           hc.name AS home_team,
-           ac.name AS away_team,
+           hc.name AS home_team, hc.name_ar AS home_team_ar,
+           ac.name AS away_team, ac.name_ar AS away_team_ar,
            (SELECT COUNT(*) FROM match_players mp2
             JOIN players p2 ON mp2.player_id = p2.id
             WHERE mp2.match_id = m.id
