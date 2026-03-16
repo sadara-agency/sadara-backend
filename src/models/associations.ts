@@ -51,6 +51,11 @@ import {
   ApprovalChainTemplateStep,
 } from "@modules/approvals/approvalChainTemplate.model";
 import { CalendarEvent, EventAttendee } from "@modules/calendar/event.model";
+import {
+  SignatureRequest,
+  SignatureSigner,
+  SignatureAuditTrail,
+} from "@modules/esignatures/esignature.model";
 import { ApprovalStep } from "@modules/approvals/approvalStep.model";
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
 import {
@@ -461,5 +466,31 @@ export function setupAssociations() {
   CalendarEvent.hasMany(CalendarEvent, {
     foreignKey: "recurrenceParentId",
     as: "recurrenceChildren",
+  });
+
+  // ── E-Signatures ──
+  SignatureRequest.belongsTo(Document, {
+    foreignKey: "documentId",
+    as: "document",
+  });
+  SignatureRequest.belongsTo(User, {
+    foreignKey: "createdBy",
+    as: "creator",
+  });
+  SignatureRequest.hasMany(SignatureSigner, {
+    foreignKey: "signatureRequestId",
+    as: "signers",
+  });
+  SignatureRequest.hasMany(SignatureAuditTrail, {
+    foreignKey: "signatureRequestId",
+    as: "auditTrail",
+  });
+  SignatureSigner.belongsTo(User, {
+    foreignKey: "userId",
+    as: "user",
+  });
+  SignatureSigner.belongsTo(SignatureRequest, {
+    foreignKey: "signatureRequestId",
+    as: "request",
   });
 }
