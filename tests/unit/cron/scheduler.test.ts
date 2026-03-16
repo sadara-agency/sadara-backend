@@ -43,6 +43,7 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
 }));
 jest.mock('../../../src/modules/matches/matchAutoTasks', () => ({
   generatePreMatchTasks: jest.fn(),
+  generateMatchLevelPreTasks: jest.fn(),
 }));
 jest.mock('../../../src/cron/engines/performance.engine', () => ({
   checkPerformanceTrends: jest.fn(),
@@ -127,6 +128,9 @@ jest.mock('../../../src/modules/documents/documentAutoTasks', () => ({
 jest.mock('../../../src/modules/referrals/referralAutoTasks', () => ({
   checkReferralOverdue: jest.fn(),
   generateCriticalReferralTask: jest.fn(),
+}));
+jest.mock('../../../src/modules/esignatures/esignature.service', () => ({
+  expireOverdueSignatureRequests: jest.fn().mockResolvedValue({ expired: 0 }),
 }));
 
 // Mock appSettings to prevent DB call in syncDisabledJobsToRedis

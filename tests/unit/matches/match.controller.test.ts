@@ -1,5 +1,8 @@
 /// <reference types="jest" />
 jest.mock('../../../src/modules/matches/match.service');
+jest.mock('../../../src/modules/matches/matchAutoTasks', () => ({
+  generateAutoTasks: jest.fn().mockResolvedValue({ created: 0 }),
+}));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
