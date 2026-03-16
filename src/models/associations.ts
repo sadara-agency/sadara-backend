@@ -50,6 +50,7 @@ import {
   ApprovalChainTemplate,
   ApprovalChainTemplateStep,
 } from "@modules/approvals/approvalChainTemplate.model";
+import { CalendarEvent, EventAttendee } from "@modules/calendar/event.model";
 import { ApprovalStep } from "@modules/approvals/approvalStep.model";
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
 import {
@@ -432,4 +433,33 @@ export function setupAssociations() {
   // Coach Alerts
   CoachAlert.belongsTo(User, { foreignKey: "coachId", as: "coach" });
   CoachAlert.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+
+  // ── Calendar Events ──
+  CalendarEvent.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  CalendarEvent.hasMany(EventAttendee, {
+    foreignKey: "eventId",
+    as: "attendees",
+  });
+  EventAttendee.belongsTo(CalendarEvent, {
+    foreignKey: "eventId",
+    as: "event",
+  });
+  EventAttendee.belongsTo(Player, {
+    foreignKey: "attendeeId",
+    as: "player",
+    constraints: false,
+  });
+  EventAttendee.belongsTo(User, {
+    foreignKey: "attendeeId",
+    as: "user",
+    constraints: false,
+  });
+  CalendarEvent.belongsTo(CalendarEvent, {
+    foreignKey: "recurrenceParentId",
+    as: "recurrenceParent",
+  });
+  CalendarEvent.hasMany(CalendarEvent, {
+    foreignKey: "recurrenceParentId",
+    as: "recurrenceChildren",
+  });
 }
