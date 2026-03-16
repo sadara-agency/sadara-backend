@@ -279,7 +279,7 @@ describe('E-Signature Service', () => {
       mockUserFindByPk.mockResolvedValue(mockUser);
       mockSACreate.mockResolvedValue({});
 
-      const result = await svc.cancelRequest('req-1', 'user-1');
+      await svc.cancelRequest('req-1', 'user-1');
       expect(req.update).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'Cancelled' }),
         expect.anything(),
