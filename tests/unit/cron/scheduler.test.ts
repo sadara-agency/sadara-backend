@@ -43,6 +43,7 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
 }));
 jest.mock('../../../src/modules/matches/matchAutoTasks', () => ({
   generatePreMatchTasks: jest.fn(),
+  generateMatchLevelPreTasks: jest.fn(),
 }));
 jest.mock('../../../src/cron/engines/performance.engine', () => ({
   checkPerformanceTrends: jest.fn(),
@@ -127,6 +128,9 @@ jest.mock('../../../src/modules/documents/documentAutoTasks', () => ({
 jest.mock('../../../src/modules/referrals/referralAutoTasks', () => ({
   checkReferralOverdue: jest.fn(),
   generateCriticalReferralTask: jest.fn(),
+}));
+jest.mock('../../../src/modules/esignatures/esignature.service', () => ({
+  expireOverdueSignatureRequests: jest.fn().mockResolvedValue({ expired: 0 }),
 }));
 
 // Mock appSettings to prevent DB call in syncDisabledJobsToRedis
@@ -236,10 +240,10 @@ describe('Cron Scheduler', () => {
   });
 
   describe('startCronJobs', () => {
-    it('should schedule all 59 cron jobs', async () => {
+    it('should schedule all 60 cron jobs', async () => {
       await startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(59);
+      expect(cron.schedule).toHaveBeenCalledTimes(60);
     });
 
     it('should log initialization', async () => {

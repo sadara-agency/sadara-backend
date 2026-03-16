@@ -297,3 +297,205 @@ export async function sendPasswordChangedEmail(
     text: `مرحباً ${userName}، تم تغيير كلمة المرور بنجاح. إذا لم تقم بهذا التغيير، تواصل مع المسؤول فوراً.`,
   });
 }
+
+// ═══════════════════════════════════════════════════════════
+// E-Signature email templates
+// ═══════════════════════════════════════════════════════════
+
+/**
+ * Send a signature request email to a signer.
+ */
+export async function sendSignatureRequestEmail(
+  to: string,
+  signerName: string,
+  documentName: string,
+  requestorName: string,
+  message?: string,
+  signingUrl?: string,
+): Promise<boolean> {
+  const messageBlock = message
+    ? `
+    <div style="background-color:rgba(255,255,255,0.03); border-radius:10px; padding:16px; margin-bottom:20px; border:1px solid rgba(228,229,243,0.05);">
+      <p style="color:rgba(255,255,255,0.5); font-size:13px; margin:0; line-height:1.6;">
+        "${escapeHtml(message)}"
+      </p>
+      <p style="color:rgba(255,255,255,0.3); font-size:11px; margin:8px 0 0;">
+        — ${escapeHtml(requestorName)}
+      </p>
+    </div>`
+    : "";
+
+  const content = `
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="display:inline-block; width:56px; height:56px; border-radius:16px; background-color:rgba(60,60,250,0.1); line-height:56px; text-align:center;">
+        <span style="font-size:28px;">✍️</span>
+      </div>
+    </div>
+
+    <h1 style="color:#ffffff; font-size:22px; font-weight:bold; text-align:center; margin:0 0 8px;">
+      طلب توقيع / Signature Requested
+    </h1>
+    <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
+      مرحباً ${escapeHtml(signerName)}، يرجى توقيع المستند التالي:<br/>
+      <strong style="color:rgba(255,255,255,0.7);">${escapeHtml(documentName)}</strong>
+    </p>
+
+    ${messageBlock}
+
+    <div style="text-align:center; margin-bottom:28px;">
+      <a href="${signingUrl || "#"}" target="_blank"
+         style="display:inline-block; background-color:#3C3CFA; color:#ffffff; font-size:14px; font-weight:600; text-decoration:none; padding:14px 40px; border-radius:12px; letter-spacing:0.3px;">
+        توقيع الآن / Sign Now
+      </a>
+    </div>
+
+    <div style="background-color:rgba(255,255,255,0.03); border-radius:10px; padding:16px; border:1px solid rgba(228,229,243,0.05);">
+      <p style="color:rgba(255,255,255,0.4); font-size:12px; margin:0; line-height:1.6;">
+        ⏱️ رابط التوقيع صالح لمدة <strong style="color:rgba(255,255,255,0.6);">7 أيام</strong>.
+      </p>
+    </div>
+
+    <p style="color:rgba(255,255,255,0.25); font-size:10px; text-align:center; margin:16px 0 0; word-break:break-all; direction:ltr;">
+      <a href="${signingUrl || "#"}" style="color:#3C3CFA; text-decoration:none;">${signingUrl || ""}</a>
+    </p>
+  `;
+
+  return sendMail({
+    to,
+    subject: `✍️ طلب توقيع: ${documentName} — صدارة`,
+    html: wrapInTemplate(content),
+    text: `مرحباً ${signerName}، يرجى توقيع المستند "${documentName}". رابط التوقيع: ${signingUrl}`,
+  });
+}
+
+/**
+ * Notify all parties when a document is fully signed.
+ */
+export async function sendSignatureCompletedEmail(
+  to: string,
+  recipientName: string,
+  documentName: string,
+): Promise<boolean> {
+  const content = `
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="display:inline-block; width:56px; height:56px; border-radius:16px; background-color:rgba(34,197,94,0.1); line-height:56px; text-align:center;">
+        <span style="font-size:28px;">✅</span>
+      </div>
+    </div>
+
+    <h1 style="color:#ffffff; font-size:22px; font-weight:bold; text-align:center; margin:0 0 8px;">
+      تم التوقيع بالكامل / Fully Signed
+    </h1>
+    <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
+      مرحباً ${escapeHtml(recipientName)}، تم جمع جميع التوقيعات على المستند:<br/>
+      <strong style="color:rgba(255,255,255,0.7);">${escapeHtml(documentName)}</strong>
+    </p>
+
+    <div style="background-color:rgba(34,197,94,0.05); border-radius:10px; padding:16px; border:1px solid rgba(34,197,94,0.1);">
+      <p style="color:rgba(255,255,255,0.5); font-size:13px; margin:0; text-align:center; line-height:1.6;">
+        يمكنك تحميل المستند الموقّع من لوحة التحكم 📄
+      </p>
+    </div>
+  `;
+
+  return sendMail({
+    to,
+    subject: `✅ تم التوقيع: ${documentName} — صدارة`,
+    html: wrapInTemplate(content),
+    text: `مرحباً ${recipientName}، تم جمع جميع التوقيعات على "${documentName}".`,
+  });
+}
+
+/**
+ * Notify the creator when a signer declines.
+ */
+export async function sendSignatureDeclinedEmail(
+  to: string,
+  recipientName: string,
+  documentName: string,
+  declinedByName: string,
+  reason?: string,
+): Promise<boolean> {
+  const reasonBlock = reason
+    ? `<p style="color:rgba(255,255,255,0.4); font-size:12px; margin:8px 0 0; line-height:1.6;">السبب: ${escapeHtml(reason)}</p>`
+    : "";
+
+  const content = `
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="display:inline-block; width:56px; height:56px; border-radius:16px; background-color:rgba(239,68,68,0.1); line-height:56px; text-align:center;">
+        <span style="font-size:28px;">❌</span>
+      </div>
+    </div>
+
+    <h1 style="color:#ffffff; font-size:22px; font-weight:bold; text-align:center; margin:0 0 8px;">
+      تم رفض التوقيع / Signature Declined
+    </h1>
+    <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
+      مرحباً ${escapeHtml(recipientName)}، قام <strong style="color:rgba(255,255,255,0.7);">${escapeHtml(declinedByName)}</strong> برفض التوقيع على:<br/>
+      <strong style="color:rgba(255,255,255,0.7);">${escapeHtml(documentName)}</strong>
+    </p>
+
+    <div style="background-color:rgba(239,68,68,0.05); border-radius:10px; padding:16px; border:1px solid rgba(239,68,68,0.1);">
+      <p style="color:rgba(255,255,255,0.5); font-size:12px; margin:0; line-height:1.6;">
+        تم إلغاء طلب التوقيع تلقائياً.
+      </p>
+      ${reasonBlock}
+    </div>
+  `;
+
+  return sendMail({
+    to,
+    subject: `❌ تم رفض التوقيع: ${documentName} — صدارة`,
+    html: wrapInTemplate(content),
+    text: `مرحباً ${recipientName}، قام ${declinedByName} برفض التوقيع على "${documentName}".${reason ? ` السبب: ${reason}` : ""}`,
+  });
+}
+
+/**
+ * Reminder email for a pending signer.
+ */
+export async function sendSignatureReminderEmail(
+  to: string,
+  signerName: string,
+  documentName: string,
+  signingUrl: string,
+  dueDate?: string | null,
+): Promise<boolean> {
+  const dueLine = dueDate
+    ? `<p style="color:rgba(255,159,10,0.8); font-size:12px; margin:8px 0 0;">⏰ الموعد النهائي: ${dueDate}</p>`
+    : "";
+
+  const content = `
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="display:inline-block; width:56px; height:56px; border-radius:16px; background-color:rgba(255,159,10,0.1); line-height:56px; text-align:center;">
+        <span style="font-size:28px;">🔔</span>
+      </div>
+    </div>
+
+    <h1 style="color:#ffffff; font-size:22px; font-weight:bold; text-align:center; margin:0 0 8px;">
+      تذكير بالتوقيع / Signature Reminder
+    </h1>
+    <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
+      مرحباً ${escapeHtml(signerName)}، لا يزال توقيعك مطلوباً على:<br/>
+      <strong style="color:rgba(255,255,255,0.7);">${escapeHtml(documentName)}</strong>
+    </p>
+
+    <div style="text-align:center; margin-bottom:28px;">
+      <a href="${signingUrl}" target="_blank"
+         style="display:inline-block; background-color:#FF9F0A; color:#000000; font-size:14px; font-weight:600; text-decoration:none; padding:14px 40px; border-radius:12px; letter-spacing:0.3px;">
+        توقيع الآن / Sign Now
+      </a>
+    </div>
+
+    <div style="background-color:rgba(255,255,255,0.03); border-radius:10px; padding:16px; border:1px solid rgba(228,229,243,0.05);">
+      ${dueLine}
+    </div>
+  `;
+
+  return sendMail({
+    to,
+    subject: `🔔 تذكير بالتوقيع: ${documentName} — صدارة`,
+    html: wrapInTemplate(content),
+    text: `مرحباً ${signerName}، لا يزال توقيعك مطلوباً على "${documentName}". رابط التوقيع: ${signingUrl}`,
+  });
+}
