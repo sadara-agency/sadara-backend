@@ -19,6 +19,12 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import { PaginationQuery } from "@shared/types";
+import {
+  cacheOrFetch,
+  buildCacheKey,
+  CacheTTL,
+  CachePrefix,
+} from "@shared/utils/cache";
 
 // ── Query parameter interfaces ──
 
@@ -500,35 +506,43 @@ export async function getFinancialDashboard(
   playerContractType?: string,
   comparisonPeriod: "MoM" | "QoQ" | "YoY" = "MoM",
 ) {
-  // Build optional contract-type filter for player queries
-  const typeFilter = playerContractType ? "AND contract_type = $1" : "";
-  const typeBind = playerContractType ? { bind: [playerContractType] } : {};
+  const cacheKey = buildCacheKey(`${CachePrefix.FINANCE}:dashboard`, {
+    playerContractType,
+    comparisonPeriod,
+  });
 
-  // Total portfolio market value
-  const [marketValue] = await sequelize.query<MarketValueRow>(
-    `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      // Build optional contract-type filter for player queries
+      const typeFilter = playerContractType ? "AND contract_type = $1" : "";
+      const typeBind = playerContractType ? { bind: [playerContractType] } : {};
+
+      // Total portfolio market value
+      const [marketValue] = await sequelize.query<MarketValueRow>(
+        `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
             COUNT(*)::INT AS total_players
      FROM players WHERE status = 'active' ${typeFilter}`,
-    { type: QueryTypes.SELECT, ...typeBind },
-  );
+        { type: QueryTypes.SELECT, ...typeBind },
+      );
 
-  // Player distribution by contract type
-  const distribution = await sequelize.query<DistributionRow>(
-    `SELECT contract_type, COUNT(*)::INT AS count
+      // Player distribution by contract type
+      const distribution = await sequelize.query<DistributionRow>(
+        `SELECT contract_type, COUNT(*)::INT AS count
      FROM players WHERE status = 'active' ${typeFilter}
      GROUP BY contract_type ORDER BY count DESC`,
-    { type: QueryTypes.SELECT, ...typeBind },
-  );
+        { type: QueryTypes.SELECT, ...typeBind },
+      );
 
-  // Expected vs collected commissions
-  const commissionTypeJoin = playerContractType
-    ? "JOIN players p ON c.player_id = p.id AND p.contract_type = $1"
-    : "";
-  const commissionPayJoin = playerContractType
-    ? "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = $1"
-    : "";
-  const [commissions] = await sequelize.query<CommissionsRow>(
-    `SELECT
+      // Expected vs collected commissions
+      const commissionTypeJoin = playerContractType
+        ? "JOIN players p ON c.player_id = p.id AND p.contract_type = $1"
+        : "";
+      const commissionPayJoin = playerContractType
+        ? "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = $1"
+        : "";
+      const [commissions] = await sequelize.query<CommissionsRow>(
+        `SELECT
        COALESCE(SUM(CASE WHEN c.total_commission ~ '^[0-9.]+$' THEN c.total_commission::NUMERIC ELSE 0 END), 0) AS expected_commissions,
        (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
         ${commissionPayJoin}
@@ -538,27 +552,27 @@ export async function getFinancialDashboard(
         WHERE pay.status IN ('Expected', 'Overdue') AND pay.payment_type = 'Commission') AS outstanding_commissions
      FROM contracts c ${commissionTypeJoin}
      WHERE c.status IN ('Active', 'Expiring Soon')`,
-    { type: QueryTypes.SELECT, ...typeBind },
-  );
+        { type: QueryTypes.SELECT, ...typeBind },
+      );
 
-  // Top 10 valued players
-  const topPlayers = await sequelize.query<TopPlayerRow>(
-    `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+      // Top 10 valued players
+      const topPlayers = await sequelize.query<TopPlayerRow>(
+        `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
             p.market_value, p.market_value_currency, p.position, p.photo_url,
             c.name AS club_name, c.name_ar AS club_name_ar
      FROM players p
      LEFT JOIN clubs c ON p.current_club_id = c.id
      WHERE p.status = 'active' AND p.market_value IS NOT NULL ${typeFilter}
      ORDER BY p.market_value DESC LIMIT 10`,
-    { type: QueryTypes.SELECT, ...typeBind },
-  );
+        { type: QueryTypes.SELECT, ...typeBind },
+      );
 
-  // Market value trend (monthly for last 12 months from valuations)
-  const trendTypeJoin = playerContractType
-    ? "JOIN players p ON v.player_id = p.id AND p.contract_type = $1"
-    : "";
-  const marketValueTrend = await sequelize.query<MarketValueTrendRow>(
-    `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
+      // Market value trend (monthly for last 12 months from valuations)
+      const trendTypeJoin = playerContractType
+        ? "JOIN players p ON v.player_id = p.id AND p.contract_type = $1"
+        : "";
+      const marketValueTrend = await sequelize.query<MarketValueTrendRow>(
+        `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
             SUM(v.value)::NUMERIC AS total_value,
             COUNT(DISTINCT v.player_id)::INT AS players_valued
      FROM valuations v
@@ -566,12 +580,12 @@ export async function getFinancialDashboard(
      WHERE v.valued_at >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
      GROUP BY DATE_TRUNC('month', v.valued_at)
      ORDER BY month`,
-    { type: QueryTypes.SELECT, ...typeBind },
-  );
+        { type: QueryTypes.SELECT, ...typeBind },
+      );
 
-  // Revenue by club (top 10 clubs by paid invoice revenue)
-  const revenueByClub = await sequelize.query<RevenueByClubRow>(
-    `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
+      // Revenue by club (top 10 clubs by paid invoice revenue)
+      const revenueByClub = await sequelize.query<RevenueByClubRow>(
+        `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
             COALESCE(SUM(i.total_amount), 0)::NUMERIC AS total_revenue,
             COUNT(*)::INT AS invoice_count
      FROM invoices i
@@ -580,13 +594,15 @@ export async function getFinancialDashboard(
      GROUP BY c.id, c.name, c.name_ar, c.logo_url
      ORDER BY total_revenue DESC
      LIMIT 10`,
-    { type: QueryTypes.SELECT },
-  );
+        { type: QueryTypes.SELECT },
+      );
 
-  // Per-player revenue breakdown (top 20 by paid payments)
-  const playerTypeJoin = playerContractType ? "AND p.contract_type = $1" : "";
-  const playerRevenueBreakdown = await sequelize.query<PlayerRevenueRow>(
-    `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
+      // Per-player revenue breakdown (top 20 by paid payments)
+      const playerTypeJoin = playerContractType
+        ? "AND p.contract_type = $1"
+        : "";
+      const playerRevenueBreakdown = await sequelize.query<PlayerRevenueRow>(
+        `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
             c.name AS club_name, c.name_ar AS club_name_ar,
             COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Commission'), 0)::NUMERIC AS commissions,
             COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Sponsorship'), 0)::NUMERIC AS sponsorship,
@@ -599,12 +615,12 @@ export async function getFinancialDashboard(
      GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url, c.name, c.name_ar
      ORDER BY total_revenue DESC
      LIMIT 20`,
-    { type: QueryTypes.SELECT, ...typeBind },
-  );
+        { type: QueryTypes.SELECT, ...typeBind },
+      );
 
-  // Cash flow timeline (-12 months to +6 months)
-  const cashFlowTimeline = await sequelize.query<CashFlowRow>(
-    `WITH months AS (
+      // Cash flow timeline (-12 months to +6 months)
+      const cashFlowTimeline = await sequelize.query<CashFlowRow>(
+        `WITH months AS (
        SELECT TO_CHAR(d, 'YYYY-MM') AS month
        FROM generate_series(
          DATE_TRUNC('month', NOW()) - INTERVAL '12 months',
@@ -635,92 +651,102 @@ export async function getFinancialDashboard(
      LEFT JOIN expected e ON m.month = e.month
      LEFT JOIN received r ON m.month = r.month
      ORDER BY m.month`,
-    { type: QueryTypes.SELECT },
-  );
+        { type: QueryTypes.SELECT },
+      );
 
-  // Period comparison
-  const periodComparison = await computePeriodComparison(comparisonPeriod);
+      // Period comparison
+      const periodComparison = await computePeriodComparison(comparisonPeriod);
 
-  // Profitability
-  const [revRow] = await sequelize.query<RevenueRow>(
-    `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
+      // Profitability
+      const [revRow] = await sequelize.query<RevenueRow>(
+        `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
      FROM payments WHERE status = 'Paid'
        AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
-    { type: QueryTypes.SELECT },
-  );
-  const [expRow] = await sequelize.query<ExpenseTotalRow>(
-    `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
+        { type: QueryTypes.SELECT },
+      );
+      const [expRow] = await sequelize.query<ExpenseTotalRow>(
+        `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
      FROM expenses
      WHERE date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
-    { type: QueryTypes.SELECT },
-  );
-  const totalRevenue = Number(revRow?.total_revenue || 0);
-  const totalExpenses = Number(expRow?.total_expenses || 0);
-  const netProfit = totalRevenue - totalExpenses;
+        { type: QueryTypes.SELECT },
+      );
+      const totalRevenue = Number(revRow?.total_revenue || 0);
+      const totalExpenses = Number(expRow?.total_expenses || 0);
+      const netProfit = totalRevenue - totalExpenses;
 
-  return {
-    totalMarketValue: marketValue?.total_market_value || 0,
-    totalPlayers: marketValue?.total_players || 0,
-    distribution,
-    commissions: commissions || {},
-    topPlayers,
-    marketValueTrend,
-    revenueByClub,
-    playerRevenueBreakdown,
-    cashFlowTimeline,
-    periodComparison,
-    profitability: {
-      totalRevenue,
-      totalExpenses,
-      netProfit,
-      profitMarginPct: totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
+      return {
+        totalMarketValue: marketValue?.total_market_value || 0,
+        totalPlayers: marketValue?.total_players || 0,
+        distribution,
+        commissions: commissions || {},
+        topPlayers,
+        marketValueTrend,
+        revenueByClub,
+        playerRevenueBreakdown,
+        cashFlowTimeline,
+        periodComparison,
+        profitability: {
+          totalRevenue,
+          totalExpenses,
+          netProfit,
+          profitMarginPct:
+            totalRevenue > 0 ? (netProfit / totalRevenue) * 100 : 0,
+        },
+      };
     },
-  };
+    CacheTTL.MEDIUM,
+  );
 }
 
 export async function getFinanceSummary(months = 12) {
-  const [invoiceStats] = await sequelize.query<InvoiceStatsRow>(
-    `
-    SELECT
-      SUM(CASE WHEN status = 'Paid' THEN total_amount ELSE 0 END)::NUMERIC AS total_paid,
-      SUM(CASE WHEN status = 'Expected' THEN total_amount ELSE 0 END)::NUMERIC AS total_pending,
-      SUM(CASE WHEN status = 'Overdue' THEN total_amount ELSE 0 END)::NUMERIC AS total_overdue,
-      COUNT(*) FILTER (WHERE status = 'Overdue')::INT AS overdue_count,
-      COUNT(*)::INT AS total_invoices
-    FROM invoices
-  `,
-    { type: QueryTypes.SELECT },
+  return cacheOrFetch(
+    buildCacheKey(`${CachePrefix.FINANCE}:summary`, { months }),
+    async () => {
+      const [invoiceStats] = await sequelize.query<InvoiceStatsRow>(
+        `
+        SELECT
+          SUM(CASE WHEN status = 'Paid' THEN total_amount ELSE 0 END)::NUMERIC AS total_paid,
+          SUM(CASE WHEN status = 'Expected' THEN total_amount ELSE 0 END)::NUMERIC AS total_pending,
+          SUM(CASE WHEN status = 'Overdue' THEN total_amount ELSE 0 END)::NUMERIC AS total_overdue,
+          COUNT(*) FILTER (WHERE status = 'Overdue')::INT AS overdue_count,
+          COUNT(*)::INT AS total_invoices
+        FROM invoices
+      `,
+        { type: QueryTypes.SELECT },
+      );
+
+      const upcomingPayments = await Payment.count({
+        where: { status: "Expected" },
+      });
+
+      const revenueByMonth = await sequelize.query<RevenueByMonthRow>(
+        `
+        SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
+          SUM(amount)::NUMERIC AS paid
+        FROM payments WHERE status = 'Paid' AND paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+        GROUP BY DATE_TRUNC('month', paid_date) ORDER BY month
+      `,
+        { bind: [months], type: QueryTypes.SELECT },
+      );
+
+      const revenueByType = await sequelize.query<RevenueByTypeRow>(
+        `
+        SELECT payment_type, SUM(amount)::NUMERIC AS total
+        FROM payments WHERE status = 'Paid'
+        GROUP BY payment_type ORDER BY total DESC
+      `,
+        { type: QueryTypes.SELECT },
+      );
+
+      return {
+        ...(invoiceStats || {}),
+        upcomingPayments,
+        revenueByMonth,
+        revenueByType,
+      };
+    },
+    CacheTTL.MEDIUM,
   );
-
-  const upcomingPayments = await Payment.count({
-    where: { status: "Expected" },
-  });
-
-  const revenueByMonth = await sequelize.query<RevenueByMonthRow>(
-    `
-    SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
-      SUM(amount)::NUMERIC AS paid
-    FROM payments WHERE status = 'Paid' AND paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
-    GROUP BY DATE_TRUNC('month', paid_date) ORDER BY month
-  `,
-    { bind: [months], type: QueryTypes.SELECT },
-  );
-
-  const revenueByType = await sequelize.query<RevenueByTypeRow>(
-    `
-    SELECT payment_type, SUM(amount)::NUMERIC AS total
-    FROM payments WHERE status = 'Paid'
-    GROUP BY payment_type ORDER BY total DESC
-  `,
-    { type: QueryTypes.SELECT },
-  );
-
-  return {
-    ...(invoiceStats || {}),
-    upcomingPayments,
-    revenueByMonth,
-    revenueByType,
-  };
 }
 
 // ══════════════════════════════════════════
