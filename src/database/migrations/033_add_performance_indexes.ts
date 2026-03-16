@@ -2,10 +2,12 @@
 // Migration 033: Add performance indexes
 //
 // Adds missing indexes on frequently queried columns across
-// contracts, tasks, payments, invoices, injuries, audit_logs,
-// valuations, documents, notes, and player_match_stats tables.
+// contracts, tasks, payments, invoices, injuries, valuations,
+// documents, notes, audit_logs, and player_match_stats tables.
 //
 // All indexes use IF NOT EXISTS for idempotency.
+// Tables that may not exist (audit_logs — created via Sequelize
+// sync, not migrations) are guarded with DO $$ blocks.
 // ═══════════════════════════════════════════════════════════════
 
 import { sequelize } from "@config/database";
@@ -70,15 +72,6 @@ const INDEXES = [
   `CREATE INDEX IF NOT EXISTS idx_injuries_status
    ON injuries (status)`,
 
-  // ── audit_logs ──
-  // contract history + entity audit trail lookups
-  `CREATE INDEX IF NOT EXISTS idx_audit_logs_entity
-   ON audit_logs (entity, entity_id)`,
-
-  // recent activity feed sorted by logged_at
-  `CREATE INDEX IF NOT EXISTS idx_audit_logs_logged_at
-   ON audit_logs (logged_at)`,
-
   // ── valuations ──
   // finance dashboard market value trend chart
   `CREATE INDEX IF NOT EXISTS idx_valuations_player_date
@@ -95,19 +88,50 @@ const INDEXES = [
    ON notes (owner_type, owner_id)`,
 ];
 
+// Tables created via Sequelize sync (not migrations) — guard with existence check
+const GUARDED_INDEXES = [
+  // ── audit_logs ──
+  // contract history + entity audit trail lookups
+  {
+    name: "idx_audit_logs_entity",
+    table: "audit_logs",
+    sql: `CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs (entity, entity_id)`,
+  },
+  // recent activity feed sorted by logged_at
+  {
+    name: "idx_audit_logs_logged_at",
+    table: "audit_logs",
+    sql: `CREATE INDEX IF NOT EXISTS idx_audit_logs_logged_at ON audit_logs (logged_at)`,
+  },
+];
+
 export async function up() {
   for (const sql of INDEXES) {
     await sequelize.query(sql);
   }
+
+  // Guarded indexes — only create if the table exists
+  for (const { table, sql } of GUARDED_INDEXES) {
+    await sequelize.query(`
+      DO $$ BEGIN
+        IF to_regclass('public.${table}') IS NOT NULL THEN
+          EXECUTE '${sql.replace(/'/g, "''")}';
+        END IF;
+      END $$;
+    `);
+  }
 }
 
 export async function down() {
-  const names = INDEXES.map((sql) => {
-    const match = sql.match(/IF NOT EXISTS (\w+)/);
-    return match?.[1];
-  }).filter(Boolean);
+  const allNames = [
+    ...INDEXES.map((sql) => {
+      const match = sql.match(/IF NOT EXISTS (\w+)/);
+      return match?.[1];
+    }),
+    ...GUARDED_INDEXES.map((g) => g.name),
+  ].filter(Boolean);
 
-  for (const name of names) {
+  for (const name of allNames) {
     await sequelize.query(`DROP INDEX IF EXISTS ${name}`);
   }
 }
