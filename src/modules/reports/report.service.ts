@@ -97,14 +97,23 @@ export async function createReport(
   });
   if (!player) throw new AppError("Player not found", 404);
 
-  const report = await TechnicalReport.create({
-    playerId: input.playerId,
-    title: input.title,
-    periodType: input.periodType,
-    periodParams: input.periodParams,
-    notes: input.notes || null,
-    createdBy,
-  });
+  let report: TechnicalReport;
+  try {
+    report = await TechnicalReport.create({
+      playerId: input.playerId,
+      title: input.title,
+      periodType: input.periodType,
+      periodParams: input.periodParams,
+      notes: input.notes || null,
+      createdBy,
+    });
+  } catch (err: any) {
+    logger.error("Failed to create report record", {
+      error: err.message,
+      stack: err.stack,
+    });
+    throw new AppError("Failed to create report. Please contact support.", 500);
+  }
 
   // Set to Generating — async PDF work
   await report.update({ status: "Generating" });

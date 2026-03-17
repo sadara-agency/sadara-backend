@@ -109,7 +109,14 @@ export function createCrudController(config: CrudConfig) {
   };
 
   const update: Handler = async (req, res) => {
-    const oldItem = await service.getById(req.params.id);
+    // Get old item for audit diff — don't block update if this fails
+    let oldItem: any = null;
+    try {
+      oldItem = await service.getById(req.params.id);
+    } catch {
+      // old item fetch failed — proceed with update without audit diff
+    }
+
     const item = await service.update(req.params.id, req.body);
     sendSuccess(res, item, `${entityLabel.slice(0, -1)} updated`);
 
@@ -118,7 +125,7 @@ export function createCrudController(config: CrudConfig) {
       oldItem instanceof Object
         ? ((oldItem as any).get?.({ plain: true }) ?? oldItem)
         : oldItem;
-    const changes = buildChanges(oldPlain, req.body);
+    const changes = oldPlain ? buildChanges(oldPlain, req.body) : undefined;
 
     Promise.all([
       logAudit(

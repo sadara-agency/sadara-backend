@@ -45,14 +45,7 @@ Note.init(
       primaryKey: true,
     },
     ownerType: {
-      type: DataTypes.ENUM(
-        "Player",
-        "Contract",
-        "Match",
-        "Injury",
-        "Club",
-        "Offer",
-      ),
+      type: DataTypes.STRING(50),
       allowNull: false,
       field: "owner_type",
     },
