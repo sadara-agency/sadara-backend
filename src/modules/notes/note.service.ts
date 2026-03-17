@@ -69,13 +69,22 @@ export async function createNote(
   input: { ownerType: NoteOwnerType; ownerId: string; content: string },
   createdBy: string,
 ) {
-  const note = await Note.create({
-    ownerType: input.ownerType,
-    ownerId: input.ownerId,
-    content: input.content,
-    createdBy,
-  });
-  return note;
+  try {
+    const note = await Note.create({
+      ownerType: input.ownerType,
+      ownerId: input.ownerId,
+      content: input.content,
+      createdBy,
+    });
+    return note;
+  } catch (err: any) {
+    throw new AppError(
+      err.message?.includes("does not exist")
+        ? "Notes feature is temporarily unavailable"
+        : "Failed to create note",
+      500,
+    );
+  }
 }
 
 export async function updateNote(id: string, content: string, userId: string) {

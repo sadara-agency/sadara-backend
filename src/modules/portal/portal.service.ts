@@ -1010,27 +1010,55 @@ export async function updatePlayerAccount(
   accountId: string,
   input: { isActive?: boolean; password?: string },
 ) {
+  // Try users table first (invite-based accounts)
   const account = await User.findByPk(accountId);
-  if (!account || account.role !== "Player")
-    throw new AppError("Player account not found", 404);
+  if (account && account.role === "Player") {
+    const updates: Record<string, unknown> = {};
 
-  const updates: Record<string, unknown> = {};
+    if (input.isActive !== undefined) {
+      updates.isActive = input.isActive;
+    }
 
-  if (input.isActive !== undefined) {
-    updates.isActive = input.isActive;
+    if (input.password) {
+      updates.passwordHash = await bcrypt.hash(
+        input.password,
+        env.bcrypt.saltRounds,
+      );
+      updates.failedLoginAttempts = 0;
+      updates.lockedUntil = null;
+    }
+
+    await account.update(updates);
+    return { id: account.id, email: account.email, isActive: account.isActive };
   }
 
-  if (input.password) {
-    updates.passwordHash = await bcrypt.hash(
-      input.password,
-      env.bcrypt.saltRounds,
-    );
-    updates.failedLoginAttempts = 0;
-    updates.lockedUntil = null;
+  // Try player_accounts table (direct login accounts)
+  const pa = await PlayerAccount.findByPk(accountId);
+  if (pa) {
+    const paUpdates: Record<string, unknown> = {};
+
+    if (input.isActive !== undefined) {
+      paUpdates.status = input.isActive ? "active" : "disabled";
+    }
+
+    if (input.password) {
+      paUpdates.passwordHash = await bcrypt.hash(
+        input.password,
+        env.bcrypt.saltRounds,
+      );
+      paUpdates.failedLoginAttempts = 0;
+      paUpdates.lockedUntil = null;
+    }
+
+    await pa.update(paUpdates);
+    return {
+      id: pa.id,
+      email: pa.email,
+      isActive: input.isActive ?? pa.status === "active",
+    };
   }
 
-  await account.update(updates);
-  return { id: account.id, email: account.email, isActive: account.isActive };
+  throw new AppError("Player account not found", 404);
 }
 
 // ══════════════════════════════════════════

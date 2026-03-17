@@ -12,6 +12,7 @@ import {
   createEmptyTechnicalAttributes,
 } from "@modules/players/utils/attributeConfig";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
+import { logger } from "@config/logger";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -447,23 +448,45 @@ export async function updatePlayer(id: string, input: any) {
     input.currentClubId !== player.currentClubId &&
     player.currentClubId
   ) {
-    // Close the previous club entry
-    const today = new Date().toISOString().split("T")[0];
-    await PlayerClubHistory.update(
-      { endDate: today },
-      { where: { playerId: id, clubId: player.currentClubId, endDate: null } },
-    );
-    // Open a new club entry
-    await PlayerClubHistory.create({
-      playerId: id,
-      clubId: input.currentClubId,
-      startDate: today,
-      position: input.position || player.position,
-      jerseyNumber: input.jerseyNumber || player.jerseyNumber,
-    });
+    try {
+      // Close the previous club entry
+      const today = new Date().toISOString().split("T")[0];
+      await PlayerClubHistory.update(
+        { endDate: today },
+        {
+          where: { playerId: id, clubId: player.currentClubId, endDate: null },
+        },
+      );
+      // Open a new club entry
+      await PlayerClubHistory.create({
+        playerId: id,
+        clubId: input.currentClubId,
+        startDate: today,
+        position: input.position || player.position,
+        jerseyNumber: input.jerseyNumber || player.jerseyNumber,
+      });
+    } catch (err: any) {
+      logger.error("Club history update failed", {
+        playerId: id,
+        error: err.message,
+      });
+    }
   }
 
-  return await player.update(input);
+  try {
+    return await player.update(input);
+  } catch (err: any) {
+    // Handle Sequelize validation errors gracefully
+    if (
+      err.name === "SequelizeValidationError" ||
+      err.name === "SequelizeUniqueConstraintError"
+    ) {
+      const messages =
+        err.errors?.map((e: any) => e.message).join(", ") || err.message;
+      throw new AppError(messages, 422);
+    }
+    throw err;
+  }
 }
 
 export async function deletePlayer(id: string) {
@@ -489,10 +512,21 @@ export async function deletePlayer(id: string) {
 // ═══════════════════════════════════════════════════════════════
 
 export async function getPlayerProviders(playerId: string) {
-  return ExternalProviderMapping.findAll({
-    where: { playerId },
-    order: [["providerName", "ASC"]],
-  });
+  try {
+    return await ExternalProviderMapping.findAll({
+      where: { playerId },
+      order: [["providerName", "ASC"]],
+    });
+  } catch (err: any) {
+    logger.error("getPlayerProviders failed", {
+      playerId,
+      error: err.message,
+    });
+    if (err.message?.includes("does not exist")) {
+      return []; // Table not yet created — return empty gracefully
+    }
+    throw err;
+  }
 }
 
 export async function upsertPlayerProvider(
@@ -505,15 +539,34 @@ export async function upsertPlayerProvider(
     notes?: string;
   },
 ) {
-  const [mapping] = await ExternalProviderMapping.upsert({
-    playerId,
-    providerName: input.providerName as any,
-    externalPlayerId: input.externalPlayerId,
-    externalTeamId: input.externalTeamId || null,
-    apiBaseUrl: input.apiBaseUrl || null,
-    notes: input.notes || null,
-  } as any);
-  return mapping;
+  try {
+    const [mapping] = await ExternalProviderMapping.upsert({
+      playerId,
+      providerName: input.providerName as any,
+      externalPlayerId: input.externalPlayerId,
+      externalTeamId: input.externalTeamId || null,
+      apiBaseUrl: input.apiBaseUrl || null,
+      notes: input.notes || null,
+    } as any);
+    return mapping;
+  } catch (err: any) {
+    logger.error("upsertPlayerProvider failed", {
+      playerId,
+      provider: input.providerName,
+      error: err.message,
+      stack: err.stack,
+    });
+    if (
+      err.name === "SequelizeDatabaseError" &&
+      err.message?.includes("does not exist")
+    ) {
+      throw new AppError(
+        "Provider mappings feature is not available. Database migration required.",
+        503,
+      );
+    }
+    throw new AppError("Failed to save provider mapping", 500);
+  }
 }
 
 // ── Duplicate Player Check ──
@@ -525,31 +578,35 @@ export async function checkDuplicate(params: {
   nationality?: string;
   excludeId?: string; // exclude a player by ID (for edit mode)
 }) {
-  const conditions: string[] = [];
+  const searchConditions: string[] = [];
+  const filterConditions: string[] = [];
   const replacements: Record<string, string> = {};
   const dobValue = params.dateOfBirth || params.dob;
 
   if (params.firstName && params.lastName) {
-    conditions.push(
+    searchConditions.push(
       `(LOWER(first_name) = LOWER(:firstName) AND LOWER(last_name) = LOWER(:lastName))`,
     );
     replacements.firstName = params.firstName;
     replacements.lastName = params.lastName;
   }
   if (dobValue) {
-    conditions.push(`date_of_birth = :dob`);
+    searchConditions.push(`date_of_birth = :dob`);
     replacements.dob = dobValue;
   }
   if (params.nationality) {
-    conditions.push(`LOWER(nationality) = LOWER(:nationality)`);
+    searchConditions.push(`LOWER(nationality) = LOWER(:nationality)`);
     replacements.nationality = params.nationality;
   }
   if (params.excludeId) {
-    conditions.push(`id != :excludeId`);
+    filterConditions.push(`id != :excludeId`);
     replacements.excludeId = params.excludeId;
   }
 
-  if (conditions.length < 2) return []; // Need at least name + DOB to check
+  // Need at least name + DOB to check (excludeId doesn't count as a search criterion)
+  if (searchConditions.length < 2) return [];
+
+  const conditions = [...searchConditions, ...filterConditions];
 
   const rows = await sequelize.query<Record<string, any>>(
     `SELECT id, first_name, last_name, first_name_ar, last_name_ar, date_of_birth, nationality
@@ -582,7 +639,7 @@ export async function removePlayerProvider(
   const mapping = await ExternalProviderMapping.findOne({
     where: { playerId, providerName },
   });
-  if (!mapping) throw new Error("Provider mapping not found");
+  if (!mapping) throw new AppError("Provider mapping not found", 404);
   await mapping.destroy();
   return { playerId, providerName };
 }
