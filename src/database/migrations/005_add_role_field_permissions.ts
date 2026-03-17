@@ -14,6 +14,14 @@ export async function up() {
     );
   `);
 
+  // Ensure DB-level defaults exist (Sequelize sync creates columns without them)
+  await sequelize.query(`
+    ALTER TABLE role_field_permissions
+      ALTER COLUMN id SET DEFAULT gen_random_uuid(),
+      ALTER COLUMN created_at SET DEFAULT NOW(),
+      ALTER COLUMN updated_at SET DEFAULT NOW();
+  `);
+
   await sequelize.query(
     `CREATE INDEX IF NOT EXISTS idx_rfp_role ON role_field_permissions(role)`,
   );
