@@ -6,10 +6,10 @@
 // can be synced from third-party APIs.
 // ═══════════════════════════════════════════════════════════════
 
-import type { QueryInterface } from "sequelize";
+import { sequelize } from "@config/database";
 
-export async function up(qi: QueryInterface) {
-  await qi.sequelize.query(`
+export async function up() {
+  await sequelize.query(`
     CREATE TABLE IF NOT EXISTS external_provider_mappings (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       player_id UUID NOT NULL REFERENCES players(id) ON DELETE CASCADE,
@@ -30,6 +30,6 @@ export async function up(qi: QueryInterface) {
   `);
 }
 
-export async function down(qi: QueryInterface) {
-  await qi.sequelize.query(`DROP TABLE IF EXISTS external_provider_mappings;`);
+export async function down() {
+  await sequelize.query(`DROP TABLE IF EXISTS external_provider_mappings;`);
 }
