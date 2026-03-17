@@ -166,9 +166,9 @@ export async function listPlayerAccounts(_req: AuthRequest, res: Response) {
 export async function updatePlayerAccount(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const data = await portalService.updatePlayerAccount(id, req.body);
-  await logAudit(
+  logAudit(
     "UPDATE",
-    "users",
+    "player_accounts",
     id,
     buildAuditContext(req.user!, req.ip),
     `Updated player account: ${data.email}`,

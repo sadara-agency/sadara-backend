@@ -1028,7 +1028,9 @@ export async function updatePlayerAccount(
       updates.lockedUntil = null;
     }
 
-    await account.update(updates);
+    if (Object.keys(updates).length > 0) {
+      await account.update(updates);
+    }
     return { id: account.id, email: account.email, isActive: account.isActive };
   }
 
@@ -1050,7 +1052,21 @@ export async function updatePlayerAccount(
       paUpdates.lockedUntil = null;
     }
 
-    await pa.update(paUpdates);
+    if (Object.keys(paUpdates).length > 0) {
+      try {
+        await pa.update(paUpdates);
+      } catch (err) {
+        logger.error("Failed to update player_account", {
+          accountId,
+          paUpdates,
+          error: (err as Error).message,
+        });
+        throw new AppError(
+          `Failed to update player account: ${(err as Error).message}`,
+          500,
+        );
+      }
+    }
     return {
       id: pa.id,
       email: pa.email,
