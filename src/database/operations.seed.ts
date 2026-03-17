@@ -408,14 +408,14 @@ export async function seedGates() {
         id: IDS.gates[0],
         playerId: IDS.players[0],
         gateNumber: "0" as any,
-        status: "Passed" as any,
+        status: "Completed" as any,
         approvedBy: IDS.users.admin,
       },
       {
         id: IDS.gates[1],
         playerId: IDS.players[0],
         gateNumber: "1" as any,
-        status: "Passed" as any,
+        status: "Completed" as any,
         approvedBy: IDS.users.admin,
       },
       {

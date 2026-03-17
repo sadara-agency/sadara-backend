@@ -1010,6 +1010,8 @@ export async function updatePlayerAccount(
   accountId: string,
   input: { isActive?: boolean; password?: string },
 ) {
+  logger.info("updatePlayerAccount called", { accountId, input });
+
   // Try users table first (invite-based accounts)
   const account = await User.findByPk(accountId);
   if (account && account.role === "Player") {
@@ -1029,7 +1031,20 @@ export async function updatePlayerAccount(
     }
 
     if (Object.keys(updates).length > 0) {
-      await account.update(updates);
+      try {
+        await account.update(updates);
+      } catch (err) {
+        logger.error("Failed to update user (Player)", {
+          accountId,
+          updates: Object.keys(updates),
+          error: (err as Error).message,
+          stack: (err as Error).stack,
+        });
+        throw new AppError(
+          `Failed to update player account: ${(err as Error).message}`,
+          500,
+        );
+      }
     }
     return { id: account.id, email: account.email, isActive: account.isActive };
   }
@@ -1060,6 +1075,7 @@ export async function updatePlayerAccount(
           accountId,
           paUpdates,
           error: (err as Error).message,
+          stack: (err as Error).stack,
         });
         throw new AppError(
           `Failed to update player account: ${(err as Error).message}`,
@@ -1074,6 +1090,7 @@ export async function updatePlayerAccount(
     };
   }
 
+  logger.warn("Player account not found in either table", { accountId });
   throw new AppError("Player account not found", 404);
 }
 

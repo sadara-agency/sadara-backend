@@ -48,6 +48,28 @@ async function initInfrastructure(): Promise<void> {
   await testConnection();
   await initRedis();
   await initSSESubscriber();
+
+  // Create core tables from Sequelize models before migrations run.
+  // We sync models individually to avoid Sequelize's buggy cyclic-reference
+  // ALTER TABLE codepath (User ↔ Player cycle generates invalid SQL).
+  const models = Object.values(sequelize.models);
+  const failed: typeof models = [];
+  for (const model of models) {
+    try {
+      await (model as any).sync({ alter: false });
+    } catch {
+      failed.push(model);
+    }
+  }
+  // Second pass: retry models that failed due to FK ordering
+  for (const model of failed) {
+    try {
+      await (model as any).sync({ alter: false });
+    } catch {
+      // Will be created by migrations
+    }
+  }
+
   await migrator.up();
 }
 

@@ -89,8 +89,9 @@ export async function seedDatabase(): Promise<void> {
 
     console.log("🌱 Seeding development database...");
 
-    // Sync models → create tables (first-time only)
-    await sequelize.sync({ alter: false });
+    // Core tables are already created by initInfrastructure (individual model sync + migrations).
+    // Do NOT call sequelize.sync() here — it triggers Sequelize's buggy cyclic-reference
+    // ALTER TABLE codepath, which fails on columns referenced by views.
 
     // Seed in FK order
     await seedUsers();
