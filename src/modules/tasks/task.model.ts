@@ -18,6 +18,7 @@ interface TaskAttributes {
   dueDate: string | null;
   completedAt: Date | null;
   isAutoCreated: boolean;
+  referralId: string | null;
   triggerRuleId: string | null;
   notes: string | null;
   createdAt?: Date;
@@ -40,6 +41,7 @@ interface TaskCreationAttributes extends Optional<
   | "dueDate"
   | "completedAt"
   | "isAutoCreated"
+  | "referralId"
   | "triggerRuleId"
   | "notes"
   | "createdAt"
@@ -71,6 +73,7 @@ export class Task
   declare dueDate: string | null;
   declare completedAt: Date | null;
   declare isAutoCreated: boolean;
+  declare referralId: string | null;
   declare triggerRuleId: string | null;
   declare notes: string | null;
 }
@@ -140,6 +143,10 @@ Task.init(
       type: DataTypes.DATE,
       field: "completed_at",
     },
+    referralId: {
+      type: DataTypes.UUID,
+      field: "referral_id",
+    },
     isAutoCreated: {
       type: DataTypes.BOOLEAN,
       field: "is_auto_created",
@@ -163,6 +170,7 @@ Task.init(
       { fields: ["assigned_to"] },
       { fields: ["status"] },
       { fields: ["match_id"] },
+      { fields: ["referral_id"] },
     ],
   },
 );

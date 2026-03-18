@@ -31,6 +31,7 @@ export const createTaskSchema = z.object({
   playerId: z.string().uuid("Invalid player ID").optional(),
   matchId: z.string().uuid("Invalid match ID").optional(),
   contractId: z.string().uuid("Invalid contract ID").optional(),
+  referralId: z.string().uuid("Invalid referral ID").optional(),
   dueDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
@@ -49,6 +50,7 @@ export const updateTaskSchema = z.object({
   playerId: z.string().uuid("Invalid player ID").nullable().optional(),
   matchId: z.string().uuid("Invalid match ID").nullable().optional(),
   contractId: z.string().uuid("Invalid contract ID").nullable().optional(),
+  referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
   dueDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
@@ -87,6 +89,7 @@ export const taskQuerySchema = z.object({
   priority: z.enum(TASK_PRIORITIES).optional(),
   assignedTo: z.string().uuid().optional(),
   playerId: z.string().uuid().optional(),
+  referralId: z.string().uuid().optional(),
 });
 
 // ── Inferred types ──
