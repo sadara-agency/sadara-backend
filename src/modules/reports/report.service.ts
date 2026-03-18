@@ -86,15 +86,25 @@ export async function createReport(
   input: CreateReportInput,
   createdBy: string,
 ) {
-  const player = await Player.findByPk(input.playerId, {
-    include: [
-      {
-        model: Club,
-        as: "club",
-        attributes: ["id", "name", "nameAr", "logoUrl"],
-      },
-    ],
-  });
+  let player: Player | null;
+  try {
+    player = await Player.findByPk(input.playerId, {
+      include: [
+        {
+          model: Club,
+          as: "club",
+          attributes: ["id", "name", "nameAr", "logoUrl"],
+        },
+      ],
+    });
+  } catch (err: any) {
+    logger.error("Failed to find player for report", {
+      error: err.message,
+      stack: err.stack,
+      playerId: input.playerId,
+    });
+    throw new AppError("Failed to find player. Please try again.", 500);
+  }
   if (!player) throw new AppError("Player not found", 404);
 
   let report: TechnicalReport;
@@ -105,43 +115,71 @@ export async function createReport(
       periodType: input.periodType,
       periodParams: input.periodParams,
       notes: input.notes || null,
+      status: "Generating",
       createdBy,
     });
   } catch (err: any) {
     logger.error("Failed to create report record", {
       error: err.message,
       stack: err.stack,
+      detail: err.original?.message || err.parent?.message,
+      sql: err.sql,
     });
-    throw new AppError("Failed to create report. Please contact support.", 500);
+    throw new AppError(
+      `Failed to create report: ${err.original?.message || err.message}`,
+      500,
+    );
   }
 
-  // Set to Generating — async PDF work
-  await report.update({ status: "Generating" });
+  // Fire-and-forget PDF generation — don't block the API response
+  generatePdfInBackground(report.id, player, input, createdBy);
 
+  return getReportById(report.id);
+}
+
+/** Async PDF generation — runs in background after API responds */
+async function generatePdfInBackground(
+  reportId: string,
+  player: Player,
+  input: CreateReportInput,
+  createdBy: string,
+) {
   try {
     const data = await gatherReportData(
       input.playerId,
       input.periodType,
       input.periodParams,
     );
-    const filePath = await generateReportPdf(report.id, player, data);
-    await report.update({ status: "Generated", filePath });
+    const filePath = await generateReportPdf(reportId, player, data);
+    await TechnicalReport.update(
+      { status: "Generated", filePath },
+      { where: { id: reportId } },
+    );
   } catch (err: any) {
-    logger.error("Report generation failed", { error: err.message });
-    await report.update({
-      status: "Failed",
-      notes: `Generation error: ${err.message}`,
+    logger.error("Report PDF generation failed", {
+      error: err.message,
+      stack: err.stack,
+      reportId,
     });
+    try {
+      await TechnicalReport.update(
+        { status: "Failed", notes: `Generation error: ${err.message}` },
+        { where: { id: reportId } },
+      );
+    } catch (updateErr: any) {
+      logger.error("Failed to update report status to Failed", {
+        error: updateErr.message,
+        reportId,
+      });
+    }
 
     // Auto-task: report failed → Creator (fire-and-forget)
-    generateReportFailedTask(report.id, createdBy).catch((e) =>
+    generateReportFailedTask(reportId, createdBy).catch((e) =>
       logger.warn("Auto-task report_generation_failed failed", {
         error: (e as Error).message,
       }),
     );
   }
-
-  return getReportById(report.id);
 }
 
 // ────────────────────────────────────────────────────────────

@@ -58,6 +58,7 @@ export async function listTasks(queryParams: any) {
   if (queryParams.priority) where.priority = queryParams.priority;
   if (queryParams.assignedTo) where.assignedTo = queryParams.assignedTo;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
+  if (queryParams.referralId) where.referralId = queryParams.referralId;
 
   if (search) {
     const pattern = `%${search}%`;

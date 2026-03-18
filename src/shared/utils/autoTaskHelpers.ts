@@ -71,6 +71,7 @@ export interface AutoTaskInput {
   playerId?: string | null;
   matchId?: string | null;
   contractId?: string | null;
+  referralId?: string | null;
   dueDays?: number;
   /** Explicit due date string (YYYY-MM-DD). Takes precedence over dueDays. */
   dueDateStr?: string;
@@ -117,6 +118,7 @@ export async function createAutoTaskIfNotExists(
   if (input.contractId) dupeWhere.contractId = input.contractId;
   if (input.matchId) dupeWhere.matchId = input.matchId;
   if (input.playerId) dupeWhere.playerId = input.playerId;
+  if (input.referralId) dupeWhere.referralId = input.referralId;
   // For match-level tasks (no player), explicitly check null
   if (input.matchId && !input.playerId) dupeWhere.playerId = null;
 
@@ -145,6 +147,7 @@ export async function createAutoTaskIfNotExists(
     playerId: input.playerId ?? null,
     matchId: input.matchId ?? null,
     contractId: input.contractId ?? null,
+    referralId: input.referralId ?? null,
     dueDate: finalDueDate,
     isAutoCreated: true,
     triggerRuleId: input.ruleId,

@@ -64,6 +64,7 @@ export async function generateCriticalReferralTask(
       assignedTo: referral.assignedTo ?? manager?.id ?? null,
       assignedBy: createdBy,
       playerId: referral.playerId,
+      referralId,
     },
     {
       roles: ["Manager", "Admin"],
@@ -122,6 +123,7 @@ export async function checkReferralOverdue(): Promise<{ created: number }> {
         priority: "high",
         assignedTo: ref.assignedTo ?? null,
         playerId: ref.playerId,
+        referralId: ref.id,
       },
       {
         roles: ["Manager"],
