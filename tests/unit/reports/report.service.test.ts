@@ -4,6 +4,7 @@ import { mockReport, mockModelInstance } from '../../setup/test-helpers';
 const mockReportFindAndCountAll = jest.fn();
 const mockReportFindByPk = jest.fn();
 const mockReportCreate = jest.fn();
+const mockReportUpdate = jest.fn();
 const mockSequelizeQuery = jest.fn();
 const mockPlayerFindByPk = jest.fn();
 
@@ -16,6 +17,7 @@ jest.mock('../../../src/modules/reports/report.model', () => ({
     findAndCountAll: (...a: unknown[]) => mockReportFindAndCountAll(...a),
     findByPk: (...a: unknown[]) => mockReportFindByPk(...a),
     create: (...a: unknown[]) => mockReportCreate(...a),
+    update: (...a: unknown[]) => mockReportUpdate(...a),
   },
 }));
 
@@ -105,13 +107,21 @@ describe('Report Service', () => {
       const report = mockModelInstance(mockReport());
       mockReportCreate.mockResolvedValue(report);
       mockReportFindByPk.mockResolvedValue(report);
+      mockReportUpdate.mockResolvedValue([1]);
       mockSequelizeQuery.mockRejectedValueOnce(new Error('DB error'));
 
-      const result = await reportService.createReport(
+      await reportService.createReport(
         { playerId: 'player-001', title: 'Test', periodType: 'Season', periodParams: { season: '2024-2025' } } as any,
         'user-001',
       );
-      expect(report.update).toHaveBeenCalledWith(expect.objectContaining({ status: 'Failed' }));
+
+      // Wait for the fire-and-forget background PDF generation to settle
+      await new Promise((r) => setImmediate(r));
+
+      expect(mockReportUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'Failed' }),
+        expect.objectContaining({ where: { id: 'report-001' } }),
+      );
     });
   });
 
