@@ -50,8 +50,8 @@ function extractToken(req: AuthRequest): string | undefined {
   }
   // 2. Authorization header (mobile/API clients)
   const authHeader = req.headers.authorization;
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.split(" ")[1];
+  if (authHeader && /^bearer\s/i.test(authHeader)) {
+    return authHeader.split(/\s+/)[1];
   }
   return undefined;
 }

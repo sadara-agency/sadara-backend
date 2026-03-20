@@ -99,6 +99,7 @@ export async function listContracts(queryParams: any) {
     offset,
     order: [[sort, order]],
     distinct: true,
+    subQuery: false,
   });
 
   const data = rows.map(enrichContract);
@@ -155,44 +156,50 @@ export async function createContract(
     if (player) playerContractType = (player as any).contractType || null;
   }
 
-  // Warn if overlapping active contract exists for this player
-  const overlap = await Contract.findOne({
-    where: {
-      playerId: input.playerId,
-      status: { [Op.in]: ["Active", "Expiring Soon"] },
-      startDate: { [Op.lte]: input.endDate },
-      endDate: { [Op.gte]: input.startDate },
-    },
-  });
-  if (overlap) {
-    throw new AppError(
-      "This player already has an active contract with overlapping dates. Terminate or adjust the existing contract first.",
-      409,
-    );
-  }
+  // Overlap check + creation in a transaction to prevent race conditions
+  const contract = await sequelize.transaction(async (t) => {
+    const overlap = await Contract.findOne({
+      where: {
+        playerId: input.playerId,
+        status: { [Op.in]: ["Active", "Expiring Soon"] },
+        startDate: { [Op.lte]: input.endDate },
+        endDate: { [Op.gte]: input.startDate },
+      },
+      transaction: t,
+    });
+    if (overlap) {
+      throw new AppError(
+        "This player already has an active contract with overlapping dates. Terminate or adjust the existing contract first.",
+        409,
+      );
+    }
 
-  const contract = await Contract.create({
-    playerId: input.playerId,
-    clubId: input.clubId,
-    category: input.category,
-    contractType: (input as any).contractType,
-    playerContractType,
-    title: input.title,
-    startDate: input.startDate,
-    endDate: input.endDate,
-    baseSalary: input.baseSalary,
-    salaryCurrency: input.salaryCurrency,
-    signingBonus: input.signingBonus,
-    releaseClause: input.releaseClause,
-    performanceBonus: input.performanceBonus,
-    commissionPct: input.commissionPct,
-    totalCommission,
-    exclusivity: input.exclusivity,
-    representationScope: input.representationScope,
-    agentName: input.agentName,
-    agentLicense: input.agentLicense,
-    notes: input.notes,
-    createdBy,
+    return await Contract.create(
+      {
+        playerId: input.playerId,
+        clubId: input.clubId,
+        category: input.category,
+        contractType: (input as any).contractType,
+        playerContractType,
+        title: input.title,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        baseSalary: input.baseSalary,
+        salaryCurrency: input.salaryCurrency,
+        signingBonus: input.signingBonus,
+        releaseClause: input.releaseClause,
+        performanceBonus: input.performanceBonus,
+        commissionPct: input.commissionPct,
+        totalCommission,
+        exclusivity: input.exclusivity,
+        representationScope: input.representationScope,
+        agentName: input.agentName,
+        agentLicense: input.agentLicense,
+        notes: input.notes,
+        createdBy,
+      },
+      { transaction: t },
+    );
   });
 
   // Fire-and-forget: auto-create legal review task
@@ -298,6 +305,20 @@ export async function terminateContract(
 
   const termDate =
     input.terminationDate || new Date().toISOString().split("T")[0];
+
+  // Validate termination date falls within contract period
+  if (new Date(termDate) < new Date(contract.startDate)) {
+    throw new AppError(
+      "Termination date cannot be before contract start date",
+      400,
+    );
+  }
+  if (contract.endDate && new Date(termDate) > new Date(contract.endDate)) {
+    throw new AppError(
+      "Termination date cannot be after contract end date",
+      400,
+    );
+  }
 
   // ── Clearance method: create a clearance record, don't terminate yet ──
   if (input.method === "clearance") {

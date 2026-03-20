@@ -438,10 +438,15 @@ export async function createLedgerPair(
     playerId,
     createdBy: userId,
   };
-  await LedgerEntry.bulkCreate([
-    { ...base, side: "Debit" as const, account: debitAccount },
-    { ...base, side: "Credit" as const, account: creditAccount },
-  ]);
+  await sequelize.transaction(async (t) => {
+    await LedgerEntry.bulkCreate(
+      [
+        { ...base, side: "Debit" as const, account: debitAccount },
+        { ...base, side: "Credit" as const, account: creditAccount },
+      ],
+      { transaction: t },
+    );
+  });
   return txId;
 }
 

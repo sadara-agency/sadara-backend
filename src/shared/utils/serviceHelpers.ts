@@ -44,6 +44,23 @@ export function bilingualSearch(search: string | undefined) {
 }
 
 /**
+ * Build an `Op.or` clause for player first/last name search (EN + AR).
+ * Returns an empty object if `search` is falsy.
+ */
+export function playerNameSearch(search: string | undefined) {
+  if (!search) return {};
+  const pattern = `%${search}%`;
+  return {
+    [Op.or]: [
+      { firstName: { [Op.iLike]: pattern } },
+      { lastName: { [Op.iLike]: pattern } },
+      { firstNameAr: { [Op.iLike]: pattern } },
+      { lastNameAr: { [Op.iLike]: pattern } },
+    ],
+  };
+}
+
+/**
  * Pick only defined (non-undefined) keys from an object.
  * Useful for building Sequelize `where` clauses from query params.
  */

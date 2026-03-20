@@ -32,136 +32,8 @@ const COMPUTED_ATTRIBUTES: [any, string][] = [
   ],
 ];
 
-// ── Heavy computed attributes (correlated subqueries — only for single player detail) ──
-const DETAIL_COMPUTED_ATTRIBUTES: [any, string][] = [
-  ...COMPUTED_ATTRIBUTES,
-  [
-    literal(
-      `(SELECT CASE WHEN c.end_date IS NULL THEN 'Active' WHEN c.end_date < CURRENT_DATE THEN 'Expired' WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon' ELSE 'Active' END FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`,
-    ),
-    "contractStatus",
-  ],
-  [
-    literal(
-      `(SELECT c.end_date::text FROM contracts c WHERE c.player_id = "Player".id ORDER BY c.end_date DESC NULLS FIRST LIMIT 1)`,
-    ),
-    "contractEnd",
-  ],
-  [
-    literal(
-      `(SELECT c.commission_pct FROM contracts c WHERE c.player_id = "Player".id AND c.commission_pct IS NOT NULL ORDER BY c.created_at DESC LIMIT 1)`,
-    ),
-    "commissionRate",
-  ],
-  [
-    literal(
-      `(SELECT COUNT(*)::int FROM match_players mp WHERE mp.player_id = "Player".id)`,
-    ),
-    "matches",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.goals), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "goals",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.assists), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "assists",
-  ],
-  [
-    literal(
-      `(SELECT ROUND(AVG(pms.rating), 1) FROM player_match_stats pms WHERE pms.player_id = "Player".id AND pms.rating IS NOT NULL)`,
-    ),
-    "rating",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(mp.minutes_played), 0)::int FROM match_players mp WHERE mp.player_id = "Player".id)`,
-    ),
-    "minutesPlayed",
-  ],
-  [
-    literal(
-      `(SELECT perf.average_rating FROM performances perf WHERE perf.player_id = "Player".id ORDER BY perf.created_at DESC LIMIT 1)`,
-    ),
-    "performance",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.tackles_total), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "tackles",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.interceptions), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "interceptions",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.duels_won), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "duelsWon",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.duels_total), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "duelsTotal",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.dribbles_completed), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "dribblesCompleted",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.dribbles_attempted), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "dribblesAttempted",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.key_passes), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "keyPasses",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.shots_on_target), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "shotsOnTarget",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.saves), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "saves",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.clean_sheet::int), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "cleanSheets",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.goals_conceded), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "goalsConceded",
-  ],
-  [
-    literal(
-      `(SELECT COALESCE(SUM(pms.penalties_saved), 0)::int FROM player_match_stats pms WHERE pms.player_id = "Player".id)`,
-    ),
-    "penaltiesSaved",
-  ],
-];
+// DETAIL_COMPUTED_ATTRIBUTES removed — getPlayerById now uses batchLoadPlayerStats()
+// which replaces 20+ correlated subqueries with 4 LATERAL joins in a single query.
 
 /**
  * Batch-load stats for a set of player IDs in ONE query using LATERAL joins.
@@ -328,6 +200,8 @@ export async function listPlayers(queryParams: any) {
       },
       { model: User, as: "agent", attributes: ["id", "fullName"] },
     ],
+    distinct: true,
+    subQuery: false,
   });
 
   // Step 2: Batch-load stats for all player IDs in a single query
@@ -370,13 +244,15 @@ export async function listPlayers(queryParams: any) {
 }
 
 // ── Get Player by ID (With Aggregates) ──
+// Uses batchLoadPlayerStats (LATERAL joins) instead of 13+ correlated subqueries.
 export async function getPlayerById(id: string) {
-  // Run main query + sidebar counts + performance history in parallel
-  const [player, counts, performanceHistory] = await Promise.all([
+  // Run lightweight base query + batch stats + sidebar counts + perf history in parallel
+  const [player, statsMap, counts, performanceHistory] = await Promise.all([
     Player.findByPk(id, {
-      attributes: { include: DETAIL_COMPUTED_ATTRIBUTES },
+      attributes: { include: COMPUTED_ATTRIBUTES },
       include: ["club", "agent"],
     }),
+    batchLoadPlayerStats([id]),
     getPlayerCounts(id),
     sequelize
       .query(
@@ -395,8 +271,34 @@ export async function getPlayerById(id: string) {
 
   if (!player) throw new AppError("Player not found", 404);
 
+  const plain = player.get({ plain: true });
+  const rawStats = statsMap.get(id) || {};
+  const stats = camelCaseKeys<Record<string, any>>(rawStats);
+
   return {
-    ...player.get({ plain: true }),
+    ...plain,
+    contractStatus: stats.contractStatus ?? null,
+    contractEnd: stats.contractEnd ?? null,
+    commissionRate: stats.commissionRate ?? null,
+    matches: stats.matches ?? 0,
+    minutesPlayed: stats.minutesPlayed ?? 0,
+    goals: stats.goals ?? 0,
+    assists: stats.assists ?? 0,
+    rating: stats.rating ?? null,
+    performance: stats.performance ?? null,
+    tackles: stats.tackles ?? 0,
+    interceptions: stats.interceptions ?? 0,
+    duelsWon: stats.duelsWon ?? 0,
+    duelsTotal: stats.duelsTotal ?? 0,
+    dribblesCompleted: stats.dribblesCompleted ?? 0,
+    dribblesAttempted: stats.dribblesAttempted ?? 0,
+    keyPasses: stats.keyPasses ?? 0,
+    shotsOnTarget: stats.shotsOnTarget ?? 0,
+    saves: stats.saves ?? 0,
+    cleanSheets: stats.cleanSheets ?? 0,
+    goalsConceded: stats.goalsConceded ?? 0,
+    penaltiesSaved: stats.penaltiesSaved ?? 0,
+    hasProviderMapping: stats.hasProviderMapping ?? false,
     counts,
     performanceHistory,
   };

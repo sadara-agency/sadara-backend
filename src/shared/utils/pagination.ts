@@ -48,3 +48,39 @@ export function buildMeta(
     totalPages: Math.ceil(total / limit),
   };
 }
+
+/**
+ * Run a paginated findAndCountAll with standard sort, offset, limit, and meta.
+ * Reduces boilerplate in service list functions.
+ */
+export async function paginatedQuery<T extends import("sequelize").Model>(
+  model: import("sequelize").ModelStatic<T>,
+  queryParams: PaginationQuery,
+  options: {
+    where?: import("sequelize").WhereOptions;
+    include?: import("sequelize").Includeable[];
+    attributes?: import("sequelize").FindAttributeOptions;
+    defaultSort?: string;
+    allowedSorts?: string[];
+    distinct?: boolean;
+  } = {},
+): Promise<{ data: T[]; meta: PaginationMeta }> {
+  const { limit, offset, page, sort, order } = parsePagination(
+    queryParams,
+    options.defaultSort ?? "createdAt",
+    options.allowedSorts,
+  );
+
+  const { count, rows } = await model.findAndCountAll({
+    where: options.where,
+    include: options.include,
+    attributes: options.attributes,
+    limit,
+    offset,
+    order: [[sort, order]],
+    distinct: options.distinct ?? true,
+    subQuery: false,
+  });
+
+  return { data: rows, meta: buildMeta(count, page, limit) };
+}

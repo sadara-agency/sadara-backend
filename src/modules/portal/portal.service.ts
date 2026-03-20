@@ -101,52 +101,51 @@ export async function getMyProfile(userId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
 
-  const profile = await Player.findByPk(playerId, {
-    include: [
-      {
-        model: Club,
-        as: "club",
-        attributes: [
-          "id",
-          "name",
-          "nameAr",
-          "logoUrl",
-          "league",
-          "city",
-          "stadium",
-        ],
-      },
-      {
-        model: User,
-        as: "agent",
-        attributes: ["id", "fullName", "fullNameAr", "email"],
-      },
-    ],
-  });
-
-  // Get active contract
-  const activeContract = await Contract.findOne({
-    where: { playerId, status: "Active" },
-    include: [
-      {
-        model: Club,
-        as: "club",
-        attributes: ["id", "name", "nameAr", "logoUrl"],
-      },
-    ],
-    order: [["endDate", "DESC"]],
-  });
-
-  // Get quick stats via raw SQL (safe — playerId is a verified string)
-  const [stats] = await sequelize.query<any>(
-    `SELECT
-      COALESCE((SELECT COUNT(*) FROM contracts WHERE player_id = :id AND status = 'Active'), 0) AS "activeContracts",
-      COALESCE((SELECT COUNT(*) FROM documents WHERE entity_type = 'Player' AND entity_id = :id), 0) AS "totalDocuments",
-      COALESCE((SELECT COUNT(*) FROM tasks WHERE player_id = :id AND status != 'Completed'), 0) AS "openTasks",
-      COALESCE((SELECT MAX(gate_number::text::integer) FROM gates WHERE player_id = :id AND status = 'Completed'), -1) AS "currentGate"
-    `,
-    { replacements: { id: playerId }, type: QueryTypes.SELECT },
-  );
+  // Run profile ORM query and combined contract+stats raw SQL in parallel (2 queries instead of 3)
+  const [profile, activeContract, [stats]] = await Promise.all([
+    Player.findByPk(playerId, {
+      include: [
+        {
+          model: Club,
+          as: "club",
+          attributes: [
+            "id",
+            "name",
+            "nameAr",
+            "logoUrl",
+            "league",
+            "city",
+            "stadium",
+          ],
+        },
+        {
+          model: User,
+          as: "agent",
+          attributes: ["id", "fullName", "fullNameAr", "email"],
+        },
+      ],
+    }),
+    Contract.findOne({
+      where: { playerId, status: "Active" },
+      include: [
+        {
+          model: Club,
+          as: "club",
+          attributes: ["id", "name", "nameAr", "logoUrl"],
+        },
+      ],
+      order: [["endDate", "DESC"]],
+    }),
+    sequelize.query<any>(
+      `SELECT
+        COALESCE((SELECT COUNT(*) FROM contracts WHERE player_id = :id AND status = 'Active'), 0) AS "activeContracts",
+        COALESCE((SELECT COUNT(*) FROM documents WHERE entity_type = 'Player' AND entity_id = :id), 0) AS "totalDocuments",
+        COALESCE((SELECT COUNT(*) FROM tasks WHERE player_id = :id AND status != 'Completed'), 0) AS "openTasks",
+        COALESCE((SELECT MAX(gate_number::text::integer) FROM gates WHERE player_id = :id AND status = 'Completed'), -1) AS "currentGate"
+      `,
+      { replacements: { id: playerId }, type: QueryTypes.SELECT },
+    ),
+  ]);
 
   return {
     player: profile,

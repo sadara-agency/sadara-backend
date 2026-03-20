@@ -45,6 +45,19 @@ export const authLimiter = rateLimit({
   store: getStore(),
 });
 
+// Strict limit for document/file uploads
+export const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 30,
+  message: {
+    success: false,
+    message: "Too many uploads, please try again later",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: getStore(),
+});
+
 // Very strict limit for password reset
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
