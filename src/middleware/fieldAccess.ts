@@ -122,44 +122,6 @@ export function dynamicFieldAccess(module: string) {
   };
 }
 
-// ── Pre-built configs for common entities (deprecated — use dynamicFieldAccess) ──
-
-/** Fields hidden from roles that should not see player contact info */
-export const PLAYER_HIDDEN_FIELDS: HiddenFieldsConfig = {
-  phone: ["Scout", "Player", "Finance", "Media", "Executive"],
-  email: ["Scout", "Player", "Finance", "Media", "Executive"],
-  guardianPhone: ["Scout", "Player", "Finance", "Media", "Executive"],
-  guardianName: ["Scout", "Player", "Finance", "Media", "Executive"],
-};
-
-/** Fields hidden from roles that should not see contract financial details */
-export const CONTRACT_HIDDEN_FIELDS: HiddenFieldsConfig = {
-  baseSalary: ["Scout", "Player", "Analyst", "Coach", "Media", "Executive"],
-  commissionPct: [
-    "Scout",
-    "Player",
-    "Analyst",
-    "Legal",
-    "Coach",
-    "Media",
-    "Executive",
-  ],
-  totalCommission: [
-    "Scout",
-    "Player",
-    "Analyst",
-    "Legal",
-    "Coach",
-    "Media",
-    "Executive",
-  ],
-  signingBonus: ["Scout", "Player", "Analyst", "Coach", "Media", "Executive"],
-  releaseClause: ["Scout", "Player", "Coach", "Media"],
-};
-
-/** Fields hidden from roles that should not see invoice/payment amounts */
-export const FINANCE_HIDDEN_FIELDS: HiddenFieldsConfig = {
-  amount: ["Scout", "Player", "Coach", "Media"],
-  taxAmount: ["Scout", "Player", "Coach", "Media"],
-  totalAmount: ["Scout", "Player", "Coach", "Media"],
-};
+// Deprecated hardcoded field configs removed.
+// Field-level permissions are now fully DB-driven via role_field_permissions table
+// and administered through the FieldPermissionsTab in Settings UI.

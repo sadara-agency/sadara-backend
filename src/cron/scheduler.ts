@@ -94,6 +94,15 @@ import {
 // E-signature expiry is lazy-loaded to avoid model init in test context
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
 
+/**
+ * Get today's date as YYYY-MM-DD in the server's local timezone.
+ * Avoids UTC offset issues when comparing with DATEONLY columns.
+ */
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // ── Disabled-state management ──
 
 interface DisabledJobEntry {
@@ -502,7 +511,7 @@ async function checkContractExpiry() {
 // ══════════════════════════════════════════════════════════════
 
 async function updateContractStatuses() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
 
   // 1. Expired: contracts past their end date that are still Active or Expiring Soon
   const [, expiredCount] = await sequelize.query(
@@ -542,7 +551,7 @@ async function updateContractStatuses() {
 // ══════════════════════════════════════════════════════════════
 
 async function checkInjuryFollowups() {
-  const today = new Date().toISOString().split("T")[0];
+  const today = todayLocal();
 
   const overdueInjuries = await sequelize.query<InjuryFollowupRow>(
     `
@@ -609,8 +618,8 @@ async function checkInjuryFollowups() {
 async function checkPaymentDueDates() {
   const sevenDaysOut = new Date();
   sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
-  const dateStr = sevenDaysOut.toISOString().split("T")[0];
-  const today = new Date().toISOString().split("T")[0];
+  const dateStr = `${sevenDaysOut.getFullYear()}-${String(sevenDaysOut.getMonth() + 1).padStart(2, "0")}-${String(sevenDaysOut.getDate()).padStart(2, "0")}`;
+  const today = todayLocal();
 
   const upcoming = await sequelize.query<PaymentReminderRow>(
     `

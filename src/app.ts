@@ -242,10 +242,27 @@ app.use("/api/v1/clearances", clearanceRoutes);
 app.use("/api/v1/calendar", calendarRoutes);
 app.use("/api/v1/esignatures", esignatureRoutes);
 
-// ── Signed documents static serving ──
-app.use(
-  "/uploads/signed-documents",
-  express.static(path.resolve("uploads/signed-documents")),
+// ── Signed documents — authenticated serving ──
+app.get(
+  "/uploads/signed-documents/:filename",
+  authenticate,
+  authorizeModule("documents", "read"),
+  (req: AuthRequest, res, next) => {
+    const { filename } = req.params;
+    // Prevent path traversal: allow only safe filenames
+    if (!/^[\w-]+\.(pdf|png|jpg|jpeg)$/i.test(filename)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid filename" });
+    }
+    const filePath = path.resolve("uploads/signed-documents", filename);
+    if (!fs.existsSync(filePath)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "File not found" });
+    }
+    res.sendFile(filePath);
+  },
 );
 
 // ── Swagger UI ──

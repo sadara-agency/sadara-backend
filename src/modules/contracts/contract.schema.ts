@@ -35,7 +35,13 @@ export const createContractSchema = z
     category: z.enum(CONTRACT_CATEGORIES).default("Club"),
     contractType: z.enum(CONTRACT_TYPES).default("Representation"),
     title: z.string().optional(),
-    startDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+    startDate: z
+      .string()
+      .regex(DATE_REGEX, "Date must be YYYY-MM-DD")
+      .refine(
+        (d) => new Date(d) >= new Date(new Date().toISOString().split("T")[0]),
+        { message: "Start date cannot be in the past" },
+      ),
     endDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
     baseSalary: z.number().positive("Salary must be positive").optional(),
     salaryCurrency: z.enum(CURRENCIES).default("SAR"),

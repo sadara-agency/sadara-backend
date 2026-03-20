@@ -25,6 +25,11 @@ router.use(authenticate);
 
 // ── Read ──
 router.get(
+  "/stats",
+  authorizeModule("settings", "read"),
+  asyncHandler(userController.stats),
+);
+router.get(
   "/",
   authorizeModule("settings", "read"),
   validate(userQuerySchema, "query"),

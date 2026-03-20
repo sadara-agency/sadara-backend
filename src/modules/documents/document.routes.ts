@@ -8,6 +8,7 @@ import {
   documentQuerySchema,
 } from "@modules/documents/document.schema";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
+import { uploadLimiter } from "@middleware/rateLimiter";
 import * as ctrl from "@modules/documents/document.controller";
 
 const router = Router();
@@ -29,6 +30,7 @@ router.get(
 // Upload real file (multipart/form-data) — metadata in form fields
 router.post(
   "/upload",
+  uploadLimiter,
   authorizeModule("documents", "create"),
   (req, res, next) => {
     uploadSingle(req, res, (err: any) => {

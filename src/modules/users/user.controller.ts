@@ -15,6 +15,12 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import * as userService from "@modules/users/user.service";
 
+// ── User Stats ──
+export async function stats(_req: AuthRequest, res: Response) {
+  const result = await userService.getUserStats();
+  sendSuccess(res, result);
+}
+
 // ── List Users ──
 export async function list(req: AuthRequest, res: Response) {
   const result = await userService.listUsers(req.query);

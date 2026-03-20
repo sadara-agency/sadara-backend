@@ -492,7 +492,13 @@ export async function updateProfile(
   const user = await User.findByPk(userId);
   if (!user) throw new AppError("User not found", 404);
   await user.update(data);
-  return user;
+  const {
+    passwordHash: _,
+    resetToken: _rt,
+    resetTokenExpiry: _rte,
+    ...safeUser
+  } = user.get({ plain: true });
+  return safeUser;
 }
 
 // ── Change Password (authenticated user) ──

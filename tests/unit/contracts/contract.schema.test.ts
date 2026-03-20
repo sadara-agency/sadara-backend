@@ -8,13 +8,20 @@ import {
   contractQuerySchema,
 } from '../../../src/modules/contracts/contract.schema';
 
+// Helper: generate a future date string YYYY-MM-DD
+function futureDate(yearsFromNow: number): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + yearsFromNow);
+  return d.toISOString().split('T')[0];
+}
+
 describe('Contract Schemas', () => {
   describe('createContractSchema', () => {
     const validInput = {
       playerId: '550e8400-e29b-41d4-a716-446655440001',
       clubId: '550e8400-e29b-41d4-a716-446655440002',
-      startDate: '2024-01-01',
-      endDate: '2026-01-01',
+      startDate: futureDate(0),
+      endDate: futureDate(2),
       baseSalary: 500000,
       commissionPct: 10,
     };
@@ -35,8 +42,8 @@ describe('Contract Schemas', () => {
     it('should reject endDate before startDate', () => {
       const result = createContractSchema.safeParse({
         ...validInput,
-        startDate: '2026-01-01',
-        endDate: '2024-01-01',
+        startDate: futureDate(2),
+        endDate: futureDate(0),
       });
       expect(result.success).toBe(false);
     });

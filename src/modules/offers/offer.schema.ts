@@ -16,6 +16,10 @@ export const createOfferSchema = z.object({
   deadline: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
+    .refine(
+      (d) => new Date(d) >= new Date(new Date().toISOString().split("T")[0]),
+      { message: "Deadline cannot be in the past" },
+    )
     .optional(),
   notes: z.string().optional(),
 });
