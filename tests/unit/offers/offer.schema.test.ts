@@ -7,6 +7,12 @@ import {
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 
+function futureDate(yearsFromNow: number): string {
+  const d = new Date();
+  d.setFullYear(d.getFullYear() + yearsFromNow);
+  return d.toISOString().split('T')[0];
+}
+
 describe('Offer Schemas', () => {
   describe('createOfferSchema', () => {
     it('should accept valid offer', () => {
@@ -25,7 +31,7 @@ describe('Offer Schemas', () => {
       expect(createOfferSchema.safeParse({ playerId: UUID, deadline: '15/06/2025' }).success).toBe(false);
     });
     it('should accept valid deadline', () => {
-      expect(createOfferSchema.safeParse({ playerId: UUID, deadline: '2025-06-15' }).success).toBe(true);
+      expect(createOfferSchema.safeParse({ playerId: UUID, deadline: futureDate(1) }).success).toBe(true);
     });
   });
 

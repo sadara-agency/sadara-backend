@@ -16,6 +16,7 @@ jest.mock('../../../src/config/database', () => ({
   sequelize: {
     query: jest.fn().mockResolvedValue([]),
     authenticate: jest.fn(),
+    transaction: jest.fn(async (cb: (t: object) => Promise<unknown>) => cb({})),
   },
 }));
 
@@ -201,6 +202,7 @@ describe('Contract Service', () => {
         expect.objectContaining({
           totalCommission: 100000, // 10% of 1,000,000
         }),
+        expect.objectContaining({ transaction: expect.anything() }),
       );
     });
   });
