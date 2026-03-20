@@ -23,13 +23,20 @@ import {
 const router = Router();
 router.use(authenticate);
 
-// ── GET /permissions — full matrix (any authenticated user) ──
+// ── GET /permissions — full matrix (Admin) or own-role only (others) ──
 
 router.get(
   "/",
-  asyncHandler(async (_req: AuthRequest, res: Response) => {
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const perms = await getPermissions();
-    sendSuccess(res, perms);
+    if (req.user?.role === "Admin") {
+      sendSuccess(res, perms);
+    } else {
+      const role = req.user?.role ?? "";
+      const ownPerms: Record<string, any> = {};
+      if (perms[role]) ownPerms[role] = perms[role];
+      sendSuccess(res, ownPerms);
+    }
   }),
 );
 
@@ -71,22 +78,30 @@ router.put(
   }),
 );
 
-// ── GET /permissions/fields/config — configurable fields definition ──
+// ── GET /permissions/fields/config — configurable fields definition (Admin only) ──
 
 router.get(
   "/fields/config",
+  authorize("Admin"),
   asyncHandler(async (_req: AuthRequest, res: Response) => {
     sendSuccess(res, CONFIGURABLE_FIELDS);
   }),
 );
 
-// ── GET /permissions/fields — field-level permissions map ──
+// ── GET /permissions/fields — field-level permissions map (own-role for non-Admin) ──
 
 router.get(
   "/fields",
-  asyncHandler(async (_req: AuthRequest, res: Response) => {
+  asyncHandler(async (req: AuthRequest, res: Response) => {
     const perms = await getFieldPermissions();
-    sendSuccess(res, perms);
+    if (req.user?.role === "Admin") {
+      sendSuccess(res, perms);
+    } else {
+      const role = req.user?.role ?? "";
+      const ownPerms: Record<string, any> = {};
+      if (perms[role]) ownPerms[role] = perms[role];
+      sendSuccess(res, ownPerms);
+    }
   }),
 );
 

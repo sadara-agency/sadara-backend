@@ -57,6 +57,31 @@ export async function listUsers(queryParams: any) {
 }
 
 // ────────────────────────────────────────────────────────────
+// User Stats (for directory KPIs)
+// ────────────────────────────────────────────────────────────
+export async function getUserStats() {
+  const [total, active, byRole] = await Promise.all([
+    User.count(),
+    User.count({ where: { isActive: true } }),
+    User.findAll({
+      attributes: [
+        "role",
+        [Sequelize.fn("COUNT", Sequelize.col("id")), "count"],
+      ],
+      group: ["role"],
+      raw: true,
+    }) as unknown as Promise<Array<{ role: string; count: string }>>,
+  ]);
+
+  return {
+    total,
+    active,
+    inactive: total - active,
+    byRole: byRole.map((r) => ({ role: r.role, count: Number(r.count) })),
+  };
+}
+
+// ────────────────────────────────────────────────────────────
 // Get User by ID
 // ────────────────────────────────────────────────────────────
 export async function getUserById(id: string) {
