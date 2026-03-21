@@ -122,7 +122,7 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
     ? result.url
     : `${req.protocol}://${req.get("host")}${result.url}`;
 
-  const user = await authService.updateProfile(req.user!.id, { avatarUrl });
+  await authService.updateProfile(req.user!.id, { avatarUrl });
   await logAudit(
     "UPDATE",
     "users",
