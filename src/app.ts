@@ -116,7 +116,7 @@ app.get("/uploads/photos/:filename", (req, res) => {
   const filename = path.basename(req.params.filename); // strip traversal
   // Only allow image extensions
   const ext = path.extname(filename).toLowerCase();
-  if (![".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
+  if (![".jpg", ".jpeg", ".png", ".webp", ".jfif"].includes(ext)) {
     return res.status(403).json({ success: false, message: "Not allowed" });
   }
   const filePath = path.join(UPLOADS_ROOT, filename);
