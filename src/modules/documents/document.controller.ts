@@ -8,6 +8,7 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
+import { uploadFile } from "@shared/utils/storage";
 import * as svc from "@modules/documents/document.service";
 
 // Documents list takes req.user?.role for RBAC, so we override list.
@@ -44,16 +45,28 @@ export async function upload(req: AuthRequest, res: Response) {
   const file = req.file;
   const body = req.body;
 
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const fileUrl = `${baseUrl}/uploads/documents/${file.filename}`;
+  // Process + upload to GCS (or local fallback)
+  const result = await uploadFile({
+    folder: "documents",
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    buffer: file.buffer,
+    generateThumbnail: file.mimetype.startsWith("image/"),
+  });
+
+  // For GCS: url is the full public URL
+  // For local: url is relative, so prefix with the server origin
+  const fileUrl = result.url.startsWith("http")
+    ? result.url
+    : `${req.protocol}://${req.get("host")}${result.url}`;
 
   const input = {
     name: body.name || file.originalname,
     type: body.type || "Other",
     status: body.status || "Active",
     fileUrl,
-    fileSize: file.size,
-    mimeType: file.mimetype,
+    fileSize: result.size,
+    mimeType: result.mimeType,
     entityType: body.entityType || null,
     entityId: body.entityId || null,
     issueDate: body.issueDate || null,
@@ -73,7 +86,7 @@ export async function upload(req: AuthRequest, res: Response) {
     "documents",
     doc!.id,
     buildAuditContext(req.user!, req.ip),
-    `Uploaded: ${doc!.name} (${file.originalname}, ${(file.size / 1024).toFixed(0)} KB)`,
+    `Uploaded: ${doc!.name} (${file.originalname}, ${(result.size / 1024).toFixed(0)} KB)`,
   );
 
   sendCreated(res, doc);

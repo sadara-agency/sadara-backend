@@ -61,3 +61,8 @@ coverage/
 # IDE
 .vscode/
 .idea/
+
+# GCP service account keys (NEVER commit these)
+*-credentials.json
+*service-account*.json
+sadara-*.json

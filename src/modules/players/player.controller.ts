@@ -5,6 +5,7 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
+import { uploadFile } from "@shared/utils/storage";
 import * as playerService from "@modules/players/player.service";
 
 const PLAYER_CACHE = [
@@ -34,8 +35,18 @@ export const { list, getById, create, update, remove } = crud;
 export async function uploadPhoto(req: AuthRequest, res: Response) {
   if (!req.file) throw new AppError("No file uploaded", 400);
 
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const photoUrl = `${baseUrl}/uploads/photos/${req.file.filename}`;
+  const result = await uploadFile({
+    folder: "photos",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: true,
+  });
+
+  // For GCS: url is the full public URL; for local: prefix with server origin
+  const photoUrl = result.url.startsWith("http")
+    ? result.url
+    : `${req.protocol}://${req.get("host")}${result.url}`;
 
   const player = await playerService.updatePlayer(req.params.id, { photoUrl });
   await logAudit(
@@ -46,7 +57,11 @@ export async function uploadPhoto(req: AuthRequest, res: Response) {
     "Updated player photo",
   );
   await invalidateMultiple(PLAYER_CACHE);
-  sendSuccess(res, { photoUrl }, "Photo uploaded");
+  sendSuccess(
+    res,
+    { photoUrl, thumbnailUrl: result.thumbnailUrl },
+    "Photo uploaded",
+  );
 }
 
 export async function checkDuplicate(req: AuthRequest, res: Response) {

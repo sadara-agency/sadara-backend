@@ -21,6 +21,7 @@ import { loadPermissions } from "@modules/permissions/permission.service";
 import { ensureSportmonksColumn } from "@modules/sportmonks/sportmonks.service";
 import { registerProvider } from "@modules/integrations/matchAnalysis.service";
 import { WyscoutProvider } from "@modules/integrations/providers/wyscout";
+import { setupAssociations } from "./models/associations";
 import chalk from "chalk";
 import gradient from "gradient-string";
 import { logger } from "@config/logger";
@@ -69,6 +70,9 @@ async function initInfrastructure(): Promise<void> {
       // Will be created by migrations
     }
   }
+
+  // Register associations AFTER tables exist so FK constraints are valid
+  setupAssociations();
 
   await migrator.up();
 }

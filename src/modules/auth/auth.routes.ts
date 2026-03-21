@@ -12,6 +12,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema,
 } from "@modules/auth/auth.schema";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
 import * as authController from "@modules/auth/auth.controller";
 
 const router = Router();
@@ -56,6 +57,26 @@ router.patch(
   validate(updateProfileSchema),
   asyncHandler(authController.updateProfile),
 );
+// ── Avatar Upload (multipart/form-data) ──
+router.post(
+  "/me/avatar",
+  authenticate,
+  (req, res, next) => {
+    uploadSingle(req, res, (err: any) => {
+      if (err) {
+        const msg =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "File too large. Maximum size is 25MB."
+            : err.message || "Upload failed";
+        return res.status(400).json({ success: false, message: msg });
+      }
+      next();
+    });
+  },
+  verifyFileType,
+  asyncHandler(authController.uploadAvatar),
+);
+
 router.post(
   "/change-password",
   authenticate,
