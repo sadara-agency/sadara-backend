@@ -21,6 +21,7 @@ import { loadPermissions } from "@modules/permissions/permission.service";
 import { ensureSportmonksColumn } from "@modules/sportmonks/sportmonks.service";
 import { registerProvider } from "@modules/integrations/matchAnalysis.service";
 import { WyscoutProvider } from "@modules/integrations/providers/wyscout";
+import { setupAssociations } from "./models/associations";
 import chalk from "chalk";
 import gradient from "gradient-string";
 import { logger } from "@config/logger";
@@ -70,6 +71,9 @@ async function initInfrastructure(): Promise<void> {
     }
   }
 
+  // Register associations AFTER tables exist so FK constraints are valid
+  setupAssociations();
+
   await migrator.up();
 }
 
@@ -115,14 +119,66 @@ async function startSchedulers(): Promise<void> {
 // Phase 4 — HTTP Server
 // ─────────────────────────────────────────────
 
+import http from "http";
+import { execSync } from "child_process";
+
+let httpServer: http.Server | null = null;
+
+/** Kill whatever is holding `port` (Windows-only helper). */
+function killPortHolder(port: number): boolean {
+  try {
+    const out = execSync(
+      `netstat -ano | findstr ":${port}" | findstr "LISTEN"`,
+      {
+        encoding: "utf8",
+      },
+    );
+    const pids = new Set(
+      out
+        .split("\n")
+        .map((l) => l.trim().split(/\s+/).pop())
+        .filter((p): p is string => !!p && /^\d+$/.test(p)),
+    );
+    for (const pid of pids) {
+      try {
+        execSync(`taskkill /F /PID ${pid}`, { stdio: "ignore" });
+        logger.warn(`Killed stale process ${pid} on port ${port}`);
+      } catch {
+        /* already gone */
+      }
+    }
+    return pids.size > 0;
+  } catch {
+    return false;
+  }
+}
+
 function startServer(): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const server = app.listen(env.port, () => {
+      httpServer = server;
       printBanner();
       resolve();
     });
     server.timeout = 120000;
     server.keepAliveTimeout = 65000;
+
+    server.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        logger.warn(
+          `Port ${env.port} in use — killing stale process and retrying…`,
+        );
+        if (killPortHolder(env.port)) {
+          setTimeout(() => {
+            server.listen(env.port);
+          }, 1000);
+        } else {
+          reject(err);
+        }
+      } else {
+        reject(err);
+      }
+    });
   });
 }
 
@@ -187,6 +243,9 @@ async function bootstrap(): Promise<void> {
 
 async function shutdown(): Promise<void> {
   logger.info("Shutting down...");
+  if (httpServer) {
+    await new Promise<void>((res) => httpServer!.close(() => res()));
+  }
   await closeSSESubscriber();
   await closeRedis();
   await sequelize.close();

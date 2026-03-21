@@ -10,6 +10,7 @@ import {
   REFRESH_COOKIE_OPTIONS,
   CLEAR_REFRESH_COOKIE_OPTIONS,
 } from "@shared/utils/cookie";
+import { uploadFile } from "@shared/utils/storage";
 import * as authService from "@modules/auth/auth.service";
 
 // ── Public Register (no token returned, account inactive) ──
@@ -101,6 +102,35 @@ export async function updateProfile(req: AuthRequest, res: Response) {
     "Profile updated",
   );
   sendSuccess(res, user, "Profile updated");
+}
+
+export async function uploadAvatar(req: AuthRequest, res: Response) {
+  if (!req.file) {
+    sendSuccess(res, { avatarUrl: null }, "No file — avatar cleared");
+    return;
+  }
+
+  const result = await uploadFile({
+    folder: "avatars",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: true,
+  });
+
+  const avatarUrl = result.url.startsWith("http")
+    ? result.url
+    : `${req.protocol}://${req.get("host")}${result.url}`;
+
+  await authService.updateProfile(req.user!.id, { avatarUrl });
+  await logAudit(
+    "UPDATE",
+    "users",
+    req.user!.id,
+    buildAuditContext(req.user!, req.ip),
+    "Avatar uploaded",
+  );
+  sendSuccess(res, { avatarUrl }, "Avatar uploaded");
 }
 
 export async function changePassword(req: AuthRequest, res: Response) {

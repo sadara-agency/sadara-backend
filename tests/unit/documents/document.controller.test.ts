@@ -1,5 +1,8 @@
 /// <reference types="jest" />
 jest.mock('../../../src/modules/documents/document.service');
+jest.mock('../../../src/shared/utils/storage', () => ({
+  uploadFile: jest.fn().mockResolvedValue({ url: 'http://cdn.test/doc.pdf', size: 2048, mimeType: 'application/pdf' }),
+}));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
@@ -48,7 +51,7 @@ describe('Document Controller', () => {
     it('should upload document and audit', async () => {
       (svc.createDocument as jest.Mock).mockResolvedValue({ id: 'd1', name: 'Doc' });
       const res = mockRes();
-      await controller.upload(mockReq({ file: { filename: 'doc.pdf', originalname: 'doc.pdf' }, body: { name: 'Doc' } }), res);
+      await controller.upload(mockReq({ file: { originalname: 'doc.pdf', mimetype: 'application/pdf', buffer: Buffer.from('fake') }, body: { name: 'Doc' } }), res);
       expect(res.status).toHaveBeenCalledWith(201);
     });
 

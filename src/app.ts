@@ -12,7 +12,6 @@ import { apiLimiter, authLimiter } from "@middleware/rateLimiter";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import type { AuthRequest } from "@shared/types";
-import { setupAssociations } from "./models/associations";
 import { sequelize } from "@config/database";
 import { isRedisConnected, getRedisClient } from "@config/redis";
 
@@ -110,38 +109,44 @@ app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 app.use("/api/v1", apiLimiter);
 app.use("/api/v1/auth", authLimiter);
 
-// ── Serve player photos (no auth — profile pictures are not confidential) ──
-const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads", "documents");
-app.get("/uploads/photos/:filename", (req, res) => {
-  const filename = path.basename(req.params.filename); // strip traversal
-  // Only allow image extensions
-  const ext = path.extname(filename).toLowerCase();
-  if (![".jpg", ".jpeg", ".png", ".webp", ".jfif"].includes(ext)) {
-    return res.status(403).json({ success: false, message: "Not allowed" });
-  }
-  const filePath = path.join(UPLOADS_ROOT, filename);
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({ success: false, message: "Photo not found" });
-  }
-  res.setHeader("Cache-Control", "public, max-age=3600");
-  res.sendFile(filePath);
-});
+// ── Local file serving (fallback when GCS is not configured) ──
+// When GCS is active, files are served directly from storage.googleapis.com.
+// These routes serve the local /uploads/ directory structure used by storage.ts.
 
-// ── Serve uploaded files (authenticated + role-checked, path-traversal safe) ──
+const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads");
+
+// Public images: photos + avatars (no auth — profile pictures are not confidential)
+for (const folder of ["photos", "avatars"] as const) {
+  app.get(`/uploads/${folder}/:filename`, (req, res) => {
+    const filename = path.basename(req.params.filename);
+    const ext = path.extname(filename).toLowerCase();
+    if (![".jpg", ".jpeg", ".png", ".webp", ".jfif"].includes(ext)) {
+      return res.status(403).json({ success: false, message: "Not allowed" });
+    }
+    const filePath = path.join(UPLOADS_ROOT, folder, filename);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+    res.sendFile(filePath);
+  });
+}
+
+// Authenticated documents
 app.get(
   "/uploads/documents/:filename",
   authenticate,
   authorizeModule("documents", "read"),
   async (req, res) => {
     const authReq = req as AuthRequest;
-    const filename = path.basename(authReq.params.filename); // strip any traversal
-    const filePath = path.join(UPLOADS_ROOT, filename);
+    const filename = path.basename(authReq.params.filename);
+    const filePath = path.join(UPLOADS_ROOT, "documents", filename);
     if (!fs.existsSync(filePath)) {
       return res
         .status(404)
         .json({ success: false, message: "File not found" });
     }
-    // Audit log (fire-and-forget)
     if (authReq.user) {
       logAudit(
         "DOWNLOAD",
@@ -155,12 +160,7 @@ app.get(
   },
 );
 
-// ── Serve signed contract PDFs (authenticated, contracts read permission) ──
-const SIGNED_CONTRACTS_ROOT = path.resolve(
-  process.cwd(),
-  "uploads",
-  "signed-contracts",
-);
+// Signed contracts
 app.get(
   "/uploads/signed-contracts/:filename",
   authenticate,
@@ -168,7 +168,7 @@ app.get(
   async (req, res) => {
     const authReq = req as AuthRequest;
     const filename = path.basename(authReq.params.filename);
-    const filePath = path.join(SIGNED_CONTRACTS_ROOT, filename);
+    const filePath = path.join(UPLOADS_ROOT, "signed-contracts", filename);
     if (!fs.existsSync(filePath)) {
       return res
         .status(404)
@@ -220,7 +220,9 @@ app.get("/api/health", async (_req, res) => {
   });
 });
 
-setupAssociations();
+// Associations are set up lazily in initInfrastructure() (index.ts)
+// AFTER model.sync() so that circular FKs (User ↔ Player) don't block
+// table creation on a fresh database.
 
 // ── API Routes ──
 app.use("/api/v1/auth", authRoutes);

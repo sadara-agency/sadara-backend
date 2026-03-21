@@ -78,6 +78,11 @@ const envSchema = z.object({
 
   // Sentry error tracking (optional)
   SENTRY_DSN: z.string().url().optional(),
+
+  // Google Cloud Storage (optional — falls back to local disk if not set)
+  GCS_BUCKET: z.string().default(""),
+  GCS_PROJECT_ID: z.string().default(""),
+  GOOGLE_APPLICATION_CREDENTIALS: z.string().default(""),
 });
 
 // ── Parse & Validate ──
@@ -176,6 +181,12 @@ export const env = {
 
   sentry: {
     dsn: validated.SENTRY_DSN,
+  },
+
+  gcs: {
+    bucket: validated.GCS_BUCKET,
+    projectId: validated.GCS_PROJECT_ID,
+    credentials: validated.GOOGLE_APPLICATION_CREDENTIALS,
   },
 
   pagination: {

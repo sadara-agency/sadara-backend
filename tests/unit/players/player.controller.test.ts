@@ -1,5 +1,8 @@
 /// <reference types="jest" />
 jest.mock('../../../src/modules/players/player.service');
+jest.mock('../../../src/shared/utils/storage', () => ({
+  uploadFile: jest.fn().mockResolvedValue({ url: 'http://cdn.test/photo.jpg', thumbnailUrl: 'http://cdn.test/photo_thumb.jpg', size: 1024, mimeType: 'image/jpeg' }),
+}));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
@@ -80,7 +83,7 @@ describe('Player Controller', () => {
     it('should upload photo', async () => {
       (svc.updatePlayer as jest.Mock).mockResolvedValue({ id: 'p1' });
       const res = mockRes();
-      await controller.uploadPhoto(mockReq({ params: { id: 'p1' }, file: { filename: 'photo.jpg' } }), res);
+      await controller.uploadPhoto(mockReq({ params: { id: 'p1' }, file: { originalname: 'photo.jpg', mimetype: 'image/jpeg', buffer: Buffer.from('fake') } }), res);
       expect(res.status).toHaveBeenCalledWith(200);
     });
 
