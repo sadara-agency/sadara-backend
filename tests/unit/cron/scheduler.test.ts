@@ -7,11 +7,13 @@
 // Mock Redis before any imports
 const mockRedisSet = jest.fn();
 const mockRedisDel = jest.fn();
+const mockRedisGet = jest.fn();
 
 jest.mock('../../../src/config/redis', () => ({
   getRedisClient: jest.fn(() => ({
     set: mockRedisSet,
     del: mockRedisDel,
+    get: mockRedisGet,
   })),
   isRedisConnected: jest.fn(() => true),
 }));
@@ -149,6 +151,7 @@ describe('Cron Scheduler', () => {
     jest.clearAllMocks();
     mockRedisSet.mockResolvedValue('OK');
     mockRedisDel.mockResolvedValue(1);
+    mockRedisGet.mockResolvedValue(null);
     // Ensure Redis is connected by default
     (isRedisConnected as jest.Mock).mockReturnValue(true);
   });
@@ -266,7 +269,7 @@ describe('Cron Scheduler', () => {
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       // Find the contract-status job (second schedule call based on startCronJobs order)
       const contractStatusCall = scheduleCalls.find(
-        (call: [string, () => Promise<void>]) => call[0] === '0 7,19 * * *',
+        (call: [string, () => Promise<void>]) => call[0] === '0 6,19 * * *',
       );
       expect(contractStatusCall).toBeDefined();
 
@@ -329,7 +332,7 @@ describe('Cron Scheduler', () => {
       await startCronJobs();
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       const fatigueCall = scheduleCalls.find(
-        (call: [string, () => Promise<void>]) => call[0] === '15 7 * * *',
+        (call: [string, () => Promise<void>]) => call[0] === '10 6 * * *',
       );
       expect(fatigueCall).toBeDefined();
 
@@ -368,7 +371,7 @@ describe('Cron Scheduler', () => {
       await startCronJobs();
       const scheduleCalls = (cron.schedule as jest.Mock).mock.calls;
       const fatigueCall = scheduleCalls.find(
-        (call: [string, () => Promise<void>]) => call[0] === '15 7 * * *',
+        (call: [string, () => Promise<void>]) => call[0] === '10 6 * * *',
       );
 
       await fatigueCall![1]();
