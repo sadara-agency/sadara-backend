@@ -7,8 +7,22 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/finance/finance.service";
 import { createApprovalRequest } from "@modules/approvals/approval.service";
+
+// Fire-and-forget cache invalidation helper
+function bustFinanceCache(extra: string[] = []) {
+  invalidateMultiple([
+    CachePrefix.FINANCE,
+    CachePrefix.DASHBOARD,
+    ...extra,
+  ]).catch((err) =>
+    logger.warn("Finance cache invalidation failed", {
+      error: (err as Error).message,
+    }),
+  );
+}
 
 // ── Invoices ──
 export async function listInvoices(req: AuthRequest, res: Response) {
@@ -45,6 +59,7 @@ export async function createInvoice(req: AuthRequest, res: Response) {
     );
   }
 
+  bustFinanceCache();
   sendCreated(res, inv);
 }
 export async function updateInvoice(req: AuthRequest, res: Response) {
@@ -56,6 +71,7 @@ export async function updateInvoice(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Invoice updated",
   );
+  bustFinanceCache();
   sendSuccess(res, inv, "Invoice updated");
 }
 export async function updateInvoiceStatus(req: AuthRequest, res: Response) {
@@ -67,6 +83,7 @@ export async function updateInvoiceStatus(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Invoice status → ${inv.status}`,
   );
+  bustFinanceCache();
   sendSuccess(res, inv, `Status updated to ${inv.status}`);
 }
 export async function deleteInvoice(req: AuthRequest, res: Response) {
@@ -78,6 +95,7 @@ export async function deleteInvoice(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Invoice deleted",
   );
+  bustFinanceCache();
   sendSuccess(res, r, "Invoice deleted");
 }
 
@@ -95,6 +113,7 @@ export async function createPayment(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Payment ${p.paymentType}: ${p.amount}`,
   );
+  bustFinanceCache([CachePrefix.CONTRACTS]);
   sendCreated(res, p);
 }
 export async function updatePaymentStatus(req: AuthRequest, res: Response) {
@@ -106,6 +125,7 @@ export async function updatePaymentStatus(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Payment status → ${p.status}`,
   );
+  bustFinanceCache([CachePrefix.CONTRACTS]);
   sendSuccess(res, p, `Payment ${p.status}`);
 }
 
@@ -123,6 +143,7 @@ export async function createLedgerEntry(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Ledger ${le.side}: ${le.account} ${le.amount}`,
   );
+  bustFinanceCache();
   sendCreated(res, le);
 }
 
@@ -140,6 +161,7 @@ export async function createValuation(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Valuation: ${v.value} (${v.trend})`,
   );
+  bustFinanceCache([CachePrefix.PLAYERS]);
   sendCreated(res, v);
 }
 
@@ -173,6 +195,7 @@ export async function createExpense(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Expense: ${exp.category} ${exp.amount}`,
   );
+  bustFinanceCache();
   sendCreated(res, exp);
 }
 export async function updateExpense(req: AuthRequest, res: Response) {
@@ -184,6 +207,7 @@ export async function updateExpense(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Expense updated",
   );
+  bustFinanceCache();
   sendSuccess(res, exp, "Expense updated");
 }
 export async function deleteExpense(req: AuthRequest, res: Response) {
@@ -195,5 +219,6 @@ export async function deleteExpense(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Expense deleted",
   );
+  bustFinanceCache();
   sendSuccess(res, r, "Expense deleted");
 }
