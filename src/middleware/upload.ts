@@ -39,7 +39,9 @@ const storage = multer.diskStorage({
     cb(null, UPLOAD_DIR);
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    let ext = path.extname(file.originalname).toLowerCase();
+    // Normalize .jfif → .jpg (JFIF is a JPEG variant common on Windows)
+    if (ext === ".jfif") ext = ".jpg";
     const uniqueName = `${crypto.randomUUID()}${ext}`;
     cb(null, uniqueName);
   },
