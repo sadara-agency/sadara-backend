@@ -35,7 +35,7 @@ export async function uploadPhoto(req: AuthRequest, res: Response) {
   if (!req.file) throw new AppError("No file uploaded", 400);
 
   const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const photoUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
+  const photoUrl = `${baseUrl}/uploads/photos/${req.file.filename}`;
 
   const player = await playerService.updatePlayer(req.params.id, { photoUrl });
   await logAudit(

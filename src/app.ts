@@ -110,8 +110,24 @@ app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 app.use("/api/v1", apiLimiter);
 app.use("/api/v1/auth", authLimiter);
 
-// ── Serve uploaded files (authenticated + role-checked, path-traversal safe) ──
+// ── Serve player photos (no auth — profile pictures are not confidential) ──
 const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads", "documents");
+app.get("/uploads/photos/:filename", (req, res) => {
+  const filename = path.basename(req.params.filename); // strip traversal
+  // Only allow image extensions
+  const ext = path.extname(filename).toLowerCase();
+  if (![".jpg", ".jpeg", ".png", ".webp"].includes(ext)) {
+    return res.status(403).json({ success: false, message: "Not allowed" });
+  }
+  const filePath = path.join(UPLOADS_ROOT, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: "Photo not found" });
+  }
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.sendFile(filePath);
+});
+
+// ── Serve uploaded files (authenticated + role-checked, path-traversal safe) ──
 app.get(
   "/uploads/documents/:filename",
   authenticate,

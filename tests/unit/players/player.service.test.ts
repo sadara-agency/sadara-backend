@@ -171,7 +171,7 @@ describe('Player Service', () => {
       const result = await playerService.updatePlayer('player-001', { position: 'Midfielder' });
 
       expect(result).toBeDefined();
-      expect(player.update).toHaveBeenCalledWith(expect.objectContaining({ position: 'Midfielder' }));
+      expect(player.update).toHaveBeenCalledWith(expect.objectContaining({ position: 'Midfielder' }), expect.anything());
     });
 
     it('should throw 404 if player not found', async () => {
@@ -188,7 +188,7 @@ describe('Player Service', () => {
 
       await playerService.updatePlayer('player-001', { currentClubId: 'club-002' });
 
-      expect(player.update).toHaveBeenCalledWith(expect.objectContaining({ currentClubId: 'club-002' }));
+      expect(player.update).toHaveBeenCalledWith(expect.objectContaining({ currentClubId: 'club-002' }), expect.anything());
     });
   });
 

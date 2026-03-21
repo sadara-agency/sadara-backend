@@ -159,7 +159,10 @@ Player.init(
     agentId: { type: DataTypes.UUID, field: "agent_id" },
     coachId: { type: DataTypes.UUID, field: "coach_id" },
     analystId: { type: DataTypes.UUID, field: "analyst_id" },
-    marketValue: { type: DataTypes.DECIMAL(15, 2) },
+    marketValue: {
+      type: DataTypes.DECIMAL(15, 2),
+      validate: { min: 0, max: 9_999_999_999_999 },
+    },
     marketValueCurrency: {
       type: DataTypes.ENUM("SAR", "USD", "EUR"),
       defaultValue: "SAR",
