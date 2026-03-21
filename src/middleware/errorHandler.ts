@@ -6,12 +6,23 @@ import { logger } from "@config/logger";
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
+  /** Optional structured error detail (e.g. JSON-stringified field errors) */
+  errorDetail?: string;
 
   constructor(message: string, statusCode = 400, isOperational = true) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
     Object.setPrototypeOf(this, AppError.prototype);
+  }
+
+  /** Create a validation error with field-level detail matching Zod middleware format */
+  static validation(
+    fieldErrors: { field: string; message: string }[],
+  ): AppError {
+    const err = new AppError("Validation failed", 422);
+    err.errorDetail = JSON.stringify(fieldErrors);
+    return err;
   }
 }
 
@@ -33,6 +44,7 @@ export function errorHandler(
     res.status(err.statusCode).json({
       success: false,
       message: err.message,
+      ...(err.errorDetail && { error: err.errorDetail }),
     });
     return;
   }

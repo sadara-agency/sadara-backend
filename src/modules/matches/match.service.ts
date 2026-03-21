@@ -6,7 +6,6 @@ import { MatchAnalysis } from "@modules/matches/matchAnalysis.model";
 import { Club } from "@modules/clubs/club.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
-import { Task } from "@modules/tasks/task.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
@@ -88,30 +87,33 @@ export async function listMatches(queryParams: any) {
     }
   }
 
-  const { count, rows } = await Match.findAndCountAll({
-    where,
-    limit,
-    offset,
-    order: [[sort, order]],
-    include: includeConfig,
-    subQuery: false,
-    distinct: true,
-  });
-
   // Build a where clause without the status filter to get global counts
   const { status: _status, ...whereWithoutStatus } = where;
-  const statusCounts = (await Match.findAll({
-    attributes: [
-      "status",
-      [Sequelize.fn("COUNT", Sequelize.col("Match.id")), "count"],
-    ],
-    where:
-      Object.keys(whereWithoutStatus).length > 0
-        ? whereWithoutStatus
-        : undefined,
-    group: ["status"],
-    raw: true,
-  })) as unknown as { status: string; count: string }[];
+
+  // Run both queries concurrently for better performance
+  const [{ count, rows }, statusCounts] = await Promise.all([
+    Match.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [[sort, order]],
+      include: includeConfig,
+      subQuery: false,
+      distinct: true,
+    }),
+    Match.findAll({
+      attributes: [
+        "status",
+        [Sequelize.fn("COUNT", Sequelize.col("Match.id")), "count"],
+      ],
+      where:
+        Object.keys(whereWithoutStatus).length > 0
+          ? whereWithoutStatus
+          : undefined,
+      group: ["status"],
+      raw: true,
+    }) as unknown as Promise<{ status: string; count: string }[]>,
+  ]);
 
   const stats = { upcoming: 0, live: 0, completed: 0, cancelled: 0, total: 0 };
   for (const row of statusCounts) {
@@ -125,6 +127,16 @@ export async function listMatches(queryParams: any) {
 
 export async function getMatchById(id: string) {
   const match = await Match.findByPk(id, {
+    attributes: {
+      include: [
+        [
+          Sequelize.literal(
+            `(SELECT COUNT(*) FROM tasks WHERE tasks.match_id = "Match".id)`,
+          ),
+          "taskCount",
+        ],
+      ],
+    },
     include: [
       { model: Club, as: "homeClub", attributes: [...CLUB_ATTRS] },
       { model: Club, as: "awayClub", attributes: [...CLUB_ATTRS] },
@@ -146,11 +158,13 @@ export async function getMatchById(id: string) {
   });
   if (!match) throw new AppError("Match not found", 404);
 
-  const taskCount = await Task.count({ where: { matchId: id } }).catch(() => 0);
-
+  const plain = match.get({ plain: true }) as any;
   return {
-    ...match.get({ plain: true }),
-    counts: { players: match.matchPlayers?.length ?? 0, tasks: taskCount },
+    ...plain,
+    counts: {
+      players: match.matchPlayers?.length ?? 0,
+      tasks: Number(plain.taskCount) || 0,
+    },
   };
 }
 

@@ -376,16 +376,46 @@ export async function updatePlayer(id: string, input: any) {
   }
 
   try {
-    return await player.update(input);
+    return await player.update(input, { fields: Object.keys(input) as any });
   } catch (err: any) {
-    // Handle Sequelize validation errors gracefully
-    if (
-      err.name === "SequelizeValidationError" ||
-      err.name === "SequelizeUniqueConstraintError"
-    ) {
-      const messages =
-        err.errors?.map((e: any) => e.message).join(", ") || err.message;
-      throw new AppError(messages, 422);
+    // Handle Sequelize validation errors — return field-level detail
+    if (err.name === "SequelizeValidationError") {
+      const fieldErrors = (err.errors || []).map((e: any) => ({
+        field: e.path || e.type || "unknown",
+        message: e.message,
+      }));
+      throw AppError.validation(
+        fieldErrors.length > 0
+          ? fieldErrors
+          : [{ field: "unknown", message: err.message }],
+      );
+    }
+    if (err.name === "SequelizeUniqueConstraintError") {
+      const fieldErrors = (err.errors || []).map((e: any) => ({
+        field: e.path || "unknown",
+        message: e.message,
+      }));
+      throw AppError.validation(
+        fieldErrors.length > 0
+          ? fieldErrors
+          : [{ field: "unknown", message: err.message }],
+      );
+    }
+    // Handle known DB errors with friendly messages instead of 500
+    if (err.name === "SequelizeDatabaseError") {
+      const msg = err.message || "";
+      if (msg.includes("numeric field overflow")) {
+        throw new AppError(
+          "A numeric value exceeds the allowed range. Please check market value and other numbers.",
+          422,
+        );
+      }
+      if (msg.includes("value too long")) {
+        throw new AppError(
+          "A text value is too long. Please shorten the input.",
+          422,
+        );
+      }
     }
     throw err;
   }

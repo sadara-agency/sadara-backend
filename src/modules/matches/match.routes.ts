@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createMatchSchema,
@@ -27,6 +28,7 @@ router.get(
   "/calendar",
   authorizeModule("matches", "read"),
   validate(calendarQuerySchema, "query"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.calendar),
 );
 
@@ -34,6 +36,7 @@ router.get(
 router.get(
   "/upcoming",
   authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.upcoming),
 );
 
@@ -42,11 +45,13 @@ router.get(
   "/player/:playerId",
   authorizeModule("matches", "read"),
   validate(playerMatchesQuerySchema, "query"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.playerMatches),
 );
 router.get(
   "/player/:playerId/stats",
   authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.playerAggregateStats),
 );
 
@@ -55,11 +60,13 @@ router.get(
   "/",
   authorizeModule("matches", "read"),
   validate(matchQuerySchema, "query"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.list),
 );
 router.get(
   "/:id",
   authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.getById),
 );
 router.post(
@@ -96,6 +103,7 @@ router.delete(
 router.get(
   "/:id/players",
   authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.getPlayers),
 );
 router.post(
@@ -120,6 +128,7 @@ router.delete(
 router.get(
   "/:id/stats",
   authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
   asyncHandler(ctrl.getStats),
 );
 router.post(
@@ -140,37 +149,43 @@ router.delete(
   asyncHandler(ctrl.deletePlayerStats),
 );
 
-// ── Match Analysis ──
+// ── Match Analysis (restricted to tactical roles) ──
 router.get(
   "/:id/analysis",
   authorizeModule("matches", "read"),
+  authorize("Admin", "Scout", "Analyst", "Coach"),
   asyncHandler(ctrl.listAnalyses),
 );
 router.get(
   "/:id/analysis/:analysisId",
   authorizeModule("matches", "read"),
+  authorize("Admin", "Scout", "Analyst", "Coach"),
   asyncHandler(ctrl.getAnalysis),
 );
 router.post(
   "/:id/analysis",
   authorizeModule("matches", "create"),
+  authorize("Admin", "Scout", "Analyst", "Coach"),
   validate(createMatchAnalysisSchema),
   asyncHandler(ctrl.createAnalysis),
 );
 router.patch(
   "/:id/analysis/:analysisId",
   authorizeModule("matches", "update"),
+  authorize("Admin", "Scout", "Analyst", "Coach"),
   validate(updateMatchAnalysisSchema),
   asyncHandler(ctrl.updateAnalysis),
 );
 router.patch(
   "/:id/analysis/:analysisId/publish",
   authorizeModule("matches", "update"),
+  authorize("Admin", "Scout", "Analyst", "Coach"),
   asyncHandler(ctrl.publishAnalysis),
 );
 router.delete(
   "/:id/analysis/:analysisId",
   authorizeModule("matches", "delete"),
+  authorize("Admin", "Scout", "Analyst", "Coach"),
   asyncHandler(ctrl.removeAnalysis),
 );
 
