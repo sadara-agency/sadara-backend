@@ -218,12 +218,21 @@ function printBanner(): void {
 // Entrypoint
 // ─────────────────────────────────────────────
 
+/** Exported so the health endpoint can distinguish "starting" from "ready". */
+export let appReady = false;
+
 async function bootstrap(): Promise<void> {
   try {
+    // Start HTTP server FIRST so Cloud Run sees the port open quickly
+    await startServer();
+
+    // Then run heavy initialization
     await initInfrastructure();
     await initApplication();
     await startSchedulers();
-    await startServer();
+
+    appReady = true;
+    logger.info("All initialization complete — app is ready");
   } catch (err: unknown) {
     const e = err instanceof Error ? err : new Error(String(err));
     logger.error("Failed to start server", {
