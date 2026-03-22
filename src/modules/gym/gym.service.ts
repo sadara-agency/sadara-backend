@@ -542,7 +542,7 @@ export async function logWorkoutSession(
 }
 
 export async function getPlayerWorkouts(playerId: string) {
-  return WorkoutAssignment.findAll({
+  const assignments = await WorkoutAssignment.findAll({
     where: { playerId },
     include: [
       {
@@ -562,8 +562,21 @@ export async function getPlayerWorkouts(playerId: string) {
           },
         ],
       },
+      {
+        model: WorkoutLog,
+        as: "logs",
+        attributes: ["sessionId"],
+      },
     ],
     order: [["createdAt", "DESC"]],
+  });
+
+  // Transform: add completedSessions array the frontend expects
+  return assignments.map((a) => {
+    const json = a.toJSON() as any;
+    json.completedSessions = (json.logs ?? []).map((l: any) => l.sessionId);
+    delete json.logs;
+    return json;
   });
 }
 
@@ -691,6 +704,8 @@ export async function addMealToPlan(
 
   const meal = await DietMeal.create({
     planId,
+    nameEn: input.nameEn,
+    nameAr: input.nameAr,
     dayNumber: input.dayNumber,
     mealType: input.mealType,
     sortOrder: input.sortOrder,
@@ -716,6 +731,49 @@ export async function addItemToMeal(mealId: string, input: any) {
 
 export async function deleteItemFromMeal(itemId: string) {
   return destroyById(DietMealItem, itemId, "Meal item");
+}
+
+// ── Player's own diet plans (with full meal/item structure) ──
+
+export async function getMyDietPlans(playerId: string) {
+  const plans = await DietPlan.findAll({
+    where: { playerId, status: "active" },
+    include: [
+      {
+        model: DietMeal,
+        as: "meals",
+        include: [
+          {
+            model: DietMealItem,
+            as: "items",
+            include: [{ model: FoodItem, as: "food" }],
+          },
+        ],
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  // Transform items to flatten food fields the frontend expects
+  return plans.map((plan) => {
+    const p = plan.toJSON() as any;
+    p.meals = (p.meals ?? []).map((meal: any) => ({
+      ...meal,
+      items: (meal.items ?? []).map((item: any) => ({
+        id: item.id,
+        foodName: item.food?.nameEn ?? item.customName ?? "",
+        foodNameAr: item.food?.nameAr ?? null,
+        portionSize: item.portionSize,
+        portionUnit: item.portionUnit,
+        calories: item.calories,
+        protein: item.protein,
+        carbs: item.carbs,
+        fat: item.fat,
+        category: item.food?.category ?? null,
+      })),
+    }));
+    return p;
+  });
 }
 
 // ── Diet Adherence (Player) ──
@@ -746,6 +804,13 @@ export async function getPlayerDietAdherence(
 
   return DietAdherence.findAll({
     where,
+    include: [
+      {
+        model: DietMeal,
+        as: "meal",
+        attributes: ["id", "nameEn", "nameAr", "mealType"],
+      },
+    ],
     order: [["date", "DESC"]],
     limit: 100,
   });

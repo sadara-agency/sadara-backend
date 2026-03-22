@@ -162,9 +162,9 @@ export const createDietPlanSchema = z.object({
   descriptionAr: z.string().optional(),
   type: z.enum(["daily", "weekly", "custom"]).default("weekly"),
   targetCalories: z.number().positive().optional(),
-  targetProtein: z.number().min(0).optional(),
-  targetCarbs: z.number().min(0).optional(),
-  targetFat: z.number().min(0).optional(),
+  proteinG: z.number().min(0).optional(),
+  carbsG: z.number().min(0).optional(),
+  fatG: z.number().min(0).optional(),
   isTemplate: z.boolean().default(false),
   templateTags: z.array(z.string()).optional(),
   playerId: z.string().uuid().optional(),
@@ -177,6 +177,8 @@ export const updateDietPlanSchema = createDietPlanSchema.partial().extend({
 // ── Diet Meals ──
 
 export const createDietMealSchema = z.object({
+  nameEn: z.string().optional(),
+  nameAr: z.string().optional(),
   dayNumber: z.number().int().min(1).default(1),
   mealType: z
     .enum(["breakfast", "lunch", "dinner", "snack", "suhoor", "iftar"])
@@ -187,8 +189,8 @@ export const createDietMealSchema = z.object({
       z.object({
         foodId: z.string().uuid().optional(),
         customName: z.string().optional(),
-        servingSize: z.number().positive().default(100),
-        servingUnit: z.string().default("g"),
+        portionSize: z.number().positive().default(100),
+        portionUnit: z.string().default("g"),
         calories: z.number().min(0).optional(),
         protein: z.number().min(0).optional(),
         carbs: z.number().min(0).optional(),
@@ -203,7 +205,7 @@ export const createDietMealSchema = z.object({
 export const logAdherenceSchema = z.object({
   mealId: z.string().uuid().optional(),
   date: z.string().optional(),
-  status: z.enum(["consumed", "skipped", "partial"]).default("consumed"),
+  status: z.enum(["ate", "skipped", "partial"]).default("ate"),
   notes: z.string().optional(),
 });
 
