@@ -121,13 +121,21 @@ export async function listBodyMetrics(playerId: string, queryParams: any) {
   const where: any = { playerId };
   if (dateRange) where.date = dateRange;
 
-  const { count, rows } = await BodyMetric.findAndCountAll({
-    where,
-    limit,
-    offset,
-    order: [["date", "DESC"]],
-  });
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  try {
+    const { count, rows } = await BodyMetric.findAndCountAll({
+      where,
+      limit,
+      offset,
+      order: [["date", "DESC"]],
+    });
+    return { data: rows, meta: buildMeta(count, page, limit) };
+  } catch (err) {
+    logger.error("Failed to list body metrics", {
+      playerId,
+      error: (err as Error).message,
+    });
+    throw new AppError("Failed to load body metrics", 500);
+  }
 }
 
 export async function createBodyMetric(

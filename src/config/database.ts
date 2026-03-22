@@ -41,19 +41,31 @@ const sequelizeOptions: Options = {
 
 export const sequelize = new Sequelize(sequelizeOptions);
 
-export async function testConnection(): Promise<void> {
-  try {
-    await sequelize.authenticate();
-    logger.info("Database connection established", {
-      host: env.db.host,
-      database: env.db.name,
-      pool: sequelizeOptions.pool?.max,
-    });
-  } catch (err) {
-    logger.error("Database connection failed", {
-      error: (err as Error).message,
-    });
-    throw err;
+export async function testConnection(
+  retries = 5,
+  delayMs = 3000,
+): Promise<void> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await sequelize.authenticate();
+      logger.info("Database connection established", {
+        host: env.db.host,
+        database: env.db.name,
+        pool: sequelizeOptions.pool?.max,
+        attempt,
+      });
+      return;
+    } catch (err) {
+      logger.error(
+        `Database connection failed (attempt ${attempt}/${retries})`,
+        {
+          error: (err as Error).message,
+          host: env.db.host,
+        },
+      );
+      if (attempt === retries) throw err;
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
   }
 }
 

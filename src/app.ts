@@ -192,28 +192,27 @@ app.get(
 // The "ready" field tells callers whether the app is fully initialized.
 app.get("/api/health", async (_req, res) => {
   // Lazy import to avoid circular dependency
-  const { appReady } = await import("./index");
+  const { appReady, initError } = await import("./index");
 
   const checks: Record<string, "ok" | "error"> = {};
 
-  if (appReady) {
-    try {
-      await sequelize.authenticate();
-      checks.database = "ok";
-    } catch {
-      checks.database = "error";
-    }
+  // Always attempt checks so we can diagnose startup failures
+  try {
+    await sequelize.authenticate();
+    checks.database = "ok";
+  } catch {
+    checks.database = "error";
+  }
 
-    try {
-      if (isRedisConnected()) {
-        await getRedisClient()!.ping();
-        checks.redis = "ok";
-      } else {
-        checks.redis = "error";
-      }
-    } catch {
+  try {
+    if (isRedisConnected()) {
+      await getRedisClient()!.ping();
+      checks.redis = "ok";
+    } else {
       checks.redis = "error";
     }
+  } catch {
+    checks.redis = "error";
   }
 
   const allOk = appReady && Object.values(checks).every((v) => v === "ok");
@@ -225,6 +224,8 @@ app.get("/api/health", async (_req, res) => {
     version: "1.0.0",
     timestamp: new Date().toISOString(),
     checks,
+    // Surface the init error so Postman/logs show exactly what failed
+    ...(initError && { initError }),
   });
 });
 

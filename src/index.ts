@@ -220,6 +220,8 @@ function printBanner(): void {
 
 /** Exported so the health endpoint can distinguish "starting" from "ready". */
 export let appReady = false;
+/** Exported so the health endpoint can surface what went wrong. */
+export let initError: string | undefined;
 
 async function bootstrap(): Promise<void> {
   try {
@@ -232,17 +234,71 @@ async function bootstrap(): Promise<void> {
     await startSchedulers();
 
     appReady = true;
+    initError = undefined;
     logger.info("All initialization complete — app is ready");
   } catch (err: unknown) {
     const e = err instanceof Error ? err : new Error(String(err));
-    logger.error("Failed to start server", {
+    const dbErr = (e as any).original?.message;
+    initError = dbErr ? `${e.message} — ${dbErr}` : e.message;
+
+    logger.error("Failed to initialize", {
       error: e.message,
       stack: e.stack,
-      ...((e as any).original?.message && {
-        dbError: (e as any).original.message,
-      }),
+      ...(dbErr && { dbError: dbErr }),
     });
-    process.exit(1);
+
+    // In production, keep the server alive so the health endpoint can report
+    // the error instead of crash-looping. Cloud Run will see ready=false.
+    if (env.nodeEnv !== "production") {
+      process.exit(1);
+    }
+
+    // Retry initialization after a delay (DB may be waking up)
+    logger.info("Will retry initialization in 10 seconds…");
+    setTimeout(() => {
+      retryInit();
+    }, 10_000);
+  }
+}
+
+async function retryInit(): Promise<void> {
+  logger.info("Retrying initialization…");
+  try {
+    await initInfrastructure();
+    await initApplication();
+    await startSchedulers();
+
+    appReady = true;
+    initError = undefined;
+    logger.info("Retry succeeded — app is ready");
+  } catch (err: unknown) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    initError = e.message;
+    logger.error("Retry failed", { error: e.message });
+
+    // Try once more after 30s then give up
+    setTimeout(() => {
+      retryInit2();
+    }, 30_000);
+  }
+}
+
+async function retryInit2(): Promise<void> {
+  logger.info("Final initialization retry…");
+  try {
+    await initInfrastructure();
+    await initApplication();
+    await startSchedulers();
+
+    appReady = true;
+    initError = undefined;
+    logger.info("Final retry succeeded — app is ready");
+  } catch (err: unknown) {
+    const e = err instanceof Error ? err : new Error(String(err));
+    initError = e.message;
+    logger.error("All retries exhausted — app staying in degraded state", {
+      error: e.message,
+    });
   }
 }
 
