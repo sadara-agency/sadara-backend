@@ -50,89 +50,98 @@ async function batchLoadPlayerStats(
 ): Promise<Map<string, Record<string, any>>> {
   if (playerIds.length === 0) return new Map();
 
-  const rows = await sequelize.query<Record<string, any>>(
-    `SELECT
-       p.id AS player_id,
-       -- Latest contract info (1 lateral instead of 3 subqueries)
-       lc.contract_status, lc.contract_end, lc.commission_rate,
-       -- Match participation (1 lateral instead of 2 subqueries)
-       COALESCE(mp_agg.matches, 0) AS matches,
-       COALESCE(mp_agg.minutes_played, 0) AS minutes_played,
-       -- Match stats (1 lateral instead of 3 subqueries)
-       COALESCE(pms_agg.goals, 0) AS goals,
-       COALESCE(pms_agg.assists, 0) AS assists,
-       pms_agg.rating,
-       COALESCE(pms_agg.tackles, 0) AS tackles,
-       COALESCE(pms_agg.interceptions, 0) AS interceptions,
-       COALESCE(pms_agg.duels_won, 0) AS duels_won,
-       COALESCE(pms_agg.duels_total, 0) AS duels_total,
-       COALESCE(pms_agg.dribbles_completed, 0) AS dribbles_completed,
-       COALESCE(pms_agg.dribbles_attempted, 0) AS dribbles_attempted,
-       COALESCE(pms_agg.key_passes, 0) AS key_passes,
-       COALESCE(pms_agg.shots_on_target, 0) AS shots_on_target,
-       COALESCE(pms_agg.saves, 0) AS saves,
-       COALESCE(pms_agg.clean_sheets, 0) AS clean_sheets,
-       COALESCE(pms_agg.goals_conceded, 0) AS goals_conceded,
-       COALESCE(pms_agg.penalties_saved, 0) AS penalties_saved,
-       -- Latest performance
-       perf_latest.performance,
-       -- Provider linked?
-       COALESCE(epm.has_provider, false) AS has_provider_mapping
-     FROM players p
-     LEFT JOIN LATERAL (
-       SELECT true AS has_provider
-       FROM external_provider_mappings epm
-       WHERE epm.player_id = p.id AND epm.is_active = true
-       LIMIT 1
-     ) epm ON true
-     LEFT JOIN LATERAL (
-       SELECT
-         CASE
-           WHEN c.end_date IS NULL THEN 'Active'
-           WHEN c.end_date < CURRENT_DATE THEN 'Expired'
-           WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
-           ELSE 'Active'
-         END AS contract_status,
-         c.end_date::text AS contract_end,
-         c.commission_pct AS commission_rate
-       FROM contracts c WHERE c.player_id = p.id
-       ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
-     ) lc ON true
-     LEFT JOIN LATERAL (
-       SELECT COUNT(*)::int AS matches,
-              COALESCE(SUM(mp.minutes_played), 0)::int AS minutes_played
-       FROM match_players mp WHERE mp.player_id = p.id
-     ) mp_agg ON true
-     LEFT JOIN LATERAL (
-       SELECT COALESCE(SUM(pms.goals), 0)::int AS goals,
-              COALESCE(SUM(pms.assists), 0)::int AS assists,
-              ROUND(AVG(pms.rating) FILTER (WHERE pms.rating IS NOT NULL), 1) AS rating,
-              COALESCE(SUM(pms.tackles_total), 0)::int AS tackles,
-              COALESCE(SUM(pms.interceptions), 0)::int AS interceptions,
-              COALESCE(SUM(pms.duels_won), 0)::int AS duels_won,
-              COALESCE(SUM(pms.duels_total), 0)::int AS duels_total,
-              COALESCE(SUM(pms.dribbles_completed), 0)::int AS dribbles_completed,
-              COALESCE(SUM(pms.dribbles_attempted), 0)::int AS dribbles_attempted,
-              COALESCE(SUM(pms.key_passes), 0)::int AS key_passes,
-              COALESCE(SUM(pms.shots_on_target), 0)::int AS shots_on_target,
-              COALESCE(SUM(pms.saves), 0)::int AS saves,
-              COALESCE(SUM(pms.clean_sheet::int), 0)::int AS clean_sheets,
-              COALESCE(SUM(pms.goals_conceded), 0)::int AS goals_conceded,
-              COALESCE(SUM(pms.penalties_saved), 0)::int AS penalties_saved
-       FROM player_match_stats pms WHERE pms.player_id = p.id
-     ) pms_agg ON true
-     LEFT JOIN LATERAL (
-       SELECT perf.average_rating AS performance
-       FROM performances perf WHERE perf.player_id = p.id
-       ORDER BY perf.created_at DESC LIMIT 1
-     ) perf_latest ON true
-     WHERE p.id IN (:ids)`,
-    { replacements: { ids: playerIds }, type: QueryTypes.SELECT },
-  );
+  try {
+    const rows = await sequelize.query<Record<string, any>>(
+      `SELECT
+         p.id AS player_id,
+         -- Latest contract info (1 lateral instead of 3 subqueries)
+         lc.contract_status, lc.contract_end, lc.commission_rate,
+         -- Match participation (1 lateral instead of 2 subqueries)
+         COALESCE(mp_agg.matches, 0) AS matches,
+         COALESCE(mp_agg.minutes_played, 0) AS minutes_played,
+         -- Match stats (1 lateral instead of 3 subqueries)
+         COALESCE(pms_agg.goals, 0) AS goals,
+         COALESCE(pms_agg.assists, 0) AS assists,
+         pms_agg.rating,
+         COALESCE(pms_agg.tackles, 0) AS tackles,
+         COALESCE(pms_agg.interceptions, 0) AS interceptions,
+         COALESCE(pms_agg.duels_won, 0) AS duels_won,
+         COALESCE(pms_agg.duels_total, 0) AS duels_total,
+         COALESCE(pms_agg.dribbles_completed, 0) AS dribbles_completed,
+         COALESCE(pms_agg.dribbles_attempted, 0) AS dribbles_attempted,
+         COALESCE(pms_agg.key_passes, 0) AS key_passes,
+         COALESCE(pms_agg.shots_on_target, 0) AS shots_on_target,
+         COALESCE(pms_agg.saves, 0) AS saves,
+         COALESCE(pms_agg.clean_sheets, 0) AS clean_sheets,
+         COALESCE(pms_agg.goals_conceded, 0) AS goals_conceded,
+         COALESCE(pms_agg.penalties_saved, 0) AS penalties_saved,
+         -- Latest performance
+         perf_latest.performance,
+         -- Provider linked?
+         COALESCE(epm.has_provider, false) AS has_provider_mapping
+       FROM players p
+       LEFT JOIN LATERAL (
+         SELECT true AS has_provider
+         FROM external_provider_mappings epm
+         WHERE epm.player_id = p.id AND epm.is_active = true
+         LIMIT 1
+       ) epm ON true
+       LEFT JOIN LATERAL (
+         SELECT
+           CASE
+             WHEN c.end_date IS NULL THEN 'Active'
+             WHEN c.end_date < CURRENT_DATE THEN 'Expired'
+             WHEN c.end_date < CURRENT_DATE + INTERVAL '90 days' THEN 'Expiring Soon'
+             ELSE 'Active'
+           END AS contract_status,
+           c.end_date::text AS contract_end,
+           c.commission_pct AS commission_rate
+         FROM contracts c WHERE c.player_id = p.id
+         ORDER BY c.end_date DESC NULLS FIRST LIMIT 1
+       ) lc ON true
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::int AS matches,
+                COALESCE(SUM(mp.minutes_played), 0)::int AS minutes_played
+         FROM match_players mp WHERE mp.player_id = p.id
+       ) mp_agg ON true
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(SUM(pms.goals), 0)::int AS goals,
+                COALESCE(SUM(pms.assists), 0)::int AS assists,
+                ROUND(AVG(pms.rating) FILTER (WHERE pms.rating IS NOT NULL), 1) AS rating,
+                COALESCE(SUM(pms.tackles_total), 0)::int AS tackles,
+                COALESCE(SUM(pms.interceptions), 0)::int AS interceptions,
+                COALESCE(SUM(pms.duels_won), 0)::int AS duels_won,
+                COALESCE(SUM(pms.duels_total), 0)::int AS duels_total,
+                COALESCE(SUM(pms.dribbles_completed), 0)::int AS dribbles_completed,
+                COALESCE(SUM(pms.dribbles_attempted), 0)::int AS dribbles_attempted,
+                COALESCE(SUM(pms.key_passes), 0)::int AS key_passes,
+                COALESCE(SUM(pms.shots_on_target), 0)::int AS shots_on_target,
+                COALESCE(SUM(pms.saves), 0)::int AS saves,
+                COALESCE(SUM(pms.clean_sheet::int), 0)::int AS clean_sheets,
+                COALESCE(SUM(pms.goals_conceded), 0)::int AS goals_conceded,
+                COALESCE(SUM(pms.penalties_saved), 0)::int AS penalties_saved
+         FROM player_match_stats pms WHERE pms.player_id = p.id
+       ) pms_agg ON true
+       LEFT JOIN LATERAL (
+         SELECT perf.average_rating AS performance
+         FROM performances perf WHERE perf.player_id = p.id
+         ORDER BY perf.created_at DESC LIMIT 1
+       ) perf_latest ON true
+       WHERE p.id IN (:ids)`,
+      { replacements: { ids: playerIds }, type: QueryTypes.SELECT },
+    );
 
-  const map = new Map<string, Record<string, any>>();
-  for (const row of rows) map.set(row.player_id, row);
-  return map;
+    const map = new Map<string, Record<string, any>>();
+    for (const row of rows) map.set(row.player_id, row);
+    return map;
+  } catch (err) {
+    logger.error("batchLoadPlayerStats failed", {
+      playerCount: playerIds.length,
+      error: (err as Error).message,
+    });
+    // Return empty map so the player list still loads (without computed stats)
+    return new Map();
+  }
 }
 
 // ── Player sidebar counts (single query instead of 3 separate COUNT queries) ──

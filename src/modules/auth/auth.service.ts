@@ -457,18 +457,35 @@ export async function getProfile(userId: string) {
   const account = await PlayerAccount.findByPk(userId);
   if (!account) throw new AppError("User not found", 404);
 
-  const playerData = await sequelize.query<{
-    first_name: string;
-    last_name: string;
-    first_name_ar: string | null;
-    last_name_ar: string | null;
-    photo_url: string | null;
-  }>(
-    `SELECT first_name, last_name, first_name_ar, last_name_ar, photo_url
-     FROM players WHERE id = :playerId LIMIT 1`,
-    { replacements: { playerId: account.playerId }, type: QueryTypes.SELECT },
-  );
-  const p = playerData[0];
+  let p:
+    | {
+        first_name: string;
+        last_name: string;
+        first_name_ar: string | null;
+        last_name_ar: string | null;
+        photo_url: string | null;
+      }
+    | undefined;
+
+  if (account.playerId) {
+    try {
+      const playerData = await sequelize.query<typeof p & {}>(
+        `SELECT first_name, last_name, first_name_ar, last_name_ar, photo_url
+         FROM players WHERE id = :playerId LIMIT 1`,
+        {
+          replacements: { playerId: account.playerId },
+          type: QueryTypes.SELECT,
+        },
+      );
+      p = playerData[0];
+    } catch (err) {
+      logger.warn("Failed to load player data for profile", {
+        userId,
+        playerId: account.playerId,
+        error: (err as Error).message,
+      });
+    }
+  }
 
   return {
     id: account.id,
