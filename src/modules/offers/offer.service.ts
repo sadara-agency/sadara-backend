@@ -13,6 +13,12 @@ import {
 } from "@modules/approvals/approval.service";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { logger } from "@config/logger";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 import {
   generateOfferCreationTask,
   generateOfferAcceptedTask,
@@ -20,7 +26,7 @@ import {
 
 // ── List Offers ──
 
-export async function listOffers(queryParams: any) {
+export async function listOffers(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -43,6 +49,10 @@ export async function listOffers(queryParams: any) {
       { "$toClub.name$": { [Op.iLike]: `%${search}%` } },
     ];
   }
+
+  // Row-level scoping
+  const scope = buildRowScope("offers", user);
+  if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Offer.findAndCountAll({
     where,
@@ -75,7 +85,7 @@ export async function listOffers(queryParams: any) {
 
 // ── Get Offer by ID ──
 
-export async function getOfferById(id: string) {
+export async function getOfferById(id: string, user?: AuthUser) {
   const offer = await Offer.findByPk(id, {
     include: [
       {
@@ -105,6 +115,10 @@ export async function getOfferById(id: string) {
   });
 
   if (!offer) throw new AppError("Offer not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("offers", offer, user);
+  if (!hasAccess) throw new AppError("Offer not found", 404);
 
   return offer;
 }

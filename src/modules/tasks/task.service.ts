@@ -17,6 +17,12 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import { CreateTaskInput, UpdateTaskInput } from "@modules/tasks/task.schema";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 // ── Shared includes for player + assignee names ──
 const TASK_INCLUDES = [
@@ -45,7 +51,7 @@ const PRIORITY_ORDER = literal(
 // ────────────────────────────────────────────────────────────
 // List Tasks
 // ────────────────────────────────────────────────────────────
-export async function listTasks(queryParams: any) {
+export async function listTasks(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -69,6 +75,10 @@ export async function listTasks(queryParams: any) {
     ];
   }
 
+  // Row-level scoping
+  const scope = buildRowScope("tasks", user);
+  if (scope) mergeScope(where, scope);
+
   // Default sort: priority (critical first) → due_date ascending
   // Unless the user explicitly requests a different sort
   const isDefaultSort = sort === "createdAt" && order === "DESC";
@@ -90,12 +100,17 @@ export async function listTasks(queryParams: any) {
 // ────────────────────────────────────────────────────────────
 // Get Task by ID
 // ────────────────────────────────────────────────────────────
-export async function getTaskById(id: string) {
+export async function getTaskById(id: string, user?: AuthUser) {
   const task = await Task.findByPk(id, {
     include: TASK_INCLUDES,
   });
 
   if (!task) throw new AppError("Task not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("tasks", task, user);
+  if (!hasAccess) throw new AppError("Task not found", 404);
+
   return task;
 }
 

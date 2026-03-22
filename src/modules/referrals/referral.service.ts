@@ -41,7 +41,7 @@ async function refetchWithIncludes(id: string) {
 // ── Access Control ──
 
 function applyAccessFilter(where: any, userId: string, userRole: string) {
-  if (userRole === "Admin") return;
+  if (["Admin", "Manager", "Executive"].includes(userRole)) return;
 
   const accessConditions = [
     { isRestricted: false },
@@ -115,7 +115,10 @@ export async function getReferralById(
   const referral = await Referral.findByPk(id, { include: referralIncludes() });
   if (!referral) throw new AppError("Referral not found", 404);
 
-  if (referral.isRestricted && userRole !== "Admin") {
+  if (
+    referral.isRestricted &&
+    !["Admin", "Manager", "Executive"].includes(userRole)
+  ) {
     const allowed = referral.restrictedTo || [];
     if (
       !allowed.includes(userId) &&

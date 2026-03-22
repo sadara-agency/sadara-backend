@@ -26,11 +26,11 @@ function bustFinanceCache(extra: string[] = []) {
 
 // ── Invoices ──
 export async function listInvoices(req: AuthRequest, res: Response) {
-  const r = await svc.listInvoices(req.query);
+  const r = await svc.listInvoices(req.query, req.user);
   sendPaginated(res, r.data, r.meta);
 }
 export async function getInvoice(req: AuthRequest, res: Response) {
-  sendSuccess(res, await svc.getInvoiceById(req.params.id));
+  sendSuccess(res, await svc.getInvoiceById(req.params.id, req.user));
 }
 export async function createInvoice(req: AuthRequest, res: Response) {
   const inv = await svc.createInvoice(req.body, req.user!.id);
@@ -101,7 +101,7 @@ export async function deleteInvoice(req: AuthRequest, res: Response) {
 
 // ── Payments ──
 export async function listPayments(req: AuthRequest, res: Response) {
-  const r = await svc.listPayments(req.query);
+  const r = await svc.listPayments(req.query, req.user);
   sendPaginated(res, r.data, r.meta);
 }
 export async function createPayment(req: AuthRequest, res: Response) {
@@ -131,7 +131,7 @@ export async function updatePaymentStatus(req: AuthRequest, res: Response) {
 
 // ── Ledger ──
 export async function listLedger(req: AuthRequest, res: Response) {
-  const r = await svc.listLedger(req.query);
+  const r = await svc.listLedger(req.query, req.user);
   sendPaginated(res, r.data, r.meta);
 }
 export async function createLedgerEntry(req: AuthRequest, res: Response) {
@@ -149,7 +149,7 @@ export async function createLedgerEntry(req: AuthRequest, res: Response) {
 
 // ── Valuations ──
 export async function listValuations(req: AuthRequest, res: Response) {
-  const r = await svc.listValuations(req.query);
+  const r = await svc.listValuations(req.query, req.user);
   sendPaginated(res, r.data, r.meta);
 }
 export async function createValuation(req: AuthRequest, res: Response) {
@@ -183,7 +183,7 @@ export async function dashboard(req: AuthRequest, res: Response) {
 
 // ── Expenses ──
 export async function listExpenses(req: AuthRequest, res: Response) {
-  const r = await svc.listExpenses(req.query);
+  const r = await svc.listExpenses(req.query, req.user);
   sendPaginated(res, r.data, r.meta);
 }
 export async function createExpense(req: AuthRequest, res: Response) {

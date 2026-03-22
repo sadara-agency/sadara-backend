@@ -58,6 +58,19 @@ export const uploadLimiter = rateLimit({
   store: getStore(),
 });
 
+// Strict limit for permission mutations (prevent cache thrashing)
+export const permissionMutationLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: {
+    success: false,
+    message: "Too many permission changes, please try again later",
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  store: getStore(),
+});
+
 // Very strict limit for password reset
 export const passwordResetLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour

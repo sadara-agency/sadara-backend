@@ -5,6 +5,8 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { hasPermission } from "@modules/permissions/permission.service";
+import { AuthUser } from "@shared/types";
+import { buildRowScope, mergeScope } from "@shared/utils/rowScope";
 
 /**
  * Maps NoteOwnerType to the backend permission module name.
@@ -19,12 +21,20 @@ const OWNER_TYPE_TO_MODULE: Record<string, string> = {
   Offer: "offers",
 };
 
-export async function listNotes(queryParams: any, userRole?: string) {
+export async function listNotes(
+  queryParams: any,
+  userRole?: string,
+  user?: AuthUser,
+) {
   const { limit, offset, page } = parsePagination(queryParams, "createdAt");
 
   const where: any = {};
   if (queryParams.ownerType) where.ownerType = queryParams.ownerType;
   if (queryParams.ownerId) where.ownerId = queryParams.ownerId;
+
+  // Row-level scoping
+  const scope = buildRowScope("notes", user);
+  if (scope) mergeScope(where, scope);
 
   // RBAC: Exclude notes attached to entities the role cannot read
   if (userRole && userRole !== "Admin") {

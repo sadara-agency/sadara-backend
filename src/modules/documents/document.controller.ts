@@ -16,8 +16,8 @@ import * as svc from "@modules/documents/document.service";
 
 const crud = createCrudController({
   service: {
-    list: (query) => svc.listDocuments(query),
-    getById: (id) => svc.getDocumentById(id),
+    list: (query, user) => svc.listDocuments(query, user?.role, user),
+    getById: (id, user) => svc.getDocumentById(id, user),
     create: (body, userId) => svc.createDocument(body, userId),
     update: (id, body) => svc.updateDocument(id, body),
     delete: (id) => svc.deleteDocument(id),
@@ -27,9 +27,9 @@ const crud = createCrudController({
   label: (d) => d.name,
 });
 
-// Override list to pass user role for RBAC filtering
+// Override list to pass user role for RBAC filtering + row-level scoping
 export async function list(req: AuthRequest, res: Response) {
-  const r = await svc.listDocuments(req.query, req.user?.role);
+  const r = await svc.listDocuments(req.query, req.user?.role, req.user);
   sendPaginated(res, r.data, r.meta);
 }
 

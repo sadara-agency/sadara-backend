@@ -14,6 +14,12 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import { hasPermission } from "@modules/permissions/permission.service";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 const USER_ATTRS = ["id", "fullName"] as const;
 
@@ -137,7 +143,11 @@ const SENSITIVE_DOC_TYPES_BY_ROLE: Record<string, string[]> = {
 
 // ── List ──
 
-export async function listDocuments(queryParams: any, userRole?: string) {
+export async function listDocuments(
+  queryParams: any,
+  userRole?: string,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -177,6 +187,10 @@ export async function listDocuments(queryParams: any, userRole?: string) {
     }
   }
 
+  // Row-level scoping
+  const scope = buildRowScope("documents", user);
+  if (scope) mergeScope(where, scope);
+
   if (search) {
     where[Op.or] = [
       { name: { [Op.iLike]: `%${search}%` } },
@@ -199,9 +213,14 @@ export async function listDocuments(queryParams: any, userRole?: string) {
 
 // ── Get by ID ──
 
-export async function getDocumentById(id: string) {
+export async function getDocumentById(id: string, user?: AuthUser) {
   const doc = await Document.findByPk(id, { include: docIncludes() });
   if (!doc) throw new AppError("Document not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("documents", doc, user);
+  if (!hasAccess) throw new AppError("Document not found", 404);
+
   return doc;
 }
 

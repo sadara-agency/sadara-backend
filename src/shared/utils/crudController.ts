@@ -71,7 +71,7 @@ export function createCrudController(config: CrudConfig) {
   }
 
   const list: Handler = async (req, res) => {
-    const result = await service.list(req.query);
+    const result = await service.list(req.query, req.user);
     const { data, meta, ...extras } = result;
     sendPaginated(
       res,
@@ -83,7 +83,7 @@ export function createCrudController(config: CrudConfig) {
   };
 
   const getById: Handler = async (req, res) => {
-    const item = await service.getById(req.params.id);
+    const item = await service.getById(req.params.id, req.user);
     sendSuccess(res, item);
   };
 

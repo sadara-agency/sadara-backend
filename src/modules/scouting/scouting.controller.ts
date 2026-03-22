@@ -14,12 +14,12 @@ import * as scoutingService from "@modules/scouting/scouting.service";
 // ══════════════════════════════════════════
 
 export async function listWatchlist(req: AuthRequest, res: Response) {
-  const result = await scoutingService.listWatchlist(req.query);
+  const result = await scoutingService.listWatchlist(req.query, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 
 export async function getWatchlistById(req: AuthRequest, res: Response) {
-  const item = await scoutingService.getWatchlistById(req.params.id);
+  const item = await scoutingService.getWatchlistById(req.params.id, req.user);
   sendSuccess(res, item);
 }
 
