@@ -73,60 +73,108 @@ export function makeSadaraHeader(subtitle: string): string {
 </div>`;
 }
 
+// ── Shared browser pool ──
+// Reuse a single Puppeteer browser instance to avoid cold-start overhead
+// (~2-3s per launch). Auto-closes after 5 min of inactivity.
+
+let sharedBrowser: any = null;
+let browserIdleTimer: ReturnType<typeof setTimeout> | null = null;
+const BROWSER_IDLE_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getSharedBrowser(extraArgs: string[] = []): Promise<any> {
+  if (browserIdleTimer) {
+    clearTimeout(browserIdleTimer);
+    browserIdleTimer = null;
+  }
+
+  if (sharedBrowser) {
+    try {
+      // Verify browser is still alive
+      await sharedBrowser.version();
+      scheduleBrowserClose();
+      return sharedBrowser;
+    } catch {
+      sharedBrowser = null;
+    }
+  }
+
+  sharedBrowser = await puppeteer.launch({
+    headless: true,
+    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      ...extraArgs,
+    ],
+  });
+
+  scheduleBrowserClose();
+  return sharedBrowser;
+}
+
+function scheduleBrowserClose() {
+  if (browserIdleTimer) clearTimeout(browserIdleTimer);
+  browserIdleTimer = setTimeout(async () => {
+    if (sharedBrowser) {
+      try {
+        await sharedBrowser.close();
+      } catch {}
+      sharedBrowser = null;
+    }
+    browserIdleTimer = null;
+  }, BROWSER_IDLE_MS);
+}
+
 // ── Puppeteer rendering ──
 
 export interface RenderOptions {
   extraArgs?: string[];
   settleMs?: number;
+  /** Timeout for the entire render operation (default 30s) */
+  timeoutMs?: number;
 }
 
 export async function renderPagesToBuffers(
   htmlPages: string[],
   options?: RenderOptions,
 ): Promise<Uint8Array[]> {
-  const { extraArgs = [], settleMs = 200 } = options || {};
-  let browser: any = null;
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-        ...extraArgs,
-      ],
-    });
+  const { extraArgs = [], settleMs = 200, timeoutMs = 30_000 } = options || {};
 
+  const renderWork = async (): Promise<Uint8Array[]> => {
+    const browser = await getSharedBrowser(extraArgs);
     const page = await browser.newPage();
     const buffers: Uint8Array[] = [];
 
-    for (const html of htmlPages) {
-      await page.setContent(html, {
-        waitUntil: "domcontentloaded",
-        timeout: 10000,
-      });
-      await page.evaluate(`new Promise(r => setTimeout(r, ${settleMs}))`);
-      buffers.push(
-        await page.pdf({
-          width: "595px",
-          height: "842px",
-          margin: { top: "0", bottom: "0", left: "0", right: "0" },
-          printBackground: true,
-        }),
-      );
+    try {
+      for (const html of htmlPages) {
+        await page.setContent(html, {
+          waitUntil: "domcontentloaded",
+          timeout: 10000,
+        });
+        await page.evaluate(`new Promise(r => setTimeout(r, ${settleMs}))`);
+        buffers.push(
+          await page.pdf({
+            width: "595px",
+            height: "842px",
+            margin: { top: "0", bottom: "0", left: "0", right: "0" },
+            printBackground: true,
+          }),
+        );
+      }
+      return buffers;
+    } finally {
+      await page.close().catch(() => {});
     }
+  };
 
-    await page.close();
-    return buffers;
-  } finally {
-    if (browser) {
-      try {
-        await browser.close();
-      } catch {}
-    }
-  }
+  // Race against timeout to prevent indefinite hangs
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("PDF render timed out")), timeoutMs),
+  );
+
+  return Promise.race([renderWork(), timeout]);
 }
 
 // ── PDF-lib merge ──

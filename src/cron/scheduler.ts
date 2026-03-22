@@ -976,98 +976,102 @@ export async function startCronJobs() {
     cron.schedule(expr, safeJob(name));
   }
 
-  schedule("0 7 * * *", "upcoming-matches"); // 7:00 AM
-  schedule("0 7,19 * * *", "contract-status"); // 7:00 AM & 7:00 PM
-  schedule("0 8 * * *", "contract-expiry"); // 8:00 AM
-  schedule("30 8 * * *", "injury-followups"); // 8:30 AM
-  schedule("0 9 * * *", "payment-reminders"); // 9:00 AM
-  schedule("30 9 * * *", "document-expiry"); // 9:30 AM
+  // ═══════════════════════════════════════════════════════════
+  // Daily jobs staggered to avoid DB contention.
+  // No two daily jobs share the same minute.
+  // ═══════════════════════════════════════════════════════════
+
   schedule("0 3 * * *", "cleanup"); // 3:00 AM
 
-  // ── Performance Trend Engine ──
+  // ── System Health & Data Quality (Sunday only) ──
+  schedule("0 4 * * 0", "orphan-record-detector"); // Sunday 4:00 AM
+  schedule("0 5 * * 0", "risk-radar-consistency"); // Sunday 5:00 AM
+  schedule("0 6 * * 0", "duplicate-record-detector"); // Sunday 6:00 AM
+
+  // ── Pre-business: data sync & verification (5:00–5:50 AM) ──
+  schedule("0 5 * * *", "calendar-auto-sync"); // 5:00 AM  (was 6:00)
+  schedule("10 5 * * *", "gate-auto-verify"); // 5:10 AM  (was 6:30)
+  schedule("20 5 * * *", "esignature-expire-overdue"); // 5:20 AM  (was 7:00)
+  schedule("30 5 * * *", "stale-task-escalator"); // 5:30 AM  (was 7:45)
+  schedule("40 5 * * *", "document-expiry"); // 5:40 AM  (was 9:30)
+
+  // ── Morning batch 1: player & contract intelligence (6:00–6:50 AM) ──
+  schedule("0 6 * * *", "upcoming-matches"); // 6:00 AM  (was 7:00)
+  schedule("0 6,19 * * *", "contract-status"); // 6:00 AM & 7:00 PM  (was 7:00)
+  schedule("10 6 * * *", "fatigue-risk"); // 6:10 AM  (was 7:15)
+  schedule("20 6 * * *", "return-to-play"); // 6:20 AM  (was 7:30)
+  schedule("30 6 * * *", "contract-expiry"); // 6:30 AM  (was 8:00)
+  schedule("40 6 * * *", "surgery-milestones"); // 6:40 AM  (was 8:00)
+  schedule("50 6 * * *", "offer-deadlines"); // 6:50 AM  (was 8:00)
+  schedule("0 6 * * 1", "injury-risk-scoring"); // Monday 6:00 AM (unchanged)
+
+  // ── Morning batch 2: alerts & follow-ups (7:00–7:50 AM) ──
+  schedule("0 7 * * *", "injury-followups"); // 7:00 AM  (was 8:30)
+  schedule("10 7 * * *", "loan-return-tracker"); // 7:10 AM  (was 8:30)
+  schedule("20 7 * * *", "training-enrollment-stale"); // 7:20 AM  (was 8:15)
+  schedule("30 7 * * *", "training-course-completed"); // 7:30 AM  (was 8:30)
+  schedule("40 7 * * *", "referral-overdue"); // 7:40 AM  (was 8:30)
+  schedule("50 7 * * *", "injury-return-overdue"); // 7:50 AM  (was 8:45)
+
+  // ── Morning batch 3: payments & approvals (8:00–8:50 AM) ──
+  schedule("0 8 * * *", "payment-reminders"); // 8:00 AM  (was 9:00)
+  schedule("10 8 * * *", "approval-step-overdue"); // 8:10 AM  (was 9:00)
+  schedule("20 8 * * *", "checklist-follow-up"); // 8:20 AM  (was 9:30)
+  schedule("30 8 * * *", "body-metric-target-deadline"); // 8:30 AM  (was 9:15)
+
+  // ── Mid-morning: analytics (9:00–9:50 AM) ──
+  schedule("0 9 * * *", "consecutive-low-ratings"); // 9:00 AM  (was 10:00)
+  schedule("10 9 * * *", "clearance-follow-up"); // 9:10 AM  (was 10:00)
+  schedule("20 9 * * *", "document-expiry-tasks"); // 9:20 AM  (was 10:00)
+  schedule("30 9 * * *", "gate-stale-detector"); // 9:30 AM  (was 10:30)
+  schedule("40 9 * * *", "draft-contract-stale"); // 9:40 AM  (was 11:30)
+  schedule("50 9 * * *", "invoice-aging-tracker"); // 9:50 AM  (was 11:00)
+
+  // ── Late morning (10:00–10:50 AM) ──
+  schedule("0 10 * * *", "injury-recurrence"); // 10:00 AM (was 11:00)
+
+  // ── Weekly jobs (unchanged timing, low overlap risk) ──
+  // Monday
   schedule("0 10 * * 1", "performance-trends"); // Monday 10:00 AM
-  schedule("15 7 * * *", "fatigue-risk"); // Daily 7:15 AM
+  schedule("15 10 * * 1", "minutes-drought"); // Monday 10:15 AM (was 10:00 — deduplicated)
   schedule("30 10 * * 1", "breakout-players"); // Monday 10:30 AM
-  schedule("0 10 * * 1", "minutes-drought"); // Monday 10:00 AM
-  schedule("0 10 * * *", "consecutive-low-ratings"); // Daily 10:00 AM
+  schedule("0 11 * * 1", "valuation-staleness-check"); // Monday 11:00 AM
+  schedule("30 11 * * 1", "prospect-unrated"); // Monday 11:30 AM
+  schedule("0 7 * * 1", "player-data-completeness"); // Monday 7:00 AM
+  schedule("30 8 * * 1", "training-no-plan"); // Monday 8:30 AM
+  schedule("0 8 * * 1", "workout-assignment-expiring"); // Monday 8:00 AM
+  schedule("0 9 * * 1", "injury-treatment-stale"); // Monday 9:00 AM
 
-  // ── Injury Intelligence Engine ──
-  schedule("0 11 * * *", "injury-recurrence"); // Daily 11:00 AM
-  schedule("30 7 * * *", "return-to-play"); // Daily 7:30 AM
-  schedule("0 6 * * 1", "injury-risk-scoring"); // Monday 6:00 AM
-  schedule("0 8 * * *", "surgery-milestones"); // Daily 8:00 AM
-
-  // ── Contract Lifecycle Engine ──
+  // Tuesday
+  schedule("0 7 * * 2", "player-missing-documents"); // Tuesday 7:00 AM
   schedule("0 9 * * 2", "contract-renewal-window"); // Tuesday 9:00 AM
   schedule("30 9 * * 2", "contract-value-mismatch"); // Tuesday 9:30 AM
-  schedule("30 8 * * *", "loan-return-tracker"); // Daily 8:30 AM
-  schedule("30 11 * * *", "draft-contract-stale"); // Daily 11:30 AM
+
+  // Wednesday
   schedule("0 9 * * 3", "commission-due-calculator"); // Wednesday 9:00 AM
-
-  // ── Financial Intelligence Engine ──
-  schedule("0 11 * * *", "invoice-aging-tracker"); // Daily 11:00 AM
-  schedule("0 10 * * 4", "revenue-anomaly-detector"); // Thursday 10:00 AM
-  schedule("0 9 1 * *", "expense-budget-monitor"); // 1st of month 9:00 AM
-  schedule("30 10 * * 4", "player-roi-calculator"); // Thursday 10:30 AM
-  schedule("0 11 * * 1", "valuation-staleness-check"); // Monday 11:00 AM
-
-  // ── Gate & Onboarding Engine ──
-  schedule("30 6 * * *", "gate-auto-verify"); // Daily 6:30 AM
-  schedule("30 10 * * *", "gate-stale-detector"); // Daily 10:30 AM
-  schedule("30 9 * * *", "checklist-follow-up"); // Daily 9:30 AM
-  schedule("0 10 * * 5", "gate-progression-nudge"); // Friday 10:00 AM
-  schedule("0 10 * * *", "clearance-follow-up"); // Daily 10:00 AM
-
-  // ── Scouting Pipeline Engine ──
   schedule("0 10 * * 3", "watchlist-staleness"); // Wednesday 10:00 AM
   schedule("30 10 * * 3", "screening-incomplete"); // Wednesday 10:30 AM
-  schedule("30 11 * * 1", "prospect-unrated"); // Monday 11:30 AM
+  schedule("0 11 * * 3", "metric-target-achieved"); // Wednesday 11:00 AM
+
+  // Thursday
+  schedule("0 10 * * 4", "revenue-anomaly-detector"); // Thursday 10:00 AM
+  schedule("30 10 * * 4", "player-roi-calculator"); // Thursday 10:30 AM
+
+  // Friday
+  schedule("0 10 * * 5", "gate-progression-nudge"); // Friday 10:00 AM
   schedule("0 11 * * 5", "deferred-decision-followup"); // Friday 11:00 AM
   schedule("30 11 * * 5", "approved-not-actioned"); // Friday 11:30 AM
 
-  // ── Training & Development Engine ──
-  schedule("15 8 * * *", "training-enrollment-stale"); // Daily 8:15 AM
+  // Saturday
   schedule("0 9 * * 6", "workout-adherence-check"); // Saturday 9:00 AM
-  schedule("15 9 * * *", "body-metric-target-deadline"); // Daily 9:15 AM
   schedule("30 9 * * 6", "diet-adherence-monitor"); // Saturday 9:30 AM
-  schedule("30 8 * * 1", "training-no-plan"); // Monday 8:30 AM
-
-  // ── Offer Pipeline Engine ──
-  schedule("0 8 * * *", "offer-deadlines"); // Daily 8:00 AM
-
-  // ── Injury Auto-Tasks ──
-  schedule("45 8 * * *", "injury-return-overdue"); // Daily 8:45 AM
-  schedule("0 9 * * 1", "injury-treatment-stale"); // Monday 9:00 AM
-
-  // ── Gym / Training Auto-Tasks ──
-  schedule("0 8 * * 1", "workout-assignment-expiring"); // Monday 8:00 AM
   schedule("0 10 * * 6", "diet-plan-no-adherence"); // Saturday 10:00 AM
-  schedule("0 11 * * 3", "metric-target-achieved"); // Wednesday 11:00 AM
-  schedule("30 8 * * *", "training-course-completed"); // Daily 8:30 AM
 
-  // ── Approval Auto-Tasks ──
-  schedule("0 9 * * *", "approval-step-overdue"); // Daily 9:00 AM
+  // Monthly
+  schedule("0 9 1 * *", "expense-budget-monitor"); // 1st of month 9:00 AM
 
-  // ── Document Auto-Tasks ──
-  schedule("0 10 * * *", "document-expiry-tasks"); // Daily 10:00 AM
-  schedule("0 7 * * 2", "player-missing-documents"); // Tuesday 7:00 AM
-
-  // ── Referral Auto-Tasks ──
-  schedule("30 8 * * *", "referral-overdue"); // Daily 8:30 AM
-
-  // ── Calendar Auto-Tasks ──
+  // ── High-frequency ──
   schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes
-  schedule("0 6 * * *", "calendar-auto-sync"); // Daily 6:00 AM
-
-  // ── E-Signature Auto-Tasks ──
-  schedule("0 7 * * *", "esignature-expire-overdue"); // Daily 7:00 AM
-
-  // ── System Health & Data Quality Engine ──
-  schedule("0 4 * * 0", "orphan-record-detector"); // Sunday 4:00 AM
-  schedule("0 7 * * 1", "player-data-completeness"); // Monday 7:00 AM
-  schedule("45 7 * * *", "stale-task-escalator"); // Daily 7:45 AM
-  schedule("0 5 * * 0", "risk-radar-consistency"); // Sunday 5:00 AM
-  schedule("0 6 * * 0", "duplicate-record-detector"); // Sunday 6:00 AM
 
   logger.info("[CRON] 60 jobs scheduled ✓");
 }

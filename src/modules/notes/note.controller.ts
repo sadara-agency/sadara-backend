@@ -22,9 +22,9 @@ const crud = createCrudController({
   label: (n) => `on ${n.ownerType} ${n.ownerId}`,
 });
 
-// Override list to pass user role for RBAC filtering
+// Override list to pass user role for RBAC filtering + row-level scoping
 export async function list(req: AuthRequest, res: Response) {
-  const result = await svc.listNotes(req.query, req.user?.role);
+  const result = await svc.listNotes(req.query, req.user?.role, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 

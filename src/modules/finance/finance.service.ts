@@ -25,6 +25,12 @@ import {
   CacheTTL,
   CachePrefix,
 } from "@shared/utils/cache";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 // ── Query parameter interfaces ──
 
@@ -259,7 +265,10 @@ const CLUB_ATTRS = ["id", "name", "nameAr", "logoUrl"] as const;
 // INVOICES
 // ══════════════════════════════════════════
 
-export async function listInvoices(queryParams: InvoiceQueryParams) {
+export async function listInvoices(
+  queryParams: InvoiceQueryParams,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -278,6 +287,11 @@ export async function listInvoices(queryParams: InvoiceQueryParams) {
       { "$club.name$": { [Op.iLike]: `%${search}%` } },
     ];
   }
+
+  // Row-level scoping
+  const scope = buildRowScope("finance", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await Invoice.findAndCountAll({
     where,
     limit,
@@ -292,7 +306,7 @@ export async function listInvoices(queryParams: InvoiceQueryParams) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function getInvoiceById(id: string) {
+export async function getInvoiceById(id: string, user?: AuthUser) {
   const inv = await Invoice.findByPk(id, {
     include: [
       { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
@@ -301,6 +315,11 @@ export async function getInvoiceById(id: string) {
     ],
   });
   if (!inv) throw new AppError("Invoice not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("finance", inv, user);
+  if (!hasAccess) throw new AppError("Invoice not found", 404);
+
   return inv;
 }
 
@@ -343,15 +362,23 @@ export async function deleteInvoice(id: string) {
 // PAYMENTS
 // ══════════════════════════════════════════
 
-export async function listPayments(queryParams: PaymentQueryParams) {
+export async function listPayments(
+  queryParams: PaymentQueryParams,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "dueDate",
   );
-  const where: Record<string, unknown> = {};
+  const where: Record<string | symbol, any> = {};
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.paymentType) where.paymentType = queryParams.paymentType;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
+
+  // Row-level scoping
+  const scope = buildRowScope("finance", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await Payment.findAndCountAll({
     where,
     limit,
@@ -382,7 +409,10 @@ export async function updatePaymentStatus(
 // LEDGER
 // ══════════════════════════════════════════
 
-export async function listLedger(queryParams: LedgerQueryParams) {
+export async function listLedger(
+  queryParams: LedgerQueryParams,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "postedAt",
@@ -399,6 +429,11 @@ export async function listLedger(queryParams: LedgerQueryParams) {
       { account: { [Op.iLike]: `%${search}%` } },
     ];
   }
+
+  // Row-level scoping
+  const scope = buildRowScope("finance", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await LedgerEntry.findAndCountAll({
     where,
     limit,
@@ -454,13 +489,21 @@ export async function createLedgerPair(
 // VALUATIONS
 // ══════════════════════════════════════════
 
-export async function listValuations(queryParams: ValuationQueryParams) {
+export async function listValuations(
+  queryParams: ValuationQueryParams,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "valuedAt",
   );
-  const where: Record<string, unknown> = {};
+  const where: Record<string | symbol, any> = {};
   if (queryParams.playerId) where.playerId = queryParams.playerId;
+
+  // Row-level scoping
+  const scope = buildRowScope("finance", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await Valuation.findAndCountAll({
     where,
     limit,
@@ -829,14 +872,21 @@ async function computePeriodComparison(period: "MoM" | "QoQ" | "YoY") {
 // EXPENSES
 // ══════════════════════════════════════════
 
-export async function listExpenses(queryParams: ExpenseQueryParams) {
+export async function listExpenses(
+  queryParams: ExpenseQueryParams,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order } = parsePagination(
     queryParams,
     "date",
   );
-  const where: Record<string, unknown> = {};
+  const where: Record<string | symbol, any> = {};
   if (queryParams.category) where.category = queryParams.category;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
+
+  // Row-level scoping
+  const scope = buildRowScope("finance", user);
+  if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Expense.findAndCountAll({
     where,

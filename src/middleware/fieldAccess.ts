@@ -78,7 +78,7 @@ function removeKeys(obj: any, fields: string[]): void {
   if (!obj || typeof obj !== "object") return;
   for (const field of fields) {
     if (field in obj) {
-      obj[field] = "[REDACTED]";
+      delete obj[field];
     }
   }
 }

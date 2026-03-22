@@ -13,6 +13,12 @@ import {
 } from "@modules/players/utils/attributeConfig";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
 import { logger } from "@config/logger";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -152,7 +158,7 @@ async function getPlayerCounts(playerId: string): Promise<PlayerCounts> {
 // Step 1: Fetch base player data with lightweight attributes (no heavy subqueries)
 // Step 2: Batch-load stats for all returned player IDs in a single query
 // Step 3: Merge stats into player objects
-export async function listPlayers(queryParams: any) {
+export async function listPlayers(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -184,6 +190,10 @@ export async function listPlayers(queryParams: any) {
       ),
     ];
   }
+
+  // Row-level scoping
+  const scope = buildRowScope("players", user);
+  if (scope) mergeScope(where, scope);
 
   // Step 1: Base query with only lightweight computed attributes (name, age)
   const { count, rows } = await Player.findAndCountAll({
@@ -245,7 +255,7 @@ export async function listPlayers(queryParams: any) {
 
 // ── Get Player by ID (With Aggregates) ──
 // Uses batchLoadPlayerStats (LATERAL joins) instead of 13+ correlated subqueries.
-export async function getPlayerById(id: string) {
+export async function getPlayerById(id: string, user?: AuthUser) {
   // Run lightweight base query + batch stats + sidebar counts + perf history in parallel
   const [player, statsMap, counts, performanceHistory] = await Promise.all([
     Player.findByPk(id, {
@@ -270,6 +280,10 @@ export async function getPlayerById(id: string) {
   ]);
 
   if (!player) throw new AppError("Player not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("players", player, user);
+  if (!hasAccess) throw new AppError("Player not found", 404);
 
   const plain = player.get({ plain: true });
   const rawStats = statsMap.get(id) || {};

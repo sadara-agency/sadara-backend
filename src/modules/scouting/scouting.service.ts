@@ -13,6 +13,12 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { notifyByRole } from "@modules/notifications/notification.service";
 import { logger } from "@config/logger";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 
@@ -20,7 +26,7 @@ const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 // WATCHLIST
 // ══════════════════════════════════════════
 
-export async function listWatchlist(queryParams: any) {
+export async function listWatchlist(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -45,6 +51,10 @@ export async function listWatchlist(queryParams: any) {
     ];
   }
 
+  // Row-level scoping
+  const scope = buildRowScope("scouting", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await Watchlist.findAndCountAll({
     where,
     limit,
@@ -65,7 +75,7 @@ export async function listWatchlist(queryParams: any) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function getWatchlistById(id: string) {
+export async function getWatchlistById(id: string, user?: AuthUser) {
   const item = await Watchlist.findByPk(id, {
     include: [
       { model: User, as: "scout", attributes: [...USER_ATTRS] },
@@ -77,6 +87,11 @@ export async function getWatchlistById(id: string) {
     ],
   });
   if (!item) throw new AppError("Watchlist entry not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("scouting", item, user);
+  if (!hasAccess) throw new AppError("Watchlist entry not found", 404);
+
   return item;
 }
 

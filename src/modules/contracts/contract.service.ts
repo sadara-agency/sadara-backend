@@ -21,6 +21,12 @@ import {
 } from "@modules/contracts/contract.schema";
 import { generateContractCreationTask } from "@modules/contracts/contractAutoTasks";
 import { logger } from "@config/logger";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
@@ -64,7 +70,7 @@ function enrichContract(contract: any) {
 // ────────────────────────────────────────────────────────────
 // List Contracts
 // ────────────────────────────────────────────────────────────
-export async function listContracts(queryParams: any) {
+export async function listContracts(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -92,6 +98,10 @@ export async function listContracts(queryParams: any) {
     ];
   }
 
+  // Row-level scoping
+  const scope = buildRowScope("contracts", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await Contract.findAndCountAll({
     where,
     include: CONTRACT_INCLUDES,
@@ -109,12 +119,16 @@ export async function listContracts(queryParams: any) {
 // ────────────────────────────────────────────────────────────
 // Get Contract by ID (with milestones)
 // ────────────────────────────────────────────────────────────
-export async function getContractById(id: string) {
+export async function getContractById(id: string, user?: AuthUser) {
   const contract = await Contract.findByPk(id, {
     include: CONTRACT_INCLUDES,
   });
 
   if (!contract) throw new AppError("Contract not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("contracts", contract, user);
+  if (!hasAccess) throw new AppError("Contract not found", 404);
 
   const enriched = enrichContract(contract);
 

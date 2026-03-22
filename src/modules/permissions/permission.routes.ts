@@ -19,6 +19,7 @@ import {
   updatePermissionsSchema,
   updateFieldPermissionsSchema,
 } from "@modules/permissions/permission.schema";
+import { permissionMutationLimiter } from "@middleware/rateLimiter";
 
 const router = Router();
 router.use(authenticate);
@@ -45,12 +46,16 @@ router.get(
 router.put(
   "/",
   authorize("Admin"),
+  permissionMutationLimiter,
   validate(updatePermissionsSchema.shape.body),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { permissions } = req.body;
 
-    // Prevent modifying Admin permissions (Admin always has full access)
-    const filtered = permissions.filter((p: any) => p.role !== "Admin");
+    // Prevent modifying Admin & Player permissions via API
+    const LOCKED_ROLES = ["Admin", "Player"];
+    const filtered = permissions.filter(
+      (p: any) => !LOCKED_ROLES.includes(p.role),
+    );
 
     for (const perm of filtered) {
       await RolePermission.upsert({
@@ -110,12 +115,16 @@ router.get(
 router.put(
   "/fields",
   authorize("Admin"),
+  permissionMutationLimiter,
   validate(updateFieldPermissionsSchema.shape.body),
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const { fieldPermissions } = req.body;
 
-    // Prevent modifying Admin field permissions
-    const filtered = fieldPermissions.filter((p: any) => p.role !== "Admin");
+    // Prevent modifying Admin & Player field permissions via API
+    const LOCKED_ROLES = ["Admin", "Player"];
+    const filtered = fieldPermissions.filter(
+      (p: any) => !LOCKED_ROLES.includes(p.role),
+    );
 
     for (const perm of filtered) {
       await RoleFieldPermission.upsert({

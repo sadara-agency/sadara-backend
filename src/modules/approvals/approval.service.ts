@@ -112,7 +112,8 @@ export async function listApprovalRequests(
   const where: any = {};
 
   // Role-based visibility
-  if (userRole === "Admin" || userRole === "Manager") {
+  const fullAccessRoles = ["Admin", "Manager", "Executive", "Finance", "Legal"];
+  if (fullAccessRoles.includes(userRole)) {
     if (!queryParams.showAll) {
       where[Op.or] = [
         { assignedTo: userId },
@@ -120,6 +121,9 @@ export async function listApprovalRequests(
         { assignedTo: null, assignedRole: null },
       ];
     }
+  } else if (userRole === "Analyst") {
+    // Analysts see own requests + approvals assigned to them
+    where[Op.or] = [{ requestedBy: userId }, { assignedTo: userId }];
   } else {
     where.requestedBy = userId;
   }
@@ -157,8 +161,9 @@ export async function listApprovalRequests(
 export async function getApprovalStats(userId: string, userRole: string) {
   const baseWhere: any = {};
 
-  // Admin/Manager see stats for ALL approvals (consistent with list?showAll behavior)
-  if (userRole !== "Admin" && userRole !== "Manager") {
+  // Full-access roles see stats for ALL approvals
+  const fullAccessRoles = ["Admin", "Manager", "Executive", "Finance", "Legal"];
+  if (!fullAccessRoles.includes(userRole)) {
     baseWhere.requestedBy = userId;
   }
 

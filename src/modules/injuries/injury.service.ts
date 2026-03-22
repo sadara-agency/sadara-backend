@@ -18,6 +18,12 @@ import type {
   AddInjuryUpdateInput,
 } from "@modules/injuries/injury.schema";
 import { generateCriticalInjuryTask } from "@modules/injuries/injuryAutoTasks";
+import { AuthUser } from "@shared/types";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
 
 const PLAYER_ATTRS = [
   "id",
@@ -31,7 +37,7 @@ const PLAYER_ATTRS = [
 
 // ── List ──
 
-export async function listInjuries(queryParams: any) {
+export async function listInjuries(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "injuryDate",
@@ -53,6 +59,10 @@ export async function listInjuries(queryParams: any) {
     ];
   }
 
+  // Row-level scoping
+  const scope = buildRowScope("injuries", user);
+  if (scope) mergeScope(where, scope);
+
   const { count, rows } = await Injury.findAndCountAll({
     where,
     limit,
@@ -67,7 +77,7 @@ export async function listInjuries(queryParams: any) {
 
 // ── Get by ID ──
 
-export async function getInjuryById(id: string) {
+export async function getInjuryById(id: string, user?: AuthUser) {
   const injury = await Injury.findByPk(id, {
     include: [
       { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
@@ -86,6 +96,11 @@ export async function getInjuryById(id: string) {
     ],
   });
   if (!injury) throw new AppError("Injury not found", 404);
+
+  // Row-level access check
+  const hasAccess = await checkRowAccess("injuries", injury, user);
+  if (!hasAccess) throw new AppError("Injury not found", 404);
+
   return injury;
 }
 
