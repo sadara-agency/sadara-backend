@@ -188,31 +188,39 @@ app.get(
 );
 
 // ── Health Check ──
+// Cloud Run startup probe hits this — must return 200 even while initializing.
+// The "ready" field tells callers whether the app is fully initialized.
 app.get("/api/health", async (_req, res) => {
+  // Lazy import to avoid circular dependency
+  const { appReady } = await import("./index");
+
   const checks: Record<string, "ok" | "error"> = {};
 
-  try {
-    await sequelize.authenticate();
-    checks.database = "ok";
-  } catch {
-    checks.database = "error";
-  }
+  if (appReady) {
+    try {
+      await sequelize.authenticate();
+      checks.database = "ok";
+    } catch {
+      checks.database = "error";
+    }
 
-  try {
-    if (isRedisConnected()) {
-      await getRedisClient()!.ping();
-      checks.redis = "ok";
-    } else {
+    try {
+      if (isRedisConnected()) {
+        await getRedisClient()!.ping();
+        checks.redis = "ok";
+      } else {
+        checks.redis = "error";
+      }
+    } catch {
       checks.redis = "error";
     }
-  } catch {
-    checks.redis = "error";
   }
 
-  const allOk = Object.values(checks).every((v) => v === "ok");
+  const allOk = appReady && Object.values(checks).every((v) => v === "ok");
 
-  res.status(allOk ? 200 : 503).json({
-    status: allOk ? "ok" : "degraded",
+  res.status(200).json({
+    status: allOk ? "ok" : appReady ? "degraded" : "starting",
+    ready: appReady,
     service: "sadara-api",
     version: "1.0.0",
     timestamp: new Date().toISOString(),
