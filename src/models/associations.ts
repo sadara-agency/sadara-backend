@@ -76,7 +76,11 @@ import {
   CoachAlert,
 } from "@modules/gym/gym.model";
 
+let associationsReady = false;
+
 export function setupAssociations() {
+  if (associationsReady) return;
+  associationsReady = true;
   // Player ↔ Club
   Player.belongsTo(Club, { as: "club", foreignKey: "currentClubId" });
   Club.hasMany(Player, { as: "players", foreignKey: "currentClubId" });
