@@ -8,18 +8,19 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
-  // ── 1. Diet Plans: rename macro columns ──
+  // ── 1. Diet Plans: rename macro columns (idempotent) ──
   await sequelize.query(`
-    ALTER TABLE diet_plans
-      RENAME COLUMN target_protein TO protein_g;
-  `);
-  await sequelize.query(`
-    ALTER TABLE diet_plans
-      RENAME COLUMN target_carbs TO carbs_g;
-  `);
-  await sequelize.query(`
-    ALTER TABLE diet_plans
-      RENAME COLUMN target_fat TO fat_g;
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_plans' AND column_name='target_protein') THEN
+        ALTER TABLE diet_plans RENAME COLUMN target_protein TO protein_g;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_plans' AND column_name='target_carbs') THEN
+        ALTER TABLE diet_plans RENAME COLUMN target_carbs TO carbs_g;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_plans' AND column_name='target_fat') THEN
+        ALTER TABLE diet_plans RENAME COLUMN target_fat TO fat_g;
+      END IF;
+    END $$;
   `);
 
   // ── 2. Diet Meals: add name columns ──
@@ -29,14 +30,16 @@ export async function up() {
       ADD COLUMN IF NOT EXISTS name_ar VARCHAR(200);
   `);
 
-  // ── 3. Diet Meal Items: rename serving → portion ──
+  // ── 3. Diet Meal Items: rename serving → portion (idempotent) ──
   await sequelize.query(`
-    ALTER TABLE diet_meal_items
-      RENAME COLUMN serving_size TO portion_size;
-  `);
-  await sequelize.query(`
-    ALTER TABLE diet_meal_items
-      RENAME COLUMN serving_unit TO portion_unit;
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_meal_items' AND column_name='serving_size') THEN
+        ALTER TABLE diet_meal_items RENAME COLUMN serving_size TO portion_size;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_meal_items' AND column_name='serving_unit') THEN
+        ALTER TABLE diet_meal_items RENAME COLUMN serving_unit TO portion_unit;
+      END IF;
+    END $$;
   `);
 
   // ── 4. Diet Adherence: rename consumed → ate ──
@@ -46,16 +49,20 @@ export async function up() {
 }
 
 export async function down() {
-  // ── 1. Revert diet_plans column names ──
-  await sequelize.query(
-    `ALTER TABLE diet_plans RENAME COLUMN protein_g TO target_protein;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE diet_plans RENAME COLUMN carbs_g TO target_carbs;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE diet_plans RENAME COLUMN fat_g TO target_fat;`,
-  );
+  // ── 1. Revert diet_plans column names (idempotent) ──
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_plans' AND column_name='protein_g') THEN
+        ALTER TABLE diet_plans RENAME COLUMN protein_g TO target_protein;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_plans' AND column_name='carbs_g') THEN
+        ALTER TABLE diet_plans RENAME COLUMN carbs_g TO target_carbs;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_plans' AND column_name='fat_g') THEN
+        ALTER TABLE diet_plans RENAME COLUMN fat_g TO target_fat;
+      END IF;
+    END $$;
+  `);
 
   // ── 2. Drop diet_meals name columns ──
   await sequelize.query(`
@@ -64,13 +71,17 @@ export async function down() {
       DROP COLUMN IF EXISTS name_ar;
   `);
 
-  // ── 3. Revert diet_meal_items column names ──
-  await sequelize.query(
-    `ALTER TABLE diet_meal_items RENAME COLUMN portion_size TO serving_size;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE diet_meal_items RENAME COLUMN portion_unit TO serving_unit;`,
-  );
+  // ── 3. Revert diet_meal_items column names (idempotent) ──
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_meal_items' AND column_name='portion_size') THEN
+        ALTER TABLE diet_meal_items RENAME COLUMN portion_size TO serving_size;
+      END IF;
+      IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='diet_meal_items' AND column_name='portion_unit') THEN
+        ALTER TABLE diet_meal_items RENAME COLUMN portion_unit TO serving_unit;
+      END IF;
+    END $$;
+  `);
 
   // ── 4. Revert adherence status ──
   await sequelize.query(
