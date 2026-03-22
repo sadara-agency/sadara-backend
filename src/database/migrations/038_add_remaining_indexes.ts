@@ -170,40 +170,22 @@ const INDEXES = [
    ON metric_targets (status)`,
 ];
 
-// Tables created via Sequelize.sync (not migrations) may not exist yet.
-// Wrap those in DO $$ guards.
-const GUARDED_TABLES = [
-  "notifications",
-  "gate_checklists",
-  "signature_signers",
-  "signature_audit_trail",
-  "training_activities",
-  "workout_logs",
-  "diet_adherence",
-  "body_metrics",
-  "metric_targets",
-];
-
 export async function up() {
   const t = await sequelize.transaction();
   try {
     for (const sql of INDEXES) {
-      // Check if the target table might need a guard
       const match = sql.match(/ON\s+(\w+)\s/i);
       const table = match?.[1] ?? "";
 
-      if (GUARDED_TABLES.includes(table)) {
-        await sequelize.query(
-          `DO $$ BEGIN
-             IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '${table}') THEN
-               EXECUTE '${sql.replace(/'/g, "''")}';
-             END IF;
-           END $$`,
-          { transaction: t },
-        );
-      } else {
-        await sequelize.query(sql, { transaction: t });
-      }
+      // Guard ALL tables — some may not exist yet (sync-created or not yet migrated)
+      await sequelize.query(
+        `DO $$ BEGIN
+           IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '${table}') THEN
+             EXECUTE '${sql.replace(/'/g, "''")}';
+           END IF;
+         END $$`,
+        { transaction: t },
+      );
     }
 
     await t.commit();
