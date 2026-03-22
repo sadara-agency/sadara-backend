@@ -5,7 +5,7 @@ import { env } from "@config/env";
 import { testConnection, sequelize } from "@config/database";
 import { initRedis, closeRedis } from "@config/redis";
 import { seedDatabase } from "./database/seed";
-import { migrator } from "@config/migrator";
+import { migrator, setMigrationTimeouts } from "@config/migrator";
 import { startSaffScheduler } from "@modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "@modules/matches/matchAutoTasks";
@@ -22,6 +22,7 @@ import { ensureSportmonksColumn } from "@modules/sportmonks/sportmonks.service";
 import { registerProvider } from "@modules/integrations/matchAnalysis.service";
 import { WyscoutProvider } from "@modules/integrations/providers/wyscout";
 import { setupAssociations } from "./models/associations";
+import { withTimeout } from "@shared/utils/timeout";
 import chalk from "chalk";
 import gradient from "gradient-string";
 import { logger } from "@config/logger";
@@ -46,18 +47,23 @@ if (env.sentry?.dsn) {
 // ─────────────────────────────────────────────
 
 async function initInfrastructure(): Promise<void> {
-  await testConnection();
-  await initRedis();
-  await initSSESubscriber();
+  await withTimeout(testConnection(), 30_000, "testConnection");
+  await withTimeout(initRedis(), 15_000, "initRedis");
+  await withTimeout(initSSESubscriber(), 10_000, "initSSESubscriber");
 
   // Create core tables from Sequelize models before migrations run.
   // We sync models individually to avoid Sequelize's buggy cyclic-reference
   // ALTER TABLE codepath (User ↔ Player cycle generates invalid SQL).
+  const MODEL_SYNC_TIMEOUT = 15_000;
   const models = Object.values(sequelize.models);
   const failed: typeof models = [];
   for (const model of models) {
     try {
-      await (model as any).sync({ alter: false });
+      await withTimeout(
+        (model as any).sync({ alter: false }),
+        MODEL_SYNC_TIMEOUT,
+        `sync(${(model as any).tableName ?? model.name})`,
+      );
     } catch {
       failed.push(model);
     }
@@ -65,7 +71,11 @@ async function initInfrastructure(): Promise<void> {
   // Second pass: retry models that failed due to FK ordering
   for (const model of failed) {
     try {
-      await (model as any).sync({ alter: false });
+      await withTimeout(
+        (model as any).sync({ alter: false }),
+        MODEL_SYNC_TIMEOUT,
+        `sync-retry(${(model as any).tableName ?? model.name})`,
+      );
     } catch {
       // Will be created by migrations
     }
@@ -74,7 +84,13 @@ async function initInfrastructure(): Promise<void> {
   // Register associations AFTER tables exist so FK constraints are valid
   setupAssociations();
 
-  await migrator.up();
+  // Set lock/statement timeouts so migrations fail fast instead of hanging
+  await setMigrationTimeouts();
+  await withTimeout(migrator.up(), 180_000, "migrator.up");
+
+  // Reset to defaults so normal app queries aren't constrained
+  await sequelize.query("RESET lock_timeout");
+  await sequelize.query("RESET statement_timeout");
 }
 
 // ─────────────────────────────────────────────
@@ -82,18 +98,59 @@ async function initInfrastructure(): Promise<void> {
 // ─────────────────────────────────────────────
 
 async function initApplication(): Promise<void> {
-  await seedDatabase();
-  await loadPermissions();
-  await loadTaskRuleConfigFromDB();
-  await loadPerformanceTrendConfig();
-  await loadInjuryIntelConfig();
-  await loadContractLifecycleConfig();
-  await loadFinancialIntelConfig();
-  await loadGateOnboardingConfig();
-  await loadScoutingPipelineConfig();
-  await loadTrainingDevConfig();
-  await loadSystemHealthConfig();
-  await ensureSportmonksColumn();
+  const CFG_TIMEOUT = 15_000;
+  await withTimeout(seedDatabase(), 60_000, "seedDatabase");
+  await withTimeout(loadPermissions(), CFG_TIMEOUT, "loadPermissions");
+  await withTimeout(
+    loadTaskRuleConfigFromDB(),
+    CFG_TIMEOUT,
+    "loadTaskRuleConfig",
+  );
+  await withTimeout(
+    loadPerformanceTrendConfig(),
+    CFG_TIMEOUT,
+    "loadPerformanceTrendConfig",
+  );
+  await withTimeout(
+    loadInjuryIntelConfig(),
+    CFG_TIMEOUT,
+    "loadInjuryIntelConfig",
+  );
+  await withTimeout(
+    loadContractLifecycleConfig(),
+    CFG_TIMEOUT,
+    "loadContractLifecycleConfig",
+  );
+  await withTimeout(
+    loadFinancialIntelConfig(),
+    CFG_TIMEOUT,
+    "loadFinancialIntelConfig",
+  );
+  await withTimeout(
+    loadGateOnboardingConfig(),
+    CFG_TIMEOUT,
+    "loadGateOnboardingConfig",
+  );
+  await withTimeout(
+    loadScoutingPipelineConfig(),
+    CFG_TIMEOUT,
+    "loadScoutingPipelineConfig",
+  );
+  await withTimeout(
+    loadTrainingDevConfig(),
+    CFG_TIMEOUT,
+    "loadTrainingDevConfig",
+  );
+  await withTimeout(
+    loadSystemHealthConfig(),
+    CFG_TIMEOUT,
+    "loadSystemHealthConfig",
+  );
+  await withTimeout(
+    ensureSportmonksColumn(),
+    CFG_TIMEOUT,
+    "ensureSportmonksColumn",
+  );
   registerProviders();
 }
 
@@ -112,7 +169,7 @@ function registerProviders(): void {
 
 async function startSchedulers(): Promise<void> {
   startSaffScheduler();
-  await startCronJobs();
+  await withTimeout(startCronJobs(), 15_000, "startCronJobs");
 }
 
 // ─────────────────────────────────────────────

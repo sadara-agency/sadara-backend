@@ -1,6 +1,7 @@
 import { createClient, RedisClientType } from "redis";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { withTimeout } from "@shared/utils/timeout";
 
 // ═══════════════════════════════════════════════════════════
 // Redis Client — Singleton with Graceful Fallback
@@ -75,7 +76,15 @@ export function isRedisConnected(): boolean {
 
 export async function closeRedis(): Promise<void> {
   if (redisClient) {
-    await redisClient.quit();
+    try {
+      await withTimeout(redisClient.quit(), 5_000, "Redis close");
+    } catch {
+      try {
+        redisClient.disconnect();
+      } catch {
+        /* ignore */
+      }
+    }
     redisClient = null;
     isConnected = false;
     logger.info("Redis connection closed");
