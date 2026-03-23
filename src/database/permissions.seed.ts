@@ -26,6 +26,7 @@ const ALL_ROLES = [
   "Coach",
   "Media",
   "Executive",
+  "GymCoach",
 ];
 
 /** Shorthand: give every role specific flags for a module. */
@@ -376,6 +377,31 @@ const RAW: Perm[] = [
       canRead: true,
     },
   ),
+
+  // ── wellness: nutrition/fitness/weight tracking ──
+  // Admin/Manager: full CRUD
+  // GymCoach: create, read, update (no delete)
+  // Coach/Analyst: read only
+  // Player: create, read, update (own data via /my/* endpoints)
+  ...forRoles("wellness", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("wellness", ["GymCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("wellness", ["Coach", "Analyst", "Executive"], {
+    canRead: true,
+  }),
+  ...forRoles("wellness", ["Player"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
 ];
 
 // ─────────────────────────────────────────────────────────────

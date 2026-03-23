@@ -55,4 +55,12 @@ export const CONFIGURABLE_FIELDS: Record<string, ConfigurableField[]> = {
     { field: "agentFee", label: "Agent Fee" },
     { field: "counterOffer", label: "Counter Offer" },
   ],
+  wellness: [
+    { field: "targetCalories", label: "Target Calories" },
+    { field: "targetProteinG", label: "Target Protein" },
+    { field: "targetFatG", label: "Target Fat" },
+    { field: "targetCarbsG", label: "Target Carbs" },
+    { field: "bodyFatPct", label: "Body Fat %" },
+    { field: "notes", label: "Notes" },
+  ],
 };

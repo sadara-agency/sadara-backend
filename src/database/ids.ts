@@ -66,4 +66,7 @@ export const IDS = {
   seedApprovalSteps: generateIds("ec600001", 3),
   seedTrainingCourses: generateIds("ecc00001", 2),
   seedTrainingEnrollments: generateIds("ecd00001", 2),
+  seedWellnessProfiles: generateIds("ece00001", 3),
+  seedWeightLogs: generateIds("ecf00001", 6),
+  seedMealLogs: generateIds("ed000001", 4),
 };

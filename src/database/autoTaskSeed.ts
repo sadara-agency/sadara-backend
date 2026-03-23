@@ -20,6 +20,11 @@ import {
   TrainingCourse,
   TrainingEnrollment,
 } from "@modules/training/training.model";
+import {
+  WellnessProfile,
+  WellnessWeightLog,
+  WellnessMealLog,
+} from "@modules/wellness/wellness.model";
 import { IDS } from "./ids";
 
 // ── Helpers ──
@@ -608,6 +613,168 @@ export async function seedAutoTaskReferrals() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// WELLNESS AUTO-TASKS
+//
+//  Weight stale: no weight log in 7+ days → notify player+coach
+//  Under-fueling: calorie_adherence < 70% for 3 days → notify
+//  Missed workout: pending assignment at end of day → notify
+//  Daily summary: aggregate meal logs → daily_summaries
+// ─────────────────────────────────────────────────────────────
+export async function seedAutoTaskWellness() {
+  // Create wellness profiles for 3 players
+  await WellnessProfile.bulkCreate(
+    [
+      {
+        id: IDS.seedWellnessProfiles[0],
+        playerId: IDS.players[0],
+        sex: "male",
+        activityLevel: 1.725,
+        goal: "maintenance",
+        targetCalories: 2800,
+        targetProteinG: 170,
+        targetFatG: 70,
+        targetCarbsG: 350,
+        createdBy: IDS.users.coach,
+      },
+      {
+        id: IDS.seedWellnessProfiles[1],
+        playerId: IDS.players[2],
+        sex: "male",
+        activityLevel: 1.55,
+        goal: "cut",
+        targetCalories: 2200,
+        targetProteinG: 180,
+        targetFatG: 55,
+        targetCarbsG: 250,
+        createdBy: IDS.users.coach,
+      },
+      {
+        id: IDS.seedWellnessProfiles[2],
+        playerId: IDS.players[5],
+        sex: "male",
+        activityLevel: 1.375,
+        goal: "bulk",
+        targetCalories: 3200,
+        targetProteinG: 160,
+        targetFatG: 80,
+        targetCarbsG: 420,
+        createdBy: IDS.users.coach,
+      },
+    ],
+    { ignoreDuplicates: true },
+  );
+
+  // Weight logs — player[0] has recent data, player[2] is stale (8 days ago)
+  await WellnessWeightLog.bulkCreate(
+    [
+      {
+        id: IDS.seedWeightLogs[0],
+        playerId: IDS.players[0],
+        weightKg: 78.5,
+        bodyFatPct: 12.5,
+        loggedAt: relDate(-1),
+        createdBy: IDS.users.player,
+      },
+      {
+        id: IDS.seedWeightLogs[1],
+        playerId: IDS.players[0],
+        weightKg: 78.2,
+        bodyFatPct: 12.3,
+        loggedAt: relDate(-8),
+        createdBy: IDS.users.player,
+      },
+      {
+        id: IDS.seedWeightLogs[2],
+        playerId: IDS.players[2],
+        weightKg: 82.0,
+        bodyFatPct: 15.0,
+        loggedAt: relDate(-8), // Stale — triggers weight_stale nudge
+        createdBy: IDS.users.player,
+      },
+      {
+        id: IDS.seedWeightLogs[3],
+        playerId: IDS.players[5],
+        weightKg: 75.0,
+        loggedAt: relDate(-2),
+        createdBy: IDS.users.player,
+      },
+      // Rapid weight change for player[5]: +3kg in 1 week (triggers red status)
+      {
+        id: IDS.seedWeightLogs[4],
+        playerId: IDS.players[5],
+        weightKg: 72.0,
+        loggedAt: relDate(-9),
+        createdBy: IDS.users.player,
+      },
+    ],
+    { ignoreDuplicates: true },
+  );
+
+  // Meal logs — player[2] is under-fueling (low calories for 3 days)
+  await WellnessMealLog.bulkCreate(
+    [
+      {
+        id: IDS.seedMealLogs[0],
+        playerId: IDS.players[2],
+        mealType: "breakfast",
+        customName: "[TEST] Small breakfast",
+        servings: 1,
+        calories: 300,
+        proteinG: 15,
+        carbsG: 40,
+        fatG: 10,
+        loggedDate: relDate(-1),
+        createdBy: IDS.users.player,
+      },
+      {
+        id: IDS.seedMealLogs[1],
+        playerId: IDS.players[2],
+        mealType: "lunch",
+        customName: "[TEST] Light lunch",
+        servings: 1,
+        calories: 400,
+        proteinG: 25,
+        carbsG: 50,
+        fatG: 12,
+        loggedDate: relDate(-1),
+        createdBy: IDS.users.player,
+      },
+      {
+        id: IDS.seedMealLogs[2],
+        playerId: IDS.players[0],
+        mealType: "breakfast",
+        customName: "[TEST] Full breakfast",
+        servings: 1,
+        calories: 800,
+        proteinG: 45,
+        carbsG: 90,
+        fatG: 25,
+        loggedDate: relDate(0),
+        createdBy: IDS.users.player,
+      },
+      {
+        id: IDS.seedMealLogs[3],
+        playerId: IDS.players[0],
+        mealType: "lunch",
+        customName: "[TEST] Chicken & rice",
+        servings: 1,
+        calories: 950,
+        proteinG: 60,
+        carbsG: 110,
+        fatG: 22,
+        loggedDate: relDate(0),
+        createdBy: IDS.users.player,
+      },
+    ],
+    { ignoreDuplicates: true },
+  );
+
+  console.log(
+    "✅ Auto-task wellness seeded (3 profiles, 5 weight logs, 4 meal logs)",
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN SEED FUNCTION
 // ─────────────────────────────────────────────────────────────
 export async function seedAutoTaskTestData() {
@@ -620,6 +787,7 @@ export async function seedAutoTaskTestData() {
   await seedAutoTaskApprovals();
   await seedAutoTaskDocuments();
   await seedAutoTaskReferrals();
+  await seedAutoTaskWellness();
 
   console.log("🎯 Auto-task test data complete!");
   console.log("");
