@@ -6,8 +6,8 @@ import { logger } from "@config/logger";
 export class AppError extends Error {
   statusCode: number;
   isOperational: boolean;
-  /** Optional structured error detail (e.g. JSON-stringified field errors) */
-  errorDetail?: string;
+  /** Optional structured error detail (e.g. field-level validation errors) */
+  errorDetail?: string | { field: string; message: string }[];
 
   constructor(message: string, statusCode = 400, isOperational = true) {
     super(message);
@@ -21,7 +21,7 @@ export class AppError extends Error {
     fieldErrors: { field: string; message: string }[],
   ): AppError {
     const err = new AppError("Validation failed", 422);
-    err.errorDetail = JSON.stringify(fieldErrors);
+    err.errorDetail = fieldErrors;
     return err;
   }
 }

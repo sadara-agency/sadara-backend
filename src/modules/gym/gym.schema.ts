@@ -1,5 +1,117 @@
 import { z } from "zod";
 
+// ══════════════════════════════════════════════════════════════════════
+//  Shared Enums — these MUST match the frontend enum values
+// ══════════════════════════════════════════════════════════════════════
+
+export const ActivityLevel = z.enum([
+  "sedentary",
+  "light",
+  "moderate",
+  "active",
+  "extra_active",
+  "fasting",
+]);
+
+export const Goal = z.enum(["cut", "maintain", "bulk"]);
+
+export const Gender = z.enum(["male", "female"]);
+
+// ══════════════════════════════════════════════════════════════════════
+//  Body Metrics — strict min/max ranges aligned with frontend
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * Ranges mirror the frontend RecordMeasurementModal BASIC_FIELDS / DETAIL_FIELDS
+ * so that server and client validation are always in sync.
+ */
+const bodyMetricFields = {
+  weight: z
+    .number()
+    .min(30, "Weight must be at least 30 kg")
+    .max(200, "Weight must be at most 200 kg")
+    .optional(),
+  height: z
+    .number()
+    .min(100, "Height must be at least 100 cm")
+    .max(220, "Height must be at most 220 cm")
+    .optional(),
+  bodyFatPct: z
+    .number()
+    .min(3, "Body fat must be at least 3%")
+    .max(50, "Body fat must be at most 50%")
+    .optional(),
+  muscleMass: z
+    .number()
+    .min(15, "Muscle mass must be at least 15 kg")
+    .max(80, "Muscle mass must be at most 80 kg")
+    .optional(),
+  bmi: z
+    .number()
+    .min(10, "BMI must be at least 10")
+    .max(60, "BMI must be at most 60")
+    .optional(),
+  chest: z
+    .number()
+    .min(50, "Chest must be at least 50 cm")
+    .max(150, "Chest must be at most 150 cm")
+    .optional(),
+  waist: z
+    .number()
+    .min(40, "Waist must be at least 40 cm")
+    .max(150, "Waist must be at most 150 cm")
+    .optional(),
+  arms: z
+    .number()
+    .min(20, "Arms must be at least 20 cm")
+    .max(60, "Arms must be at most 60 cm")
+    .optional(),
+  thighs: z
+    .number()
+    .min(30, "Thighs must be at least 30 cm")
+    .max(90, "Thighs must be at most 90 cm")
+    .optional(),
+};
+
+export const createBodyMetricSchema = z
+  .object({
+    playerId: z.string().uuid(),
+    date: z.string().optional(),
+    ...bodyMetricFields,
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.muscleMass != null && data.weight != null) {
+        return data.muscleMass <= data.weight;
+      }
+      return true;
+    },
+    {
+      message: "Muscle mass cannot exceed total body weight",
+      path: ["muscleMass"],
+    },
+  );
+
+export const updateBodyMetricSchema = z
+  .object({
+    ...bodyMetricFields,
+    date: z.string().optional(),
+    notes: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.muscleMass != null && data.weight != null) {
+        return data.muscleMass <= data.weight;
+      }
+      return true;
+    },
+    {
+      message: "Muscle mass cannot exceed total body weight",
+      path: ["muscleMass"],
+    },
+  );
+
 // ── Exercise Library ──
 
 export const createExerciseSchema = z.object({
@@ -19,34 +131,13 @@ export const createExerciseSchema = z.object({
 
 export const updateExerciseSchema = createExerciseSchema.partial();
 
-// ── Body Metrics ──
-
-export const createBodyMetricSchema = z.object({
-  playerId: z.string().uuid(),
-  date: z.string().optional(),
-  weight: z.number().positive().optional(),
-  height: z.number().positive().optional(),
-  bodyFatPct: z.number().min(0).max(100).optional(),
-  muscleMass: z.number().positive().optional(),
-  bmi: z.number().positive().optional(),
-  chest: z.number().positive().optional(),
-  waist: z.number().positive().optional(),
-  arms: z.number().positive().optional(),
-  thighs: z.number().positive().optional(),
-  notes: z.string().optional(),
-});
-
-export const updateBodyMetricSchema = createBodyMetricSchema
-  .partial()
-  .omit({ playerId: true });
-
 // ── Metric Targets ──
 
 export const createMetricTargetSchema = z.object({
   playerId: z.string().uuid(),
-  targetWeight: z.number().positive().optional(),
-  targetBodyFat: z.number().min(0).max(100).optional(),
-  targetMuscleMass: z.number().positive().optional(),
+  targetWeight: z.number().min(30).max(200).optional(),
+  targetBodyFat: z.number().min(3).max(50).optional(),
+  targetMuscleMass: z.number().min(15).max(80).optional(),
   deadline: z.string().optional(),
   notes: z.string().optional(),
 });
@@ -62,14 +153,22 @@ export const updateMetricTargetSchema = createMetricTargetSchema
 
 export const calculateBmrSchema = z.object({
   playerId: z.string().uuid(),
-  weight: z.number().positive(),
-  height: z.number().positive(),
-  age: z.number().int().positive(),
-  gender: z.enum(["male", "female"]).default("male"),
-  activityLevel: z
-    .enum(["sedentary", "light", "moderate", "active", "extra_active"])
-    .default("moderate"),
-  goal: z.enum(["cut", "maintain", "bulk"]).default("maintain"),
+  weight: z
+    .number()
+    .min(30, "Weight must be at least 30 kg")
+    .max(200, "Weight must be at most 200 kg"),
+  height: z
+    .number()
+    .min(100, "Height must be at least 100 cm")
+    .max(220, "Height must be at most 220 cm"),
+  age: z
+    .number()
+    .int()
+    .min(10, "Age must be at least 10")
+    .max(80, "Age must be at most 80"),
+  gender: Gender.default("male"),
+  activityLevel: ActivityLevel.default("moderate"),
+  goal: Goal.default("maintain"),
 });
 
 // ── Workout Plans ──
