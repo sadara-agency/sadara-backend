@@ -12,10 +12,10 @@ import { QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import {
-  notifyByRole,
   notifyUser,
 } from "@modules/notifications/notification.service";
 import { createAutoTaskIfNotExists, cfg } from "@shared/utils/autoTaskHelpers";
+
 import {
   WellnessProfile,
   WellnessMealLog,
