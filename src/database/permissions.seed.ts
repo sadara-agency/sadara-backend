@@ -445,6 +445,14 @@ export async function seedPermissions(): Promise<void> {
       canDelete: p.canDelete,
     })),
     {
+      fields: [
+        "role",
+        "module",
+        "canCreate",
+        "canRead",
+        "canUpdate",
+        "canDelete",
+      ],
       updateOnDuplicate: ["canCreate", "canRead", "canUpdate", "canDelete"],
     },
   );
