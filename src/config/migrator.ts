@@ -3,6 +3,18 @@ import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import path from "path";
 
+/**
+ * Set safety timeouts so a single migration can never hang the whole deploy.
+ * - lock_timeout:      10 s — fail fast if another session holds a lock
+ * - statement_timeout: 120 s — cap any single DDL/DML statement
+ * Called once before migrator.up() runs.
+ */
+export async function setMigrationTimeouts(): Promise<void> {
+  await sequelize.query("SET lock_timeout = '10s'");
+  await sequelize.query("SET statement_timeout = '120s'");
+  logger.info("Migration safety timeouts set (lock 10s, statement 120s)");
+}
+
 export const migrator = new Umzug({
   migrations: {
     glob: [

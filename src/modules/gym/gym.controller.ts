@@ -369,8 +369,8 @@ export async function getMyDietPlans(req: AuthRequest, res: Response) {
     sendSuccess(res, [], "Player account not linked");
     return;
   }
-  const result = await svc.listDietPlans({ playerId, status: "active" });
-  sendSuccess(res, result.data);
+  const plans = await svc.getMyDietPlans(playerId);
+  sendSuccess(res, plans);
 }
 
 export async function logMyAdherence(req: AuthRequest, res: Response) {

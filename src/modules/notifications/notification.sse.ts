@@ -8,6 +8,7 @@ import { getRedisClient } from "@config/redis";
 import { COOKIE_NAME } from "@shared/utils/cookie";
 import { AuthUser } from "@shared/types";
 import { logger } from "@config/logger";
+import { withTimeout } from "@shared/utils/timeout";
 import type { RedisClientType } from "redis";
 
 // ── SSE Notification Payload ──
@@ -74,7 +75,7 @@ export async function initSSESubscriber(): Promise<void> {
   try {
     // Redis v5 requires a dedicated client for subscriptions
     subscriberClient = mainClient.duplicate() as RedisClientType;
-    await subscriberClient.connect();
+    await withTimeout(subscriberClient.connect(), 10_000, "SSE Redis connect");
 
     // Pattern subscribe to all notification channels
     await subscriberClient.pSubscribe(
@@ -135,10 +136,20 @@ export async function publishNotification(
 export async function closeSSESubscriber(): Promise<void> {
   if (subscriberClient) {
     try {
-      await subscriberClient.pUnsubscribe(`${CHANNEL_PREFIX}*`);
-      await subscriberClient.quit();
+      await withTimeout(
+        subscriberClient
+          .pUnsubscribe(`${CHANNEL_PREFIX}*`)
+          .then(() => subscriberClient!.quit()),
+        5_000,
+        "SSE Redis close",
+      );
     } catch {
-      // Ignore errors during shutdown
+      // Timeout or error during shutdown — force disconnect
+      try {
+        subscriberClient.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
     subscriberClient = null;
   }

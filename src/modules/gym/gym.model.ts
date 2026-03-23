@@ -781,9 +781,9 @@ interface DietPlanAttributes {
   descriptionAr?: string | null;
   type: string;
   targetCalories?: number | null;
-  targetProtein?: number | null;
-  targetCarbs?: number | null;
-  targetFat?: number | null;
+  proteinG?: number | null;
+  carbsG?: number | null;
+  fatG?: number | null;
   status: string;
   isTemplate: boolean;
   templateTags?: string[] | null;
@@ -809,9 +809,9 @@ export class DietPlan
   declare descriptionAr: string | null;
   declare type: string;
   declare targetCalories: number | null;
-  declare targetProtein: number | null;
-  declare targetCarbs: number | null;
-  declare targetFat: number | null;
+  declare proteinG: number | null;
+  declare carbsG: number | null;
+  declare fatG: number | null;
   declare status: string;
   declare isTemplate: boolean;
   declare templateTags: string[] | null;
@@ -833,9 +833,9 @@ DietPlan.init(
     descriptionAr: { type: DataTypes.TEXT, field: "description_ar" },
     type: { type: DataTypes.STRING(20), defaultValue: "weekly" },
     targetCalories: { type: DataTypes.DECIMAL(7, 1), field: "target_calories" },
-    targetProtein: { type: DataTypes.DECIMAL(5, 1), field: "target_protein" },
-    targetCarbs: { type: DataTypes.DECIMAL(5, 1), field: "target_carbs" },
-    targetFat: { type: DataTypes.DECIMAL(5, 1), field: "target_fat" },
+    proteinG: { type: DataTypes.DECIMAL(5, 1), field: "protein_g" },
+    carbsG: { type: DataTypes.DECIMAL(5, 1), field: "carbs_g" },
+    fatG: { type: DataTypes.DECIMAL(5, 1), field: "fat_g" },
     status: { type: DataTypes.STRING(20), defaultValue: "draft" },
     isTemplate: {
       type: DataTypes.BOOLEAN,
@@ -859,6 +859,8 @@ DietPlan.init(
 interface DietMealAttributes {
   id: string;
   planId: string;
+  nameEn?: string | null;
+  nameAr?: string | null;
   dayNumber: number;
   mealType: string;
   sortOrder: number;
@@ -877,6 +879,8 @@ export class DietMeal
 {
   declare id: string;
   declare planId: string;
+  declare nameEn: string | null;
+  declare nameAr: string | null;
   declare dayNumber: number;
   declare mealType: string;
   declare sortOrder: number;
@@ -891,6 +895,8 @@ DietMeal.init(
       primaryKey: true,
     },
     planId: { type: DataTypes.UUID, allowNull: false, field: "plan_id" },
+    nameEn: { type: DataTypes.STRING(200), field: "name_en" },
+    nameAr: { type: DataTypes.STRING(200), field: "name_ar" },
     dayNumber: {
       type: DataTypes.INTEGER,
       defaultValue: 1,
@@ -919,8 +925,8 @@ interface DietMealItemAttributes {
   mealId: string;
   foodId?: string | null;
   customName?: string | null;
-  servingSize: number;
-  servingUnit: string;
+  portionSize: number;
+  portionUnit: string;
   calories?: number | null;
   protein?: number | null;
   carbs?: number | null;
@@ -932,7 +938,7 @@ interface DietMealItemAttributes {
 
 interface DietMealItemCreation extends Optional<
   DietMealItemAttributes,
-  "id" | "servingSize" | "servingUnit" | "sortOrder" | "createdAt" | "updatedAt"
+  "id" | "portionSize" | "portionUnit" | "sortOrder" | "createdAt" | "updatedAt"
 > {}
 
 export class DietMealItem
@@ -943,13 +949,14 @@ export class DietMealItem
   declare mealId: string;
   declare foodId: string | null;
   declare customName: string | null;
-  declare servingSize: number;
-  declare servingUnit: string;
+  declare portionSize: number;
+  declare portionUnit: string;
   declare calories: number | null;
   declare protein: number | null;
   declare carbs: number | null;
   declare fat: number | null;
   declare sortOrder: number;
+  declare food?: FoodItem;
 }
 
 DietMealItem.init(
@@ -962,15 +969,15 @@ DietMealItem.init(
     mealId: { type: DataTypes.UUID, allowNull: false, field: "meal_id" },
     foodId: { type: DataTypes.UUID, field: "food_id" },
     customName: { type: DataTypes.STRING(200), field: "custom_name" },
-    servingSize: {
+    portionSize: {
       type: DataTypes.DECIMAL(6, 1),
       defaultValue: 100,
-      field: "serving_size",
+      field: "portion_size",
     },
-    servingUnit: {
+    portionUnit: {
       type: DataTypes.STRING(20),
       defaultValue: "g",
-      field: "serving_unit",
+      field: "portion_unit",
     },
     calories: { type: DataTypes.DECIMAL(6, 1) },
     protein: { type: DataTypes.DECIMAL(5, 1) },
@@ -1034,7 +1041,7 @@ DietAdherence.init(
     playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
     mealId: { type: DataTypes.UUID, field: "meal_id" },
     date: { type: DataTypes.DATEONLY, defaultValue: DataTypes.NOW },
-    status: { type: DataTypes.STRING(20), defaultValue: "consumed" },
+    status: { type: DataTypes.STRING(20), defaultValue: "ate" },
     notes: { type: DataTypes.TEXT },
   },
   {
