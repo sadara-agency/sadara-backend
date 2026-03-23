@@ -335,7 +335,10 @@ export async function seedFinance() {
       trend: trends[i],
       valuedAt: "2026-02-01",
     })),
-    { ignoreDuplicates: true },
+    {
+      fields: ["playerId", "value", "currency", "source", "trend", "valuedAt"],
+      ignoreDuplicates: true,
+    },
   );
 
   console.log("✅ Finance seeded (4 invoices, 6 payments, 10 valuations)");
@@ -541,7 +544,10 @@ export async function seedGates() {
         sortOrder: 2,
       },
     ],
-    { ignoreDuplicates: true },
+    {
+      fields: ["gateId", "item", "isCompleted", "isMandatory", "sortOrder"],
+      ignoreDuplicates: true,
+    },
   );
 
   console.log("✅ Gates seeded (4 gates + 14 checklist items)");
