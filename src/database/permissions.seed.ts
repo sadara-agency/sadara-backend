@@ -435,6 +435,10 @@ function dedup(entries: Perm[]): Perm[] {
 export async function seedPermissions(): Promise<void> {
   const permissions = dedup(RAW);
 
+  // Truncate + re-insert: avoids Sequelize v6 bug where updateOnDuplicate
+  // forces id into INSERT as NULL, breaking PG18's strict NOT NULL default handling.
+  await RolePermission.destroy({ where: {}, truncate: true, cascade: true });
+
   await RolePermission.bulkCreate(
     permissions.map((p) => ({
       role: p.role,
@@ -453,7 +457,6 @@ export async function seedPermissions(): Promise<void> {
         "canUpdate",
         "canDelete",
       ],
-      updateOnDuplicate: ["canCreate", "canRead", "canUpdate", "canDelete"],
     },
   );
 
