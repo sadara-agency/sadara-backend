@@ -183,7 +183,6 @@ export async function checkWeightStale(): Promise<{ flagged: number }> {
   if (!rc.enabled) return { flagged: 0 };
 
   const staleDays = rc.threshold ?? 7;
-  const dueDays = rc.dueDays ?? 3;
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - staleDays);
