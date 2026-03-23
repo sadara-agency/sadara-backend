@@ -25,7 +25,7 @@ export function validate(schema: ZodSchema, target: ValidationTarget = "body") {
           errors,
         });
 
-        sendError(res, "Validation failed", 422, JSON.stringify(errors));
+        sendError(res, "Validation failed", 422, errors);
         return;
       }
 

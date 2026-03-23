@@ -44,7 +44,7 @@ export function sendError(
   res: Response,
   message: string,
   statusCode = 400,
-  error?: string,
+  error?: string | { field: string; message: string }[],
 ): void {
   const response: ApiResponse = {
     success: false,

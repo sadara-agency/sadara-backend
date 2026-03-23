@@ -18,7 +18,7 @@ export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
   message?: string;
-  error?: string;
+  error?: string | { field: string; message: string }[];
   meta?: PaginationMeta;
 }
 
