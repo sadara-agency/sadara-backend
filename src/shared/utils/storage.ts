@@ -18,10 +18,20 @@ const LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
 let gcsClient: GCSStorage | null = null;
 function getGCS(): GCSStorage {
   if (!gcsClient) {
-    gcsClient = new GCSStorage({
+    const opts: ConstructorParameters<typeof GCSStorage>[0] = {
       projectId: env.gcs.projectId,
-      ...(env.gcs.credentials ? { keyFilename: env.gcs.credentials } : {}),
-    });
+    };
+
+    if (env.gcs.credentialsJson) {
+      // PaaS (Railway/Render): credentials passed as JSON string via env var
+      opts.credentials = JSON.parse(env.gcs.credentialsJson);
+    } else if (env.gcs.credentials) {
+      // Local dev: path to service account key file
+      opts.keyFilename = env.gcs.credentials;
+    }
+    // If neither set, uses Application Default Credentials (ADC)
+
+    gcsClient = new GCSStorage(opts);
   }
   return gcsClient;
 }
