@@ -2,7 +2,7 @@
 // src/modules/wellness/wellness.service.ts
 // ═══════════════════════════════════════════════════════════════
 
-import { Op, fn, col, literal } from "sequelize";
+import { Op } from "sequelize";
 import {
   WellnessProfile,
   WellnessWeightLog,
