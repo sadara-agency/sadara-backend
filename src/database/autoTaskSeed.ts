@@ -673,7 +673,6 @@ export async function seedAutoTaskWellness() {
         weightKg: 78.5,
         bodyFatPct: 12.5,
         loggedAt: relDate(-1),
-        createdBy: IDS.users.player,
       },
       {
         id: IDS.seedWeightLogs[1],
@@ -681,7 +680,6 @@ export async function seedAutoTaskWellness() {
         weightKg: 78.2,
         bodyFatPct: 12.3,
         loggedAt: relDate(-8),
-        createdBy: IDS.users.player,
       },
       {
         id: IDS.seedWeightLogs[2],
@@ -689,14 +687,12 @@ export async function seedAutoTaskWellness() {
         weightKg: 82.0,
         bodyFatPct: 15.0,
         loggedAt: relDate(-8), // Stale — triggers weight_stale nudge
-        createdBy: IDS.users.player,
       },
       {
         id: IDS.seedWeightLogs[3],
         playerId: IDS.players[5],
         weightKg: 75.0,
         loggedAt: relDate(-2),
-        createdBy: IDS.users.player,
       },
       // Rapid weight change for player[5]: +3kg in 1 week (triggers red status)
       {
@@ -704,7 +700,6 @@ export async function seedAutoTaskWellness() {
         playerId: IDS.players[5],
         weightKg: 72.0,
         loggedAt: relDate(-9),
-        createdBy: IDS.users.player,
       },
     ],
     { ignoreDuplicates: true },
@@ -724,7 +719,6 @@ export async function seedAutoTaskWellness() {
         carbsG: 40,
         fatG: 10,
         loggedDate: relDate(-1),
-        createdBy: IDS.users.player,
       },
       {
         id: IDS.seedMealLogs[1],
@@ -737,7 +731,6 @@ export async function seedAutoTaskWellness() {
         carbsG: 50,
         fatG: 12,
         loggedDate: relDate(-1),
-        createdBy: IDS.users.player,
       },
       {
         id: IDS.seedMealLogs[2],
@@ -750,7 +743,6 @@ export async function seedAutoTaskWellness() {
         carbsG: 90,
         fatG: 25,
         loggedDate: relDate(0),
-        createdBy: IDS.users.player,
       },
       {
         id: IDS.seedMealLogs[3],
@@ -763,7 +755,6 @@ export async function seedAutoTaskWellness() {
         carbsG: 110,
         fatG: 22,
         loggedDate: relDate(0),
-        createdBy: IDS.users.player,
       },
     ],
     { ignoreDuplicates: true },
