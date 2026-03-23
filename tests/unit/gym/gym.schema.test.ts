@@ -315,11 +315,11 @@ describe('Gym Schemas', () => {
 
   describe('logAdherenceSchema', () => {
     it('should accept valid adherence', () => {
-      expect(logAdherenceSchema.safeParse({ status: 'consumed' }).success).toBe(true);
+      expect(logAdherenceSchema.safeParse({ status: 'ate' }).success).toBe(true);
     });
 
-    it('should default status to consumed', () => {
-      expect(logAdherenceSchema.parse({}).status).toBe('consumed');
+    it('should default status to ate', () => {
+      expect(logAdherenceSchema.parse({}).status).toBe('ate');
     });
 
     it('should accept skipped and partial', () => {
