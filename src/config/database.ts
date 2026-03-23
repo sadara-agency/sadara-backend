@@ -2,13 +2,19 @@ import { Sequelize, Options } from "sequelize";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
 
+// Cloud SQL via Unix socket: DB_HOST starts with /cloudsql/
+const isCloudSQL = env.db.host.startsWith("/cloudsql/");
+
 const sequelizeOptions: Options = {
-  host: env.db.host,
-  port: env.db.port,
   database: env.db.name,
   username: env.db.user,
   password: env.db.password,
   dialect: "postgres",
+
+  // Cloud SQL uses Unix socket; others use host:port
+  ...(isCloudSQL
+    ? { host: env.db.host }
+    : { host: env.db.host, port: env.db.port }),
 
   // Use structured logger instead of console.log
   logging:
@@ -25,12 +31,15 @@ const sequelizeOptions: Options = {
 
   dialectOptions: {
     useUTC: true,
-    ...(env.nodeEnv === "production" && {
-      ssl: {
-        require: true,
-        rejectUnauthorized: env.db.sslRejectUnauthorized,
-      },
-    }),
+    // Cloud SQL Auth Proxy handles encryption — no SSL needed
+    // External hosts (Supabase, etc.) in production need SSL
+    ...(env.nodeEnv === "production" &&
+      !isCloudSQL && {
+        ssl: {
+          require: true,
+          rejectUnauthorized: env.db.sslRejectUnauthorized,
+        },
+      }),
   },
 
   // Retry logic for transient connection failures
