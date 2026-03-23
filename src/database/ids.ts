@@ -23,7 +23,6 @@ export const IDS = {
     media: "a0000001-0000-0000-0000-000000000009",
     executive: "a0000001-0000-0000-0000-000000000010",
     // ── Additional staff for auto-task testing ──
-    gymCoach: "a0000001-0000-0000-0000-000000000011",
     agent2: "a0000001-0000-0000-0000-000000000012",
     coach2: "a0000001-0000-0000-0000-000000000013",
     analyst2: "a0000001-0000-0000-0000-000000000014",
@@ -65,11 +64,6 @@ export const IDS = {
   seedDocuments: generateIds("ec400001", 6),
   seedApprovals: generateIds("ec500001", 2),
   seedApprovalSteps: generateIds("ec600001", 3),
-  seedWorkoutPlans: generateIds("ec700001", 2),
-  seedWorkoutSessions: generateIds("ec800001", 2),
-  seedWorkoutAssignments: generateIds("ec900001", 3),
-  seedDietPlans: generateIds("eca00001", 2),
-  seedMetricTargets: generateIds("ecb00001", 2),
   seedTrainingCourses: generateIds("ecc00001", 2),
   seedTrainingEnrollments: generateIds("ecd00001", 2),
 };

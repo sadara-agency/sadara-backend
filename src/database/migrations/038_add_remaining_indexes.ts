@@ -6,8 +6,7 @@
 //   approval_requests, notifications, gates, gate_checklists,
 //   signature_requests, signature_signers, clearances, watchlists,
 //   screening_cases, training_enrollments, training_activities,
-//   referrals, technical_reports, workout_assignments, diet_plans,
-//   diet_adherence, body_metrics, metric_targets
+//   referrals, technical_reports
 //
 // All indexes use IF NOT EXISTS for idempotency.
 // Sync-created tables guarded with DO $$ blocks.
@@ -130,44 +129,6 @@ const INDEXES = [
 
   `CREATE INDEX IF NOT EXISTS idx_reports_created_by
    ON technical_reports (created_by)`,
-
-  // ── workout_assignments (gym) ──
-  `CREATE INDEX IF NOT EXISTS idx_workout_assignments_player
-   ON workout_assignments (player_id)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_workout_assignments_plan
-   ON workout_assignments (plan_id)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_workout_assignments_status
-   ON workout_assignments (status)`,
-
-  // ── diet_plans (gym) ──
-  `CREATE INDEX IF NOT EXISTS idx_diet_plans_player
-   ON diet_plans (player_id)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_diet_plans_status
-   ON diet_plans (status)`,
-
-  // ── diet_adherence (gym) ──
-  `CREATE INDEX IF NOT EXISTS idx_diet_adherence_plan
-   ON diet_adherence (plan_id)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_diet_adherence_player
-   ON diet_adherence (player_id)`,
-
-  // ── body_metrics (gym) ──
-  `CREATE INDEX IF NOT EXISTS idx_body_metrics_player
-   ON body_metrics (player_id)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_body_metrics_created
-   ON body_metrics (created_at)`,
-
-  // ── metric_targets (gym) ──
-  `CREATE INDEX IF NOT EXISTS idx_metric_targets_player
-   ON metric_targets (player_id)`,
-
-  `CREATE INDEX IF NOT EXISTS idx_metric_targets_status
-   ON metric_targets (status)`,
 ];
 
 export async function up() {

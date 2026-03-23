@@ -40,7 +40,6 @@ export async function up() {
     ('Media',     'players', 'nationalId', true),
     ('Executive', 'players', 'nationalId', true),
     ('Coach',     'players', 'nationalId', true),
-    ('GymCoach',  'players', 'nationalId', true),
 
     -- CONTRACTS: agent details (hidden from non-management/legal roles)
     ('Analyst',   'contracts', 'agentName', true),

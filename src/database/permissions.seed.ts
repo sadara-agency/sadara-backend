@@ -14,8 +14,7 @@ interface Perm {
   canDelete: boolean;
 }
 
-/** Base roles for general module access. GymCoach is excluded here
- *  and gets explicit permissions at the bottom of the matrix. */
+/** Base roles for general module access. */
 const ALL_ROLES = [
   "Admin",
   "Manager",
@@ -369,22 +368,6 @@ const RAW: Perm[] = [
   }),
   ...forRoles("spl-sync", ["Manager"], { canRead: true, canCreate: true }),
 
-  // ── gym: GymCoach has full CRUD, Admin/Manager/Coach/Player can read ──
-  ...forRoles("gym", ["Admin"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("gym", ["GymCoach"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("gym", ["Manager", "Coach"], { canRead: true }),
-  ...forRoles("gym", ["Player"], { canRead: true }), // row-level: own only
-
   // ── clearances: management/legal/finance/executive ──
   ...forRoles(
     "clearances",
@@ -393,27 +376,6 @@ const RAW: Perm[] = [
       canRead: true,
     },
   ),
-
-  // ── GymCoach access to existing modules ──
-  ...forRoles("dashboard", ["GymCoach"], { canRead: true }),
-  ...forRoles("players", ["GymCoach"], { canRead: true }),
-  ...forRoles("injuries", ["GymCoach"], {
-    canRead: true,
-    canCreate: true,
-    canUpdate: true,
-  }),
-  ...forRoles("training", ["GymCoach"], { canRead: true }),
-  ...forRoles("notifications", ["GymCoach"], {
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("settings", ["GymCoach"], { canRead: true, canUpdate: true }),
-  ...forRoles("tasks", ["GymCoach"], {
-    canRead: true,
-    canCreate: true,
-    canUpdate: true,
-  }),
 ];
 
 // ─────────────────────────────────────────────────────────────

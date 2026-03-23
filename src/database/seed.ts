@@ -39,7 +39,6 @@ import {
 } from "./operations.seed";
 import { seedPermissions } from "./permissions.seed";
 import { seedApprovalChains } from "./approvalChains.seed";
-import { seedGymData } from "./gym.seed";
 import { seedAutoTaskTestData } from "./autoTaskSeed";
 
 export async function seedDatabase(): Promise<void> {
@@ -55,21 +54,6 @@ export async function seedDatabase(): Promise<void> {
     await seedApprovalChains();
   } catch (err) {
     console.error("❌ Approval chains seed failed:", (err as Error).message);
-  }
-
-  // Gym exercise library and food database (all environments)
-  try {
-    await seedGymData();
-  } catch (err) {
-    const e = err as any;
-    console.error("❌ Gym seed failed:", e.message);
-    if (e.errors)
-      console.error(
-        "   Details:",
-        JSON.stringify(e.errors.map((v: any) => v.message)),
-      );
-    if (e.original) console.error("   DB error:", e.original.message);
-    if (e.sql) console.error("   SQL:", e.sql?.substring(0, 300));
   }
 
   if (env.nodeEnv !== "development") {

@@ -58,10 +58,8 @@ import {
 } from "./engines/scouting.engine";
 import {
   checkEnrollmentStaleness,
-  checkWorkoutAdherence,
-  checkMetricTargetDeadlines,
-  checkDietAdherence,
   checkNoTrainingPlan,
+  checkTrainingCourseCompleted,
 } from "./engines/training.engine";
 import {
   detectOrphanRecords,
@@ -75,12 +73,6 @@ import {
   checkInjuryReturnOverdue,
   checkInjuryTreatmentStale,
 } from "@modules/injuries/injuryAutoTasks";
-import {
-  checkWorkoutAssignmentExpiring,
-  checkDietPlanNoAdherence,
-  checkMetricTargetAchieved,
-  checkTrainingCourseCompleted,
-} from "@modules/gym/gymAutoTasks";
 import { checkApprovalStepOverdue } from "@modules/approvals/approvalAutoTasks";
 import {
   checkDocumentExpiryTasks,
@@ -876,9 +868,6 @@ registerJob("approved-not-actioned", checkApprovedNotActioned);
 
 // ── Training & Development Engine ──
 registerJob("training-enrollment-stale", checkEnrollmentStaleness);
-registerJob("workout-adherence-check", checkWorkoutAdherence);
-registerJob("body-metric-target-deadline", checkMetricTargetDeadlines);
-registerJob("diet-adherence-monitor", checkDietAdherence);
 registerJob("training-no-plan", checkNoTrainingPlan);
 
 // ── Offer Pipeline Engine ──
@@ -888,10 +877,6 @@ registerJob("offer-deadlines", checkOfferDeadlines);
 registerJob("injury-return-overdue", checkInjuryReturnOverdue);
 registerJob("injury-treatment-stale", checkInjuryTreatmentStale);
 
-// ── Gym / Training Auto-Tasks ──
-registerJob("workout-assignment-expiring", checkWorkoutAssignmentExpiring);
-registerJob("diet-plan-no-adherence", checkDietPlanNoAdherence);
-registerJob("metric-target-achieved", checkMetricTargetAchieved);
 registerJob("training-course-completed", checkTrainingCourseCompleted);
 
 // ── Approval Auto-Tasks ──
@@ -1039,7 +1024,6 @@ export async function startCronJobs() {
   schedule("30 11 * * 1", "prospect-unrated"); // Monday 11:30 AM
   schedule("0 7 * * 1", "player-data-completeness"); // Monday 7:00 AM
   schedule("30 8 * * 1", "training-no-plan"); // Monday 8:30 AM
-  schedule("0 8 * * 1", "workout-assignment-expiring"); // Monday 8:00 AM
   schedule("0 9 * * 1", "injury-treatment-stale"); // Monday 9:00 AM
 
   // Tuesday
@@ -1063,9 +1047,6 @@ export async function startCronJobs() {
   schedule("30 11 * * 5", "approved-not-actioned"); // Friday 11:30 AM
 
   // Saturday
-  schedule("0 9 * * 6", "workout-adherence-check"); // Saturday 9:00 AM
-  schedule("30 9 * * 6", "diet-adherence-monitor"); // Saturday 9:30 AM
-  schedule("0 10 * * 6", "diet-plan-no-adherence"); // Saturday 10:00 AM
 
   // Monthly
   schedule("0 9 1 * *", "expense-budget-monitor"); // 1st of month 9:00 AM

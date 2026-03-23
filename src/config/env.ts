@@ -83,6 +83,10 @@ const envSchema = z.object({
   GCS_BUCKET: z.string().default(""),
   GCS_PROJECT_ID: z.string().default(""),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().default(""),
+
+  // Nutritionix Food API (optional)
+  NUTRITIONIX_APP_ID: z.string().default(""),
+  NUTRITIONIX_API_KEY: z.string().default(""),
 });
 
 // ── Parse & Validate ──
@@ -187,6 +191,11 @@ export const env = {
     bucket: validated.GCS_BUCKET,
     projectId: validated.GCS_PROJECT_ID,
     credentials: validated.GOOGLE_APPLICATION_CREDENTIALS,
+  },
+
+  nutritionix: {
+    appId: validated.NUTRITIONIX_APP_ID,
+    apiKey: validated.NUTRITIONIX_API_KEY,
   },
 
   pagination: {

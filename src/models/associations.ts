@@ -58,23 +58,6 @@ import {
 } from "@modules/esignatures/esignature.model";
 import { ApprovalStep } from "@modules/approvals/approvalStep.model";
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
-import {
-  ExerciseLibrary,
-  BodyMetric,
-  MetricTarget,
-  BmrCalculation,
-  WorkoutPlan,
-  WorkoutSession,
-  WorkoutExercise,
-  WorkoutAssignment,
-  WorkoutLog,
-  FoodItem,
-  DietPlan,
-  DietMeal,
-  DietMealItem,
-  DietAdherence,
-  CoachAlert,
-} from "@modules/gym/gym.model";
 
 let associationsReady = false;
 
@@ -357,91 +340,6 @@ export function setupAssociations() {
 
   // ── Contract Templates ──
   ContractTemplate.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
-
-  // ═══════════════════════════════════════════
-  // GYM COACH MODULE
-  // ═══════════════════════════════════════════
-
-  // Body Metrics
-  Player.hasMany(BodyMetric, { foreignKey: "playerId", as: "bodyMetrics" });
-  BodyMetric.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  BodyMetric.belongsTo(User, { foreignKey: "recordedBy", as: "recorder" });
-
-  // Metric Targets
-  Player.hasMany(MetricTarget, { foreignKey: "playerId", as: "metricTargets" });
-  MetricTarget.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  MetricTarget.belongsTo(User, { foreignKey: "setBy", as: "setter" });
-
-  // BMR Calculations
-  Player.hasMany(BmrCalculation, {
-    foreignKey: "playerId",
-    as: "bmrCalculations",
-  });
-  BmrCalculation.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-
-  // Workout Plans → Sessions → Exercises
-  WorkoutPlan.hasMany(WorkoutSession, { foreignKey: "planId", as: "sessions" });
-  WorkoutSession.belongsTo(WorkoutPlan, { foreignKey: "planId", as: "plan" });
-  WorkoutSession.hasMany(WorkoutExercise, {
-    foreignKey: "sessionId",
-    as: "exercises",
-  });
-  WorkoutExercise.belongsTo(WorkoutSession, {
-    foreignKey: "sessionId",
-    as: "session",
-  });
-  WorkoutExercise.belongsTo(ExerciseLibrary, {
-    foreignKey: "exerciseId",
-    as: "exercise",
-  });
-
-  // Workout Assignments
-  WorkoutPlan.hasMany(WorkoutAssignment, {
-    foreignKey: "planId",
-    as: "assignments",
-  });
-  WorkoutAssignment.belongsTo(WorkoutPlan, {
-    foreignKey: "planId",
-    as: "plan",
-  });
-  WorkoutAssignment.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  Player.hasMany(WorkoutAssignment, {
-    foreignKey: "playerId",
-    as: "workoutAssignments",
-  });
-
-  // Workout Logs
-  WorkoutAssignment.hasMany(WorkoutLog, {
-    foreignKey: "assignmentId",
-    as: "logs",
-  });
-  WorkoutLog.belongsTo(WorkoutAssignment, {
-    foreignKey: "assignmentId",
-    as: "assignment",
-  });
-  WorkoutLog.belongsTo(WorkoutSession, {
-    foreignKey: "sessionId",
-    as: "session",
-  });
-  WorkoutLog.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-
-  // Diet Plans → Meals → Items
-  DietPlan.hasMany(DietMeal, { foreignKey: "planId", as: "meals" });
-  DietMeal.belongsTo(DietPlan, { foreignKey: "planId", as: "plan" });
-  DietMeal.hasMany(DietMealItem, { foreignKey: "mealId", as: "items" });
-  DietMealItem.belongsTo(DietMeal, { foreignKey: "mealId", as: "meal" });
-  DietMealItem.belongsTo(FoodItem, { foreignKey: "foodId", as: "food" });
-  DietPlan.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  Player.hasMany(DietPlan, { foreignKey: "playerId", as: "dietPlans" });
-
-  // Diet Adherence
-  DietAdherence.belongsTo(DietPlan, { foreignKey: "planId", as: "plan" });
-  DietAdherence.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  DietAdherence.belongsTo(DietMeal, { foreignKey: "mealId", as: "meal" });
-
-  // Coach Alerts
-  CoachAlert.belongsTo(User, { foreignKey: "coachId", as: "coach" });
-  CoachAlert.belongsTo(Player, { foreignKey: "playerId", as: "player" });
 
   // ── Calendar Events ──
   CalendarEvent.belongsTo(User, { foreignKey: "createdBy", as: "creator" });

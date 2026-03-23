@@ -52,7 +52,7 @@
  *               password: { type: string, minLength: 8 }
  *               fullName: { type: string }
  *               fullNameAr: { type: string }
- *               role: { type: string, enum: [Admin, Manager, Analyst, Scout, Player, Legal, Finance, Coach, Media, Executive, GymCoach] }
+ *               role: { type: string, enum: [Admin, Manager, Analyst, Scout, Player, Legal, Finance, Coach, Media, Executive] }
  *               isActive: { type: boolean, default: true }
  *     responses:
  *       201: { description: User created }

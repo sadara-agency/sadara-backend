@@ -41,12 +41,6 @@ export const CONFIGURABLE_FIELDS: Record<string, ConfigurableField[]> = {
     { field: "surgeryDate", label: "Surgery Date" },
     { field: "cause", label: "Cause" },
   ],
-  gym: [
-    { field: "bodyFatPct", label: "Body Fat %" },
-    { field: "muscleMass", label: "Muscle Mass" },
-    { field: "weight", label: "Weight" },
-    { field: "measurements", label: "Measurements" },
-  ],
   scouting: [
     { field: "fitAssessment", label: "Fit Assessment" },
     { field: "riskAssessment", label: "Risk Assessment" },

@@ -11,7 +11,6 @@ const ROLES = [
   "Coach",
   "Media",
   "Executive",
-  "GymCoach",
 ] as const;
 
 const MODULES = [
@@ -37,7 +36,6 @@ const MODULES = [
   "settings",
   "saff-data",
   "spl-sync",
-  "gym",
 ] as const;
 
 export const updatePermissionsSchema = z.object({
