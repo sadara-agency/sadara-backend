@@ -16,11 +16,20 @@ const sequelizeOptions: Options = {
     ? { host: env.db.host }
     : { host: env.db.host, port: env.db.port }),
 
-  // Use structured logger instead of console.log
+  // Production: log slow queries (>1s) for observability
+  // Development: log all queries at debug level
   logging:
     env.nodeEnv === "production"
-      ? false // Disable query logging in production for performance
+      ? (sql: string, timing?: number) => {
+          if (timing && timing > 1000) {
+            logger.warn("Slow query detected", {
+              sql: sql.slice(0, 500),
+              durationMs: timing,
+            });
+          }
+        }
       : (msg) => logger.debug(msg as string),
+  benchmark: env.nodeEnv === "production",
 
   pool: {
     max: env.nodeEnv === "production" ? 20 : 5,

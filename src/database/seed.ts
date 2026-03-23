@@ -40,6 +40,7 @@ import {
 import { seedPermissions } from "./permissions.seed";
 import { seedApprovalChains } from "./approvalChains.seed";
 import { seedAutoTaskTestData } from "./autoTaskSeed";
+import { seedProdAdmin, seedProdClubs } from "./production.seed";
 
 export async function seedDatabase(): Promise<void> {
   // Permissions must always be seeded (all environments)
@@ -56,8 +57,14 @@ export async function seedDatabase(): Promise<void> {
     console.error("❌ Approval chains seed failed:", (err as Error).message);
   }
 
+  // ── Production seed: admin user + SPL clubs ──
   if (env.nodeEnv !== "development") {
-    console.log("⏭️  Skipping dev seed — not in development mode");
+    try {
+      await seedProdAdmin();
+      await seedProdClubs();
+    } catch (err) {
+      console.error("❌ Production seed failed:", (err as Error).message);
+    }
     return;
   }
 
