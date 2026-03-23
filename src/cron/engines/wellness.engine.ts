@@ -267,7 +267,6 @@ export async function checkUnderFueling(): Promise<{ flagged: number }> {
 
   const consecutiveDays = rc.threshold ?? 3;
   const thresholdPct = 70;
-  const dueDays = rc.dueDays ?? 3;
 
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - consecutiveDays);
