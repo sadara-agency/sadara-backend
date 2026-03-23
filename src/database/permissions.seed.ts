@@ -14,8 +14,7 @@ interface Perm {
   canDelete: boolean;
 }
 
-/** Base roles for general module access. GymCoach is excluded here
- *  and gets explicit permissions at the bottom of the matrix. */
+/** Base roles for general module access. */
 const ALL_ROLES = [
   "Admin",
   "Manager",
@@ -27,6 +26,7 @@ const ALL_ROLES = [
   "Coach",
   "Media",
   "Executive",
+  "GymCoach",
 ];
 
 /** Shorthand: give every role specific flags for a module. */
@@ -369,22 +369,6 @@ const RAW: Perm[] = [
   }),
   ...forRoles("spl-sync", ["Manager"], { canRead: true, canCreate: true }),
 
-  // ── gym: GymCoach has full CRUD, Admin/Manager/Coach/Player can read ──
-  ...forRoles("gym", ["Admin"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("gym", ["GymCoach"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("gym", ["Manager", "Coach"], { canRead: true }),
-  ...forRoles("gym", ["Player"], { canRead: true }), // row-level: own only
-
   // ── clearances: management/legal/finance/executive ──
   ...forRoles(
     "clearances",
@@ -394,24 +378,28 @@ const RAW: Perm[] = [
     },
   ),
 
-  // ── GymCoach access to existing modules ──
-  ...forRoles("dashboard", ["GymCoach"], { canRead: true }),
-  ...forRoles("players", ["GymCoach"], { canRead: true }),
-  ...forRoles("injuries", ["GymCoach"], {
-    canRead: true,
+  // ── wellness: nutrition/fitness/weight tracking ──
+  // Admin/Manager: full CRUD
+  // GymCoach: create, read, update (no delete)
+  // Coach/Analyst: read only
+  // Player: create, read, update (own data via /my/* endpoints)
+  ...forRoles("wellness", ["Admin", "Manager"], {
     canCreate: true,
-    canUpdate: true,
-  }),
-  ...forRoles("training", ["GymCoach"], { canRead: true }),
-  ...forRoles("notifications", ["GymCoach"], {
     canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("settings", ["GymCoach"], { canRead: true, canUpdate: true }),
-  ...forRoles("tasks", ["GymCoach"], {
-    canRead: true,
+  ...forRoles("wellness", ["GymCoach"], {
     canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("wellness", ["Coach", "Analyst", "Executive"], {
+    canRead: true,
+  }),
+  ...forRoles("wellness", ["Player"], {
+    canCreate: true,
+    canRead: true,
     canUpdate: true,
   }),
 ];

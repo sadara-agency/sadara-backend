@@ -104,15 +104,6 @@ export async function seedUsers() {
       },
       // ── Additional staff for auto-task testing ──
       {
-        id: IDS.users.gymCoach,
-        email: "gymcoach@sadara.com",
-        passwordHash: hash,
-        fullName: "Bandar Al-Zahrani",
-        fullNameAr: "بندر الزهراني",
-        role: "GymCoach",
-        isActive: true,
-      },
-      {
         id: IDS.users.agent2,
         email: "agent2@sadara.com",
         passwordHash: hash,

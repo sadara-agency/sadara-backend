@@ -93,9 +93,6 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   approved_not_actioned: { enabled: true, dueDays: 3, threshold: 14 },
   // Training & development rules (triggered by training.engine.ts cron jobs)
   enrollment_stale: { enabled: true, dueDays: 5, threshold: 14 },
-  workout_adherence: { enabled: true, dueDays: 3, threshold: 7 },
-  metric_target_deadline: { enabled: true, dueDays: 3, threshold: 14 },
-  diet_adherence_low: { enabled: true, dueDays: 3, threshold: 50 },
   no_training_plan: { enabled: true, dueDays: 5 },
   // System health rules (triggered by systemhealth.engine.ts cron jobs)
   orphan_records: { enabled: true, dueDays: 7 },
@@ -128,11 +125,7 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   injury_return_overdue: { enabled: true, dueDays: 2 },
   injury_treatment_stale: { enabled: true, dueDays: 3, threshold: 14 },
 
-  // Training / Workout / Diet triggers
-  workout_assignment_expiring: { enabled: true, dueDays: 5, threshold: 7 },
-  workout_completed: { enabled: true, dueDays: 5 },
-  diet_plan_no_adherence: { enabled: true, dueDays: 2, threshold: 7 },
-  metric_target_achieved: { enabled: true, dueDays: 5 },
+  // Training triggers
   training_course_completed: { enabled: true, dueDays: 5 },
 
   // Approval triggers

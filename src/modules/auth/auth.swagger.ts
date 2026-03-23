@@ -176,7 +176,7 @@
  *               fullNameAr: { type: string }
  *               role:
  *                 type: string
- *                 enum: [Admin, Manager, Analyst, Scout, Player, Legal, Finance, Coach, Media, Executive, GymCoach]
+ *                 enum: [Admin, Manager, Analyst, Scout, Player, Legal, Finance, Coach, Media, Executive]
  *     responses:
  *       201: { description: User invited and created }
  *       403: { description: Admin role required }

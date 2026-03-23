@@ -137,7 +137,6 @@ const SENSITIVE_DOC_TYPES_BY_ROLE: Record<string, string[]> = {
   Scout: ["Passport", "Medical", "ID"],
   Player: ["Passport", "ID"],
   Media: ["Passport", "Medical", "ID"],
-  GymCoach: ["Passport", "ID", "Contract"],
   Coach: ["Passport", "ID", "Contract"],
 };
 

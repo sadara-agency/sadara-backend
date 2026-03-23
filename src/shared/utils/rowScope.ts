@@ -106,7 +106,6 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Finance: ownAssigned,
     Legal: ownAssigned,
     Media: ownAssigned,
-    GymCoach: ownAssigned,
   },
 
   approvals: {
@@ -117,7 +116,6 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
       [Op.or]: [{ requestedBy: u.id }, { assignedTo: u.id }],
     }),
     Media: (u) => ({ requestedBy: u.id }),
-    GymCoach: (u) => ({ requestedBy: u.id }),
   },
 
   documents: {
@@ -126,7 +124,6 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Coach: ownUploaded,
     Analyst: ownUploaded,
     Media: ownUploaded,
-    GymCoach: ownUploaded,
   },
 
   notes: {
@@ -135,7 +132,6 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Coach: ownCreated,
     Analyst: ownCreated,
     Media: ownCreated,
-    GymCoach: ownCreated,
   },
 };
 

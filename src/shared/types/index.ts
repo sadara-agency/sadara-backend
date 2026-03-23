@@ -10,9 +10,9 @@ export type UserRole =
   | "Legal"
   | "Finance"
   | "Coach"
+  | "GymCoach"
   | "Media"
-  | "Executive"
-  | "GymCoach";
+  | "Executive";
 
 export interface ApiResponse<T = any> {
   success: boolean;

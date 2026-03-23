@@ -90,10 +90,14 @@ jest.mock('../../../src/cron/engines/scouting.engine', () => ({
 }));
 jest.mock('../../../src/cron/engines/training.engine', () => ({
   checkEnrollmentStaleness: jest.fn(),
-  checkWorkoutAdherence: jest.fn(),
-  checkMetricTargetDeadlines: jest.fn(),
-  checkDietAdherence: jest.fn(),
   checkNoTrainingPlan: jest.fn(),
+  checkTrainingCourseCompleted: jest.fn(),
+}));
+jest.mock('../../../src/cron/engines/wellness.engine', () => ({
+  aggregateDailySummaries: jest.fn(),
+  checkWeightStale: jest.fn(),
+  checkUnderFueling: jest.fn(),
+  checkMissedWorkout: jest.fn(),
 }));
 jest.mock('../../../src/cron/engines/systemhealth.engine', () => ({
   detectOrphanRecords: jest.fn(),
@@ -111,13 +115,6 @@ jest.mock('../../../src/modules/injuries/injuryAutoTasks', () => ({
   checkInjuryReturnOverdue: jest.fn(),
   checkInjuryTreatmentStale: jest.fn(),
   generateCriticalInjuryTask: jest.fn(),
-}));
-jest.mock('../../../src/modules/gym/gymAutoTasks', () => ({
-  checkWorkoutAssignmentExpiring: jest.fn(),
-  checkDietPlanNoAdherence: jest.fn(),
-  checkMetricTargetAchieved: jest.fn(),
-  checkTrainingCourseCompleted: jest.fn(),
-  generateWorkoutCompletedTask: jest.fn(),
 }));
 jest.mock('../../../src/modules/approvals/approvalAutoTasks', () => ({
   checkApprovalStepOverdue: jest.fn(),
@@ -190,7 +187,7 @@ describe('Cron Scheduler', () => {
       // Scouting engine
       expect(names).toContain('watchlist-staleness');
       // Training engine
-      expect(names).toContain('workout-adherence-check');
+      expect(names).toContain('training-course-completed');
       // System health engine
       expect(names).toContain('orphan-record-detector');
     });

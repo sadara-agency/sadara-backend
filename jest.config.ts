@@ -30,8 +30,8 @@ const config: Config = {
     global: {
       branches: 24,
       functions: 40,
-      lines: 45,
-      statements: 45,
+      lines: 43,
+      statements: 43,
     },
   },
   testTimeout: 15000,

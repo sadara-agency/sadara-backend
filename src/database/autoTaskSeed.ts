@@ -17,17 +17,14 @@ import { Document } from "@modules/documents/document.model";
 import { ApprovalRequest } from "@modules/approvals/approval.model";
 import { ApprovalStep } from "@modules/approvals/approvalStep.model";
 import {
-  WorkoutPlan,
-  WorkoutSession,
-  WorkoutAssignment,
-  DietPlan,
-  MetricTarget,
-  BodyMetric,
-} from "@modules/gym/gym.model";
-import {
   TrainingCourse,
   TrainingEnrollment,
 } from "@modules/training/training.model";
+import {
+  WellnessProfile,
+  WellnessWeightLog,
+  WellnessMealLog,
+} from "@modules/wellness/wellness.model";
 import { IDS } from "./ids";
 
 // ── Helpers ──
@@ -295,175 +292,11 @@ export async function seedAutoTaskInjuries() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// 15–19. TRAINING / WORKOUT / DIET AUTO-TASKS
+// 19. TRAINING AUTO-TASKS
 //
-//  #15 workout_assignment_expiring — endDate in 7 days
-//  #16 workout_completed           — 100% complete (real-time)
-//  #17 diet_plan_no_adherence      — active plan, 0 logs in 7 days
-//  #18 metric_target_achieved      — target metric reached
 //  #19 training_course_completed   — enrollment → Completed
 // ─────────────────────────────────────────────────────────────
 export async function seedAutoTaskTraining() {
-  // Workout plans
-  await WorkoutPlan.bulkCreate(
-    [
-      {
-        id: IDS.seedWorkoutPlans[0],
-        nameEn: "[TEST] Strength Program A",
-        nameAr: "برنامج القوة أ",
-        durationWeeks: 6,
-        daysPerWeek: 4,
-        status: "active",
-        createdBy: IDS.users.coach,
-      },
-      {
-        id: IDS.seedWorkoutPlans[1],
-        nameEn: "[TEST] Recovery Program",
-        nameAr: "برنامج التعافي",
-        durationWeeks: 4,
-        daysPerWeek: 3,
-        status: "active",
-        createdBy: IDS.users.gymCoach,
-      },
-    ],
-    { ignoreDuplicates: true },
-  );
-
-  // Workout sessions (needed for plan structure)
-  await WorkoutSession.bulkCreate(
-    [
-      {
-        id: IDS.seedWorkoutSessions[0],
-        planId: IDS.seedWorkoutPlans[0],
-        weekNumber: 1,
-        dayNumber: 1,
-        sessionName: "Upper Body Strength",
-      },
-      {
-        id: IDS.seedWorkoutSessions[1],
-        planId: IDS.seedWorkoutPlans[1],
-        weekNumber: 1,
-        dayNumber: 1,
-        sessionName: "Light Cardio & Stretch",
-      },
-    ],
-    { ignoreDuplicates: true },
-  );
-
-  // Workout assignments
-  await WorkoutAssignment.bulkCreate(
-    [
-      {
-        // #15 — Expiring in 5 days (within 7-day window)
-        id: IDS.seedWorkoutAssignments[0],
-        planId: IDS.seedWorkoutPlans[0],
-        playerId: IDS.players[0],
-        assignedBy: IDS.users.coach,
-        startDate: relDate(-25),
-        endDate: relDate(5),
-        status: "active",
-        completionPct: 65,
-      },
-      {
-        // #16 — 100% complete (triggers completion task)
-        id: IDS.seedWorkoutAssignments[1],
-        planId: IDS.seedWorkoutPlans[0],
-        playerId: IDS.players[17], // Saad Al-Shehri
-        assignedBy: IDS.users.gymCoach,
-        startDate: relDate(-30),
-        endDate: relDate(0),
-        status: "active",
-        completionPct: 100,
-      },
-      {
-        // Normal active assignment (control — should not trigger)
-        id: IDS.seedWorkoutAssignments[2],
-        planId: IDS.seedWorkoutPlans[1],
-        playerId: IDS.players[16], // Khalid Al-Ghannam
-        assignedBy: IDS.users.gymCoach,
-        startDate: relDate(-10),
-        endDate: relDate(20),
-        status: "active",
-        completionPct: 30,
-      },
-    ],
-    { ignoreDuplicates: true },
-  );
-
-  // #17 — Diet plan with no adherence logs
-  await DietPlan.bulkCreate(
-    [
-      {
-        id: IDS.seedDietPlans[0],
-        nameEn: "[TEST] Weight Management Plan",
-        nameAr: "خطة إدارة الوزن",
-        targetCalories: 2200,
-        proteinG: 150,
-        carbsG: 250,
-        fatG: 70,
-        status: "active",
-        playerId: IDS.players[1],
-        createdBy: IDS.users.coach,
-      },
-      {
-        // Control — active plan (should also trigger if no logs)
-        id: IDS.seedDietPlans[1],
-        nameEn: "[TEST] Muscle Gain Plan",
-        nameAr: "خطة بناء العضلات",
-        targetCalories: 3000,
-        proteinG: 200,
-        carbsG: 350,
-        fatG: 90,
-        status: "active",
-        playerId: IDS.players[15], // Abdulaziz (agent2's player)
-        createdBy: IDS.users.gymCoach,
-      },
-    ],
-    { ignoreDuplicates: true },
-  );
-
-  // #18 — Metric target achieved
-  await MetricTarget.bulkCreate(
-    [
-      {
-        // Target: 75kg — current weight will be at/below target
-        id: IDS.seedMetricTargets[0],
-        playerId: IDS.players[0],
-        setBy: IDS.users.coach,
-        targetWeight: 75.0,
-        targetBodyFat: 12.0,
-        deadline: relDate(30),
-        status: "active",
-      },
-      {
-        // Target not yet reached (control)
-        id: IDS.seedMetricTargets[1],
-        playerId: IDS.players[3],
-        setBy: IDS.users.coach,
-        targetWeight: 70.0,
-        targetBodyFat: 10.0,
-        deadline: relDate(60),
-        status: "active",
-      },
-    ],
-    { ignoreDuplicates: true },
-  );
-
-  // Body metric that meets the target (player[0] at 74.5kg, 11.5% BF)
-  await BodyMetric.bulkCreate(
-    [
-      {
-        playerId: IDS.players[0],
-        recordedBy: IDS.users.coach,
-        date: relDate(-1),
-        weight: 74.5,
-        bodyFatPct: 11.5,
-        muscleMass: 62.0,
-      },
-    ],
-    { ignoreDuplicates: true },
-  );
-
   // #19 — Training course completed
   await TrainingCourse.bulkCreate(
     [
@@ -516,9 +349,7 @@ export async function seedAutoTaskTraining() {
     { ignoreDuplicates: true },
   );
 
-  console.log(
-    "✅ Auto-task training/workout/diet seeded (2 plans, 3 assignments, 2 diets, 2 targets, 2 courses, 2 enrollments)",
-  );
+  console.log("✅ Auto-task training seeded (2 courses, 2 enrollments)");
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -782,6 +613,159 @@ export async function seedAutoTaskReferrals() {
 }
 
 // ─────────────────────────────────────────────────────────────
+// WELLNESS AUTO-TASKS
+//
+//  Weight stale: no weight log in 7+ days → notify player+coach
+//  Under-fueling: calorie_adherence < 70% for 3 days → notify
+//  Missed workout: pending assignment at end of day → notify
+//  Daily summary: aggregate meal logs → daily_summaries
+// ─────────────────────────────────────────────────────────────
+export async function seedAutoTaskWellness() {
+  // Create wellness profiles for 3 players
+  await WellnessProfile.bulkCreate(
+    [
+      {
+        id: IDS.seedWellnessProfiles[0],
+        playerId: IDS.players[0],
+        sex: "male",
+        activityLevel: 1.725,
+        goal: "maintenance",
+        targetCalories: 2800,
+        targetProteinG: 170,
+        targetFatG: 70,
+        targetCarbsG: 350,
+        createdBy: IDS.users.coach,
+      },
+      {
+        id: IDS.seedWellnessProfiles[1],
+        playerId: IDS.players[2],
+        sex: "male",
+        activityLevel: 1.55,
+        goal: "cut",
+        targetCalories: 2200,
+        targetProteinG: 180,
+        targetFatG: 55,
+        targetCarbsG: 250,
+        createdBy: IDS.users.coach,
+      },
+      {
+        id: IDS.seedWellnessProfiles[2],
+        playerId: IDS.players[5],
+        sex: "male",
+        activityLevel: 1.375,
+        goal: "bulk",
+        targetCalories: 3200,
+        targetProteinG: 160,
+        targetFatG: 80,
+        targetCarbsG: 420,
+        createdBy: IDS.users.coach,
+      },
+    ],
+    { ignoreDuplicates: true },
+  );
+
+  // Weight logs — player[0] has recent data, player[2] is stale (8 days ago)
+  await WellnessWeightLog.bulkCreate(
+    [
+      {
+        id: IDS.seedWeightLogs[0],
+        playerId: IDS.players[0],
+        weightKg: 78.5,
+        bodyFatPct: 12.5,
+        loggedAt: relDate(-1),
+      },
+      {
+        id: IDS.seedWeightLogs[1],
+        playerId: IDS.players[0],
+        weightKg: 78.2,
+        bodyFatPct: 12.3,
+        loggedAt: relDate(-8),
+      },
+      {
+        id: IDS.seedWeightLogs[2],
+        playerId: IDS.players[2],
+        weightKg: 82.0,
+        bodyFatPct: 15.0,
+        loggedAt: relDate(-8), // Stale — triggers weight_stale nudge
+      },
+      {
+        id: IDS.seedWeightLogs[3],
+        playerId: IDS.players[5],
+        weightKg: 75.0,
+        loggedAt: relDate(-2),
+      },
+      // Rapid weight change for player[5]: +3kg in 1 week (triggers red status)
+      {
+        id: IDS.seedWeightLogs[4],
+        playerId: IDS.players[5],
+        weightKg: 72.0,
+        loggedAt: relDate(-9),
+      },
+    ],
+    { ignoreDuplicates: true },
+  );
+
+  // Meal logs — player[2] is under-fueling (low calories for 3 days)
+  await WellnessMealLog.bulkCreate(
+    [
+      {
+        id: IDS.seedMealLogs[0],
+        playerId: IDS.players[2],
+        mealType: "breakfast",
+        customName: "[TEST] Small breakfast",
+        servings: 1,
+        calories: 300,
+        proteinG: 15,
+        carbsG: 40,
+        fatG: 10,
+        loggedDate: relDate(-1),
+      },
+      {
+        id: IDS.seedMealLogs[1],
+        playerId: IDS.players[2],
+        mealType: "lunch",
+        customName: "[TEST] Light lunch",
+        servings: 1,
+        calories: 400,
+        proteinG: 25,
+        carbsG: 50,
+        fatG: 12,
+        loggedDate: relDate(-1),
+      },
+      {
+        id: IDS.seedMealLogs[2],
+        playerId: IDS.players[0],
+        mealType: "breakfast",
+        customName: "[TEST] Full breakfast",
+        servings: 1,
+        calories: 800,
+        proteinG: 45,
+        carbsG: 90,
+        fatG: 25,
+        loggedDate: relDate(0),
+      },
+      {
+        id: IDS.seedMealLogs[3],
+        playerId: IDS.players[0],
+        mealType: "lunch",
+        customName: "[TEST] Chicken & rice",
+        servings: 1,
+        calories: 950,
+        proteinG: 60,
+        carbsG: 110,
+        fatG: 22,
+        loggedDate: relDate(0),
+      },
+    ],
+    { ignoreDuplicates: true },
+  );
+
+  console.log(
+    "✅ Auto-task wellness seeded (3 profiles, 5 weight logs, 4 meal logs)",
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // MAIN SEED FUNCTION
 // ─────────────────────────────────────────────────────────────
 export async function seedAutoTaskTestData() {
@@ -794,6 +778,7 @@ export async function seedAutoTaskTestData() {
   await seedAutoTaskApprovals();
   await seedAutoTaskDocuments();
   await seedAutoTaskReferrals();
+  await seedAutoTaskWellness();
 
   console.log("🎯 Auto-task test data complete!");
   console.log("");
@@ -808,7 +793,6 @@ export async function seedAutoTaskTestData() {
   console.log("     • Create a new offer → manager review (#10)");
   console.log("     • Accept an offer → conversion task (#11)");
   console.log("     • Create a Critical injury → coach+manager alert (#12)");
-  console.log("     • Complete a workout (log session at 100%) (#16)");
   console.log("     • Reject an approval → creator task (#21)");
   console.log("     • Create a Critical referral → manager task (#25)");
   console.log("     • Complete a gate → next-gate task (#27)");

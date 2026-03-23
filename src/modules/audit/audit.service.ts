@@ -41,7 +41,6 @@ export async function listAuditLogs(queryParams: any) {
         "approval_requests",
         "gates",
         "gate_checklists",
-        "gym",
         "documents",
         "notes",
         "clubs",

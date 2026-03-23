@@ -41,12 +41,6 @@ export const CONFIGURABLE_FIELDS: Record<string, ConfigurableField[]> = {
     { field: "surgeryDate", label: "Surgery Date" },
     { field: "cause", label: "Cause" },
   ],
-  gym: [
-    { field: "bodyFatPct", label: "Body Fat %" },
-    { field: "muscleMass", label: "Muscle Mass" },
-    { field: "weight", label: "Weight" },
-    { field: "measurements", label: "Measurements" },
-  ],
   scouting: [
     { field: "fitAssessment", label: "Fit Assessment" },
     { field: "riskAssessment", label: "Risk Assessment" },
@@ -60,5 +54,13 @@ export const CONFIGURABLE_FIELDS: Record<string, ConfigurableField[]> = {
     { field: "salaryOffered", label: "Salary Offered" },
     { field: "agentFee", label: "Agent Fee" },
     { field: "counterOffer", label: "Counter Offer" },
+  ],
+  wellness: [
+    { field: "targetCalories", label: "Target Calories" },
+    { field: "targetProteinG", label: "Target Protein" },
+    { field: "targetFatG", label: "Target Fat" },
+    { field: "targetCarbsG", label: "Target Carbs" },
+    { field: "bodyFatPct", label: "Body Fat %" },
+    { field: "notes", label: "Notes" },
   ],
 };
