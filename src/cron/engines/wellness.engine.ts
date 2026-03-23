@@ -20,10 +20,6 @@ import {
   WellnessProfile,
   WellnessMealLog,
 } from "@modules/wellness/wellness.model";
-import {
-  WellnessWorkoutAssignment,
-  WellnessDailySummary,
-} from "@modules/wellness/fitness.model";
 import { calculateRingScore } from "@modules/wellness/wellness.helpers";
 
 // ── Helpers ──
