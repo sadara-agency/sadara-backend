@@ -2,7 +2,8 @@
 // src/modules/wellness/wellness.service.ts
 // ═══════════════════════════════════════════════════════════════
 
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
+import { sequelize } from "@config/database";
 import {
   WellnessProfile,
   WellnessWeightLog,
@@ -35,7 +36,13 @@ import type {
   MacroComputeResponse,
   WeightTrendResponse,
   DailyTotalsResponse,
+  PlayerDashboardResponse,
+  CoachOverviewResponse,
+  CoachOverviewPlayer,
+  TrafficLightStatus,
+  DailySummaryResponse,
 } from "./wellness.types";
+import { calculateRingScore } from "./wellness.helpers";
 
 // ══════════════════════════════════════════
 // PROFILES
@@ -468,5 +475,216 @@ export async function getDailyTotals(
     calorieAdherencePct,
     proteinAdherencePct,
     meals: meals.map((m) => m.get({ plain: true })) as any,
+  };
+}
+
+// ══════════════════════════════════════════
+// DASHBOARD (Phase 4)
+// ══════════════════════════════════════════
+
+function todayLocal(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Get player ring dashboard with today's stats and 7-day history.
+ */
+export async function getPlayerDashboard(
+  playerId: string,
+  days = 7,
+): Promise<PlayerDashboardResponse> {
+  const today = todayLocal();
+
+  // Get profile targets
+  const profile = await WellnessProfile.findOne({ where: { playerId } });
+  const targetCalories = profile
+    ? Number(profile.targetCalories) || null
+    : null;
+  const targetProteinG = profile
+    ? Number(profile.targetProteinG) || null
+    : null;
+
+  // Get today's totals (reuse existing logic)
+  const todayTotals = await getDailyTotals(playerId, today);
+
+  // Check if workout completed today
+  const [workoutRow]: any = await sequelize.query(
+    `SELECT COUNT(*) AS cnt
+     FROM wellness_workout_assignments
+     WHERE player_id = :playerId AND assigned_date = :date AND status = 'completed'`,
+    { replacements: { playerId, date: today }, type: QueryTypes.SELECT },
+  );
+  const workoutCompleted = Number(workoutRow?.cnt || 0) > 0;
+
+  const ringScore = calculateRingScore(
+    todayTotals.calorieAdherencePct ?? 0,
+    todayTotals.proteinAdherencePct ?? 0,
+    workoutCompleted,
+  );
+
+  // Get history from daily summaries
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().split("T")[0];
+
+  const history: any[] = await sequelize.query(
+    `SELECT summary_date, total_calories, total_protein_g, total_carbs_g, total_fat_g,
+            calorie_adherence_pct, protein_adherence_pct, workout_completed, weight_logged, ring_score
+     FROM wellness_daily_summaries
+     WHERE player_id = :playerId AND summary_date >= :cutoff
+     ORDER BY summary_date DESC`,
+    { replacements: { playerId, cutoff: cutoffStr }, type: QueryTypes.SELECT },
+  );
+
+  return {
+    today: {
+      totalCalories: todayTotals.totalCalories,
+      totalProteinG: todayTotals.totalProteinG,
+      calorieAdherencePct: todayTotals.calorieAdherencePct,
+      proteinAdherencePct: todayTotals.proteinAdherencePct,
+      workoutCompleted,
+      ringScore,
+    },
+    history: history.map((h) => ({
+      summaryDate: h.summary_date,
+      totalCalories: Number(h.total_calories),
+      totalProteinG: Number(h.total_protein_g),
+      totalCarbsG: Number(h.total_carbs_g),
+      totalFatG: Number(h.total_fat_g),
+      calorieAdherencePct:
+        h.calorie_adherence_pct != null
+          ? Number(h.calorie_adherence_pct)
+          : null,
+      proteinAdherencePct:
+        h.protein_adherence_pct != null
+          ? Number(h.protein_adherence_pct)
+          : null,
+      workoutCompleted: Boolean(h.workout_completed),
+      weightLogged: Boolean(h.weight_logged),
+      ringScore: Number(h.ring_score),
+    })),
+    profile: { targetCalories, targetProteinG },
+  };
+}
+
+/**
+ * Coach traffic light overview for all players with wellness profiles.
+ */
+export async function getCoachOverview(): Promise<CoachOverviewResponse> {
+  // Get all players with profiles + last 3 daily summaries
+  const players: any[] = await sequelize.query(
+    `SELECT wp.player_id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
+     FROM wellness_profiles wp
+     JOIN players p ON p.id = wp.player_id
+     WHERE p.status = 'active'
+     ORDER BY p.first_name, p.last_name`,
+    { type: QueryTypes.SELECT },
+  );
+
+  const threeDaysAgo = new Date();
+  threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+  const threeDaysStr = threeDaysAgo.toISOString().split("T")[0];
+
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const sevenDaysStr = sevenDaysAgo.toISOString().split("T")[0];
+
+  const result: CoachOverviewPlayer[] = [];
+  let greenCount = 0,
+    yellowCount = 0,
+    redCount = 0;
+
+  for (const p of players) {
+    // Last 3 days of summaries
+    const summaries: any[] = await sequelize.query(
+      `SELECT ring_score, workout_completed, summary_date
+       FROM wellness_daily_summaries
+       WHERE player_id = :playerId AND summary_date >= :cutoff
+       ORDER BY summary_date DESC
+       LIMIT 3`,
+      {
+        replacements: { playerId: p.player_id, cutoff: threeDaysStr },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    // Weight change in last 7 days
+    const weights: any[] = await sequelize.query(
+      `SELECT weight_kg, logged_at
+       FROM wellness_weight_logs
+       WHERE player_id = :playerId AND logged_at >= :cutoff
+       ORDER BY logged_at DESC
+       LIMIT 2`,
+      {
+        replacements: { playerId: p.player_id, cutoff: sevenDaysStr },
+        type: QueryTypes.SELECT,
+      },
+    );
+
+    const avgRingScore =
+      summaries.length > 0
+        ? Math.round(
+            summaries.reduce((s, r) => s + Number(r.ring_score), 0) /
+              summaries.length,
+          )
+        : 0;
+    const lastRingScore =
+      summaries.length > 0 ? Number(summaries[0].ring_score) : 0;
+    const missedWorkouts = summaries.filter((s) => !s.workout_completed).length;
+    const weightChange7d =
+      weights.length >= 2
+        ? Math.round(
+            (Number(weights[0].weight_kg) -
+              Number(weights[weights.length - 1].weight_kg)) *
+              10,
+          ) / 10
+        : null;
+
+    // Determine traffic light status
+    let status: TrafficLightStatus = "green";
+    const rapidWeightChange =
+      weightChange7d != null && Math.abs(weightChange7d) > 2;
+
+    if (avgRingScore < 60 || rapidWeightChange || missedWorkouts >= 3) {
+      status = "red";
+    } else if (avgRingScore < 80 || missedWorkouts >= 1) {
+      status = "yellow";
+    }
+
+    if (status === "green") greenCount++;
+    else if (status === "yellow") yellowCount++;
+    else redCount++;
+
+    result.push({
+      playerId: p.player_id,
+      firstName: p.first_name,
+      lastName: p.last_name,
+      firstNameAr: p.first_name_ar,
+      lastNameAr: p.last_name_ar,
+      status,
+      avgRingScore,
+      lastRingScore,
+      missedWorkouts,
+      weightChange7d,
+    });
+  }
+
+  // Sort: red first, then yellow, then green
+  const order: Record<TrafficLightStatus, number> = {
+    red: 0,
+    yellow: 1,
+    green: 2,
+  };
+  result.sort((a, b) => order[a.status] - order[b.status]);
+
+  return {
+    players: result,
+    summary: {
+      green: greenCount,
+      yellow: yellowCount,
+      red: redCount,
+      total: players.length,
+    },
   };
 }

@@ -93,6 +93,12 @@ jest.mock('../../../src/cron/engines/training.engine', () => ({
   checkNoTrainingPlan: jest.fn(),
   checkTrainingCourseCompleted: jest.fn(),
 }));
+jest.mock('../../../src/cron/engines/wellness.engine', () => ({
+  aggregateDailySummaries: jest.fn(),
+  checkWeightStale: jest.fn(),
+  checkUnderFueling: jest.fn(),
+  checkMissedWorkout: jest.fn(),
+}));
 jest.mock('../../../src/cron/engines/systemhealth.engine', () => ({
   detectOrphanRecords: jest.fn(),
   checkPlayerDataCompleteness: jest.fn(),

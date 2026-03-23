@@ -81,6 +81,13 @@ router.get(
   asyncHandler(ctrl.myDailyTotals),
 );
 
+// Player ring dashboard
+router.get(
+  "/my/dashboard",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.myDashboard),
+);
+
 // ══════════════════════════════════════════
 // PROFILES (Coach / GymCoach / Admin)
 // ══════════════════════════════════════════
@@ -191,6 +198,21 @@ router.get(
   "/meals/:playerId/daily-totals",
   authorizeModule("wellness", "read"),
   asyncHandler(ctrl.getDailyTotals),
+);
+
+// ══════════════════════════════════════════
+// DASHBOARD (Coach + Admin)
+// ══════════════════════════════════════════
+
+router.get(
+  "/dashboard/overview",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.coachOverview),
+);
+router.get(
+  "/dashboard/player/:playerId",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.playerDashboard),
 );
 
 export default router;

@@ -169,3 +169,51 @@ export interface AssignmentDetailResponse extends WorkoutAssignmentResponse {
   logs: WorkoutLogEntry[];
   previousWeekLogs?: WorkoutLogEntry[];
 }
+
+// ── Dashboard (Phase 4) ──
+
+export interface DailySummaryResponse {
+  summaryDate: string;
+  totalCalories: number;
+  totalProteinG: number;
+  totalCarbsG: number;
+  totalFatG: number;
+  calorieAdherencePct: number | null;
+  proteinAdherencePct: number | null;
+  workoutCompleted: boolean;
+  weightLogged: boolean;
+  ringScore: number;
+}
+
+export interface PlayerDashboardResponse {
+  today: {
+    totalCalories: number;
+    totalProteinG: number;
+    calorieAdherencePct: number | null;
+    proteinAdherencePct: number | null;
+    workoutCompleted: boolean;
+    ringScore: number;
+  };
+  history: DailySummaryResponse[];
+  profile: { targetCalories: number | null; targetProteinG: number | null };
+}
+
+export type TrafficLightStatus = "green" | "yellow" | "red";
+
+export interface CoachOverviewPlayer {
+  playerId: string;
+  firstName: string;
+  lastName: string;
+  firstNameAr: string | null;
+  lastNameAr: string | null;
+  status: TrafficLightStatus;
+  avgRingScore: number;
+  lastRingScore: number;
+  missedWorkouts: number;
+  weightChange7d: number | null;
+}
+
+export interface CoachOverviewResponse {
+  players: CoachOverviewPlayer[];
+  summary: { green: number; yellow: number; red: number; total: number };
+}

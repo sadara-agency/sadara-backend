@@ -62,6 +62,12 @@ import {
   checkTrainingCourseCompleted,
 } from "./engines/training.engine";
 import {
+  aggregateDailySummaries,
+  checkWeightStale,
+  checkUnderFueling,
+  checkMissedWorkout,
+} from "./engines/wellness.engine";
+import {
   detectOrphanRecords,
   checkPlayerDataCompleteness,
   escalateStaleTasks,
@@ -907,6 +913,12 @@ registerJob("stale-task-escalator", escalateStaleTasks);
 registerJob("risk-radar-consistency", checkRiskRadarConsistency);
 registerJob("duplicate-record-detector", detectDuplicateRecords);
 
+// ── Wellness Engine ──
+registerJob("wellness-daily-summary", aggregateDailySummaries);
+registerJob("wellness-weight-stale", checkWeightStale);
+registerJob("wellness-under-fueling", checkUnderFueling);
+registerJob("wellness-missed-workout", checkMissedWorkout);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -1050,6 +1062,12 @@ export async function startCronJobs() {
 
   // Monthly
   schedule("0 9 1 * *", "expense-budget-monitor"); // 1st of month 9:00 AM
+
+  // ── Wellness Engine ──
+  schedule("55 23 * * *", "wellness-daily-summary"); // 23:55 daily
+  schedule("5 9 * * *", "wellness-weight-stale"); // 09:05 daily
+  schedule("5 10 * * *", "wellness-under-fueling"); // 10:05 daily
+  schedule("0 20 * * *", "wellness-missed-workout"); // 20:00 daily
 
   // ── High-frequency ──
   schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes

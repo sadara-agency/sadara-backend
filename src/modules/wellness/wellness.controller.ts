@@ -275,3 +275,27 @@ export async function myDailyTotals(req: AuthRequest, res: Response) {
   const totals = await svc.getDailyTotals(playerId, date);
   sendSuccess(res, totals);
 }
+
+// ══════════════════════════════════════════
+// DASHBOARD (Phase 4)
+// ══════════════════════════════════════════
+
+export async function playerDashboard(req: AuthRequest, res: Response) {
+  const data = await svc.getPlayerDashboard(req.params.playerId);
+  sendSuccess(res, data);
+}
+
+export async function coachOverview(req: AuthRequest, res: Response) {
+  const data = await svc.getCoachOverview();
+  sendSuccess(res, data);
+}
+
+export async function myDashboard(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, null, "Player account not linked");
+    return;
+  }
+  const data = await svc.getPlayerDashboard(playerId);
+  sendSuccess(res, data);
+}
