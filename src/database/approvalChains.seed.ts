@@ -135,6 +135,17 @@ export async function seedApprovalChains(): Promise<void> {
         dueDays: s.dueDays,
         isMandatory: true,
       })),
+      {
+        fields: [
+          "templateId",
+          "stepNumber",
+          "approverRole",
+          "label",
+          "labelAr",
+          "dueDays",
+          "isMandatory",
+        ],
+      },
     );
 
     created++;

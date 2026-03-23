@@ -282,7 +282,10 @@ export async function seedAutoTaskInjuries() {
           updatedBy: IDS.users.coach,
         },
       ],
-      { ignoreDuplicates: true },
+      {
+        fields: ["injuryId", "updateDate", "status", "notes", "updatedBy"],
+        ignoreDuplicates: true,
+      },
     );
   } catch {
     // InjuryUpdate may not exist yet
