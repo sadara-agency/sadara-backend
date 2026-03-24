@@ -16,6 +16,18 @@ export async function up() {
     );
   `);
 
+  // Ensure unique constraint exists even if table was pre-created by model.sync()
+  await sequelize.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'uq_role_module'
+      ) THEN
+        ALTER TABLE role_permissions ADD CONSTRAINT uq_role_module UNIQUE (role, module);
+      END IF;
+    END $$;
+  `);
+
   await sequelize.query(
     `CREATE INDEX IF NOT EXISTS idx_role_permissions_role ON role_permissions(role)`,
   );

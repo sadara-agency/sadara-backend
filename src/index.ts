@@ -48,36 +48,49 @@ if (env.sentry?.dsn) {
 
 async function initInfrastructure(): Promise<void> {
   await withTimeout(testConnection(), 30_000, "testConnection");
-  await withTimeout(initRedis(), 15_000, "initRedis");
-  await withTimeout(initSSESubscriber(), 10_000, "initSSESubscriber");
-
-  // Create core tables from Sequelize models before migrations run.
-  // We sync models individually to avoid Sequelize's buggy cyclic-reference
-  // ALTER TABLE codepath (User ↔ Player cycle generates invalid SQL).
-  const MODEL_SYNC_TIMEOUT = 15_000;
-  const models = Object.values(sequelize.models);
-  const failed: typeof models = [];
-  for (const model of models) {
-    try {
-      await withTimeout(
-        (model as any).sync({ alter: false }),
-        MODEL_SYNC_TIMEOUT,
-        `sync(${(model as any).tableName ?? model.name})`,
-      );
-    } catch {
-      failed.push(model);
-    }
+  // Redis/SSE are non-critical — app works without them (in-memory fallback)
+  try {
+    await withTimeout(initRedis(), 15_000, "initRedis");
+  } catch (err) {
+    logger.warn("Redis init failed — continuing without Redis", {
+      error: (err as Error).message,
+    });
   }
-  // Second pass: retry models that failed due to FK ordering
-  for (const model of failed) {
-    try {
-      await withTimeout(
-        (model as any).sync({ alter: false }),
-        MODEL_SYNC_TIMEOUT,
-        `sync-retry(${(model as any).tableName ?? model.name})`,
-      );
-    } catch {
-      // Will be created by migrations
+  try {
+    await withTimeout(initSSESubscriber(), 10_000, "initSSESubscriber");
+  } catch (err) {
+    logger.warn("SSE subscriber init failed — continuing without SSE", {
+      error: (err as Error).message,
+    });
+  }
+
+  // In production, migrations are the source of truth for schema.
+  // model.sync() is only needed in development for convenience.
+  if (env.nodeEnv !== "production") {
+    const MODEL_SYNC_TIMEOUT = 15_000;
+    const models = Object.values(sequelize.models);
+    const failed: typeof models = [];
+    for (const model of models) {
+      try {
+        await withTimeout(
+          (model as any).sync({ alter: false }),
+          MODEL_SYNC_TIMEOUT,
+          `sync(${(model as any).tableName ?? model.name})`,
+        );
+      } catch {
+        failed.push(model);
+      }
+    }
+    for (const model of failed) {
+      try {
+        await withTimeout(
+          (model as any).sync({ alter: false }),
+          MODEL_SYNC_TIMEOUT,
+          `sync-retry(${(model as any).tableName ?? model.name})`,
+        );
+      } catch {
+        // Will be created by migrations
+      }
     }
   }
 
@@ -245,30 +258,27 @@ function startServer(): Promise<void> {
 
 function printBanner(): void {
   const isProd = env.nodeEnv === "production";
-  const envColor = isProd ? chalk.redBright : chalk.cyanBright;
 
-  console.log("");
-  console.log(chalk.bold.blue("🚀 Sadara Engine"));
-  console.log(chalk.gray("────────────────────────────────"));
-
-  console.log(
-    `${chalk.white("Server:")} ${chalk.blue(`http://localhost:${env.port}`)}`,
-  );
-
-  console.log(
-    `${chalk.white("Health:")} ${chalk.blue(`http://localhost:${env.port}/api/health`)}`,
-  );
-
-  console.log(
-    `${chalk.white("Environment:")} ${envColor(env.nodeEnv.toUpperCase())}`,
-  );
-
-  console.log(
-    chalk.gray(`[${new Date().toLocaleTimeString()}] Sadara is ready.`),
-  );
-
-  console.log(chalk.gray("────────────────────────────────"));
-  console.log("");
+  if (isProd) {
+    // Production: clean structured logs, no chalk/decorations
+    logger.info("HTTP server listening", { port: env.port });
+  } else {
+    const envColor = chalk.cyanBright;
+    console.log("");
+    console.log(chalk.bold.blue("Sadara Engine"));
+    console.log(chalk.gray("────────────────────────────────"));
+    console.log(
+      `${chalk.white("Server:")} ${chalk.blue(`http://localhost:${env.port}`)}`,
+    );
+    console.log(
+      `${chalk.white("Health:")} ${chalk.blue(`http://localhost:${env.port}/api/health`)}`,
+    );
+    console.log(
+      `${chalk.white("Environment:")} ${envColor(env.nodeEnv.toUpperCase())}`,
+    );
+    console.log(chalk.gray("────────────────────────────────"));
+    console.log("");
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -280,82 +290,56 @@ export let appReady = false;
 /** Exported so the health endpoint can surface what went wrong. */
 export let initError: string | undefined;
 
+async function runInit(): Promise<void> {
+  await initInfrastructure();
+  await initApplication();
+  await startSchedulers();
+  appReady = true;
+  initError = undefined;
+}
+
 async function bootstrap(): Promise<void> {
   try {
     // Start HTTP server FIRST so Cloud Run sees the port open quickly
     await startServer();
-
-    // Then run heavy initialization
-    await initInfrastructure();
-    await initApplication();
-    await startSchedulers();
-
-    appReady = true;
-    initError = undefined;
-    logger.info("All initialization complete — app is ready");
+    await runInit();
+    logger.info("App ready", { startupMs: Math.round(performance.now()) });
   } catch (err: unknown) {
     const e = err instanceof Error ? err : new Error(String(err));
     const dbErr = (e as any).original?.message;
     initError = dbErr ? `${e.message} — ${dbErr}` : e.message;
 
-    logger.error("Failed to initialize", {
-      error: e.message,
-      stack: e.stack,
-      ...(dbErr && { dbError: dbErr }),
-    });
+    logger.error("Init failed", { error: initError });
 
-    // In production, keep the server alive so the health endpoint can report
-    // the error instead of crash-looping. Cloud Run will see ready=false.
+    // In development, crash immediately
     if (env.nodeEnv !== "production") {
       process.exit(1);
     }
 
-    // Retry initialization after a delay (DB may be waking up)
-    logger.info("Will retry initialization in 10 seconds…");
-    setTimeout(() => {
-      retryInit();
-    }, 10_000);
-  }
-}
+    // In production, retry with backoff (DB/Redis may be waking up)
+    const delays = [10_000, 30_000];
+    for (let i = 0; i < delays.length; i++) {
+      const attempt = i + 2;
+      logger.info(
+        `Retrying init in ${delays[i] / 1000}s (attempt ${attempt}/3)`,
+      );
+      await new Promise((r) => setTimeout(r, delays[i]));
+      try {
+        await runInit();
+        logger.info("App ready (retry succeeded)", {
+          attempt,
+          startupMs: Math.round(performance.now()),
+        });
+        return;
+      } catch (retryErr: unknown) {
+        const re =
+          retryErr instanceof Error ? retryErr : new Error(String(retryErr));
+        initError = re.message;
+        logger.error(`Init retry ${attempt}/3 failed`, { error: re.message });
+      }
+    }
 
-async function retryInit(): Promise<void> {
-  logger.info("Retrying initialization…");
-  try {
-    await initInfrastructure();
-    await initApplication();
-    await startSchedulers();
-
-    appReady = true;
-    initError = undefined;
-    logger.info("Retry succeeded — app is ready");
-  } catch (err: unknown) {
-    const e = err instanceof Error ? err : new Error(String(err));
-    initError = e.message;
-    logger.error("Retry failed", { error: e.message });
-
-    // Try once more after 30s then give up
-    setTimeout(() => {
-      retryInit2();
-    }, 30_000);
-  }
-}
-
-async function retryInit2(): Promise<void> {
-  logger.info("Final initialization retry…");
-  try {
-    await initInfrastructure();
-    await initApplication();
-    await startSchedulers();
-
-    appReady = true;
-    initError = undefined;
-    logger.info("Final retry succeeded — app is ready");
-  } catch (err: unknown) {
-    const e = err instanceof Error ? err : new Error(String(err));
-    initError = e.message;
-    logger.error("All retries exhausted — app staying in degraded state", {
-      error: e.message,
-    });
+    logger.error("All init retries exhausted — running in degraded mode");
   }
 }
 

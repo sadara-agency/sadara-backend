@@ -5,14 +5,14 @@ import path from "path";
 
 /**
  * Set safety timeouts so a single migration can never hang the whole deploy.
- * - lock_timeout:      10 s — fail fast if another session holds a lock
+ * - lock_timeout:      30 s — fail fast if another session holds a lock
  * - statement_timeout: 120 s — cap any single DDL/DML statement
  * Called once before migrator.up() runs.
  */
 export async function setMigrationTimeouts(): Promise<void> {
-  await sequelize.query("SET lock_timeout = '10s'");
+  await sequelize.query("SET lock_timeout = '30s'");
   await sequelize.query("SET statement_timeout = '120s'");
-  logger.info("Migration safety timeouts set (lock 10s, statement 120s)");
+  logger.info("Migration safety timeouts set (lock 30s, statement 120s)");
 }
 
 export const migrator = new Umzug({
@@ -28,8 +28,17 @@ export const migrator = new Umzug({
     tableName: "sequelize_meta",
   }),
   logger: {
-    info: (msg) =>
-      logger.info(typeof msg === "string" ? msg : JSON.stringify(msg)),
+    info: (msg) => {
+      // Only log actual migration activity, not "up"/"down" bookkeeping
+      if (typeof msg === "object" && (msg as any)?.event) {
+        const { event, name, durationSeconds } = msg as any;
+        if (event === "migrated") {
+          logger.info(`Migration complete: ${name}`, { durationSeconds });
+        } else if (event === "migrating") {
+          logger.info(`Running migration: ${name}`);
+        }
+      }
+    },
     warn: (msg) =>
       logger.warn(typeof msg === "string" ? msg : JSON.stringify(msg)),
     error: (msg) =>
@@ -38,8 +47,9 @@ export const migrator = new Umzug({
           ? msg
           : ((msg as any)?.message ?? JSON.stringify(msg)),
       ),
-    debug: (msg) =>
-      logger.debug(typeof msg === "string" ? msg : JSON.stringify(msg)),
+    debug: () => {
+      /* suppress debug noise */
+    },
   },
 });
 

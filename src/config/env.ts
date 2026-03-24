@@ -31,9 +31,11 @@ const envSchema = z.object({
     ? z.string().min(8, "DB password must be ≥8 chars in production")
     : z.string().default("admin1234"),
 
-  // JWT — REQUIRED in production
+  // JWT — REQUIRED in production (256-bit minimum for HS256)
   JWT_SECRET: isProduction
-    ? z.string().min(32, "JWT_SECRET must be ≥32 chars in production")
+    ? z
+        .string()
+        .min(64, "JWT_SECRET must be ≥64 hex chars (256-bit) in production")
     : z.string().default(devJwtSecret),
   JWT_EXPIRES_IN: z.string().default("7d"),
   JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
