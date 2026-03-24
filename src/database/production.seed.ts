@@ -1,8 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/database/production.seed.ts
 // Production seed — creates the minimum data needed for the
-// platform to be operational: admin user, SPL clubs, and
-// system reference data. No test/demo data.
+// platform to be operational: admin user + SPL clubs.
 // ─────────────────────────────────────────────────────────────
 import bcrypt from "bcryptjs";
 import { User } from "@modules/users/user.model";
@@ -13,21 +12,11 @@ import { logger } from "@config/logger";
 // ── Admin User ──
 
 const PROD_ADMIN_ID = "a0000001-prod-0000-0000-000000000001";
+const DEFAULT_ADMIN_PASSWORD = "Sadara2025!";
 
 export async function seedProdAdmin(): Promise<void> {
-  // Admin email & password come from env so they are never hardcoded.
-  // PROD_ADMIN_EMAIL defaults to admin@sadara.com but can be overridden.
-  // PROD_ADMIN_PASSWORD is required — the seed will skip if not set.
   const email = process.env.PROD_ADMIN_EMAIL || "admin@sadara.com";
-  const password = process.env.PROD_ADMIN_PASSWORD;
-
-  if (!password) {
-    logger.warn(
-      "PROD_ADMIN_PASSWORD not set — skipping admin user seed. " +
-        "Set it as an env var and redeploy to create the initial admin.",
-    );
-    return;
-  }
+  const password = process.env.PROD_ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 
   const existing = await User.findOne({ where: { email } });
   if (existing) {

@@ -57,36 +57,38 @@ export async function seedDatabase(): Promise<void> {
     console.error("❌ Approval chains seed failed:", (err as Error).message);
   }
 
-  // ── Production seed: admin user + SPL clubs ──
-  if (env.nodeEnv !== "development") {
-    try {
-      await seedProdAdmin();
-      await seedProdClubs();
-    } catch (err) {
-      console.error("❌ Production seed failed:", (err as Error).message);
-    }
+  // Check if already seeded (any environment)
+  const existingAdmin = await User.findOne({
+    where: { email: "admin@sadara.com" },
+  });
+  if (existingAdmin) {
+    console.log("⏭️  Database already seeded (admin user exists)");
     return;
   }
 
+  // ── Seed baseline data (all environments) ──
   try {
-    // Check if already seeded
-    const existingAdmin = await User.findOne({
-      where: { email: "admin@sadara.com" },
-    });
-    if (existingAdmin) {
-      console.log("⏭️  Database already seeded (admin user exists)");
-      return;
+    const isProd = env.nodeEnv !== "development";
+    console.log(
+      isProd
+        ? "🌱 Seeding production database..."
+        : "🌱 Seeding development database...",
+    );
+
+    // Production uses seedProdAdmin (password from env or default),
+    // development uses seedUsers (fixed demo accounts)
+    if (isProd) {
+      await seedProdAdmin();
+    } else {
+      await seedUsers();
     }
 
-    console.log("🌱 Seeding development database...");
-
-    // Core tables are already created by initInfrastructure (individual model sync + migrations).
-    // Do NOT call sequelize.sync() here — it triggers Sequelize's buggy cyclic-reference
-    // ALTER TABLE codepath, which fails on columns referenced by views.
-
-    // Seed in FK order
-    await seedUsers();
-    await seedClubs();
+    // Reference & operational data — same for all environments
+    if (isProd) {
+      await seedProdClubs();
+    } else {
+      await seedClubs();
+    }
     await seedPlayers();
     await seedContracts();
     await seedMatches();
@@ -101,16 +103,20 @@ export async function seedDatabase(): Promise<void> {
     await seedMatchPlayers();
     await seedMatchStats();
 
-    // Auto-task trigger test data (contracts, offers, injuries, etc. in trigger-ready states)
-    await seedAutoTaskTestData();
+    if (!isProd) {
+      // Extra test data only in development
+      await seedAutoTaskTestData();
+    }
 
     console.log("");
-    console.log("🎉 Development seed complete!");
-    console.log("   📧 admin@sadara.com   / Sadara2025!");
-    console.log("   📧 agent@sadara.com   / Sadara2025!");
-    console.log("   📧 analyst@sadara.com / Sadara2025!");
-    console.log("   📧 scout@sadara.com   / Sadara2025!");
-    console.log("   📧 salem@sadara.com   / Sadara2025! (Player)");
+    console.log("🎉 Seed complete!");
+    if (!isProd) {
+      console.log("   📧 admin@sadara.com   / Sadara2025!");
+      console.log("   📧 agent@sadara.com   / Sadara2025!");
+      console.log("   📧 analyst@sadara.com / Sadara2025!");
+      console.log("   📧 scout@sadara.com   / Sadara2025!");
+      console.log("   📧 salem@sadara.com   / Sadara2025! (Player)");
+    }
   } catch (err) {
     console.error("❌ Seed failed:", (err as Error).message);
     console.error((err as Error).stack);
