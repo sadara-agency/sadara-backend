@@ -66,11 +66,9 @@ export async function testConnection(
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       await sequelize.authenticate();
-      logger.info("Database connection established", {
-        host: env.db.host,
+      logger.info("Database connected", {
         database: env.db.name,
-        pool: sequelizeOptions.pool?.max,
-        attempt,
+        ...(attempt > 1 && { attempt }),
       });
       return;
     } catch (err) {
