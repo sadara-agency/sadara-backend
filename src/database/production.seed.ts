@@ -11,7 +11,7 @@ import { logger } from "@config/logger";
 
 // ── Admin User ──
 
-const PROD_ADMIN_ID = "a0000001-prod-0000-0000-000000000001";
+const PROD_ADMIN_ID = "a0000001-0000-4000-a000-000000000001";
 const DEFAULT_ADMIN_PASSWORD = "Sadara2025!";
 
 export async function seedProdAdmin(): Promise<void> {
