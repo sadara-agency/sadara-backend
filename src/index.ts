@@ -99,7 +99,7 @@ async function initInfrastructure(): Promise<void> {
 
 async function initApplication(): Promise<void> {
   const CFG_TIMEOUT = 15_000;
-  await withTimeout(seedDatabase(), 60_000, "seedDatabase");
+  await withTimeout(seedDatabase(), 120_000, "seedDatabase");
   await withTimeout(loadPermissions(), CFG_TIMEOUT, "loadPermissions");
   await withTimeout(
     loadTaskRuleConfigFromDB(),
