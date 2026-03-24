@@ -336,7 +336,6 @@ export async function seedFinance() {
       valuedAt: "2026-02-01",
     })),
     {
-      fields: ["playerId", "value", "currency", "source", "trend", "valuedAt"],
       ignoreDuplicates: true,
     },
   );
@@ -545,7 +544,6 @@ export async function seedGates() {
       },
     ],
     {
-      fields: ["gateId", "item", "isCompleted", "isMandatory", "sortOrder"],
       ignoreDuplicates: true,
     },
   );

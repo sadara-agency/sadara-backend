@@ -448,16 +448,6 @@ export async function seedPermissions(): Promise<void> {
       canUpdate: p.canUpdate,
       canDelete: p.canDelete,
     })),
-    {
-      fields: [
-        "role",
-        "module",
-        "canCreate",
-        "canRead",
-        "canUpdate",
-        "canDelete",
-      ],
-    },
   );
 
   console.log(`  ✅ Seeded ${permissions.length} role permission entries`);
