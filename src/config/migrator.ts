@@ -10,9 +10,9 @@ import path from "path";
  * Called once before migrator.up() runs.
  */
 export async function setMigrationTimeouts(): Promise<void> {
-  await sequelize.query("SET lock_timeout = '10s'");
+  await sequelize.query("SET lock_timeout = '30s'");
   await sequelize.query("SET statement_timeout = '120s'");
-  logger.info("Migration safety timeouts set (lock 10s, statement 120s)");
+  logger.info("Migration safety timeouts set (lock 30s, statement 120s)");
 }
 
 export const migrator = new Umzug({

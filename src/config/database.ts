@@ -60,8 +60,8 @@ const sequelizeOptions: Options = {
 export const sequelize = new Sequelize(sequelizeOptions);
 
 export async function testConnection(
-  retries = 5,
-  delayMs = 3000,
+  retries = 10,
+  delayMs = 5000,
 ): Promise<void> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
