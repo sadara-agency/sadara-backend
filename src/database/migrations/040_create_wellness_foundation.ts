@@ -56,6 +56,19 @@ export async function up() {
       { transaction: tx },
     );
 
+    // ── Ensure unique constraint exists (may be missing if model.sync created the table) ──
+    await sequelize.query(
+      `DO $$
+       BEGIN
+         IF NOT EXISTS (
+           SELECT 1 FROM pg_constraint WHERE conname = 'uq_role_module'
+         ) THEN
+           ALTER TABLE role_permissions ADD CONSTRAINT uq_role_module UNIQUE (role, module);
+         END IF;
+       END $$;`,
+      { transaction: tx },
+    );
+
     // ── Seed wellness module permissions for all roles ──
     await sequelize.query(
       `INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete)
