@@ -48,8 +48,21 @@ if (env.sentry?.dsn) {
 
 async function initInfrastructure(): Promise<void> {
   await withTimeout(testConnection(), 30_000, "testConnection");
-  await withTimeout(initRedis(), 15_000, "initRedis");
-  await withTimeout(initSSESubscriber(), 10_000, "initSSESubscriber");
+  // Redis/SSE are non-critical — app works without them (in-memory fallback)
+  try {
+    await withTimeout(initRedis(), 15_000, "initRedis");
+  } catch (err) {
+    logger.warn("Redis init failed — continuing without Redis", {
+      error: (err as Error).message,
+    });
+  }
+  try {
+    await withTimeout(initSSESubscriber(), 10_000, "initSSESubscriber");
+  } catch (err) {
+    logger.warn("SSE subscriber init failed — continuing without SSE", {
+      error: (err as Error).message,
+    });
+  }
 
   // Create core tables from Sequelize models before migrations run.
   // We sync models individually to avoid Sequelize's buggy cyclic-reference

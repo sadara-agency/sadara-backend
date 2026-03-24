@@ -83,28 +83,25 @@ export async function seedDatabase(): Promise<void> {
       await seedUsers();
     }
 
-    // Reference & operational data — same for all environments
     if (isProd) {
+      // Production: only reference data (clubs)
       await seedProdClubs();
     } else {
+      // Development: full demo dataset
       await seedClubs();
-    }
-    await seedPlayers();
-    await seedContracts();
-    await seedMatches();
-    await seedOffers();
-    await seedTasks();
-    await seedFinance();
-    await seedDocuments();
-    await seedGates();
-    await seedReferrals();
-    await seedScouting();
-    await seedPerformances();
-    await seedMatchPlayers();
-    await seedMatchStats();
-
-    if (!isProd) {
-      // Extra test data only in development
+      await seedPlayers();
+      await seedContracts();
+      await seedMatches();
+      await seedOffers();
+      await seedTasks();
+      await seedFinance();
+      await seedDocuments();
+      await seedGates();
+      await seedReferrals();
+      await seedScouting();
+      await seedPerformances();
+      await seedMatchPlayers();
+      await seedMatchStats();
       await seedAutoTaskTestData();
     }
 
