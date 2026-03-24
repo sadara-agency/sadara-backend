@@ -158,41 +158,64 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ─── Docker Build ────────────────────────────────────────────
+  # ─── Docker Build & Push to Artifact Registry ───────────────
   docker:
-    name: Docker Build
+    name: Docker Build & Push
     runs-on: ubuntu-latest
     needs: [build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker europe-west1-docker.pkg.dev --quiet
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
+      - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
-          tags: sadara-backend:${{ github.sha }}
+          push: true
+          tags: |
+            europe-west1-docker.pkg.dev/sadara-490200/sadara-backend/api:${{ github.sha }}
+            europe-west1-docker.pkg.dev/sadara-490200/sadara-backend/api:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  # ─── Deploy to Railway (main only) ──────────────────────────
+  # ─── Deploy to Cloud Run (main only) ────────────────────────
   deploy:
-    name: Deploy to Railway
+    name: Deploy to Cloud Run
     runs-on: ubuntu-latest
-    needs: [build, docker, security]
+    needs: [docker, security]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
-
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
 
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
+      - id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: api-sadara
+          region: europe-west1
+          image: europe-west1-docker.pkg.dev/sadara-490200/sadara-backend/api:${{ github.sha }}
 
-      - name: Deploy
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service backend --detach
+      - name: Show deployed URL
+        run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
