@@ -64,33 +64,33 @@ async function initInfrastructure(): Promise<void> {
     });
   }
 
-  // Create core tables from Sequelize models before migrations run.
-  // We sync models individually to avoid Sequelize's buggy cyclic-reference
-  // ALTER TABLE codepath (User ↔ Player cycle generates invalid SQL).
-  const MODEL_SYNC_TIMEOUT = 15_000;
-  const models = Object.values(sequelize.models);
-  const failed: typeof models = [];
-  for (const model of models) {
-    try {
-      await withTimeout(
-        (model as any).sync({ alter: false }),
-        MODEL_SYNC_TIMEOUT,
-        `sync(${(model as any).tableName ?? model.name})`,
-      );
-    } catch {
-      failed.push(model);
+  // In production, migrations are the source of truth for schema.
+  // model.sync() is only needed in development for convenience.
+  if (env.nodeEnv !== "production") {
+    const MODEL_SYNC_TIMEOUT = 15_000;
+    const models = Object.values(sequelize.models);
+    const failed: typeof models = [];
+    for (const model of models) {
+      try {
+        await withTimeout(
+          (model as any).sync({ alter: false }),
+          MODEL_SYNC_TIMEOUT,
+          `sync(${(model as any).tableName ?? model.name})`,
+        );
+      } catch {
+        failed.push(model);
+      }
     }
-  }
-  // Second pass: retry models that failed due to FK ordering
-  for (const model of failed) {
-    try {
-      await withTimeout(
-        (model as any).sync({ alter: false }),
-        MODEL_SYNC_TIMEOUT,
-        `sync-retry(${(model as any).tableName ?? model.name})`,
-      );
-    } catch {
-      // Will be created by migrations
+    for (const model of failed) {
+      try {
+        await withTimeout(
+          (model as any).sync({ alter: false }),
+          MODEL_SYNC_TIMEOUT,
+          `sync-retry(${(model as any).tableName ?? model.name})`,
+        );
+      } catch {
+        // Will be created by migrations
+      }
     }
   }
 
