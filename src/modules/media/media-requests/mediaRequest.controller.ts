@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
-import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import * as mediaRequestService from "./mediaRequest.service";

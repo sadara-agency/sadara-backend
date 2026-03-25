@@ -1,4 +1,3 @@
-import { Op } from "sequelize";
 import { MediaKitGeneration } from "./mediaKit.model";
 import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
