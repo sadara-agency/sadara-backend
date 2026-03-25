@@ -123,7 +123,12 @@ export async function createMediaRequest(
   data: CreateMediaRequestInput,
   userId: string,
 ) {
-  return MediaRequest.create({ ...data, createdBy: userId });
+  return MediaRequest.create({
+    ...data,
+    deadline: data.deadline ? new Date(data.deadline) : undefined,
+    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+    createdBy: userId,
+  });
 }
 
 // ── Update ──
@@ -134,7 +139,11 @@ export async function updateMediaRequest(
 ) {
   const request = await MediaRequest.findByPk(id);
   if (!request) throw new AppError("Media request not found", 404);
-  return request.update(data);
+  return request.update({
+    ...data,
+    deadline: data.deadline ? new Date(data.deadline) : undefined,
+    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+  });
 }
 
 // ── Update Status ──
