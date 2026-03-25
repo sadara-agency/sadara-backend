@@ -428,6 +428,56 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
     canUpdate: true,
   }),
+
+  // ── Media Module ──
+  ...forRoles("media_requests", ["Admin", "Manager", "Media"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("media_requests", ["Executive"], { canRead: true }),
+
+  ...forRoles("media_contacts", ["Admin", "Manager", "Media"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+
+  ...forRoles("press_releases", ["Admin", "Media"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("press_releases", ["Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("press_releases", ["Executive", "Analyst"], { canRead: true }),
+
+  ...forRoles("media_kits", ["Admin", "Manager", "Media"], {
+    canCreate: true,
+    canRead: true,
+  }),
+  ...forRoles("media_kits", ["Executive", "Analyst", "Scout"], {
+    canRead: true,
+  }),
+
+  ...forRoles("social_media", ["Admin", "Media"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("social_media", ["Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("social_media", ["Executive"], { canRead: true }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

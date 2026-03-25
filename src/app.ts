@@ -51,6 +51,7 @@ import calendarRoutes from "@modules/calendar/event.routes";
 import esignatureRoutes from "@modules/esignatures/esignature.routes";
 import wellnessRoutes from "@modules/wellness/wellness.routes";
 import fitnessRoutes from "@modules/wellness/fitness.routes";
+import mediaRoutes from "@modules/media/media.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -270,6 +271,7 @@ app.use("/api/v1/calendar", calendarRoutes);
 app.use("/api/v1/esignatures", esignatureRoutes);
 app.use("/api/v1/wellness", wellnessRoutes);
 app.use("/api/v1/wellness", fitnessRoutes);
+app.use("/api/v1/media", mediaRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(

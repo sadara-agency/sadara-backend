@@ -1,0 +1,71 @@
+import { z } from "zod";
+
+// ── Create ──
+
+export const createSocialPostSchema = z.object({
+  title: z.string().min(1).max(500),
+  titleAr: z.string().max(500).optional(),
+  contentEn: z.string().optional(),
+  contentAr: z.string().optional(),
+  postType: z.enum([
+    "match_day",
+    "transfer",
+    "injury_update",
+    "achievement",
+    "general",
+    "custom",
+  ]),
+  platforms: z
+    .array(z.enum(["twitter", "instagram", "linkedin", "facebook", "tiktok"]))
+    .min(1),
+  scheduledAt: z.string().datetime().optional(),
+  playerId: z.string().uuid().optional(),
+  clubId: z.string().uuid().optional(),
+  matchId: z.string().uuid().optional(),
+  imageUrls: z.array(z.string().url()).optional(),
+  tags: z.array(z.string()).optional(),
+});
+
+// ── Update ──
+
+export const updateSocialPostSchema = createSocialPostSchema.partial();
+
+// ── Update Status ──
+
+export const updateSocialPostStatusSchema = z.object({
+  status: z.enum(["draft", "scheduled", "published", "archived"]),
+});
+
+// ── Query ──
+
+export const socialPostQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(20),
+  sort: z
+    .enum(["created_at", "scheduled_at", "published_at"])
+    .default("created_at"),
+  order: z.enum(["asc", "desc"]).default("desc"),
+  postType: z
+    .enum([
+      "match_day",
+      "transfer",
+      "injury_update",
+      "achievement",
+      "general",
+      "custom",
+    ])
+    .optional(),
+  status: z.enum(["draft", "scheduled", "published", "archived"]).optional(),
+  playerId: z.string().uuid().optional(),
+  clubId: z.string().uuid().optional(),
+  search: z.string().optional(),
+});
+
+// ── Inferred Types ──
+
+export type CreateSocialPostInput = z.infer<typeof createSocialPostSchema>;
+export type UpdateSocialPostInput = z.infer<typeof updateSocialPostSchema>;
+export type UpdateSocialPostStatusInput = z.infer<
+  typeof updateSocialPostStatusSchema
+>;
+export type SocialPostQuery = z.infer<typeof socialPostQuerySchema>;
