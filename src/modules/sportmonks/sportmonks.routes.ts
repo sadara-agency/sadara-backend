@@ -8,37 +8,37 @@ router.use(authenticate);
 
 router.get(
   "/fixtures",
-  authorizeModule("matches", "read"),
+  authorizeModule("sportmonks", "read"),
   asyncHandler(ctrl.getFixtures),
 );
 router.post(
   "/import",
-  authorizeModule("matches", "create"),
+  authorizeModule("sportmonks", "create"),
   asyncHandler(ctrl.importFixtures),
 );
 router.get(
   "/leagues",
-  authorizeModule("matches", "read"),
+  authorizeModule("sportmonks", "read"),
   asyncHandler(ctrl.getLeagues),
 );
 router.get(
   "/team-maps",
-  authorizeModule("matches", "read"),
+  authorizeModule("sportmonks", "read"),
   asyncHandler(ctrl.getTeamMappings),
 );
 router.patch(
   "/team-maps/:sportmonksTeamId/map",
-  authorizeModule("matches", "update"),
+  authorizeModule("sportmonks", "update"),
   asyncHandler(ctrl.mapTeam),
 );
 router.get(
   "/teams/search",
-  authorizeModule("matches", "read"),
+  authorizeModule("sportmonks", "read"),
   asyncHandler(ctrl.searchTeamsHandler),
 );
 router.post(
   "/test-connection",
-  authorizeModule("matches", "read"),
+  authorizeModule("sportmonks", "read"),
   asyncHandler(ctrl.testConnectionHandler),
 );
 
