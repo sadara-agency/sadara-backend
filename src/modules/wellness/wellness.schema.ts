@@ -5,7 +5,7 @@ import { z } from "zod";
 export const createProfileSchema = z.object({
   playerId: z.string().uuid(),
   sex: z.enum(["male", "female"]),
-  activityLevel: z.number().min(1.0).max(2.5).default(1.55),
+  activityLevel: z.coerce.number().min(1.0).max(2.5).default(1.55),
   goal: z.enum(["bulk", "cut", "maintenance"]).default("maintenance"),
   targetCalories: z.number().int().positive().optional(),
   targetProteinG: z.number().positive().optional(),

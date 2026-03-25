@@ -34,6 +34,8 @@ const MODULES = [
   "audit",
   "market-intel",
   "settings",
+  "users",
+  "sportmonks",
   "saff-data",
   "spl-sync",
 ] as const;

@@ -134,11 +134,9 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles(
-    "clubs",
-    ["Analyst", "Scout", "Player", "Legal", "Coach", "Media", "Executive"],
-    { canRead: true },
-  ),
+  ...forRoles("clubs", ["Analyst", "Scout", "Coach", "Media", "Executive"], {
+    canRead: true,
+  }),
 
   ...forRoles("matches", ["Admin"], {
     canCreate: true,
@@ -170,7 +168,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("contracts", ["Finance", "Executive", "Analyst"], {
     canRead: true,
   }),
-  ...forRoles("contracts", ["Player"], { canRead: true }),
+  // Player contract access is via the Player Portal, not the staff dashboard
 
   ...forRoles("offers", ["Admin"], {
     canCreate: true,
@@ -215,12 +213,16 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("scouting", ["Manager", "Analyst", "Scout"], {
+  ...forRoles("scouting", ["Manager", "Scout"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("scouting", ["Coach", "Executive"], { canRead: true }),
+  ...forRoles("scouting", ["Analyst"], {
+    canRead: true,
+  }),
+  // Coach and Executive intentionally excluded from scouting (Admin, Manager, Analyst, Scout only)
+  // Analyst has read-only on scouting — they analyze reports, not create/edit them
 
   ...forRoles("referrals", ["Admin"], {
     canCreate: true,
@@ -233,7 +235,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("referrals", ["Executive"], { canRead: true }),
+  // Executive intentionally excluded from referrals (Admin, Manager, Analyst, Scout only)
 
   ...forRoles("injuries", ["Admin"], {
     canRead: true,
@@ -255,7 +257,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("injuries", ["Analyst", "Executive", "Media"], {
     canRead: true,
   }),
-  ...forRoles("injuries", ["Player"], { canRead: true }),
+  // Player injuries access is via the Player Portal, not the staff dashboard
 
   ...forRoles("training", ["Admin"], {
     canRead: true,
@@ -278,7 +280,8 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("training", ["Analyst", "Scout"], {
     canRead: true,
   }),
-  ...forRoles("training", ["Player", "Executive"], { canRead: true }),
+  ...forRoles("training", ["Executive"], { canRead: true }),
+  // Player training access is via the Player Portal, not the staff dashboard
 
   ...forRoles("finance", ["Admin"], {
     canCreate: true,
@@ -291,7 +294,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("finance", ["Analyst"], { canRead: true, canCreate: true }),
+  // Analyst intentionally excluded from finance (Admin, Manager, Finance, Executive only)
   ...forRoles("finance", ["Executive"], { canRead: true }),
 
   ...forRoles("reports", ["Admin"], {
@@ -332,11 +335,10 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
   ...forRoles("documents", ["Analyst"], { canRead: true, canCreate: true }),
-  ...forRoles(
-    "documents",
-    ["Scout", "Player", "Finance", "Coach", "Media", "Executive"],
-    { canRead: true },
-  ),
+  ...forRoles("documents", ["Finance", "Coach", "Media", "Executive"], {
+    canRead: true,
+  }),
+  // Scout and Player intentionally excluded from documents
 
   ...forRoles("audit", ["Admin", "Manager", "Executive"], { canRead: true }),
 
@@ -349,6 +351,15 @@ const RAW_PERMISSIONS: Perm[] = [
   ...allRoles("settings", { canRead: true, canUpdate: true }),
   ...forRoles("settings", ["Admin"], { canCreate: true, canDelete: true }),
 
+  // Users module — separate from settings, Admin/Manager only
+  ...forRoles("users", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("users", ["Manager"], { canRead: true }),
+
   ...allRoles("competitions", { canRead: true }),
   ...forRoles("competitions", ["Admin"], {
     canCreate: true,
@@ -359,6 +370,14 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
+
+  // Sportmonks — data ingestion tool, Admin/Manager only
+  ...forRoles("sportmonks", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("sportmonks", ["Manager"], { canRead: true }),
 
   ...forRoles("saff-data", ["Admin"], {
     canRead: true,
@@ -1232,6 +1251,8 @@ async function seedAllData(tx: Transaction): Promise<void> {
       analystId: i % 2 === 0 ? IDS.users.analyst : IDS.users.analyst2,
       marketValue: p.value,
       marketValueCurrency: "SAR" as const,
+      heightCm: rand(170, 192),
+      weightKg: rand(65, 90),
       status: "active" as const,
       speed: rand(50, 90),
       passing: rand(50, 90),
