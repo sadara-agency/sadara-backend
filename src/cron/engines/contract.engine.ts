@@ -793,10 +793,12 @@ export async function checkCommissionsDue(): Promise<{
       (pm.due_date::date - CURRENT_DATE) AS days_until_due
     FROM payments pm
     JOIN players p ON p.id = pm.player_id
+    LEFT JOIN contracts c ON c.id = pm.contract_id
     WHERE pm.payment_type = 'Commission'
       AND pm.status = 'Expected'
       AND pm.due_date >= :today
       AND pm.due_date <= :alertDate
+      AND (c.id IS NULL OR c.status NOT IN ('Terminated'))
     ORDER BY pm.due_date ASC
     `,
     {
@@ -821,9 +823,11 @@ export async function checkCommissionsDue(): Promise<{
       (CURRENT_DATE - pm.due_date::date) AS days_overdue
     FROM payments pm
     JOIN players p ON p.id = pm.player_id
+    LEFT JOIN contracts c ON c.id = pm.contract_id
     WHERE pm.payment_type = 'Commission'
       AND pm.status = 'Expected'
       AND pm.due_date < :today
+      AND (c.id IS NULL OR c.status NOT IN ('Terminated'))
     ORDER BY pm.due_date ASC
     `,
     {

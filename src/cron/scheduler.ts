@@ -512,15 +512,18 @@ async function updateContractStatuses() {
   const today = todayLocal();
 
   // 1. Expired: contracts past their end date that are still Active or Expiring Soon
+  //    Only transition contracts that have at least one signature (proper signing flow)
   const [, expiredCount] = await sequelize.query(
     `UPDATE contracts
      SET status = 'Expired', updated_at = NOW()
      WHERE status IN ('Active', 'Expiring Soon')
-       AND end_date < :today`,
+       AND end_date < :today
+       AND (signed_at IS NOT NULL OR agent_signed_at IS NOT NULL)`,
     { replacements: { today } },
   );
 
   // 2. Expiring Soon: active contracts within 30 days of end date
+  //    Only transition properly signed contracts
   const thirtyDaysOut = new Date();
   thirtyDaysOut.setDate(thirtyDaysOut.getDate() + 30);
   const thirtyStr = thirtyDaysOut.toISOString().split("T")[0];
@@ -530,7 +533,8 @@ async function updateContractStatuses() {
      SET status = 'Expiring Soon', updated_at = NOW()
      WHERE status = 'Active'
        AND end_date >= :today
-       AND end_date <= :threshold`,
+       AND end_date <= :threshold
+       AND (signed_at IS NOT NULL OR agent_signed_at IS NOT NULL)`,
     { replacements: { today, threshold: thirtyStr } },
   );
 

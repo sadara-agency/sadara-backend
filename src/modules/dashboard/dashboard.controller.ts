@@ -2,7 +2,16 @@ import { Response } from "express";
 import { AuthRequest } from "@shared/types";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
+import { hasPermission } from "@modules/permissions/permission.service";
 import * as dashboardService from "@modules/dashboard/dashboard.service";
+
+// ── Per-module permission guard ──
+// Returns true if the user's role can read the given module.
+// KPIs, alerts, and today overview are multi-module aggregates — always allowed
+// (they already pass through the route-level authorizeModule("dashboard","read")).
+async function canRead(req: AuthRequest, module: string): Promise<boolean> {
+  return hasPermission(req.user!.role, module, "read");
+}
 
 // GET /dashboard/kpis
 export async function getKpis(_req: AuthRequest, res: Response) {
@@ -24,25 +33,29 @@ export async function getTodayOverview(_req: AuthRequest, res: Response) {
 
 // GET /dashboard/top-players
 export async function getTopPlayers(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "players"))) return sendSuccess(res, []);
   const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
   const data = await dashboardService.getTopPlayers(limit);
   sendSuccess(res, data);
 }
 
 // GET /dashboard/contracts/status
-export async function getContractStatus(_req: AuthRequest, res: Response) {
+export async function getContractStatus(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "contracts"))) return sendSuccess(res, []);
   const data = await dashboardService.getContractStatusDistribution();
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/players/distribution
-export async function getPlayerDistribution(_req: AuthRequest, res: Response) {
+export async function getPlayerDistribution(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "players"))) return sendSuccess(res, []);
   const data = await dashboardService.getPlayerDistribution();
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/offers/recent
 export async function getRecentOffers(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "offers"))) return sendSuccess(res, []);
   const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
   const data = await dashboardService.getRecentOffers(limit);
   sendSuccess(res, camelCaseKeys(data));
@@ -50,6 +63,7 @@ export async function getRecentOffers(req: AuthRequest, res: Response) {
 
 // GET /dashboard/matches/upcoming
 export async function getUpcomingMatches(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "matches"))) return sendSuccess(res, []);
   const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
   const { id, role, playerId } = req.user!;
   const data = await dashboardService.getUpcomingMatches(
@@ -63,6 +77,7 @@ export async function getUpcomingMatches(req: AuthRequest, res: Response) {
 
 // GET /dashboard/tasks/urgent
 export async function getUrgentTasks(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "tasks"))) return sendSuccess(res, []);
   const limit = Math.min(parseInt(req.query.limit as string) || 5, 20);
   const { id, role, playerId } = req.user!;
   const data = await dashboardService.getUrgentTasks(limit, id, role, playerId);
@@ -71,44 +86,50 @@ export async function getUrgentTasks(req: AuthRequest, res: Response) {
 
 // GET /dashboard/revenue
 export async function getRevenueChart(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "finance"))) return sendSuccess(res, []);
   const months = Math.min(parseInt(req.query.months as string) || 12, 24);
   const data = await dashboardService.getRevenueChart(months);
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/performance
-export async function getPerformanceAverages(_req: AuthRequest, res: Response) {
+export async function getPerformanceAverages(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "players"))) return sendSuccess(res, []);
   const data = await dashboardService.getPerformanceAverages();
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/activity
 export async function getRecentActivity(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "audit"))) return sendSuccess(res, []);
   const limit = Math.min(parseInt(req.query.limit as string) || 10, 50);
   const data = await dashboardService.getRecentActivity(limit);
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/quick-stats
-export async function getQuickStats(_req: AuthRequest, res: Response) {
+export async function getQuickStats(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "gates"))) return sendSuccess(res, {});
   const data = await dashboardService.getQuickStats();
   sendSuccess(res, data);
 }
 
 // GET /dashboard/offer-pipeline
-export async function getOfferPipeline(_req: AuthRequest, res: Response) {
+export async function getOfferPipeline(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "offers"))) return sendSuccess(res, []);
   const data = await dashboardService.getOfferPipeline();
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/injury-trends
-export async function getInjuryTrends(_req: AuthRequest, res: Response) {
+export async function getInjuryTrends(req: AuthRequest, res: Response) {
+  if (!(await canRead(req, "injuries"))) return sendSuccess(res, []);
   const data = await dashboardService.getInjuryTrends();
   sendSuccess(res, camelCaseKeys(data));
 }
 
 // GET /dashboard/kpi-trends
-export async function getKpiTrends(_req: AuthRequest, res: Response) {
+export async function getKpiTrends(req: AuthRequest, res: Response) {
   const data = await dashboardService.getKpiTrends();
   sendSuccess(res, data);
 }

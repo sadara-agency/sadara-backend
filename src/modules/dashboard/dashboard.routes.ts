@@ -1,12 +1,25 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
 import * as dashboardController from "@modules/dashboard/dashboard.controller";
+import * as configController from "@modules/dashboard/dashboardConfig.controller";
 
 const router = Router();
 router.use(authenticate);
+
+// ── Widget layout config ──
+router.get(
+  "/config",
+  authorizeModule("dashboard", "read"),
+  asyncHandler(configController.getConfig),
+);
+router.put(
+  "/config",
+  authorize("Admin"),
+  asyncHandler(configController.updateConfig),
+);
 
 // ── Volatile, per-user data — SHORT (60s) ──
 router.get(

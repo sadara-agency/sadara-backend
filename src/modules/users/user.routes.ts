@@ -26,43 +26,43 @@ router.use(authenticate);
 // ── Read ──
 router.get(
   "/stats",
-  authorizeModule("settings", "read"),
+  authorizeModule("users", "read"),
   asyncHandler(userController.stats),
 );
 router.get(
   "/",
-  authorizeModule("settings", "read"),
+  authorizeModule("users", "read"),
   validate(userQuerySchema, "query"),
   asyncHandler(userController.list),
 );
 router.get(
   "/:id",
-  authorizeModule("settings", "read"),
+  authorizeModule("users", "read"),
   asyncHandler(userController.getById),
 );
 
 // ── Write ──
 router.post(
   "/",
-  authorizeModule("settings", "create"),
+  authorizeModule("users", "create"),
   validate(createUserSchema),
   asyncHandler(userController.create),
 );
 router.patch(
   "/:id",
-  authorizeModule("settings", "update"),
+  authorizeModule("users", "update"),
   validate(updateUserSchema),
   asyncHandler(userController.update),
 );
 router.post(
   "/:id/reset-password",
-  authorizeModule("settings", "update"),
+  authorizeModule("users", "update"),
   validate(resetPasswordSchema),
   asyncHandler(userController.resetPassword),
 );
 router.delete(
   "/:id",
-  authorizeModule("settings", "delete"),
+  authorizeModule("users", "delete"),
   asyncHandler(userController.remove),
 );
 
