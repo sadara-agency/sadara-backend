@@ -2,6 +2,8 @@ import path from "path";
 import fs from "fs";
 import puppeteer from "puppeteer";
 import { PDFDocument } from "pdf-lib";
+import { AppError } from "@middleware/errorHandler";
+import { env } from "@config/env";
 
 // ── Helpers ──
 
@@ -100,7 +102,7 @@ async function getSharedBrowser(extraArgs: string[] = []): Promise<any> {
 
   sharedBrowser = await puppeteer.launch({
     headless: true,
-    executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+    executablePath: env.puppeteer.executablePath,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -171,7 +173,10 @@ export async function renderPagesToBuffers(
 
   // Race against timeout to prevent indefinite hangs
   const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error("PDF render timed out")), timeoutMs),
+    setTimeout(
+      () => reject(new AppError("PDF render timed out", 504)),
+      timeoutMs,
+    ),
   );
 
   return Promise.race([renderWork(), timeout]);
@@ -200,7 +205,7 @@ export async function mergeWithBrandPages(
     const [coverPage] = await merged.copyPages(coverDoc, [0]);
     merged.addPage(coverPage);
   } else if (required) {
-    throw new Error(`Brand asset not found: ${coverPath}`);
+    throw new AppError(`Brand asset not found: ${coverPath}`, 500);
   }
 
   for (const buf of contentBuffers) {
@@ -214,7 +219,7 @@ export async function mergeWithBrandPages(
     const [backPage] = await merged.copyPages(backDoc, [0]);
     merged.addPage(backPage);
   } else if (required) {
-    throw new Error(`Brand asset not found: ${backPath}`);
+    throw new AppError(`Brand asset not found: ${backPath}`, 500);
   }
 
   return Buffer.from(await merged.save());

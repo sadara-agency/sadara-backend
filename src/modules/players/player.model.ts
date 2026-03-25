@@ -1,5 +1,6 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
 import { encryptFields, decryptFields } from "@shared/utils/encryption";
 import {
   TechnicalAttributesJson,
@@ -225,8 +226,9 @@ Player.addHook("afterFind", decryptFields(ENCRYPTED_PLAYER_FIELDS));
 Player.addHook("beforeValidate", (instance: Player) => {
   const ta = instance.technicalAttributes;
   if (ta && !validateTechnicalAttributes(ta)) {
-    throw new Error(
+    throw new AppError(
       `Invalid technical_attributes shape for group "${(ta as any)?.group}"`,
+      400,
     );
   }
   // Auto-init when position is set but technical_attributes is missing

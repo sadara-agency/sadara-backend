@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Op, Sequelize } from "sequelize";
+import { logger } from "@config/logger";
 import { Club } from "@modules/clubs/club.model";
 import {
   Competition,
@@ -66,12 +67,12 @@ export async function seedClubExternalIds(): Promise<{
       }
 
       updated++;
-      console.log(
+      logger.info(
         `[SPL Service] ✓ ${entry.nameEn} → spl=${entry.splTeamId} espn=${entry.espnTeamId}`,
       );
     } else {
       notFound.push(entry.nameEn);
-      console.warn(`[SPL Service] ✗ No Sadara club for "${entry.nameEn}"`);
+      logger.warn(`[SPL Service] ✗ No Sadara club for "${entry.nameEn}"`);
     }
   }
 

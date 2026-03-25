@@ -5,6 +5,7 @@
 import { Response } from "express";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { logger } from "@config/logger";
 import { AuthRequest } from "@shared/types";
 import * as splSync from "@modules/spl/spl.sync";
 import {
@@ -56,17 +57,17 @@ export async function syncAll(req: AuthRequest, res: Response) {
 
   splSync
     .syncAllTeams((name, i, total) => {
-      console.log(`[SPL] Syncing ${name} (${i + 1}/${total})...`);
+      logger.info(`[SPL] Syncing ${name} (${i + 1}/${total})...`);
     })
     .then((result) => {
       updateSyncState({ isRunning: false, lastResult: result });
-      console.log(
+      logger.info(
         `[SPL] ✓ Complete: ${result.totalPlayers} players, ${result.teams} teams`,
       );
     })
     .catch((err) => {
       updateSyncState({ isRunning: false });
-      console.error(`[SPL] ✗ Failed: ${err.message}`);
+      logger.error(`[SPL] ✗ Failed: ${err.message}`);
     });
 
   await logAudit(

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createEventSchema,
@@ -16,12 +17,14 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("calendar", "read"),
+  dynamicFieldAccess("calendar"),
   validate(eventQuerySchema, "query"),
   asyncHandler(eventController.list),
 );
 router.get(
   "/:id",
   authorizeModule("calendar", "read"),
+  dynamicFieldAccess("calendar"),
   asyncHandler(eventController.getById),
 );
 

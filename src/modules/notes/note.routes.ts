@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate } from "@middleware/auth";
+import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createNoteSchema,
@@ -14,19 +15,27 @@ router.use(authenticate);
 
 router.get(
   "/",
+  authorizeModule("notes", "read"),
+  dynamicFieldAccess("notes"),
   validate(noteQuerySchema, "query"),
   asyncHandler(noteController.list),
 );
 router.post(
   "/",
+  authorizeModule("notes", "create"),
   validate(createNoteSchema),
   asyncHandler(noteController.create),
 );
 router.patch(
   "/:id",
+  authorizeModule("notes", "update"),
   validate(updateNoteSchema),
   asyncHandler(noteController.update),
 );
-router.delete("/:id", asyncHandler(noteController.remove));
+router.delete(
+  "/:id",
+  authorizeModule("notes", "delete"),
+  asyncHandler(noteController.remove),
+);
 
 export default router;

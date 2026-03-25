@@ -7,6 +7,8 @@
 
 import axios, { type AxiosInstance, type AxiosError } from "axios";
 import { env } from "@config/env";
+import { logger } from "@config/logger";
+import { AppError } from "@middleware/errorHandler";
 import type {
   SmApiResponse,
   SmFixture,
@@ -38,8 +40,9 @@ async function request<T>(
 ): Promise<T> {
   const token = getToken();
   if (!token) {
-    throw new Error(
+    throw new AppError(
       "Sportmonks API token is not configured. Set SPORTMONKS_API_TOKEN in environment.",
+      500,
     );
   }
 
@@ -61,7 +64,7 @@ async function request<T>(
 
       if (status === 429) {
         const delay = RETRY_BASE_MS * Math.pow(2, attempt);
-        console.warn(
+        logger.warn(
           `[Sportmonks] Rate limited (429). Retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
         );
         await new Promise((r) => setTimeout(r, delay));
@@ -70,22 +73,27 @@ async function request<T>(
       }
 
       if (status === 401 || status === 403) {
-        throw new Error(
+        throw new AppError(
           `Sportmonks authentication failed (${status}). Check your API token.`,
+          503,
         );
       }
 
       if (status === 404) {
-        throw new Error(`Sportmonks resource not found: ${path}`);
+        throw new AppError(`Sportmonks resource not found: ${path}`, 404);
       }
 
-      throw new Error(
+      throw new AppError(
         `Sportmonks API error: ${axErr.message} (status: ${status ?? "unknown"})`,
+        502,
       );
     }
   }
 
-  throw lastError ?? new Error("Sportmonks API request failed after retries");
+  throw (
+    lastError ??
+    new AppError("Sportmonks API request failed after retries", 503)
+  );
 }
 
 // ── Public API ──

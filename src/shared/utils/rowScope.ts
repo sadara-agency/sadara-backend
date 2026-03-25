@@ -8,6 +8,7 @@
 import { Op, literal, QueryTypes } from "sequelize";
 import { AuthUser } from "@shared/types";
 import { sequelize } from "@config/database";
+import { AppError } from "@middleware/errorHandler";
 
 // ── Helpers ──
 
@@ -18,7 +19,8 @@ const UUID_RE =
 
 /** Validate UUID format to prevent SQL injection in literal() calls */
 function safeId(value: string): string {
-  if (!UUID_RE.test(value)) throw new Error("Invalid UUID in row scope filter");
+  if (!UUID_RE.test(value))
+    throw new AppError("Invalid UUID in row scope filter", 400);
   return value;
 }
 

@@ -29,11 +29,13 @@ router.use(authenticate);
 router.get(
   "/summary",
   authorizeModule("finance", "read"),
+  dynamicFieldAccess("finance"),
   asyncHandler(ctrl.summary),
 );
 router.get(
   "/dashboard",
   authorizeModule("finance", "read"),
+  dynamicFieldAccess("finance"),
   validate(dashboardQuerySchema, "query"),
   asyncHandler(ctrl.dashboard),
 );
@@ -116,6 +118,7 @@ router.post(
 router.get(
   "/valuations",
   authorizeModule("finance", "read"),
+  dynamicFieldAccess("finance"),
   validate(valuationQuerySchema, "query"),
   asyncHandler(ctrl.listValuations),
 );
@@ -130,6 +133,7 @@ router.post(
 router.get(
   "/expenses",
   authorizeModule("finance", "read"),
+  dynamicFieldAccess("finance"),
   validate(expenseQuerySchema, "query"),
   asyncHandler(ctrl.listExpenses),
 );

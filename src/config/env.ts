@@ -90,6 +90,15 @@ const envSchema = z.object({
   // Nutritionix Food API (optional)
   NUTRITIONIX_APP_ID: z.string().default(""),
   NUTRITIONIX_API_KEY: z.string().default(""),
+
+  // Puppeteer (optional — override Chromium binary path)
+  PUPPETEER_EXECUTABLE_PATH: z.string().default(""),
+
+  // Production admin seed (optional)
+  PROD_ADMIN_EMAIL: z.string().default("admin@sadara.com"),
+  PROD_ADMIN_PASSWORD: z.string().default(""),
+  PROD_ADMIN_NAME: z.string().default("System Admin"),
+  PROD_ADMIN_NAME_AR: z.string().default("مدير النظام"),
 });
 
 // ── Parse & Validate ──
@@ -200,6 +209,17 @@ export const env = {
   nutritionix: {
     appId: validated.NUTRITIONIX_APP_ID,
     apiKey: validated.NUTRITIONIX_API_KEY,
+  },
+
+  puppeteer: {
+    executablePath: validated.PUPPETEER_EXECUTABLE_PATH || undefined,
+  },
+
+  prodAdmin: {
+    email: validated.PROD_ADMIN_EMAIL,
+    password: validated.PROD_ADMIN_PASSWORD,
+    name: validated.PROD_ADMIN_NAME,
+    nameAr: validated.PROD_ADMIN_NAME_AR,
   },
 
   pagination: {

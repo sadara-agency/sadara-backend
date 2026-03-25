@@ -9,6 +9,7 @@
 import axios, { type AxiosInstance, type AxiosError } from "axios";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { AppError } from "@middleware/errorHandler";
 import { cacheGet, cacheSet, CacheTTL } from "@shared/utils/cache";
 
 const BASE_URL = "https://trackapi.nutritionix.com/v2";
@@ -72,8 +73,9 @@ async function request<T>(
   params?: Record<string, string | number>,
 ): Promise<T> {
   if (!isConfigured()) {
-    throw new Error(
+    throw new AppError(
       "Nutritionix API is not configured. Set NUTRITIONIX_APP_ID and NUTRITIONIX_API_KEY in environment.",
+      500,
     );
   }
 
@@ -99,22 +101,27 @@ async function request<T>(
       }
 
       if (status === 401 || status === 403) {
-        throw new Error(
+        throw new AppError(
           `Nutritionix authentication failed (${status}). Check your API credentials.`,
+          503,
         );
       }
 
       if (status === 404) {
-        throw new Error(`Nutritionix resource not found: ${path}`);
+        throw new AppError(`Nutritionix resource not found: ${path}`, 404);
       }
 
-      throw new Error(
+      throw new AppError(
         `Nutritionix API error: ${axErr.message} (status: ${status ?? "unknown"})`,
+        502,
       );
     }
   }
 
-  throw lastError ?? new Error("Nutritionix API request failed after retries");
+  throw (
+    lastError ??
+    new AppError("Nutritionix API request failed after retries", 503)
+  );
 }
 
 // ── Public API ──

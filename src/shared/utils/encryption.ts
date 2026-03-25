@@ -1,21 +1,52 @@
 import crypto from "crypto";
 import { env } from "@config/env";
+import { AppError } from "@middleware/errorHandler";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16; // 128-bit IV
 const TAG_LENGTH = 16; // 128-bit auth tag
 const ENCODING = "base64"; // Store as base64 string
 
+// Fixed salt for key derivation — changing this will invalidate all encrypted data.
+// This is acceptable because the ENCRYPTION_KEY itself provides the entropy.
+const KDF_SALT = Buffer.from("sadara-aes256-kdf-v1");
+
+/** Cache derived keys so scryptSync / SHA-256 run only once per process. */
+let _scryptKey: Buffer | null = null;
+let _legacySha256Key: Buffer | null = null;
+
+function getRawKey(): string {
+  const raw = env.encryption.key || "";
+  if (!raw) {
+    throw new AppError(
+      "ENCRYPTION_KEY is not set — cannot encrypt/decrypt",
+      500,
+    );
+  }
+  return raw;
+}
+
 /**
- * Derive a 32-byte key from the configured encryption key.
- * Uses SHA-256 to normalise any key length to exactly 32 bytes.
+ * Derive a 32-byte key using scrypt (preferred).
  */
 function getKey(): Buffer {
-  const raw = env.encryption.key || process.env.ENCRYPTION_KEY || "";
-  if (!raw) {
-    throw new Error("ENCRYPTION_KEY is not set — cannot encrypt/decrypt");
-  }
-  return crypto.createHash("sha256").update(raw).digest();
+  if (_scryptKey) return _scryptKey;
+  _scryptKey = crypto.scryptSync(getRawKey(), KDF_SALT, 32, {
+    N: 16384,
+    r: 8,
+    p: 1,
+  });
+  return _scryptKey;
+}
+
+/**
+ * Legacy SHA-256 key derivation — used only to decrypt data
+ * encrypted before the scrypt upgrade. Will be removed in a future release.
+ */
+function getLegacyKey(): Buffer {
+  if (_legacySha256Key) return _legacySha256Key;
+  _legacySha256Key = crypto.createHash("sha256").update(getRawKey()).digest();
+  return _legacySha256Key;
 }
 
 /**
@@ -41,19 +72,33 @@ export function encrypt(plaintext: string): string {
 /**
  * Decrypt a value produced by `encrypt()`.
  * Expects format `iv:tag:ciphertext` in base64.
+ *
+ * Tries scrypt-derived key first. If that fails (data encrypted before
+ * the KDF upgrade), falls back to the legacy SHA-256 key.
  */
 export function decrypt(ciphertext: string): string {
   const parts = ciphertext.split(":");
   if (parts.length !== 3) {
-    throw new Error("Invalid encrypted value format — expected iv:tag:data");
+    throw new AppError(
+      "Invalid encrypted value format — expected iv:tag:data",
+      400,
+    );
   }
-  const key = getKey();
   const iv = Buffer.from(parts[0], ENCODING);
   const tag = Buffer.from(parts[1], ENCODING);
   const encrypted = Buffer.from(parts[2], ENCODING);
-  const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-  decipher.setAuthTag(tag);
-  return decipher.update(encrypted) + decipher.final("utf8");
+
+  // Try scrypt key first (current)
+  try {
+    const decipher = crypto.createDecipheriv(ALGORITHM, getKey(), iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(encrypted) + decipher.final("utf8");
+  } catch {
+    // Fall back to legacy SHA-256 key for data encrypted before the upgrade
+    const decipher = crypto.createDecipheriv(ALGORITHM, getLegacyKey(), iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(encrypted) + decipher.final("utf8");
+  }
 }
 
 /**
