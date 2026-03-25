@@ -15,8 +15,8 @@ const PROD_ADMIN_ID = "a0000001-0000-4000-a000-000000000001";
 const DEFAULT_ADMIN_PASSWORD = "Sadara2025!";
 
 export async function seedProdAdmin(): Promise<void> {
-  const email = process.env.PROD_ADMIN_EMAIL || "admin@sadara.com";
-  const password = process.env.PROD_ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
+  const email = env.prodAdmin.email;
+  const password = env.prodAdmin.password || DEFAULT_ADMIN_PASSWORD;
 
   const existing = await User.findOne({ where: { email } });
   if (existing) {
@@ -30,8 +30,8 @@ export async function seedProdAdmin(): Promise<void> {
     id: PROD_ADMIN_ID,
     email,
     passwordHash: hash,
-    fullName: process.env.PROD_ADMIN_NAME || "System Admin",
-    fullNameAr: process.env.PROD_ADMIN_NAME_AR || "مدير النظام",
+    fullName: env.prodAdmin.name,
+    fullNameAr: env.prodAdmin.nameAr,
     role: "Admin",
     isActive: true,
   });

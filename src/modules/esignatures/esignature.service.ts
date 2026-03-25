@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Op } from "sequelize";
 import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
 import {
   SignatureRequest,
   SignatureSigner,
@@ -482,7 +483,7 @@ async function finalizeRequest(requestId: string) {
       signedUrl = await generateSignedDocument(request);
     } catch (err: any) {
       // Log but don't fail — the signatures are already captured
-      console.error("[E-Sign] PDF generation failed:", err.message);
+      logger.error("[E-Sign] PDF generation failed:", { error: err.message });
     }
   }
 

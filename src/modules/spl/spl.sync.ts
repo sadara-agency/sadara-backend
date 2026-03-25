@@ -14,6 +14,7 @@
 
 import { Op, Sequelize } from "sequelize";
 import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
 import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
 import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
@@ -310,7 +311,7 @@ export async function syncTeam(splTeamId: string): Promise<SplSyncSummary> {
     errors = 0;
 
   const roster = await scrapeTeamRoster(splTeamId);
-  console.log(`[SPL Sync] Team ${splTeamId}: ${roster.length} players`);
+  logger.info(`[SPL Sync] Team ${splTeamId}: ${roster.length} players`);
 
   for (let i = 0; i < roster.length; i++) {
     const { splPlayerId, slug, name } = roster[i];
@@ -333,7 +334,7 @@ export async function syncTeam(splTeamId: string): Promise<SplSyncSummary> {
       else if (r.action === "updated") updated++;
       else skipped++;
     } catch (err: any) {
-      console.error(`[SPL Sync] Error ${name}: ${err.message}`);
+      logger.error(`[SPL Sync] Error ${name}: ${err.message}`);
       results.push({
         splPlayerId,
         playerName: name,
@@ -356,7 +357,7 @@ export async function syncTeam(splTeamId: string): Promise<SplSyncSummary> {
     syncedAt: new Date(),
     durationMs: Date.now() - start,
   };
-  console.log(
+  logger.info(
     `[SPL Sync] ✓ Team ${splTeamId}: ${created}c ${updated}u ${skipped}s ${errors}e (${summary.durationMs}ms)`,
   );
   return summary;
@@ -378,8 +379,8 @@ export async function syncAllTeams(
   for (let i = 0; i < SPL_CLUB_REGISTRY.length; i++) {
     const club = SPL_CLUB_REGISTRY[i];
     if (onProgress) onProgress(club.nameEn, i, SPL_CLUB_REGISTRY.length);
-    console.log(
-      `\n[SPL Sync] ── ${club.nameEn} (${i + 1}/${SPL_CLUB_REGISTRY.length}) ──`,
+    logger.info(
+      `[SPL Sync] ── ${club.nameEn} (${i + 1}/${SPL_CLUB_REGISTRY.length}) ──`,
     );
     try {
       const s = await syncTeam(club.splTeamId);
@@ -388,7 +389,7 @@ export async function syncAllTeams(
       u += s.updated;
       e += s.errors;
     } catch (err: any) {
-      console.error(`[SPL Sync] ✗ ${club.nameEn}: ${err.message}`);
+      logger.error(`[SPL Sync] ✗ ${club.nameEn}: ${err.message}`);
       e++;
     }
     if (i < SPL_CLUB_REGISTRY.length - 1)

@@ -3,6 +3,7 @@
 // Express routes for clearance (مخالصة) endpoints.
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
+import { asyncHandler } from "@middleware/errorHandler";
 import * as controller from "@modules/clearances/clearance.controller";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
@@ -23,18 +24,22 @@ router.get(
   "/",
   authorizeModule("contracts", "read"),
   validate(clearanceQuerySchema, "query"),
-  controller.list,
+  asyncHandler(controller.list),
 );
 
 // GET    /api/v1/clearances/:id      — Get single clearance
-router.get("/:id", authorizeModule("contracts", "read"), controller.getById);
+router.get(
+  "/:id",
+  authorizeModule("contracts", "read"),
+  asyncHandler(controller.getById),
+);
 
 // POST   /api/v1/clearances          — Create new clearance
 router.post(
   "/",
   authorizeModule("contracts", "create"),
   validate(createClearanceSchema),
-  controller.create,
+  asyncHandler(controller.create),
 );
 
 // PUT    /api/v1/clearances/:id      — Update clearance
@@ -42,7 +47,7 @@ router.put(
   "/:id",
   authorizeModule("contracts", "update"),
   validate(updateClearanceSchema),
-  controller.update,
+  asyncHandler(controller.update),
 );
 
 // POST   /api/v1/clearances/:id/complete — Sign & complete clearance
@@ -50,14 +55,14 @@ router.post(
   "/:id/complete",
   authorizeModule("contracts", "update"),
   validate(completeClearanceSchema),
-  controller.complete,
+  asyncHandler(controller.complete),
 );
 
 // DELETE /api/v1/clearances/:id      — Delete clearance (Processing only)
 router.delete(
   "/:id",
   authorizeModule("contracts", "delete"),
-  controller.remove,
+  asyncHandler(controller.remove),
 );
 
 export default router;

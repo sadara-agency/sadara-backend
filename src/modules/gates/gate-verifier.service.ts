@@ -1,4 +1,5 @@
 import { Op } from "sequelize";
+import { AppError } from "@middleware/errorHandler";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Player } from "@modules/players/player.model";
 import { Document } from "@modules/documents/document.model";
@@ -73,7 +74,7 @@ export async function verifyGate(
   gateId: string,
 ): Promise<GateVerificationResult> {
   const gate = await Gate.findByPk(gateId);
-  if (!gate) throw new Error("Gate not found");
+  if (!gate) throw new AppError("Gate not found", 404);
 
   const items = await GateChecklist.findAll({
     where: { gateId },
@@ -148,7 +149,7 @@ export async function verifyGate(
  */
 export async function verifyItem(itemId: string): Promise<VerificationResult> {
   const item = await GateChecklist.findByPk(itemId);
-  if (!item) throw new Error("Checklist item not found");
+  if (!item) throw new AppError("Checklist item not found", 404);
 
   if (item.verificationType === "manual") {
     return {
@@ -162,7 +163,7 @@ export async function verifyItem(itemId: string): Promise<VerificationResult> {
   }
 
   const gate = await Gate.findByPk(item.gateId);
-  if (!gate) throw new Error("Gate not found");
+  if (!gate) throw new AppError("Gate not found", 404);
 
   const rule = item.verificationRule;
   if (!rule) {

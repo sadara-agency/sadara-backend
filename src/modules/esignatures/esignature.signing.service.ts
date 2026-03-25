@@ -9,6 +9,7 @@ import fs from "fs";
 import crypto from "crypto";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { UPLOAD_DIR_PATH } from "@middleware/upload";
+import { AppError } from "@middleware/errorHandler";
 import { SignatureRequest } from "./esignature.model";
 
 const SIGNED_DIR = path.resolve(UPLOAD_DIR_PATH, "..", "signed-documents");
@@ -28,7 +29,7 @@ export async function generateSignedDocument(
     (s: any) => s.status === "Signed" && s.signatureData,
   );
 
-  if (!doc?.fileUrl) throw new Error("Document has no file URL");
+  if (!doc?.fileUrl) throw new AppError("Document has no file URL", 400);
 
   // Load original PDF
   let originalPdfBytes: Buffer;
@@ -45,10 +46,11 @@ export async function generateSignedDocument(
   } else if (fileUrl.startsWith("http")) {
     // Remote URL
     const res = await fetch(fileUrl);
-    if (!res.ok) throw new Error(`Failed to fetch document: ${res.statusText}`);
+    if (!res.ok)
+      throw new AppError(`Failed to fetch document: ${res.statusText}`, 502);
     originalPdfBytes = Buffer.from(await res.arrayBuffer());
   } else {
-    throw new Error(`Unsupported file URL format: ${fileUrl}`);
+    throw new AppError(`Unsupported file URL format: ${fileUrl}`, 400);
   }
 
   const pdfDoc = await PDFDocument.load(originalPdfBytes);

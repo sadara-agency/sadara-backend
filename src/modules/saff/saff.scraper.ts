@@ -1,6 +1,7 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import * as iconv from "iconv-lite";
+import { logger } from "@config/logger";
 
 const BASE_URL_EN = "https://www.saff.com.sa/en";
 const BASE_URL_AR = "https://www.saff.com.sa/ar";
@@ -127,7 +128,7 @@ async function fetchPage(
     } catch (err: any) {
       lastError = err;
       if (attempt < MAX_RETRIES) {
-        console.warn(
+        logger.warn(
           `[SAFF Scraper] Retry ${attempt + 1}/${MAX_RETRIES} for ${url}: ${err.message}`,
         );
       }
@@ -532,7 +533,7 @@ export async function scrapeAllWeeks(
 ): Promise<ScrapedFixture[]> {
   // This would require understanding the SAFF site's week
   // switching mechanism. Placeholder for phased implementation.
-  console.log(
+  logger.info(
     `[SAFF Scraper] Scraping all ${totalWeeks} weeks for championship ${saffId}`,
   );
   const result = await scrapeChampionship(saffId, season);
@@ -560,12 +561,12 @@ export async function scrapeBatch(
       const result = await scrapeChampionship(saffId, season);
       results.push(result);
 
-      console.log(
+      logger.info(
         `[SAFF Scraper] ✓ #${saffId}: ${result.standings.length} standings, ` +
           `${result.fixtures.length} fixtures, ${result.teams.length} teams`,
       );
     } catch (error: any) {
-      console.error(`[SAFF Scraper] ✗ #${saffId}: ${error.message}`);
+      logger.error(`[SAFF Scraper] ✗ #${saffId}: ${error.message}`);
       results.push({
         tournamentId: saffId,
         season,

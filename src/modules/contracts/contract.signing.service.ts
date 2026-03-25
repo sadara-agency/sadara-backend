@@ -13,6 +13,7 @@ import crypto from "crypto";
 import { Contract } from "@modules/contracts/contract.model";
 import { generateContractPdfBuffer } from "@modules/contracts/contract.pdf.controller";
 import { UPLOAD_DIR_PATH } from "@middleware/upload";
+import { AppError } from "@middleware/errorHandler";
 
 const SIGNED_DIR = path.resolve(UPLOAD_DIR_PATH, "..", "signed-contracts");
 if (!fs.existsSync(SIGNED_DIR)) {
@@ -31,7 +32,7 @@ export async function regenerateSignedPdf(contractId: string): Promise<string> {
     include: [{ association: "player" }, { association: "club" }],
   });
 
-  if (!contract) throw new Error(`Contract ${contractId} not found`);
+  if (!contract) throw new AppError(`Contract ${contractId} not found`, 404);
 
   // Generate the full PDF — getData() now reads both agent & player signatures
   const { buffer } = await generateContractPdfBuffer(contract);

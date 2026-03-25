@@ -8,7 +8,9 @@
  */
 
 import axios, { type AxiosInstance, type AxiosError } from "axios";
+import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { AppError } from "@middleware/errorHandler";
 import type {
   MatchAnalysisProvider,
   ExternalMatch,
@@ -24,11 +26,9 @@ export class WyscoutProvider implements MatchAnalysisProvider {
   private client: AxiosInstance;
 
   constructor(apiKey?: string, baseUrl?: string) {
-    const key = apiKey || process.env.WYSCOUT_API_KEY || "";
+    const key = apiKey || env.wyscout.apiKey || "";
     const base =
-      baseUrl ||
-      process.env.WYSCOUT_BASE_URL ||
-      "https://apirest.wyscout.com/v3";
+      baseUrl || env.wyscout.baseUrl || "https://apirest.wyscout.com/v3";
 
     this.client = axios.create({
       baseURL: base,
@@ -74,24 +74,28 @@ export class WyscoutProvider implements MatchAnalysisProvider {
 
         // Auth error — don't retry
         if (status === 401 || status === 403) {
-          throw new Error(
+          throw new AppError(
             `Wyscout authentication failed (${status}). Check your API key.`,
+            503,
           );
         }
 
         // Not found
         if (status === 404) {
-          throw new Error(`Wyscout resource not found: ${path}`);
+          throw new AppError(`Wyscout resource not found: ${path}`, 404);
         }
 
         // Other errors — don't retry
-        throw new Error(
+        throw new AppError(
           `Wyscout API error: ${axErr.message} (status: ${status ?? "unknown"})`,
+          502,
         );
       }
     }
 
-    throw lastError ?? new Error("Wyscout API request failed after retries");
+    throw (
+      lastError ?? new AppError("Wyscout API request failed after retries", 503)
+    );
   }
 
   // ── Public interface ──

@@ -6,6 +6,7 @@
 
 import axios from "axios";
 import * as cheerio from "cheerio";
+import { logger } from "@config/logger";
 import {
   ScrapedPlayerBio,
   ScrapedSeasonStats,
@@ -75,7 +76,7 @@ export async function scrapePlayerProfile(
     const $ = cheerio.load(html);
     const bio = extractBio($, splPlayerId, slug);
     if (!bio.fullName) {
-      console.warn(`[SPL] No name for ${splPlayerId}`);
+      logger.warn(`[SPL] No name for ${splPlayerId}`);
       return null;
     }
     return {
@@ -86,7 +87,7 @@ export async function scrapePlayerProfile(
     };
   } catch (err: any) {
     if (err.response?.status === 404) {
-      console.warn(`[SPL] 404 for ${splPlayerId}`);
+      logger.warn(`[SPL] 404 for ${splPlayerId}`);
       return null;
     }
     throw err;
@@ -268,9 +269,9 @@ export async function scrapeTeamRoster(
           name: sanitize($(el).text()) || parsed.slug.replace(/-/g, " "),
         });
     });
-    console.log(`[SPL] Team ${splTeamId}: ${players.length} players found`);
+    logger.info(`[SPL] Team ${splTeamId}: ${players.length} players found`);
   } catch (err: any) {
-    console.error(`[SPL] Team ${splTeamId} roster error: ${err.message}`);
+    logger.error(`[SPL] Team ${splTeamId} roster error: ${err.message}`);
   }
   return players;
 }
@@ -288,9 +289,9 @@ export async function scrapePlayers(
         list[i].slug || "player",
       );
       results.push(r);
-      if (r) console.log(`[SPL] ✓ ${r.bio.fullName}`);
+      if (r) logger.info(`[SPL] ✓ ${r.bio.fullName}`);
     } catch (err: any) {
-      console.error(`[SPL] ✗ #${list[i].splPlayerId}: ${err.message}`);
+      logger.error(`[SPL] ✗ #${list[i].splPlayerId}: ${err.message}`);
       results.push(null);
     }
     if (i < list.length - 1) await delay(REQUEST_DELAY);

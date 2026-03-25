@@ -340,6 +340,15 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   // Scout and Player intentionally excluded from documents
 
+  // Notes — polymorphic, tied to players/contracts/etc.
+  ...allRoles("notes", { canRead: true, canCreate: true }),
+  ...forRoles("notes", ["Admin", "Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+
   ...forRoles("audit", ["Admin", "Manager", "Executive"], { canRead: true }),
 
   ...forRoles(

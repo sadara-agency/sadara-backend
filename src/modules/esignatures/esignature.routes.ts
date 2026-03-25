@@ -44,7 +44,11 @@ router.get(
   asyncHandler(ctrl.list),
 );
 
-router.get("/my-pending", asyncHandler(ctrl.getMyPending));
+router.get(
+  "/my-pending",
+  authorizeModule("documents", "read"),
+  asyncHandler(ctrl.getMyPending),
+);
 
 router.get(
   "/:id",
@@ -60,12 +64,14 @@ router.post(
 
 router.post(
   "/:id/signers/:signerId/sign",
+  authorizeModule("documents", "update"),
   validate(submitSignatureSchema),
   asyncHandler(ctrl.submitAuth),
 );
 
 router.post(
   "/:id/signers/:signerId/decline",
+  authorizeModule("documents", "update"),
   validate(declineSignatureSchema),
   asyncHandler(ctrl.declineAuth),
 );
