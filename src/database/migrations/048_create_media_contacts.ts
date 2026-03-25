@@ -1,6 +1,10 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
-export async function up(queryInterface: QueryInterface) {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}) {
   await queryInterface.createTable("media_contacts", {
     id: {
       type: DataTypes.UUID,
@@ -58,6 +62,10 @@ export async function up(queryInterface: QueryInterface) {
   await queryInterface.addIndex("media_contacts", ["email"]);
 }
 
-export async function down(queryInterface: QueryInterface) {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}) {
   await queryInterface.dropTable("media_contacts");
 }
