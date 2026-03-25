@@ -572,11 +572,12 @@ export async function getPlayerDashboard(
  * Coach traffic light overview for all players with wellness profiles.
  */
 export async function getCoachOverview(): Promise<CoachOverviewResponse> {
-  // Get all players with profiles + last 3 daily summaries
+  // Get all active players, LEFT JOIN profiles so players without profiles also appear
   const players: any[] = await sequelize.query(
-    `SELECT wp.player_id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
-     FROM wellness_profiles wp
-     JOIN players p ON p.id = wp.player_id
+    `SELECT p.id AS player_id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+            CASE WHEN wp.id IS NOT NULL THEN true ELSE false END AS has_profile
+     FROM players p
+     LEFT JOIN wellness_profiles wp ON wp.player_id = p.id
      WHERE p.status = 'active'
      ORDER BY p.first_name, p.last_name`,
     { type: QueryTypes.SELECT },
@@ -595,7 +596,30 @@ export async function getCoachOverview(): Promise<CoachOverviewResponse> {
     yellowCount = 0,
     redCount = 0;
 
+  let noneCount = 0;
+
   for (const p of players) {
+    const hasProfile = p.has_profile === true || p.has_profile === "true";
+
+    // Players without a profile get "none" status — no need to query summaries
+    if (!hasProfile) {
+      noneCount++;
+      result.push({
+        playerId: p.player_id,
+        firstName: p.first_name,
+        lastName: p.last_name,
+        firstNameAr: p.first_name_ar,
+        lastNameAr: p.last_name_ar,
+        hasProfile: false,
+        status: "none",
+        avgRingScore: 0,
+        lastRingScore: 0,
+        missedWorkouts: 0,
+        weightChange7d: null,
+      });
+      continue;
+    }
+
     // Last 3 days of summaries
     const summaries: any[] = await sequelize.query(
       `SELECT ring_score, workout_completed, summary_date
@@ -662,6 +686,7 @@ export async function getCoachOverview(): Promise<CoachOverviewResponse> {
       lastName: p.last_name,
       firstNameAr: p.first_name_ar,
       lastNameAr: p.last_name_ar,
+      hasProfile: true,
       status,
       avgRingScore,
       lastRingScore,
@@ -670,13 +695,14 @@ export async function getCoachOverview(): Promise<CoachOverviewResponse> {
     });
   }
 
-  // Sort: red first, then yellow, then green
-  const order: Record<TrafficLightStatus, number> = {
+  // Sort: red first, then yellow, then green, then no-profile
+  const order: Record<string, number> = {
     red: 0,
     yellow: 1,
     green: 2,
+    none: 3,
   };
-  result.sort((a, b) => order[a.status] - order[b.status]);
+  result.sort((a, b) => (order[a.status] ?? 4) - (order[b.status] ?? 4));
 
   return {
     players: result,
@@ -684,6 +710,7 @@ export async function getCoachOverview(): Promise<CoachOverviewResponse> {
       green: greenCount,
       yellow: yellowCount,
       red: redCount,
+      none: noneCount,
       total: players.length,
     },
   };

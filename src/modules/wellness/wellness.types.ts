@@ -206,7 +206,8 @@ export interface CoachOverviewPlayer {
   lastName: string;
   firstNameAr: string | null;
   lastNameAr: string | null;
-  status: TrafficLightStatus;
+  hasProfile: boolean;
+  status: TrafficLightStatus | "none";
   avgRingScore: number;
   lastRingScore: number;
   missedWorkouts: number;
@@ -215,5 +216,11 @@ export interface CoachOverviewPlayer {
 
 export interface CoachOverviewResponse {
   players: CoachOverviewPlayer[];
-  summary: { green: number; yellow: number; red: number; total: number };
+  summary: {
+    green: number;
+    yellow: number;
+    red: number;
+    none: number;
+    total: number;
+  };
 }
