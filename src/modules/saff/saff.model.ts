@@ -1,4 +1,4 @@
-import { DataTypes, Model, Optional } from "sequelize";
+import { DataTypes, Model, Op, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
 // ══════════════════════════════════════════
@@ -192,7 +192,11 @@ SaffStanding.init(
     underscored: true,
     timestamps: true,
     indexes: [
-      { fields: ["tournament_id", "season", "position"], unique: true },
+      {
+        fields: ["tournament_id", "season", "saff_team_id"],
+        unique: true,
+        name: "idx_saff_standings_team_season",
+      },
       { fields: ["saff_team_id"] },
       { fields: ["club_id"] },
     ],
@@ -347,9 +351,28 @@ SaffFixture.init(
     timestamps: true,
     indexes: [
       { fields: ["tournament_id", "season", "match_date"] },
+      {
+        fields: [
+          "tournament_id",
+          "season",
+          "saff_home_team_id",
+          "saff_away_team_id",
+          "match_date",
+        ],
+        unique: true,
+        name: "idx_saff_fixtures_match_identity",
+      },
       { fields: ["saff_home_team_id"] },
       { fields: ["saff_away_team_id"] },
-      { fields: ["match_id"] },
+      {
+        fields: ["match_id"],
+        unique: true,
+        where: { match_id: { [Op.ne]: null } },
+        name: "idx_saff_fixtures_match_id_unique",
+      },
+      { fields: ["home_club_id"], name: "idx_saff_fixtures_home_club_id" },
+      { fields: ["away_club_id"], name: "idx_saff_fixtures_away_club_id" },
+      { fields: ["status"], name: "idx_saff_fixtures_status" },
     ],
   },
 );

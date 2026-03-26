@@ -111,13 +111,15 @@ export async function getClubById(id: string) {
   // As you wire up associations, you can replace these with
   // Sequelize includes.
   const [contacts, players, contracts] = await Promise.all([
-    sequelize.query(
-      `SELECT id, name, name_ar, role, email, phone, is_primary
+    sequelize
+      .query(
+        `SELECT id, name, name_ar, role, email, phone, is_primary
        FROM contacts
        WHERE club_id = :id
        ORDER BY is_primary DESC`,
-      { replacements: { id }, type: QueryTypes.SELECT },
-    ),
+        { replacements: { id }, type: QueryTypes.SELECT },
+      )
+      .catch(() => [] as any[]), // Table may not exist yet
 
     sequelize.query(
       `SELECT p.id,

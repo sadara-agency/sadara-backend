@@ -1,6 +1,7 @@
 import cron, { ScheduledTask } from "node-cron";
 import { logger } from "@config/logger";
 import * as saffService from "@modules/saff/saff.service";
+import { getCurrentSeason } from "@modules/saff/saff.service";
 
 // ══════════════════════════════════════════
 // SCHEDULE CONFIG
@@ -10,30 +11,23 @@ interface SyncSchedule {
   name: string;
   cron: string; // cron expression
   agencyValues: string[]; // which tournaments to sync
-  season: string;
 }
-
-// Current season — update each year
-const CURRENT_SEASON = "2025-2026";
 
 const SCHEDULES: SyncSchedule[] = [
   {
     name: "Critical & High (every 12h)",
     cron: "0 */12 * * *", // At minute 0 of every 12th hour
     agencyValues: ["Critical", "High"],
-    season: CURRENT_SEASON,
   },
   {
     name: "Medium (daily at 4 AM)",
     cron: "0 4 * * *", // Every day at 04:00
     agencyValues: ["Medium"],
-    season: CURRENT_SEASON,
   },
   {
     name: "Scouting & Low (weekly Sunday 3 AM)",
     cron: "0 3 * * 0", // Every Sunday at 03:00
     agencyValues: ["Scouting", "Low"],
-    season: CURRENT_SEASON,
   },
 ];
 
@@ -85,7 +79,7 @@ export function getSyncStatus(): SyncStatus & {
 
 export async function runSync(
   agencyValues: string[],
-  season: string,
+  season: string = getCurrentSeason(),
   triggerSource: string = "scheduler",
 ): Promise<void> {
   if (syncStatus.isRunning) {

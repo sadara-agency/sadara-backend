@@ -27,7 +27,11 @@ const mockClubFindByPk = jest.fn();
 const mockClubFindOrCreate = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { query: jest.fn(), authenticate: jest.fn(), transaction: jest.fn() },
+  sequelize: {
+    query: jest.fn(),
+    authenticate: jest.fn(),
+    transaction: jest.fn().mockResolvedValue({ commit: jest.fn(), rollback: jest.fn() }),
+  },
 }));
 
 jest.mock('../../../src/modules/saff/saff.model', () => ({
@@ -69,6 +73,22 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
 }));
 jest.mock('../../../src/modules/matches/match.model', () => ({
   Match: { findOne: jest.fn(), create: jest.fn(), name: 'Match' },
+}));
+jest.mock('../../../src/modules/matches/matchPlayer.model', () => ({
+  MatchPlayer: { findOrCreate: jest.fn(), findAll: jest.fn(), name: 'MatchPlayer' },
+}));
+jest.mock('../../../src/modules/players/player.model', () => ({
+  Player: { findAll: jest.fn(), name: 'Player' },
+}));
+jest.mock('../../../src/modules/contracts/contract.model', () => ({
+  Contract: { findAll: jest.fn(), name: 'Contract' },
+}));
+jest.mock('../../../src/modules/competitions/competition.model', () => ({
+  Competition: { findOne: jest.fn(), create: jest.fn(), findOrCreate: jest.fn(), name: 'Competition' },
+  ClubCompetition: { findOrCreate: jest.fn(), name: 'ClubCompetition' },
+}));
+jest.mock('../../../src/modules/scouting/scouting.model', () => ({
+  Watchlist: { findAll: jest.fn(), name: 'Watchlist' },
 }));
 jest.mock('../../../src/modules/saff/saff.scraper', () => ({
   scrapeBatch: jest.fn(),
@@ -168,7 +188,7 @@ describe('SAFF Service', () => {
       mockStandingUpdate.mockResolvedValue([1]);
       mockFixtureUpdate.mockResolvedValue([1]);
       const result = await saffService.mapTeamToClub({ saffTeamId: 123, season: '2024-2025', clubId: 'club-001' } as any);
-      expect(teamMap.update).toHaveBeenCalledWith({ clubId: 'club-001' });
+      expect(teamMap.update).toHaveBeenCalledWith({ clubId: 'club-001' }, expect.objectContaining({ transaction: expect.anything() }));
     });
 
     it('should throw 404 if club not found', async () => {
