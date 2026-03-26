@@ -188,7 +188,7 @@ describe('SAFF Service', () => {
       mockStandingUpdate.mockResolvedValue([1]);
       mockFixtureUpdate.mockResolvedValue([1]);
       const result = await saffService.mapTeamToClub({ saffTeamId: 123, season: '2024-2025', clubId: 'club-001' } as any);
-      expect(teamMap.update).toHaveBeenCalledWith({ clubId: 'club-001' });
+      expect(teamMap.update).toHaveBeenCalledWith({ clubId: 'club-001' }, expect.objectContaining({ transaction: expect.anything() }));
     });
 
     it('should throw 404 if club not found', async () => {
