@@ -70,6 +70,9 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
 jest.mock('../../../src/modules/matches/match.model', () => ({
   Match: { findOne: jest.fn(), create: jest.fn(), name: 'Match' },
 }));
+jest.mock('../../../src/modules/matches/matchPlayer.model', () => ({
+  MatchPlayer: { findOrCreate: jest.fn(), findAll: jest.fn(), name: 'MatchPlayer' },
+}));
 jest.mock('../../../src/modules/saff/saff.scraper', () => ({
   scrapeBatch: jest.fn(),
   scrapeTeamLogos: jest.fn(),
