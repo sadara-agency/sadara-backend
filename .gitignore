@@ -62,6 +62,9 @@ coverage/
 .vscode/
 .idea/
 
+# Postman
+postman/
+
 # GCP service account keys (NEVER commit these)
 *-credentials.json
 *service-account*.json
