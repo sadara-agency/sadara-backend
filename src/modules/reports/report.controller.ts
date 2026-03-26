@@ -2,6 +2,7 @@ import { Response } from "express";
 import path from "path";
 import fs from "fs";
 import { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
 import {
   sendSuccess,
   sendCreated,
@@ -50,18 +51,12 @@ export async function download(req: AuthRequest, res: Response): Promise<void> {
   const report = await svc.getReportById(req.params.id);
 
   if (report.status !== "Generated" || !report.filePath) {
-    res
-      .status(400)
-      .json({ success: false, message: "Report PDF not available" });
-    return;
+    throw new AppError("Report PDF not available", 400);
   }
 
   const filePath = path.resolve(report.filePath);
   if (!fs.existsSync(filePath)) {
-    res
-      .status(404)
-      .json({ success: false, message: "Report file not found on disk" });
-    return;
+    throw new AppError("Report file not found on disk", 404);
   }
 
   const fileName = `${report.title.replace(/[^a-zA-Z0-9\u0600-\u06FF_-]/g, "_")}.pdf`;
@@ -180,8 +175,7 @@ export async function exportXlsx(
   const { type } = req.params;
   const config = REPORT_DATA_MAP[type];
   if (!config) {
-    res.status(400).json({ success: false, message: "Invalid report type" });
-    return;
+    throw new AppError("Invalid report type", 400);
   }
 
   const data = await config.fetch(req.query as any);
@@ -208,8 +202,7 @@ export async function exportPdf(
   const { type } = req.params;
   const config = REPORT_DATA_MAP[type];
   if (!config) {
-    res.status(400).json({ success: false, message: "Invalid report type" });
-    return;
+    throw new AppError("Invalid report type", 400);
   }
 
   const data = await config.fetch(req.query as any);

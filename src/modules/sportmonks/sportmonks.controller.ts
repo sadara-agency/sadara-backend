@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import * as svc from "@modules/sportmonks/sportmonks.service";
@@ -11,10 +12,7 @@ export async function getFixtures(req: AuthRequest, res: Response) {
     leagueId?: string;
   };
   if (!from || !to) {
-    res
-      .status(400)
-      .json({ success: false, message: "from and to date params required" });
-    return;
+    throw new AppError("from and to date params required", 400);
   }
   const fixtures = await svc.fetchFixtures(
     from,
@@ -27,13 +25,7 @@ export async function getFixtures(req: AuthRequest, res: Response) {
 export async function importFixtures(req: AuthRequest, res: Response) {
   const { fixtureIds, from, to, leagueId } = req.body;
   if (!fixtureIds?.length || !from || !to) {
-    res
-      .status(400)
-      .json({
-        success: false,
-        message: "fixtureIds array and from/to dates required",
-      });
-    return;
+    throw new AppError("fixtureIds array and from/to dates required", 400);
   }
   const result = await svc.importFixtures(fixtureIds, from, to, leagueId);
   await logAudit(
@@ -60,8 +52,7 @@ export async function mapTeam(req: AuthRequest, res: Response) {
   const sportmonksTeamId = Number(req.params.sportmonksTeamId);
   const { clubId } = req.body;
   if (!clubId || isNaN(sportmonksTeamId)) {
-    res.status(400).json({ success: false, message: "clubId required" });
-    return;
+    throw new AppError("clubId required", 400);
   }
   await svc.mapTeam(sportmonksTeamId, clubId);
   await logAudit(
@@ -77,13 +68,7 @@ export async function mapTeam(req: AuthRequest, res: Response) {
 export async function searchTeamsHandler(req: AuthRequest, res: Response) {
   const q = (req.query.q as string) || "";
   if (!q || q.length < 2) {
-    res
-      .status(400)
-      .json({
-        success: false,
-        message: "Search query must be at least 2 characters",
-      });
-    return;
+    throw new AppError("Search query must be at least 2 characters", 400);
   }
   const teams = await svc.searchTeams(q);
   sendSuccess(res, teams);

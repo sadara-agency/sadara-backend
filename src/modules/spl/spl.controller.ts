@@ -53,7 +53,7 @@ export async function syncAll(req: AuthRequest, res: Response) {
   }
 
   updateSyncState({ isRunning: true, lastRun: new Date() });
-  res.json({ success: true, message: "Full SPL sync started in background." });
+  sendSuccess(res, null, "Full SPL sync started in background.");
 
   splSync
     .syncAllTeams((name, i, total) => {
