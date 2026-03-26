@@ -47,19 +47,26 @@ if (env.sentry?.dsn) {
 // ─────────────────────────────────────────────
 
 async function initInfrastructure(): Promise<void> {
+  logger.info("[infra] Connecting to PostgreSQL...");
   await withTimeout(testConnection(), 30_000, "testConnection");
+  logger.info("[infra] PostgreSQL connected");
+
   // Redis/SSE are non-critical — app works without them (in-memory fallback)
   try {
+    logger.info("[infra] Connecting to Redis...");
     await withTimeout(initRedis(), 15_000, "initRedis");
+    logger.info("[infra] Redis connected");
   } catch (err) {
-    logger.warn("Redis init failed — continuing without Redis", {
+    logger.warn("[infra] Redis unavailable — using in-memory fallback", {
       error: (err as Error).message,
     });
   }
   try {
+    logger.info("[infra] Starting SSE subscriber...");
     await withTimeout(initSSESubscriber(), 10_000, "initSSESubscriber");
+    logger.info("[infra] SSE subscriber ready");
   } catch (err) {
-    logger.warn("SSE subscriber init failed — continuing without SSE", {
+    logger.warn("[infra] SSE subscriber unavailable — notifications disabled", {
       error: (err as Error).message,
     });
   }
@@ -69,6 +76,7 @@ async function initInfrastructure(): Promise<void> {
   if (env.nodeEnv !== "production") {
     const MODEL_SYNC_TIMEOUT = 15_000;
     const models = Object.values(sequelize.models);
+    logger.info(`[infra] Syncing ${models.length} models...`);
     const failed: typeof models = [];
     for (const model of models) {
       try {
@@ -81,6 +89,9 @@ async function initInfrastructure(): Promise<void> {
         failed.push(model);
       }
     }
+    if (failed.length > 0) {
+      logger.info(`[infra] Retrying ${failed.length} failed model syncs...`);
+    }
     for (const model of failed) {
       try {
         await withTimeout(
@@ -92,14 +103,18 @@ async function initInfrastructure(): Promise<void> {
         // Will be created by migrations
       }
     }
+    logger.info("[infra] Model sync complete");
   }
 
   // Register associations AFTER tables exist so FK constraints are valid
   setupAssociations();
+  logger.info("[infra] Model associations registered");
 
   // Set lock/statement timeouts so migrations fail fast instead of hanging
   await setMigrationTimeouts();
+  logger.info("[infra] Running migrations...");
   await withTimeout(migrator.up(), 180_000, "migrator.up");
+  logger.info("[infra] Migrations complete");
 
   // Reset to defaults so normal app queries aren't constrained
   await sequelize.query("RESET lock_timeout");
@@ -112,8 +127,15 @@ async function initInfrastructure(): Promise<void> {
 
 async function initApplication(): Promise<void> {
   const CFG_TIMEOUT = 15_000;
+
+  logger.info("[app] Seeding database...");
   await withTimeout(seedDatabase(), 120_000, "seedDatabase");
+  logger.info("[app] Database seeded");
+
+  logger.info("[app] Loading permissions...");
   await withTimeout(loadPermissions(), CFG_TIMEOUT, "loadPermissions");
+
+  logger.info("[app] Loading engine configs...");
   await withTimeout(
     loadTaskRuleConfigFromDB(),
     CFG_TIMEOUT,
@@ -159,6 +181,8 @@ async function initApplication(): Promise<void> {
     CFG_TIMEOUT,
     "loadSystemHealthConfig",
   );
+  logger.info("[app] All engine configs loaded");
+
   await withTimeout(
     ensureSportmonksColumn(),
     CFG_TIMEOUT,
@@ -181,8 +205,11 @@ function registerProviders(): void {
 // ─────────────────────────────────────────────
 
 async function startSchedulers(): Promise<void> {
+  logger.info("[jobs] Starting SAFF scheduler...");
   startSaffScheduler();
+  logger.info("[jobs] Starting cron jobs...");
   await withTimeout(startCronJobs(), 15_000, "startCronJobs");
+  logger.info("[jobs] All schedulers running");
 }
 
 // ─────────────────────────────────────────────
@@ -291,6 +318,7 @@ export let appReady = false;
 export let initError: string | undefined;
 
 async function runInit(): Promise<void> {
+  logger.info("[boot] Retrying init sequence...");
   await initInfrastructure();
   await initApplication();
   await startSchedulers();
@@ -301,15 +329,27 @@ async function runInit(): Promise<void> {
 async function bootstrap(): Promise<void> {
   try {
     // Start HTTP server FIRST so Cloud Run sees the port open quickly
+    logger.info("[boot] Starting HTTP server...");
     await startServer();
-    await runInit();
-    logger.info("App ready", { startupMs: Math.round(performance.now()) });
+    logger.info("[boot] Phase 1/3 — Infrastructure");
+    await initInfrastructure();
+    logger.info("[boot] Phase 2/3 — Application");
+    await initApplication();
+    logger.info("[boot] Phase 3/3 — Schedulers");
+    await startSchedulers();
+    appReady = true;
+    initError = undefined;
+    logger.info("[boot] Ready", {
+      port: env.port,
+      env: env.nodeEnv,
+      startupMs: Math.round(performance.now()),
+    });
   } catch (err: unknown) {
     const e = err instanceof Error ? err : new Error(String(err));
     const dbErr = (e as any).original?.message;
     initError = dbErr ? `${e.message} — ${dbErr}` : e.message;
 
-    logger.error("Init failed", { error: initError });
+    logger.error("[boot] Init failed", { error: initError });
 
     // In development, crash immediately
     if (env.nodeEnv !== "production") {
@@ -321,12 +361,12 @@ async function bootstrap(): Promise<void> {
     for (let i = 0; i < delays.length; i++) {
       const attempt = i + 2;
       logger.info(
-        `Retrying init in ${delays[i] / 1000}s (attempt ${attempt}/3)`,
+        `[boot] Retrying in ${delays[i] / 1000}s (attempt ${attempt}/3)...`,
       );
       await new Promise((r) => setTimeout(r, delays[i]));
       try {
         await runInit();
-        logger.info("App ready (retry succeeded)", {
+        logger.info("[boot] Ready (retry succeeded)", {
           attempt,
           startupMs: Math.round(performance.now()),
         });
@@ -335,11 +375,13 @@ async function bootstrap(): Promise<void> {
         const re =
           retryErr instanceof Error ? retryErr : new Error(String(retryErr));
         initError = re.message;
-        logger.error(`Init retry ${attempt}/3 failed`, { error: re.message });
+        logger.error(`[boot] Retry ${attempt}/3 failed`, {
+          error: re.message,
+        });
       }
     }
 
-    logger.error("All init retries exhausted — running in degraded mode");
+    logger.error("[boot] All retries exhausted — running in degraded mode");
   }
 }
 
@@ -348,13 +390,18 @@ async function bootstrap(): Promise<void> {
 // ─────────────────────────────────────────────
 
 async function shutdown(): Promise<void> {
-  logger.info("Shutting down...");
+  logger.info("[shutdown] Graceful shutdown started...");
   if (httpServer) {
+    logger.info("[shutdown] Closing HTTP server...");
     await new Promise<void>((res) => httpServer!.close(() => res()));
   }
+  logger.info("[shutdown] Closing SSE subscriber...");
   await closeSSESubscriber();
+  logger.info("[shutdown] Closing Redis...");
   await closeRedis();
+  logger.info("[shutdown] Closing database...");
   await sequelize.close();
+  logger.info("[shutdown] Complete");
   process.exit(0);
 }
 

@@ -8,7 +8,7 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
-import { uploadFile } from "@shared/utils/storage";
+import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import * as svc from "@modules/documents/document.service";
 
 // Documents list takes req.user?.role for RBAC, so we override list.
@@ -54,11 +54,10 @@ export async function upload(req: AuthRequest, res: Response) {
     generateThumbnail: file.mimetype.startsWith("image/"),
   });
 
-  // For GCS: url is the full public URL
-  // For local: url is relative, so prefix with the server origin
-  const fileUrl = result.url.startsWith("http")
-    ? result.url
-    : `${req.protocol}://${req.get("host")}${result.url}`;
+  // Documents are private — result.url is a GCS key (e.g. "documents/uuid.pdf")
+  // or a local relative path (e.g. "/uploads/documents/uuid.pdf").
+  // We store it as-is; the /download endpoint resolves it to a signed URL.
+  const fileUrl = result.url;
 
   const input = {
     name: body.name || file.originalname,
@@ -90,4 +89,16 @@ export async function upload(req: AuthRequest, res: Response) {
   );
 
   sendCreated(res, doc);
+}
+
+// ── Download (signed URL redirect for private files) ──
+
+export async function download(req: AuthRequest, res: Response) {
+  const doc = await svc.getDocumentById(req.params.id, req.user);
+  if (!doc?.fileUrl) {
+    throw new AppError("Document file not available", 404);
+  }
+
+  const url = await resolveFileUrl(doc.fileUrl, 15); // 15 min expiry
+  res.redirect(url);
 }
