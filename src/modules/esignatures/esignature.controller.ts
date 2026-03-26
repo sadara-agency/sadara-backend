@@ -5,7 +5,21 @@ import {
   sendCreated,
   sendPaginated,
 } from "@shared/utils/apiResponse";
+import { resolveFileUrl } from "@shared/utils/storage";
 import * as svc from "./esignature.service";
+
+/** Resolve document.fileUrl to an accessible URL (signed URL for private GCS keys) */
+async function resolveDocUrl(obj: any): Promise<void> {
+  const doc = obj?.document || obj?.dataValues?.document;
+  if (doc) {
+    const raw = doc.fileUrl || doc.dataValues?.fileUrl;
+    if (raw) {
+      const resolved = await resolveFileUrl(raw, 30);
+      if (doc.dataValues) doc.dataValues.fileUrl = resolved;
+      else doc.fileUrl = resolved;
+    }
+  }
+}
 
 // ── Create signature request ──
 export async function create(req: AuthRequest, res: Response) {
@@ -26,6 +40,7 @@ export async function list(req: AuthRequest, res: Response) {
 // ── Get by ID ──
 export async function getById(req: AuthRequest, res: Response) {
   const result = await svc.getRequestById(req.params.id);
+  await resolveDocUrl(result);
   sendSuccess(res, result);
 }
 
@@ -88,6 +103,7 @@ export async function getMyPending(req: AuthRequest, res: Response) {
 // ── Public: view by token ──
 export async function viewByToken(req: Request, res: Response) {
   const { signer, request } = await svc.verifySigningToken(req.params.token);
+  await resolveDocUrl(request);
   sendSuccess(res, { signer, request });
 }
 

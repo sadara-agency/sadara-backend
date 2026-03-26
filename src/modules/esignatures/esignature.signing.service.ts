@@ -11,6 +11,7 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { UPLOAD_DIR_PATH } from "@middleware/upload";
 import { AppError } from "@middleware/errorHandler";
 import { SignatureRequest } from "./esignature.model";
+import { resolveFileUrl, uploadFile } from "@shared/utils/storage";
 
 const SIGNED_DIR = path.resolve(UPLOAD_DIR_PATH, "..", "signed-documents");
 if (!fs.existsSync(SIGNED_DIR)) {
@@ -44,13 +45,21 @@ export async function generateSignedDocument(
     );
     originalPdfBytes = await fs.promises.readFile(localPath);
   } else if (fileUrl.startsWith("http")) {
-    // Remote URL
+    // Remote URL (legacy full GCS URLs or external URLs)
     const res = await fetch(fileUrl);
     if (!res.ok)
       throw new AppError(`Failed to fetch document: ${res.statusText}`, 502);
     originalPdfBytes = Buffer.from(await res.arrayBuffer());
   } else {
-    throw new AppError(`Unsupported file URL format: ${fileUrl}`, 400);
+    // GCS key (e.g. "documents/uuid.pdf") — resolve via signed URL then fetch
+    const signedUrl = await resolveFileUrl(fileUrl, 5);
+    const res = await fetch(signedUrl);
+    if (!res.ok)
+      throw new AppError(
+        `Failed to fetch document from storage: ${res.statusText}`,
+        502,
+      );
+    originalPdfBytes = Buffer.from(await res.arrayBuffer());
   }
 
   const pdfDoc = await PDFDocument.load(originalPdfBytes);
@@ -209,26 +218,17 @@ export async function generateSignedDocument(
     }
   }
 
-  // Save
+  // Save — upload to GCS (private) or local fallback
   const pdfBytes = await pdfDoc.save();
   const fileName = `signed-${request.id.slice(0, 8)}-${crypto.randomUUID().slice(0, 8)}.pdf`;
-  const filePath = path.join(SIGNED_DIR, fileName);
-  await fs.promises.writeFile(filePath, pdfBytes);
 
-  // Clean up previous signed PDF
-  if (request.signedDocumentUrl?.includes("/signed-documents/")) {
-    const oldFile = path.join(
-      SIGNED_DIR,
-      path.basename(request.signedDocumentUrl),
-    );
-    if (oldFile !== filePath) {
-      try {
-        await fs.promises.unlink(oldFile);
-      } catch {
-        // Best-effort
-      }
-    }
-  }
+  const result = await uploadFile({
+    folder: "signed-documents",
+    originalName: fileName,
+    mimeType: "application/pdf",
+    buffer: Buffer.from(pdfBytes),
+    generateThumbnail: false,
+  });
 
-  return `/uploads/signed-documents/${fileName}`;
+  return result.url;
 }

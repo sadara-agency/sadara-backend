@@ -46,13 +46,28 @@ export interface UploadResult {
   mimeType: string;
 }
 
+export type UploadFolder =
+  | "photos"
+  | "documents"
+  | "avatars"
+  | "signed-contracts"
+  | "signed-documents";
+
+/** Folders whose objects are made publicly readable on upload */
+const PUBLIC_FOLDERS: ReadonlySet<UploadFolder> = new Set([
+  "photos",
+  "avatars",
+]);
+
+/** Folders whose objects stay private — access via signed URLs only */
+const PRIVATE_FOLDERS: ReadonlySet<UploadFolder> = new Set([
+  "documents",
+  "signed-contracts",
+  "signed-documents",
+]);
+
 export interface UploadOptions {
-  folder:
-    | "photos"
-    | "documents"
-    | "avatars"
-    | "signed-contracts"
-    | "signed-documents";
+  folder: UploadFolder;
   originalName: string;
   mimeType: string;
   buffer: Buffer;
@@ -118,8 +133,9 @@ export async function uploadFile(opts: UploadOptions): Promise<UploadResult> {
     finalExt = ext || ".bin";
   }
 
+  const isPublic = PUBLIC_FOLDERS.has(folder);
   const key = `${folder}/${baseName}${finalExt}`;
-  const url = await writeToStorage(key, processedBuffer, finalMime);
+  const url = await writeToStorage(key, processedBuffer, finalMime, isPublic);
 
   // Thumbnail (images only)
   let thumbnailUrl: string | null = null;
@@ -131,7 +147,12 @@ export async function uploadFile(opts: UploadOptions): Promise<UploadResult> {
       .toBuffer();
 
     const thumbKey = `${folder}/thumb_${baseName}.webp`;
-    thumbnailUrl = await writeToStorage(thumbKey, thumbBuffer, "image/webp");
+    thumbnailUrl = await writeToStorage(
+      thumbKey,
+      thumbBuffer,
+      "image/webp",
+      isPublic,
+    );
   }
 
   return {
@@ -194,6 +215,7 @@ async function writeToStorage(
   key: string,
   buffer: Buffer,
   contentType: string,
+  isPublic: boolean,
 ): Promise<string> {
   if (USE_GCS) {
     const bucket = getGCS().bucket(env.gcs.bucket);
@@ -203,12 +225,20 @@ async function writeToStorage(
       contentType,
       resumable: false, // Small files — no need for resumable
       metadata: {
-        cacheControl: "public, max-age=31536000, immutable", // CDN cache 1 year (files are UUID-named)
+        cacheControl: isPublic
+          ? "public, max-age=31536000, immutable" // CDN cache 1 year
+          : "private, no-store",
       },
     });
 
-    // Public URL (if bucket is public) or authenticated URL
-    return `https://storage.googleapis.com/${env.gcs.bucket}/${key}`;
+    if (isPublic) {
+      await file.makePublic();
+      return `https://storage.googleapis.com/${env.gcs.bucket}/${key}`;
+    }
+
+    // Private files — return the GCS key, NOT a URL.
+    // Callers must use getSignedUrl(key) to generate time-limited access.
+    return key;
   }
 
   // Local fallback
@@ -219,6 +249,39 @@ async function writeToStorage(
 
   // Return relative path — caller builds full URL with req.protocol + host
   return `/uploads/${key}`;
+}
+
+// ── Helpers ──
+
+/** Check if a stored URL/key is a private GCS key (needs signed URL) */
+export function isPrivateKey(urlOrKey: string): boolean {
+  return PRIVATE_FOLDERS.has(urlOrKey.split("/")[0] as UploadFolder);
+}
+
+/**
+ * Resolve a stored file reference to an accessible URL.
+ * - Public files: already a full URL, returned as-is.
+ * - Private GCS keys: generates a signed URL (default 60 min).
+ * - Local paths: returned as-is (served by Express static).
+ */
+export async function resolveFileUrl(
+  urlOrKey: string,
+  expiresInMinutes = 60,
+): Promise<string> {
+  if (!urlOrKey) return urlOrKey;
+
+  // Already a full URL (public GCS or external URL) — pass through
+  if (urlOrKey.startsWith("http")) return urlOrKey;
+
+  // Local path — pass through
+  if (urlOrKey.startsWith("/uploads/")) return urlOrKey;
+
+  // Private GCS key — generate signed URL
+  if (USE_GCS && isPrivateKey(urlOrKey)) {
+    return getSignedUrl(urlOrKey, expiresInMinutes);
+  }
+
+  return urlOrKey;
 }
 
 // ── Startup log ──
