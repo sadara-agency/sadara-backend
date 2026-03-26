@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import {
   SaffTournament,
   SaffStanding,
@@ -7,8 +7,17 @@ import {
 } from "@modules/saff/saff.model";
 import { Club } from "@modules/clubs/club.model";
 import { Match } from "@modules/matches/match.model";
+import { MatchPlayer } from "@modules/matches/matchPlayer.model";
+import { Player } from "@modules/players/player.model";
+import { Contract } from "@modules/contracts/contract.model";
+import {
+  Competition,
+  ClubCompetition,
+} from "@modules/competitions/competition.model";
+import { Watchlist } from "@modules/scouting/scouting.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
+import { logger } from "@config/logger";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   scrapeBatch,
@@ -24,6 +33,17 @@ import type {
   MapTeamInput,
   ImportRequest,
 } from "@modules/saff/saff.schema";
+
+// ══════════════════════════════════════════
+// HELPERS
+// ══════════════════════════════════════════
+
+/** Calculate current football season from date (season starts ~August). */
+export function getCurrentSeason(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  return now.getMonth() >= 7 ? `${year}-${year + 1}` : `${year - 1}-${year}`;
+}
 
 // ══════════════════════════════════════════
 // TOURNAMENT CATALOG
@@ -509,14 +529,8 @@ export async function fetchFromSaff(input: FetchRequest) {
     const txn = await sequelize.transaction();
 
     try {
-      // ── Store standings ──
+      // ── Store standings (UPSERT — preserves clubId mappings) ──
       if (dataTypes.includes("standings") && result.standings.length) {
-        // Delete existing standings for this tournament+season
-        await SaffStanding.destroy({
-          where: { tournamentId: tournament.id, season },
-          transaction: txn,
-        });
-
         await SaffStanding.bulkCreate(
           result.standings.map((s) => ({
             tournamentId: tournament.id,
@@ -534,18 +548,29 @@ export async function fetchFromSaff(input: FetchRequest) {
             goalDifference: s.goalDifference,
             points: s.points,
           })),
-          { transaction: txn },
+          {
+            transaction: txn,
+            updateOnDuplicate: [
+              "position",
+              "teamNameEn",
+              "teamNameAr",
+              "played",
+              "won",
+              "drawn",
+              "lost",
+              "goalsFor",
+              "goalsAgainst",
+              "goalDifference",
+              "points",
+              "updatedAt",
+            ],
+          },
         );
         summary.standings += result.standings.length;
       }
 
-      // ── Store fixtures ──
+      // ── Store fixtures (UPSERT — preserves homeClubId, awayClubId, matchId mappings) ──
       if (dataTypes.includes("fixtures") && result.fixtures.length) {
-        await SaffFixture.destroy({
-          where: { tournamentId: tournament.id, season },
-          transaction: txn,
-        });
-
         await SaffFixture.bulkCreate(
           result.fixtures.map((f) => ({
             tournamentId: tournament.id,
@@ -564,7 +589,23 @@ export async function fetchFromSaff(input: FetchRequest) {
             city: f.city,
             status: f.homeScore !== null ? "completed" : "upcoming",
           })),
-          { transaction: txn },
+          {
+            transaction: txn,
+            updateOnDuplicate: [
+              "matchTime",
+              "week",
+              "homeTeamNameEn",
+              "homeTeamNameAr",
+              "awayTeamNameEn",
+              "awayTeamNameAr",
+              "homeScore",
+              "awayScore",
+              "stadium",
+              "city",
+              "status",
+              "updatedAt",
+            ],
+          },
         );
         summary.fixtures += result.fixtures.length;
       }
@@ -600,9 +641,16 @@ export async function fetchFromSaff(input: FetchRequest) {
       );
 
       await txn.commit();
-    } catch (error) {
-      await txn.rollback();
-      throw error;
+    } catch (error: any) {
+      try {
+        await txn.rollback();
+      } catch {
+        /* rollback may fail if connection is dead */
+      }
+      logger.error(
+        `[SAFF Service] fetchFromSaff failed for tournament ${result.tournamentId}: ${error.message}`,
+      );
+      // Continue to next tournament instead of aborting entire batch
     }
   }
 
@@ -720,36 +768,54 @@ export async function mapTeamToClub(input: MapTeamInput) {
   const club = await Club.findByPk(input.clubId);
   if (!club) throw new AppError("Club not found", 404);
 
-  const [teamMap] = await SaffTeamMap.findOrCreate({
-    where: { saffTeamId: input.saffTeamId, season: input.season },
-    defaults: {
-      saffTeamId: input.saffTeamId,
-      season: input.season,
-      teamNameEn: club.name,
-      teamNameAr: club.nameAr || "",
-      clubId: input.clubId,
-    },
-  });
+  const txn = await sequelize.transaction();
 
-  await teamMap.update({ clubId: input.clubId });
+  try {
+    const [teamMap] = await SaffTeamMap.findOrCreate({
+      where: { saffTeamId: input.saffTeamId, season: input.season },
+      defaults: {
+        saffTeamId: input.saffTeamId,
+        season: input.season,
+        teamNameEn: club.name,
+        teamNameAr: club.nameAr || "",
+        clubId: input.clubId,
+      },
+      transaction: txn,
+    });
 
-  // Also update any existing standings/fixtures with this team
-  await SaffStanding.update(
-    { clubId: input.clubId },
-    { where: { saffTeamId: input.saffTeamId, season: input.season } },
-  );
+    await teamMap.update({ clubId: input.clubId }, { transaction: txn });
 
-  await SaffFixture.update(
-    { homeClubId: input.clubId },
-    { where: { saffHomeTeamId: input.saffTeamId, season: input.season } },
-  );
+    // Also update any existing standings/fixtures with this team
+    await SaffStanding.update(
+      { clubId: input.clubId },
+      {
+        where: { saffTeamId: input.saffTeamId, season: input.season },
+        transaction: txn,
+      },
+    );
 
-  await SaffFixture.update(
-    { awayClubId: input.clubId },
-    { where: { saffAwayTeamId: input.saffTeamId, season: input.season } },
-  );
+    await SaffFixture.update(
+      { homeClubId: input.clubId },
+      {
+        where: { saffHomeTeamId: input.saffTeamId, season: input.season },
+        transaction: txn,
+      },
+    );
 
-  return teamMap;
+    await SaffFixture.update(
+      { awayClubId: input.clubId },
+      {
+        where: { saffAwayTeamId: input.saffTeamId, season: input.season },
+        transaction: txn,
+      },
+    );
+
+    await txn.commit();
+    return teamMap;
+  } catch (error) {
+    await txn.rollback();
+    throw error;
+  }
 }
 
 // ══════════════════════════════════════════
@@ -763,60 +829,103 @@ export async function importToSadara(input: ImportRequest) {
     where: { saffId: { [Op.in]: tournamentIds } },
   });
 
-  const summary = { clubs: 0, matches: 0, standings: 0 };
+  const summary = {
+    clubs: 0,
+    matches: 0,
+    playersLinked: 0,
+    errors: [] as string[],
+  };
 
   for (const tournament of tournaments) {
-    // ── Import clubs ──
-    if (importTypes.includes("clubs")) {
-      const teamMaps = await SaffTeamMap.findAll({
-        where: { season, clubId: null },
+    const txn = await sequelize.transaction();
+
+    try {
+      // ── Resolve or create Competition ──
+      let competition = await Competition.findOne({
+        where: { saffId: tournament.saffId },
+        transaction: txn,
       });
 
-      for (const tm of teamMaps) {
-        // Also check for soft-deleted clubs and reactivate if found
-        const [club, created] = await Club.findOrCreate({
-          where: { name: tm.teamNameEn },
+      if (!competition) {
+        [competition] = await Competition.findOrCreate({
+          where: { saffId: tournament.saffId },
           defaults: {
-            name: tm.teamNameEn,
-            nameAr: tm.teamNameAr,
-            type: "Club" as const,
+            name: tournament.name,
+            nameAr: tournament.nameAr,
             country: "Saudi Arabia",
-            city: tm.city || undefined,
-            league: tournament.name,
-          },
+            type: tournament.category === "pro" ? "league" : "cup",
+            tier: tournament.tier,
+            agencyValue: tournament.agencyValue,
+            saffId: tournament.saffId,
+            isActive: true,
+          } as any,
+          transaction: txn,
         });
-
-        // Fill Arabic name if club exists but has no Arabic name
-        if (!created && !club.nameAr && tm.teamNameAr) {
-          await club.update({ nameAr: tm.teamNameAr });
-        }
-
-        // Reactivate if club was soft-deleted
-        if (!created && !club.isActive) {
-          await club.update({ isActive: true });
-        }
-
-        await tm.update({ clubId: club.id });
-        if (created) summary.clubs++;
       }
-    }
 
-    // ── Import matches (with deduplication) ──
-    if (importTypes.includes("matches")) {
-      const fixtures = await SaffFixture.findAll({
-        where: { tournamentId: tournament.id, season, matchId: null },
-      });
-
-      for (const fixture of fixtures) {
-        // Only import if both teams are mapped
-        const homeMap = await SaffTeamMap.findOne({
-          where: { saffTeamId: fixture.saffHomeTeamId, season },
-        });
-        const awayMap = await SaffTeamMap.findOne({
-          where: { saffTeamId: fixture.saffAwayTeamId, season },
+      // ── Import clubs ──
+      if (importTypes.includes("clubs")) {
+        const teamMaps = await SaffTeamMap.findAll({
+          where: { season, clubId: null },
+          transaction: txn,
         });
 
-        if (homeMap?.clubId && awayMap?.clubId) {
+        for (const tm of teamMaps) {
+          const [club, created] = await Club.findOrCreate({
+            where: { name: tm.teamNameEn },
+            defaults: {
+              name: tm.teamNameEn,
+              nameAr: tm.teamNameAr,
+              type: "Club" as const,
+              country: "Saudi Arabia",
+              city: tm.city || undefined,
+              league: tournament.name,
+            },
+            transaction: txn,
+          });
+
+          if (!created && !club.nameAr && tm.teamNameAr) {
+            await club.update({ nameAr: tm.teamNameAr }, { transaction: txn });
+          }
+          if (!created && !club.isActive) {
+            await club.update({ isActive: true }, { transaction: txn });
+          }
+
+          await tm.update({ clubId: club.id }, { transaction: txn });
+          if (created) summary.clubs++;
+
+          // ── Enroll club in competition for this season ──
+          await ClubCompetition.findOrCreate({
+            where: { clubId: club.id, competitionId: competition.id, season },
+            defaults: {
+              clubId: club.id,
+              competitionId: competition.id,
+              season,
+            },
+            transaction: txn,
+          });
+        }
+      }
+
+      // ── Import matches (with deduplication + player auto-linking) ──
+      if (importTypes.includes("matches")) {
+        const fixtures = await SaffFixture.findAll({
+          where: { tournamentId: tournament.id, season, matchId: null },
+          transaction: txn,
+        });
+
+        for (const fixture of fixtures) {
+          const homeMap = await SaffTeamMap.findOne({
+            where: { saffTeamId: fixture.saffHomeTeamId, season },
+            transaction: txn,
+          });
+          const awayMap = await SaffTeamMap.findOne({
+            where: { saffTeamId: fixture.saffAwayTeamId, season },
+            transaction: txn,
+          });
+
+          if (!homeMap?.clubId || !awayMap?.clubId) continue;
+
           // Check for existing match to prevent duplicates
           const existingMatch = await Match.findOne({
             where: {
@@ -825,26 +934,40 @@ export async function importToSadara(input: ImportRequest) {
               matchDate: fixture.matchDate,
               season,
             },
+            transaction: txn,
           });
 
+          let matchId: string;
+
           if (existingMatch) {
-            // Link fixture to existing match
-            await fixture.update({ matchId: existingMatch.id });
+            matchId = existingMatch.id;
+            await fixture.update({ matchId }, { transaction: txn });
             // Update score if SAFF has one and existing match doesn't
             if (
               fixture.homeScore !== null &&
               existingMatch.homeScore === null
             ) {
-              await existingMatch.update({
-                homeScore: fixture.homeScore,
-                awayScore: fixture.awayScore,
-                status: "completed",
-              });
+              await existingMatch.update(
+                {
+                  homeScore: fixture.homeScore,
+                  awayScore: fixture.awayScore,
+                  status: "completed",
+                },
+                { transaction: txn },
+              );
+            }
+            // Link to competition if not already linked
+            if (!existingMatch.competitionId && competition) {
+              await existingMatch.update(
+                { competitionId: competition.id },
+                { transaction: txn },
+              );
             }
           } else {
             const match = await Match.create({
               homeClubId: homeMap.clubId,
               awayClubId: awayMap.clubId,
+              competitionId: competition.id,
               competition: tournament.name,
               season,
               matchDate: fixture.matchDate,
@@ -855,11 +978,69 @@ export async function importToSadara(input: ImportRequest) {
               createdBy: "system",
             } as any);
 
-            await fixture.update({ matchId: match.id });
+            matchId = match.id;
+            await fixture.update({ matchId }, { transaction: txn });
             summary.matches++;
+          }
+
+          // ── Auto-link managed players to this match ──
+          const today = new Date().toISOString().split("T")[0];
+          const clubIds = [homeMap.clubId, awayMap.clubId];
+
+          const managedPlayers = await Player.findAll({
+            where: {
+              currentClubId: { [Op.in]: clubIds },
+              status: "active",
+            },
+            include: [
+              {
+                model: Contract,
+                as: "contracts",
+                where: {
+                  status: "Active",
+                  endDate: { [Op.gte]: today },
+                },
+                required: true,
+                attributes: ["id"],
+              },
+            ],
+            attributes: ["id", "currentClubId"],
+            transaction: txn,
+          });
+
+          for (const player of managedPlayers) {
+            const [, created] = await MatchPlayer.findOrCreate({
+              where: { matchId, playerId: player.id },
+              defaults: {
+                matchId,
+                playerId: player.id,
+                availability: "not_called",
+              },
+              transaction: txn,
+            });
+            if (created) summary.playersLinked++;
+          }
+
+          // Enroll both clubs in competition
+          for (const clubId of clubIds) {
+            await ClubCompetition.findOrCreate({
+              where: { clubId, competitionId: competition.id, season },
+              defaults: { clubId, competitionId: competition.id, season },
+              transaction: txn,
+            });
           }
         }
       }
+
+      await txn.commit();
+    } catch (error: unknown) {
+      await txn.rollback();
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(
+        `[SAFF Import] Failed for tournament ${tournament.name}: ${msg}`,
+      );
+      summary.errors.push(`${tournament.name}: ${msg}`);
+      // Continue to next tournament instead of throwing
     }
   }
 
@@ -870,11 +1051,17 @@ export async function importToSadara(input: ImportRequest) {
 // FETCH TEAM LOGOS
 // ══════════════════════════════════════════
 
-export async function fetchTeamLogos(season: string) {
-  // Get all team maps that don't have a logo yet
-  const teamMaps = await SaffTeamMap.findAll({
-    where: { season, logoUrl: null },
-  });
+export async function fetchTeamLogos(season: string, force = false) {
+  // Build filter: missing logos, OR logos pointing to the generic SAFF site logo
+  const where: any = { season };
+  if (!force) {
+    where[Op.or] = [
+      { logoUrl: null },
+      { logoUrl: { [Op.like]: "%/assets/images/logo%" } }, // bad generic SAFF logo
+    ];
+  }
+
+  const teamMaps = await SaffTeamMap.findAll({ where });
 
   if (teamMaps.length === 0) return { fetched: 0 };
 
@@ -886,10 +1073,13 @@ export async function fetchTeamLogos(season: string) {
     const logo = logos.get(tm.saffTeamId);
     if (logo) {
       await tm.update({ logoUrl: logo });
-      // Also update the linked club's logo if it exists and has no logo
+      // Also update the linked club's logo if it has no logo or a bad one
       if (tm.clubId) {
         const club = await Club.findByPk(tm.clubId);
-        if (club && !club.logoUrl) {
+        if (
+          club &&
+          (!club.logoUrl || club.logoUrl.includes("/assets/images/logo"))
+        ) {
           await club.update({ logoUrl: logo });
         }
       }
@@ -921,4 +1111,298 @@ export async function getStats() {
     teamMaps,
     unmappedTeams: unmapped,
   };
+}
+
+// ══════════════════════════════════════════
+// PLAYER-CENTRIC QUERIES
+// ══════════════════════════════════════════
+
+/**
+ * Get upcoming SAFF fixtures that involve clubs where Sadara-managed players
+ * (with active contracts) are currently playing.
+ */
+export async function getPlayerUpcomingMatches(
+  season: string,
+  limit: number = 20,
+) {
+  const today = new Date().toISOString().split("T")[0];
+
+  // Find club IDs where Sadara has managed players
+  const managedPlayers = await Player.findAll({
+    where: { status: "active" },
+    include: [
+      {
+        model: Contract,
+        as: "contracts",
+        where: { status: "Active", endDate: { [Op.gte]: today } },
+        required: true,
+        attributes: ["id"],
+      },
+    ],
+    attributes: [
+      "id",
+      "firstName",
+      "lastName",
+      "firstNameAr",
+      "lastNameAr",
+      "currentClubId",
+      "position",
+    ],
+    raw: false,
+  });
+
+  if (!managedPlayers.length) return { fixtures: [], players: [] };
+
+  // Group players by clubId
+  const playersByClub = new Map<string, typeof managedPlayers>();
+  const clubIds = new Set<string>();
+
+  for (const p of managedPlayers) {
+    if (!p.currentClubId) continue;
+    clubIds.add(p.currentClubId);
+    const existing = playersByClub.get(p.currentClubId) || [];
+    existing.push(p);
+    playersByClub.set(p.currentClubId, existing);
+  }
+
+  if (!clubIds.size) return { fixtures: [], players: [] };
+
+  // Find upcoming fixtures where either club has managed players
+  const fixtures = await SaffFixture.findAll({
+    where: {
+      season,
+      status: "upcoming",
+      matchDate: { [Op.gte]: today },
+      [Op.or]: [
+        { homeClubId: { [Op.in]: [...clubIds] } },
+        { awayClubId: { [Op.in]: [...clubIds] } },
+      ],
+    },
+    include: [
+      {
+        model: SaffTournament,
+        as: "tournament",
+        attributes: ["id", "saffId", "name", "nameAr", "category", "tier"],
+      },
+    ],
+    order: [
+      ["matchDate", "ASC"],
+      ["matchTime", "ASC"],
+    ],
+    limit,
+  });
+
+  // Enrich each fixture with the managed players involved
+  const enriched = fixtures.map((f) => {
+    const homePlayers = f.homeClubId
+      ? playersByClub.get(f.homeClubId) || []
+      : [];
+    const awayPlayers = f.awayClubId
+      ? playersByClub.get(f.awayClubId) || []
+      : [];
+
+    return {
+      ...f.toJSON(),
+      managedPlayers: {
+        home: homePlayers.map((p) => ({
+          id: p.id,
+          name: `${p.firstName} ${p.lastName}`,
+          nameAr:
+            p.firstNameAr && p.lastNameAr
+              ? `${p.firstNameAr} ${p.lastNameAr}`
+              : null,
+          position: p.position,
+        })),
+        away: awayPlayers.map((p) => ({
+          id: p.id,
+          name: `${p.firstName} ${p.lastName}`,
+          nameAr:
+            p.firstNameAr && p.lastNameAr
+              ? `${p.firstNameAr} ${p.lastNameAr}`
+              : null,
+          position: p.position,
+        })),
+      },
+    };
+  });
+
+  return { fixtures: enriched, totalPlayers: managedPlayers.length };
+}
+
+/**
+ * For a given player, return their club's standings in all SAFF tournaments
+ * for the current season.
+ */
+export async function getPlayerCompetitionStats(
+  playerId: string,
+  season: string,
+) {
+  const player = await Player.findByPk(playerId, {
+    attributes: [
+      "id",
+      "firstName",
+      "lastName",
+      "firstNameAr",
+      "lastNameAr",
+      "currentClubId",
+    ],
+  });
+  if (!player) throw new AppError("Player not found", 404);
+  if (!player.currentClubId)
+    return { player: player.toJSON(), standings: [], matchCount: 0 };
+
+  // Find club's standings across all SAFF tournaments
+  const standings = await SaffStanding.findAll({
+    where: { clubId: player.currentClubId, season },
+    include: [
+      {
+        model: SaffTournament,
+        as: "tournament",
+        attributes: [
+          "id",
+          "saffId",
+          "name",
+          "nameAr",
+          "category",
+          "tier",
+          "agencyValue",
+        ],
+      },
+    ],
+    order: [[{ model: SaffTournament, as: "tournament" }, "tier", "ASC"]],
+  });
+
+  // Count matches imported for this club
+  const matchCount = await Match.count({
+    where: {
+      season,
+      [Op.or]: [
+        { homeClubId: player.currentClubId },
+        { awayClubId: player.currentClubId },
+      ],
+    },
+  });
+
+  return {
+    player: player.toJSON(),
+    standings: standings.map((s) => s.toJSON()),
+    matchCount,
+  };
+}
+
+/**
+ * Find upcoming SAFF fixtures where either club name matches a scouting
+ * Watchlist prospect's currentClub. Returns fixtures tagged with watchlist entries.
+ */
+export async function getWatchlistMatches(season: string, limit: number = 20) {
+  const today = new Date().toISOString().split("T")[0];
+
+  // Get active watchlist prospects with known clubs
+  const prospects = await Watchlist.findAll({
+    where: {
+      status: { [Op.in]: ["Active", "Shortlisted"] },
+      currentClub: { [Op.ne]: null },
+    },
+    attributes: [
+      "id",
+      "prospectName",
+      "prospectNameAr",
+      "currentClub",
+      "position",
+      "priority",
+    ],
+  });
+
+  if (!prospects.length) return { fixtures: [], prospects: [] };
+
+  // Map prospect club names to find matching SAFF team maps
+  const clubNames = [
+    ...new Set(prospects.map((p) => p.currentClub).filter(Boolean)),
+  ] as string[];
+
+  const teamMaps = await SaffTeamMap.findAll({
+    where: {
+      season,
+      clubId: { [Op.ne]: null as any },
+      [Op.or]: [
+        { teamNameEn: { [Op.in]: clubNames } },
+        { teamNameAr: { [Op.in]: clubNames } },
+      ],
+    } as any,
+  });
+
+  if (!teamMaps.length)
+    return { fixtures: [], prospects: prospects.map((p) => p.toJSON()) };
+
+  const clubIds = new Set(
+    teamMaps.map((tm) => tm.clubId).filter(Boolean) as string[],
+  );
+
+  // Build a map from clubId → prospects at that club
+  const clubToName = new Map<string, string[]>();
+  for (const tm of teamMaps) {
+    if (tm.clubId) {
+      clubToName.set(tm.clubId, [tm.teamNameEn, tm.teamNameAr]);
+    }
+  }
+
+  const prospectsByClubName = new Map<string, typeof prospects>();
+  for (const p of prospects) {
+    if (!p.currentClub) continue;
+    const existing = prospectsByClubName.get(p.currentClub) || [];
+    existing.push(p);
+    prospectsByClubName.set(p.currentClub, existing);
+  }
+
+  // Find upcoming fixtures involving those clubs
+  const fixtures = await SaffFixture.findAll({
+    where: {
+      season,
+      status: "upcoming",
+      matchDate: { [Op.gte]: today },
+      [Op.or]: [
+        { homeClubId: { [Op.in]: [...clubIds] } },
+        { awayClubId: { [Op.in]: [...clubIds] } },
+      ],
+    },
+    include: [
+      {
+        model: SaffTournament,
+        as: "tournament",
+        attributes: ["id", "saffId", "name", "nameAr", "category", "tier"],
+      },
+    ],
+    order: [["matchDate", "ASC"]],
+    limit,
+  });
+
+  // Enrich with watchlist prospect info
+  const enriched = fixtures.map((f) => {
+    const getProspectsForClub = (clubId: string | null) => {
+      if (!clubId) return [];
+      const names = clubToName.get(clubId) || [];
+      const matched: typeof prospects = [];
+      for (const name of names) {
+        const ps = prospectsByClubName.get(name) || [];
+        matched.push(...ps);
+      }
+      return matched.map((p) => ({
+        id: p.id,
+        name: p.prospectName,
+        nameAr: p.prospectNameAr,
+        position: p.position,
+        priority: p.priority,
+      }));
+    };
+
+    return {
+      ...f.toJSON(),
+      watchlistProspects: {
+        home: getProspectsForClub(f.homeClubId),
+        away: getProspectsForClub(f.awayClubId),
+      },
+    };
+  });
+
+  return { fixtures: enriched };
 }

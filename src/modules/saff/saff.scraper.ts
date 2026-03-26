@@ -4,7 +4,7 @@ import * as iconv from "iconv-lite";
 import { logger } from "@config/logger";
 
 const BASE_URL_EN = "https://www.saff.com.sa/en";
-const BASE_URL_AR = "https://www.saff.com.sa/ar";
+const BASE_URL_AR = "https://www.saff.com.sa"; // Root path serves Arabic content; /ar/ returns 404
 const REQUEST_DELAY = 1500; // ms between requests to be respectful
 
 // Standard browser UA — SAFF's WAF rejects non-browser User-Agents
@@ -450,28 +450,23 @@ export async function scrapeTeamLogo(
     const url = `${BASE_URL_EN}/team.php?id=${saffTeamId}`;
     const $ = await fetchPage(url, "en");
 
-    // Look for team logo image - check common patterns on SAFF team pages
-    let logoImg = $('img[src*="logo"]').first();
-    if (!logoImg.length) logoImg = $('img[src*="team"]').first();
+    // SAFF team logos live in /uploadcenter/ with filenames like
+    // saffteamlarge75SGm1747742996.png or saffteamsmall1661266882.png
+    // Prefer the large variant; fall back to small.
+    let logoImg = $('img[src*="saffteamlarge"]').first();
+    if (!logoImg.length) logoImg = $('img[src*="saffteamsmall"]').first();
+    // Broader fallback: any image from uploadcenter that isn't news/article
     if (!logoImg.length)
-      logoImg = $(
-        ".team-logo img, .team-header img, .club-logo img, .team-img img",
-      ).first();
-    // Fallback: first large image in the profile/header area
-    if (!logoImg.length)
-      logoImg = $("img[width]")
-        .filter((_, el) => {
-          const w = parseInt($(el).attr("width") || "0", 10);
-          return w >= 50 && w <= 200;
-        })
-        .first();
+      logoImg = $('img[src*="uploadcenter/saffteam"]').first();
 
     let src = logoImg.attr("src");
     if (!src) return null;
 
-    // Make absolute URL
+    // Make absolute URL — src is typically "../uploadcenter/filename.png"
     if (!src.startsWith("http")) {
-      src = `https://www.saff.com.sa${src.startsWith("/") ? "" : "/"}${src}`;
+      // Strip leading ../ segments and build absolute URL
+      const cleanPath = src.replace(/^(\.\.\/)+/, "");
+      src = `https://www.saff.com.sa/${cleanPath}`;
     }
     return src;
   } catch {
@@ -491,8 +486,9 @@ export async function scrapeTeamLogos(
     try {
       const logo = await scrapeTeamLogo(id);
       if (logo) logos.set(id, logo);
-    } catch {
-      // Skip failed logos silently
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.warn(`[SAFF Scraper] Failed to fetch logo for team ${id}: ${msg}`);
     }
 
     // Respectful delay

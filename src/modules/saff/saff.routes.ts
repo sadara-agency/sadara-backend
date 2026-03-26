@@ -103,4 +103,23 @@ router.post(
   asyncHandler(saffController.triggerSync),
 );
 
+// ── Player-centric endpoints ──
+router.get(
+  "/player-matches",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getPlayerUpcomingMatches),
+);
+
+router.get(
+  "/player-stats/:playerId",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getPlayerCompetitionStats),
+);
+
+router.get(
+  "/watchlist-matches",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getWatchlistMatches),
+);
+
 export default router;

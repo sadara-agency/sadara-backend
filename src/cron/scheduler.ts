@@ -738,6 +738,32 @@ async function checkDocumentExpiry() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// JOB: Match Status Auto-Transition
+// ══════════════════════════════════════════════════════════════
+
+async function autoTransitionMatchStatuses() {
+  // Mark "upcoming" matches whose date has passed as "completed"
+  const [, updated] = await sequelize.query(
+    `
+    UPDATE matches
+    SET status = 'completed', updated_at = NOW()
+    WHERE status = 'upcoming'
+      AND match_date::date < CURRENT_DATE
+    `,
+    { type: QueryTypes.RAW },
+  );
+
+  const count = (updated as any)?.rowCount ?? 0;
+  if (count > 0) {
+    logger.info(
+      `[Cron] Auto-transitioned ${count} past matches from "upcoming" → "completed"`,
+    );
+  }
+
+  return { transitioned: count };
+}
+
+// ══════════════════════════════════════════════════════════════
 // JOB 5: Upcoming Match Prep
 // ══════════════════════════════════════════════════════════════
 
@@ -827,6 +853,7 @@ async function cleanup() {
 // REGISTER ALL JOBS
 // ══════════════════════════════════════════════════════════════
 
+registerJob("match-status-auto-transition", autoTransitionMatchStatuses);
 registerJob("upcoming-matches", checkUpcomingMatches);
 registerJob("contract-status", updateContractStatuses);
 registerJob("contract-expiry", checkContractExpiry);
@@ -995,6 +1022,8 @@ export async function startCronJobs() {
   schedule("20 5 * * *", "esignature-expire-overdue"); // 5:20 AM  (was 7:00)
   schedule("30 5 * * *", "stale-task-escalator"); // 5:30 AM  (was 7:45)
   schedule("40 5 * * *", "document-expiry"); // 5:40 AM  (was 9:30)
+
+  schedule("50 5 * * *", "match-status-auto-transition"); // 5:50 AM — mark past "upcoming" matches as "completed"
 
   // ── Morning batch 1: player & contract intelligence (6:00–6:50 AM) ──
   schedule("0 6 * * *", "upcoming-matches"); // 6:00 AM  (was 7:00)

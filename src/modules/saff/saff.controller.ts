@@ -11,15 +11,24 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AuthRequest } from "@shared/types";
 import * as saffService from "@modules/saff/saff.service";
+import { getCurrentSeason } from "@modules/saff/saff.service";
 import {
   getSyncStatus as getSchedulerStatus,
   runSync,
 } from "@modules/saff/saff.scheduler";
+import type {
+  TournamentQuery,
+  StandingQuery,
+  FixtureQuery,
+  TeamMapQuery,
+} from "@modules/saff/saff.schema";
 
 // ── Tournaments ──
 
 export async function listTournaments(req: AuthRequest, res: Response) {
-  const result = await saffService.listTournaments(req.query as any);
+  const result = await saffService.listTournaments(
+    req.query as unknown as TournamentQuery,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 
@@ -52,21 +61,27 @@ export async function fetchFromSaff(req: AuthRequest, res: Response) {
 // ── Standings ──
 
 export async function listStandings(req: AuthRequest, res: Response) {
-  const result = await saffService.listStandings(req.query as any);
+  const result = await saffService.listStandings(
+    req.query as unknown as StandingQuery,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 
 // ── Fixtures ──
 
 export async function listFixtures(req: AuthRequest, res: Response) {
-  const result = await saffService.listFixtures(req.query as any);
+  const result = await saffService.listFixtures(
+    req.query as unknown as FixtureQuery,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 
 // ── Team Maps ──
 
 export async function listTeamMaps(req: AuthRequest, res: Response) {
-  const result = await saffService.listTeamMaps(req.query as any);
+  const result = await saffService.listTeamMaps(
+    req.query as unknown as TeamMapQuery,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 
@@ -91,7 +106,7 @@ export async function importToSadara(req: AuthRequest, res: Response) {
     "clubs",
     null,
     buildAuditContext(req.user!, req.ip),
-    `SAFF import: ${result.clubs} clubs, ${result.matches} matches`,
+    `SAFF import: ${result.clubs} clubs, ${result.matches} matches, ${result.playersLinked} players linked`,
   );
   sendSuccess(res, { imported: result }, "Import completed");
 }
@@ -99,7 +114,7 @@ export async function importToSadara(req: AuthRequest, res: Response) {
 // ── Fetch Team Logos ──
 
 export async function fetchTeamLogos(req: AuthRequest, res: Response) {
-  const { season = "2025-2026" } = req.body;
+  const { season = getCurrentSeason() } = req.body;
   const result = await saffService.fetchTeamLogos(season);
   await logAudit(
     "UPDATE",
@@ -126,11 +141,40 @@ export async function getSyncStatus(req: AuthRequest, res: Response) {
 }
 
 export async function triggerSync(req: AuthRequest, res: Response) {
-  const { agencyValues = ["Critical", "High"], season = "2025-2026" } =
+  const { agencyValues = ["Critical", "High"], season = getCurrentSeason() } =
     req.body;
 
   // Run in background — don't await
   runSync(agencyValues, season, `manual:${req.user!.email}`);
 
   sendSuccess(res, { agencyValues, season }, "Sync triggered in background");
+}
+
+// ── Player-centric endpoints ──
+
+export async function getPlayerUpcomingMatches(
+  req: AuthRequest,
+  res: Response,
+) {
+  const season = (req.query.season as string) || getCurrentSeason();
+  const limit = parseInt(req.query.limit as string, 10) || 20;
+  const result = await saffService.getPlayerUpcomingMatches(season, limit);
+  sendSuccess(res, result);
+}
+
+export async function getPlayerCompetitionStats(
+  req: AuthRequest,
+  res: Response,
+) {
+  const { playerId } = req.params;
+  const season = (req.query.season as string) || getCurrentSeason();
+  const result = await saffService.getPlayerCompetitionStats(playerId, season);
+  sendSuccess(res, result);
+}
+
+export async function getWatchlistMatches(req: AuthRequest, res: Response) {
+  const season = (req.query.season as string) || getCurrentSeason();
+  const limit = parseInt(req.query.limit as string, 10) || 20;
+  const result = await saffService.getWatchlistMatches(season, limit);
+  sendSuccess(res, result);
 }
