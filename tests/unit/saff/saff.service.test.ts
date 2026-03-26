@@ -27,7 +27,11 @@ const mockClubFindByPk = jest.fn();
 const mockClubFindOrCreate = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { query: jest.fn(), authenticate: jest.fn(), transaction: jest.fn() },
+  sequelize: {
+    query: jest.fn(),
+    authenticate: jest.fn(),
+    transaction: jest.fn().mockResolvedValue({ commit: jest.fn(), rollback: jest.fn() }),
+  },
 }));
 
 jest.mock('../../../src/modules/saff/saff.model', () => ({
