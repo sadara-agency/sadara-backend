@@ -11,9 +11,7 @@
 import { QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
-import {
-  notifyUser,
-} from "@modules/notifications/notification.service";
+import { notifyUser } from "@modules/notifications/notification.service";
 import { createAutoTaskIfNotExists, cfg } from "@shared/utils/autoTaskHelpers";
 
 import {
@@ -47,9 +45,10 @@ export async function aggregateDailySummaries(): Promise<{
   // Get all players with wellness profiles
   const players: any[] = await sequelize.query(
     `SELECT wp.player_id, wp.target_calories, wp.target_protein_g,
-            p.first_name, p.last_name, p.user_id
+            p.first_name, p.last_name, u.id AS user_id
      FROM wellness_profiles wp
      JOIN players p ON p.id = wp.player_id
+     LEFT JOIN users u ON u.player_id = p.id
      WHERE p.status = 'active'`,
     { type: QueryTypes.SELECT },
   );
@@ -190,9 +189,10 @@ export async function checkWeightStale(): Promise<{ flagged: number }> {
 
   const stalePlayers: any[] = await sequelize.query(
     `SELECT wp.player_id, p.first_name, p.last_name,
-            p.first_name_ar, p.last_name_ar, p.user_id
+            p.first_name_ar, p.last_name_ar, u.id AS user_id
      FROM wellness_profiles wp
      JOIN players p ON p.id = wp.player_id
+     LEFT JOIN users u ON u.player_id = p.id
      WHERE p.status = 'active'
        AND NOT EXISTS (
          SELECT 1 FROM wellness_weight_logs wl
@@ -269,16 +269,17 @@ export async function checkUnderFueling(): Promise<{ flagged: number }> {
 
   const underFueled: any[] = await sequelize.query(
     `SELECT ds.player_id, p.first_name, p.last_name,
-            p.first_name_ar, p.last_name_ar, p.user_id,
+            p.first_name_ar, p.last_name_ar, u.id AS user_id,
             ROUND(AVG(ds.calorie_adherence_pct)) AS avg_adherence
      FROM wellness_daily_summaries ds
      JOIN players p ON p.id = ds.player_id
+     LEFT JOIN users u ON u.player_id = p.id
      WHERE ds.summary_date >= :cutoff
        AND ds.calorie_adherence_pct IS NOT NULL
        AND ds.calorie_adherence_pct < :threshold
        AND p.status = 'active'
      GROUP BY ds.player_id, p.first_name, p.last_name,
-              p.first_name_ar, p.last_name_ar, p.user_id
+              p.first_name_ar, p.last_name_ar, u.id
      HAVING COUNT(*) >= :days`,
     {
       replacements: {
@@ -351,10 +352,11 @@ export async function checkMissedWorkout(): Promise<{ notified: number }> {
 
   const pending: any[] = await sequelize.query(
     `SELECT wa.id, wa.player_id, p.first_name, p.last_name,
-            p.first_name_ar, p.last_name_ar, p.user_id,
+            p.first_name_ar, p.last_name_ar, u.id AS user_id,
             wt.name AS template_name, wt.name_ar AS template_name_ar
      FROM wellness_workout_assignments wa
      JOIN players p ON p.id = wa.player_id
+     LEFT JOIN users u ON u.player_id = p.id
      LEFT JOIN wellness_workout_templates wt ON wt.id = wa.template_id
      WHERE wa.assigned_date = :today
        AND wa.status = 'pending'
