@@ -1,6 +1,10 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
-import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import * as mediaKitService from "./mediaKit.service";
 
@@ -48,7 +52,7 @@ export async function generateSquadKit(req: AuthRequest, res: Response) {
 
 export async function listHistory(req: AuthRequest, res: Response) {
   const result = await mediaKitService.listGenerationHistory(req.query);
-  res.json({ success: true, data: result.data, meta: result.meta });
+  sendPaginated(res, result.data, result.meta);
 }
 
 // ── Get by ID ──

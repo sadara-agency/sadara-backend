@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
 import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import {
@@ -73,8 +74,7 @@ export async function login(req: Request, res: Response) {
 export async function refresh(req: Request, res: Response) {
   const rawToken = req.cookies?.[REFRESH_COOKIE_NAME];
   if (!rawToken) {
-    res.status(401).json({ success: false, message: "No refresh token" });
-    return;
+    throw new AppError("No refresh token", 401);
   }
 
   const result = await authService.refreshSession(rawToken);
