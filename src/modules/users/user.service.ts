@@ -16,8 +16,6 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { CreateUserInput, UpdateUserInput } from "@modules/users/user.schema";
-import { revokeAllUserTokens } from "@modules/auth/auth.service";
-import { sendCustomSSE } from "@modules/notifications/notification.sse";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {
@@ -266,6 +264,12 @@ export async function getActiveSessions() {
 // Force Logout (admin revokes all sessions for a user)
 // ────────────────────────────────────────────────────────────
 export async function forceLogout(targetId: string, adminId: string) {
+  // Lazy imports to avoid circular dependency chain
+  // (auth.service → playerAccount.model → sequelize.define at import time)
+  const { revokeAllUserTokens } = await import("@modules/auth/auth.service");
+  const { sendCustomSSE } =
+    await import("@modules/notifications/notification.sse");
+
   if (targetId === adminId) {
     throw new AppError("Cannot force-logout yourself", 400);
   }
