@@ -30,6 +30,11 @@ router.get(
   asyncHandler(userController.stats),
 );
 router.get(
+  "/active-sessions",
+  authorizeModule("users", "read"),
+  asyncHandler(userController.activeSessions),
+);
+router.get(
   "/",
   authorizeModule("users", "read"),
   validate(userQuerySchema, "query"),
@@ -59,6 +64,11 @@ router.post(
   authorizeModule("users", "update"),
   validate(resetPasswordSchema),
   asyncHandler(userController.resetPassword),
+);
+router.post(
+  "/:id/force-logout",
+  authorizeModule("users", "delete"),
+  asyncHandler(userController.forceLogout),
 );
 router.delete(
   "/:id",

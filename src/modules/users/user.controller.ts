@@ -95,3 +95,24 @@ export async function remove(req: AuthRequest, res: Response) {
 
   sendSuccess(res, result, "User deleted");
 }
+
+// ── Active Sessions ──
+export async function activeSessions(_req: AuthRequest, res: Response) {
+  const result = await userService.getActiveSessions();
+  sendSuccess(res, result);
+}
+
+// ── Force Logout ──
+export async function forceLogout(req: AuthRequest, res: Response) {
+  const result = await userService.forceLogout(req.params.id, req.user!.id);
+
+  await logAudit(
+    "FORCE_LOGOUT",
+    "users",
+    result.id,
+    buildAuditContext(req.user!, req.ip),
+    `Force logged out user: ${result.fullName}`,
+  );
+
+  sendSuccess(res, result, "User logged out");
+}
