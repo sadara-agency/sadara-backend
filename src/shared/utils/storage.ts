@@ -232,7 +232,16 @@ async function writeToStorage(
     });
 
     if (isPublic) {
-      await file.makePublic();
+      // Make object publicly readable (fine-grained ACL buckets).
+      // Fails silently on uniform bucket-level access buckets — those
+      // rely on bucket IAM (allUsers → Storage Object Viewer) instead.
+      try {
+        await file.makePublic();
+      } catch {
+        logger.debug(
+          `[storage] makePublic() skipped for ${key} (uniform bucket-level access)`,
+        );
+      }
       return `https://storage.googleapis.com/${env.gcs.bucket}/${key}`;
     }
 

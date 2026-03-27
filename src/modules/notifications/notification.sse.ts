@@ -252,6 +252,33 @@ export function handleSSEConnection(req: Request, res: Response): void {
   });
 }
 
+// ── Custom SSE Events (non-notification) ──
+
+/**
+ * Send a custom SSE event to a specific user (e.g. force_logout).
+ * Unlike publishNotification, this sends an arbitrary event type
+ * and does NOT go through Redis pub/sub — local connections only.
+ */
+export function sendCustomSSE(
+  userId: string,
+  event: string,
+  data: unknown,
+): void {
+  const userConns = connections.get(userId);
+  if (!userConns || userConns.size === 0) return;
+
+  for (const res of userConns) {
+    const ok = sendSSE(res, event, data);
+    if (!ok) {
+      userConns.delete(res);
+    }
+  }
+
+  if (userConns.size === 0) {
+    connections.delete(userId);
+  }
+}
+
 // ── Stats (for health check) ──
 
 export function getSSEStats(): {

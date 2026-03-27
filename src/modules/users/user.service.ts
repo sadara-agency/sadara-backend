@@ -6,7 +6,7 @@
 // login/register/profile for the authenticated user.
 // This module lets Admins manage ALL users in the system.
 // ─────────────────────────────────────────────────────────────
-import { Op, Sequelize } from "sequelize";
+import { Op, Sequelize, QueryTypes } from "sequelize";
 import bcrypt from "bcryptjs";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
@@ -210,4 +210,79 @@ export async function deleteUser(id: string, requesterId: string) {
 
   await user.destroy();
   return { id };
+}
+
+// ────────────────────────────────────────────────────────────
+// Active Sessions (who is online right now)
+// ────────────────────────────────────────────────────────────
+
+interface ActiveSessionRow {
+  id: string;
+  fullName: string;
+  fullNameAr: string | null;
+  email: string;
+  role: string;
+  avatarUrl: string | null;
+  lastLogin: string | null;
+  lastActivity: string;
+  sessionCount: string;
+}
+
+export async function getActiveSessions() {
+  const rows = await sequelize.query<ActiveSessionRow>(
+    `SELECT u.id, u.full_name AS "fullName", u.full_name_ar AS "fullNameAr",
+            u.email, u.role, u.avatar_url AS "avatarUrl",
+            u.last_login AS "lastLogin", u.last_activity AS "lastActivity",
+            COALESCE(rt.cnt, 0) AS "sessionCount"
+     FROM users u
+     LEFT JOIN (
+       SELECT user_id, COUNT(*) AS cnt
+       FROM refresh_tokens
+       WHERE revoked_at IS NULL AND expires_at > NOW() AND user_type = 'user'
+       GROUP BY user_id
+     ) rt ON rt.user_id::uuid = u.id
+     WHERE u.last_activity > NOW() - INTERVAL '30 minutes'
+       AND u.is_active = true
+     ORDER BY u.last_activity DESC`,
+    { type: QueryTypes.SELECT },
+  );
+
+  const TEN_MIN = 10 * 60 * 1000;
+
+  return rows.map((r) => {
+    const lastActivityMs = new Date(r.lastActivity).getTime();
+    const ago = Date.now() - lastActivityMs;
+    return {
+      ...r,
+      sessionCount: Number(r.sessionCount),
+      status: ago <= TEN_MIN ? ("online" as const) : ("idle" as const),
+    };
+  });
+}
+
+// ────────────────────────────────────────────────────────────
+// Force Logout (admin revokes all sessions for a user)
+// ────────────────────────────────────────────────────────────
+export async function forceLogout(targetId: string, adminId: string) {
+  // Lazy imports to avoid circular dependency chain
+  // (auth.service → playerAccount.model → sequelize.define at import time)
+  const { revokeAllUserTokens } = await import("@modules/auth/auth.service");
+  const { sendCustomSSE } =
+    await import("@modules/notifications/notification.sse");
+
+  if (targetId === adminId) {
+    throw new AppError("Cannot force-logout yourself", 400);
+  }
+
+  const user = await findOrThrow(User, targetId, "User");
+
+  // Revoke all refresh tokens
+  await revokeAllUserTokens(targetId, "user");
+
+  // Push immediate logout via SSE
+  sendCustomSSE(targetId, "force_logout", {
+    message: "You have been logged out by an administrator",
+  });
+
+  return { id: user.id, fullName: (user as any).fullName };
 }
