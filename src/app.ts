@@ -107,9 +107,8 @@ app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
-// Rate limiting
+// Rate limiting (auth-specific limits are applied per-route in auth.routes.ts)
 app.use("/api/v1", apiLimiter);
-app.use("/api/v1/auth", authLimiter);
 
 // ── Local file serving (fallback when GCS is not configured) ──
 // When GCS is active, files are served directly from storage.googleapis.com.

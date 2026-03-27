@@ -44,7 +44,9 @@ router.post(
 );
 
 // ── Refresh Token ──
-router.post("/refresh", authLimiter, asyncHandler(authController.refresh));
+// No authLimiter here — refresh is automated (page load, tab focus) and
+// shouldn't eat into the login attempt budget. apiLimiter still applies.
+router.post("/refresh", asyncHandler(authController.refresh));
 
 // ── Logout ──
 router.post("/logout", authenticate, asyncHandler(authController.logout));
