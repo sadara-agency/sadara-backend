@@ -240,7 +240,7 @@ export async function getActiveSessions() {
        FROM refresh_tokens
        WHERE revoked_at IS NULL AND expires_at > NOW() AND user_type = 'user'
        GROUP BY user_id
-     ) rt ON rt.user_id = u.id::text
+     ) rt ON rt.user_id::uuid = u.id
      WHERE u.last_activity > NOW() - INTERVAL '30 minutes'
        AND u.is_active = true
      ORDER BY u.last_activity DESC`,
