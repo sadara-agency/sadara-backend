@@ -55,13 +55,13 @@ export async function up() {
   // Previously /dashboard/users was gated by "settings" which all roles could read.
   // Admin gets full CRUD, Manager gets read-only.
   await sequelize.query(`
-    INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete)
+    INSERT INTO role_permissions (id, role, module, can_create, can_read, can_update, can_delete, created_at, updated_at)
     VALUES
-      ('Admin',   'users', true,  true,  true,  true),
-      ('Manager', 'users', false, true,  false, false),
+      (gen_random_uuid(), 'Admin',   'users', true,  true,  true,  true,  NOW(), NOW()),
+      (gen_random_uuid(), 'Manager', 'users', false, true,  false, false, NOW(), NOW()),
       -- Sportmonks: data ingestion tool, Admin/Manager only
-      ('Admin',   'sportmonks', true,  true,  true,  false),
-      ('Manager', 'sportmonks', false, true,  false, false)
+      (gen_random_uuid(), 'Admin',   'sportmonks', true,  true,  true,  false, NOW(), NOW()),
+      (gen_random_uuid(), 'Manager', 'sportmonks', false, true,  false, false, NOW(), NOW())
     ON CONFLICT (role, module) DO UPDATE SET
       can_create = EXCLUDED.can_create,
       can_read   = EXCLUDED.can_read,
