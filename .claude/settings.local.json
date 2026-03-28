@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx jest:*)",
+      "Bash(grep -E \"\\(app|routes|index\\)\\\\.ts$\")",
+      "Bash(find /e/Sadara/Code/backend/src/modules -type f -name *.validation.ts)",
+      "Bash(find /e/Sadara/Code/backend/src/modules -type f \\\\\\(-name *.schema.ts -o -name *.validation.ts \\\\\\))"
+    ]
+  }
+}

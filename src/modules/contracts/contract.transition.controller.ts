@@ -195,6 +195,7 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       entityType: "contract",
       entityId: id,
       entityTitle: `Contract: ${contract.title || `#${id.slice(0, 8)}`}`,
+      entityTitleAr: `عقد: ${contract.title || `#${id.slice(0, 8)}`}`,
       action: "review",
       requestedBy: req.user!.id,
       assignedRole: "Manager",

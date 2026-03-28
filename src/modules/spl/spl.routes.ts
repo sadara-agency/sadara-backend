@@ -11,6 +11,7 @@ import {
   syncTeamSchema,
   syncAllSchema,
   seedClubIdsSchema,
+  syncDetailedStatsSchema,
 } from "@modules/spl/spl.schema";
 import * as c from "@modules/spl/spl.controller";
 
@@ -27,6 +28,28 @@ router.get(
   "/sync-status",
   authorizeModule("spl-sync", "read"),
   asyncHandler(c.getStatus),
+);
+
+// PulseLive data (read-only)
+router.get(
+  "/standings",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(c.standings),
+);
+router.get(
+  "/leaderboard/:stat",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(c.leaderboard),
+);
+router.get(
+  "/players/:id/detailed-stats",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(c.playerDetailedStats),
+);
+router.get(
+  "/team-stats/:teamId",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(c.teamStats),
 );
 
 // Sync operations
@@ -47,6 +70,14 @@ router.post(
   authorizeModule("spl-sync", "create"),
   validate(syncAllSchema),
   asyncHandler(c.syncAll),
+);
+
+// PulseLive sync
+router.post(
+  "/sync/detailed-stats",
+  authorizeModule("spl-sync", "create"),
+  validate(syncDetailedStatsSchema),
+  asyncHandler(c.syncDetailedStats),
 );
 
 // Seed

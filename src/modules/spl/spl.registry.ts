@@ -13,6 +13,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Nassr",
     nameAr: "النصر",
     city: "Riyadh",
+    pulseLiveTeamId: 3503,
   },
   {
     splTeamId: "3095",
@@ -21,6 +22,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Hilal",
     nameAr: "الهلال",
     city: "Riyadh",
+    pulseLiveTeamId: 3505,
   },
   {
     splTeamId: "3097",
@@ -29,6 +31,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Ahli",
     nameAr: "الأهلي",
     city: "Jeddah",
+    pulseLiveTeamId: 3507,
   },
   {
     splTeamId: "3081",
@@ -37,6 +40,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Ittihad",
     nameAr: "الاتحاد",
     city: "Jeddah",
+    pulseLiveTeamId: 3492,
   },
   {
     splTeamId: "3094",
@@ -45,6 +49,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Shabab",
     nameAr: "الشباب",
     city: "Riyadh",
+    pulseLiveTeamId: 3494,
   },
   {
     splTeamId: "3087",
@@ -53,6 +58,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Taawoun",
     nameAr: "التعاون",
     city: "Buraidah",
+    pulseLiveTeamId: 3499,
   },
   {
     splTeamId: "3089",
@@ -61,6 +67,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Qadsiah",
     nameAr: "القادسية",
     city: "Khobar",
+    pulseLiveTeamId: 3513,
   },
   {
     splTeamId: "3090",
@@ -69,6 +76,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Raed",
     nameAr: "الرائد",
     city: "Buraidah",
+    pulseLiveTeamId: 3500,
   },
   {
     splTeamId: "3096",
@@ -77,6 +85,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Fayha",
     nameAr: "الفيحاء",
     city: "Al Majmaah",
+    pulseLiveTeamId: 3496,
   },
   {
     splTeamId: "3086",
@@ -85,6 +94,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Ettifaq",
     nameAr: "الاتفاق",
     city: "Dammam",
+    pulseLiveTeamId: 3491,
   },
   {
     splTeamId: "3082",
@@ -93,6 +103,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Fateh",
     nameAr: "الفتح",
     city: "Al-Hasa",
+    pulseLiveTeamId: 3490,
   },
   {
     splTeamId: "3088",
@@ -101,6 +112,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Riyadh",
     nameAr: "الرياض",
     city: "Riyadh",
+    pulseLiveTeamId: 3500,
   },
   {
     splTeamId: "3098",
@@ -109,6 +121,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Khaleej",
     nameAr: "الخليج",
     city: "Saihat",
+    pulseLiveTeamId: 3498,
   },
   {
     splTeamId: "3084",
@@ -117,6 +130,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Kholood",
     nameAr: "الخلود",
     city: "Al-Hasa",
+    pulseLiveTeamId: 3521,
   },
   {
     splTeamId: "3083",
@@ -125,6 +139,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Okhdood",
     nameAr: "الأخدود",
     city: "Najran",
+    pulseLiveTeamId: 3493,
   },
   {
     splTeamId: "3099",
@@ -133,6 +148,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Hazem",
     nameAr: "الحزم",
     city: "Ar Rass",
+    pulseLiveTeamId: 3497,
   },
   {
     splTeamId: "3091",
@@ -149,6 +165,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Najma",
     nameAr: "النجمة",
     city: "Unaizah",
+    pulseLiveTeamId: 3522,
   },
 ];
 
@@ -161,4 +178,10 @@ export function findRegistryEntry(
       ? c.nameEn.toLowerCase() === value.toLowerCase()
       : c[key] === value,
   );
+}
+
+export function findByPulseLiveTeamId(
+  pulseLiveTeamId: number,
+): SplClubEntry | undefined {
+  return SPL_CLUB_REGISTRY.find((c) => c.pulseLiveTeamId === pulseLiveTeamId);
 }

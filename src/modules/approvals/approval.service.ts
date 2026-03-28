@@ -29,6 +29,7 @@ interface CreateApprovalInput {
   entityType: string;
   entityId: string;
   entityTitle: string;
+  entityTitleAr?: string;
   action: string;
   requestedBy: string;
   assignedTo?: string;
@@ -63,7 +64,7 @@ export async function createApprovalRequest(input: CreateApprovalInput) {
     const notifPayload = {
       type: "system" as const,
       title: `Approval needed: ${input.entityTitle}`,
-      titleAr: `مطلوب موافقة: ${input.entityTitle}`,
+      titleAr: `مطلوب موافقة: ${input.entityTitleAr || input.entityTitle}`,
       body: `Action: ${input.action}`,
       bodyAr: `الإجراء: ${input.action}`,
       link: "/dashboard/approvals",

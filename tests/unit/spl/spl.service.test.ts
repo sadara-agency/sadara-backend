@@ -31,6 +31,14 @@ jest.mock('../../../src/modules/spl/spl.registry', () => ({
     { nameEn: 'Al Hilal', nameAr: 'الهلال', splTeamId: '1', espnTeamId: '100' },
     { nameEn: 'Al Nassr', nameAr: 'النصر', splTeamId: '2', espnTeamId: '200' },
   ],
+  findByPulseLiveTeamId: jest.fn(),
+}));
+
+jest.mock('../../../src/modules/spl/spl.pulselive', () => ({
+  fetchStandings: jest.fn(),
+  fetchRankedPlayers: jest.fn(),
+  fetchPlayerStats: jest.fn(),
+  fetchTeamStats: jest.fn(),
 }));
 
 jest.mock('../../../src/config/logger', () => ({

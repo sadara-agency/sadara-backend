@@ -19,7 +19,8 @@
       "@config/*": ["config/*"],
       "@middleware/*": ["middleware/*"],
       "@modules/*": ["modules/*"],
-      "@shared/*": ["shared/*"]
+      "@shared/*": ["shared/*"],
+      "@cron/*": ["cron/*"]
     }
   },
   "include": [

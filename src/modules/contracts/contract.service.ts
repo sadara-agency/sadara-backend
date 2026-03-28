@@ -20,6 +20,7 @@ import {
   UpdateContractInput,
 } from "@modules/contracts/contract.schema";
 import { generateContractCreationTask } from "@modules/contracts/contractAutoTasks";
+import { isApprovalChainResolved } from "@modules/approvals/approval.service";
 import { logger } from "@config/logger";
 import { AuthUser } from "@shared/types";
 import {
@@ -146,7 +147,10 @@ export async function getContractById(id: string, user?: AuthUser) {
     // milestones/commission_schedules tables may not exist yet
   }
 
-  return { ...enriched, milestones };
+  // Include approval chain status for UI visibility decisions
+  const approvalChain = await isApprovalChainResolved("contract", id);
+
+  return { ...enriched, milestones, approvalStatus: approvalChain.status };
 }
 
 // ────────────────────────────────────────────────────────────

@@ -89,6 +89,12 @@ import {
   checkCalendarReminders,
   syncAutoCalendarEvents,
 } from "@modules/calendar/calendarAutoTasks";
+import {
+  analyzeLeagueIntelligence,
+  refreshTrackedPlayers,
+  syncCompetitionData,
+  cleanupExpiredInsights,
+} from "./engines/spl.intelligence.engine";
 // E-signature expiry is lazy-loaded to avoid model init in test context
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
 
@@ -950,6 +956,12 @@ registerJob("wellness-weight-stale", checkWeightStale);
 registerJob("wellness-under-fueling", checkUnderFueling);
 registerJob("wellness-missed-workout", checkMissedWorkout);
 
+// ── SPL Intelligence Engine ──
+registerJob("spl-intelligence-analysis", analyzeLeagueIntelligence);
+registerJob("spl-tracked-player-digest", refreshTrackedPlayers);
+registerJob("spl-competition-sync", syncCompetitionData);
+registerJob("spl-insight-cleanup", cleanupExpiredInsights);
+
 // ══════════════════════════════════════════════════════════════
 // EXPORTS — for manual testing via cron.routes.ts
 // ══════════════════════════════════════════════════════════════
@@ -1102,8 +1114,14 @@ export async function startCronJobs() {
   schedule("5 10 * * *", "wellness-under-fueling"); // 10:05 daily
   schedule("0 20 * * *", "wellness-missed-workout"); // 20:00 daily
 
+  // ── SPL Intelligence Engine ──
+  schedule("0 8 * * 6", "spl-competition-sync"); // Saturday 8:00 AM
+  schedule("30 8 * * 6", "spl-intelligence-analysis"); // Saturday 8:30 AM
+  schedule("0 9 * * 0", "spl-tracked-player-digest"); // Sunday 9:00 AM
+  schedule("0 4 * * *", "spl-insight-cleanup"); // Daily 4:00 AM
+
   // ── High-frequency ──
   schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes
 
-  logger.info("[CRON] 60 jobs scheduled ✓");
+  logger.info("[CRON] 64 jobs scheduled ✓");
 }

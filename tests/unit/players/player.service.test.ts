@@ -33,8 +33,12 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: { name: 'Club' },
 }));
 
+const mockUserFindOne = jest.fn();
 jest.mock('../../../src/modules/users/user.model', () => ({
-  User: { name: 'User' },
+  User: {
+    name: 'User',
+    findOne: (...a: unknown[]) => mockUserFindOne(...a),
+  },
 }));
 
 jest.mock('../../../src/modules/players/playerClubHistory.model', () => ({
@@ -65,6 +69,7 @@ import * as playerService from '../../../src/modules/players/player.service';
 describe('Player Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockUserFindOne.mockResolvedValue(null);
   });
 
   // ════════════════════════════════════════════════════════

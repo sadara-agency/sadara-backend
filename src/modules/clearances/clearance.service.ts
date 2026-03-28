@@ -20,6 +20,7 @@ const INCLUDE_RELATIONS = [
     attributes: [
       "id",
       "title",
+      "contractType",
       "startDate",
       "endDate",
       "status",
