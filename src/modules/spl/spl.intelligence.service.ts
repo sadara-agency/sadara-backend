@@ -5,7 +5,6 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Op } from "sequelize";
-import { logger } from "@config/logger";
 import { AppError } from "@middleware/errorHandler";
 import {
   SplCompetition,

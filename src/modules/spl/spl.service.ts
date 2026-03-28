@@ -4,9 +4,8 @@
 // Club external IDs use Sequelize model columns (splTeamId, espnTeamId).
 // ─────────────────────────────────────────────────────────────
 
-import { Op, Sequelize, QueryTypes } from "sequelize";
+import { Op, Sequelize } from "sequelize";
 import { logger } from "@config/logger";
-import { sequelize } from "@config/database";
 import { Club } from "@modules/clubs/club.model";
 import {
   Competition,

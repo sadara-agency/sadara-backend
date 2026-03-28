@@ -286,18 +286,6 @@ async function upsertPerformance(
 // ── PulseLive detailed stats upsert ──
 // Maps 155+ PulseLive metrics → structured columns + extended_stats JSONB
 
-const PL_STAT_MAP: Record<string, string> = {
-  appearances: "appearances",
-  games_started: "starts",
-  mins_played: "minutes",
-  goals: "goals",
-  goal_assist: "assists",
-  yellow_card: "yellow_cards",
-  red_card: "red_cards",
-  clean_sheet: "clean_sheets",
-  aerial_won: "aerial_duels_won",
-};
-
 export async function upsertDetailedPerformance(
   playerId: string,
   plStats: Record<string, number>,

@@ -28,8 +28,8 @@ export async function up() {
 
   // Seed Roshn Saudi League
   await sequelize.query(`
-    INSERT INTO spl_competitions (id, pulselive_comp_id, pulselive_season_id, name, name_ar, tier)
-    VALUES (gen_random_uuid(), 72, 859, 'Roshn Saudi League', 'دوري روشن السعودي', 'premier')
+    INSERT INTO spl_competitions (id, pulselive_comp_id, pulselive_season_id, name, name_ar, tier, created_at, updated_at)
+    VALUES (gen_random_uuid(), 72, 859, 'Roshn Saudi League', 'دوري روشن السعودي', 'premier', NOW(), NOW())
     ON CONFLICT (pulselive_comp_id) DO NOTHING;
   `);
 
