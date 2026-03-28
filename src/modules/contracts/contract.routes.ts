@@ -21,6 +21,8 @@ import {
 import { transitionContract } from "@modules/contracts/contract.transition.controller";
 import { generatePdf } from "@modules/contracts/contract.pdf.controller";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
+import { uploadSignedContract } from "@modules/contracts/contract.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -82,6 +84,13 @@ router.get(
   "/:id/pdf",
   authorizeModule("contracts", "read"),
   asyncHandler(generatePdf),
+);
+router.post(
+  "/:id/upload-signed",
+  authorizeModule("contracts", "create"),
+  uploadSingle,
+  verifyFileType,
+  asyncHandler(uploadSignedContract),
 );
 router.post(
   "/:id/transition",

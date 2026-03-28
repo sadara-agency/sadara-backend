@@ -63,6 +63,11 @@ import { MediaKitGeneration } from "@modules/media/media-kits/mediaKit.model";
 import { SocialPost } from "@modules/media/social-media/socialPost.model";
 import { ApprovalStep } from "@modules/approvals/approvalStep.model";
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
+import {
+  SplCompetition,
+  SplInsight,
+  SplTrackedPlayer,
+} from "@modules/spl/spl.intelligence.model";
 
 let associationsReady = false;
 
@@ -435,4 +440,30 @@ export function setupAssociations() {
   SocialPost.belongsTo(Club, { foreignKey: "clubId", as: "club" });
   SocialPost.belongsTo(Match, { foreignKey: "matchId", as: "match" });
   SocialPost.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+
+  // ── SPL Intelligence ──
+  SplInsight.belongsTo(SplCompetition, {
+    foreignKey: "competitionId",
+    as: "competition",
+  });
+  SplCompetition.hasMany(SplInsight, {
+    foreignKey: "competitionId",
+    as: "insights",
+  });
+  SplInsight.belongsTo(Watchlist, {
+    foreignKey: "watchlistId",
+    as: "watchlist",
+  });
+  SplTrackedPlayer.belongsTo(SplCompetition, {
+    foreignKey: "competitionId",
+    as: "competition",
+  });
+  SplTrackedPlayer.belongsTo(User, {
+    foreignKey: "userId",
+    as: "user",
+  });
+  User.hasMany(SplTrackedPlayer, {
+    foreignKey: "userId",
+    as: "trackedPlayers",
+  });
 }

@@ -298,8 +298,26 @@ export async function getPlayerById(id: string, user?: AuthUser) {
   const rawStats = statsMap.get(id) || {};
   const stats = camelCaseKeys<Record<string, any>>(rawStats);
 
+  // Determine portal account status for this player
+  let portalStatus: "active" | "pending" | "expired" | null = null;
+  const portalUser = await User.findOne({
+    where: { playerId: id },
+    attributes: ["isActive", "inviteTokenExpiry"],
+  });
+  if (portalUser) {
+    if (portalUser.isActive) {
+      portalStatus = "active";
+    } else {
+      const tokenExpired =
+        !portalUser.inviteTokenExpiry ||
+        new Date(portalUser.inviteTokenExpiry).getTime() < Date.now();
+      portalStatus = tokenExpired ? "expired" : "pending";
+    }
+  }
+
   return {
     ...plain,
+    portalStatus,
     contractStatus: stats.contractStatus ?? null,
     contractEnd: stats.contractEnd ?? null,
     commissionRate: stats.commissionRate ?? null,

@@ -9,6 +9,7 @@ interface ApprovalRequestAttributes {
   entityType: ApprovalEntityType;
   entityId: string;
   entityTitle: string;
+  entityTitleAr: string | null;
   action: string;
   status: ApprovalStatus;
   priority: "low" | "normal" | "high" | "critical";
@@ -39,6 +40,7 @@ interface ApprovalRequestCreation extends Optional<
   | "resolvedAt"
   | "currentStep"
   | "totalSteps"
+  | "entityTitleAr"
   | "templateId"
   | "createdAt"
   | "updatedAt"
@@ -52,6 +54,7 @@ export class ApprovalRequest
   declare entityType: ApprovalEntityType;
   declare entityId: string;
   declare entityTitle: string;
+  declare entityTitleAr: string | null;
   declare action: string;
   declare status: ApprovalStatus;
   declare priority: "low" | "normal" | "high" | "critical";
@@ -90,6 +93,11 @@ ApprovalRequest.init(
       type: DataTypes.STRING(500),
       allowNull: false,
       field: "entity_title",
+    },
+    entityTitleAr: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: "entity_title_ar",
     },
     action: {
       type: DataTypes.STRING(100),

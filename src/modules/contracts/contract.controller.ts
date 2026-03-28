@@ -4,6 +4,8 @@ import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { createCrudController } from "@shared/utils/crudController";
+import { AppError } from "@middleware/errorHandler";
+import { uploadFile } from "@shared/utils/storage";
 import * as contractService from "@modules/contracts/contract.service";
 
 const crud = createCrudController({
@@ -58,6 +60,23 @@ export async function terminate(req: AuthRequest, res: Response) {
     );
     sendSuccess(res, result, "Contract terminated");
   }
+}
+
+// ── Upload Signed Contract Document ──
+export async function uploadSignedContract(req: AuthRequest, res: Response) {
+  if (!req.file) {
+    throw new AppError("No file provided", 400);
+  }
+
+  const result = await uploadFile({
+    folder: "signed-contracts",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: false,
+  });
+
+  sendSuccess(res, { url: result.url }, "Signed contract uploaded");
 }
 
 // ── Contract History ──

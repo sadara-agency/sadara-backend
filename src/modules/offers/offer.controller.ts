@@ -47,15 +47,20 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   // Approval hooks
   if (req.body.status === "Under Review") {
     const player = await Player.findByPk(offer.playerId, {
-      attributes: ["firstName", "lastName"],
+      attributes: ["firstName", "lastName", "firstNameAr", "lastNameAr"],
     });
     const playerName = player
       ? [player.firstName, player.lastName].filter(Boolean).join(" ")
       : `#${offer.id.slice(0, 8)}`;
+    const playerNameAr = player
+      ? [player.firstNameAr, player.lastNameAr].filter(Boolean).join(" ")
+      : "";
+    const offerTypeAr = offer.offerType === "Transfer" ? "انتقال" : "إعارة";
     createApprovalRequest({
       entityType: "offer",
       entityId: offer.id,
       entityTitle: `${offer.offerType} Offer: ${playerName}`,
+      entityTitleAr: `عرض ${offerTypeAr}: ${playerNameAr || playerName}`,
       action: "review_offer",
       requestedBy: req.user!.id,
       assignedRole: "Manager",

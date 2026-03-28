@@ -28,6 +28,7 @@ import {
   PlayerSyncResult,
   SplSyncSummary,
 } from "@modules/spl/spl.types";
+import { fetchPlayerStats } from "@modules/spl/spl.pulselive";
 
 const PROVIDER_SPL = "SPL";
 const PROVIDER_PULSELIVE = "PulseLive";
@@ -231,7 +232,7 @@ async function createMappings(
 // Real constraint: UNIQUE(player_id, season, competition)
 // columns: appearances, starts, minutes, goals, assists, yellow_cards,
 //   red_cards, clean_sheets, average_rating, xg, xa, key_passes,
-//   successful_dribbles, aerial_duels_won, data_source
+//   successful_dribbles, aerial_duels_won, data_source, extended_stats
 
 async function upsertPerformance(
   playerId: string,
@@ -280,6 +281,160 @@ async function upsertPerformance(
       },
     },
   );
+}
+
+// ── PulseLive detailed stats upsert ──
+// Maps 155+ PulseLive metrics → structured columns + extended_stats JSONB
+
+const PL_STAT_MAP: Record<string, string> = {
+  appearances: "appearances",
+  games_started: "starts",
+  mins_played: "minutes",
+  goals: "goals",
+  goal_assist: "assists",
+  yellow_card: "yellow_cards",
+  red_card: "red_cards",
+  clean_sheet: "clean_sheets",
+  aerial_won: "aerial_duels_won",
+};
+
+export async function upsertDetailedPerformance(
+  playerId: string,
+  plStats: Record<string, number>,
+  season = "2025-2026",
+): Promise<void> {
+  const competition = "Saudi Pro League";
+
+  const appearances = plStats.appearances ?? 0;
+  const starts = plStats.games_started ?? 0;
+  const minutes = plStats.mins_played ?? 0;
+  const goals = plStats.goals ?? 0;
+  const assists = plStats.goal_assist ?? 0;
+  const yellowCards = plStats.yellow_card ?? 0;
+  const redCards = plStats.red_card ?? 0;
+  const cleanSheets = plStats.clean_sheet ?? 0;
+  const aerialDuelsWon = plStats.aerial_won ?? 0;
+  const keyPasses = plStats.big_chance_created ?? 0;
+  const successfulDribbles = plStats.successful_final_third_passes ?? 0;
+
+  await sequelize.query(
+    `INSERT INTO performances (
+       id, player_id, season, competition, data_source,
+       appearances, starts, minutes, goals, assists,
+       yellow_cards, red_cards, clean_sheets,
+       average_rating, xg, xa, key_passes, successful_dribbles, aerial_duels_won,
+       extended_stats,
+       created_at, updated_at
+     ) VALUES (
+       gen_random_uuid(), :playerId, :season, :competition, 'PulseLive',
+       :appearances, :starts, :minutes, :goals, :assists,
+       :yellowCards, :redCards, :cleanSheets,
+       NULL, NULL, NULL, :keyPasses, :successfulDribbles, :aerialDuelsWon,
+       :extendedStats::jsonb,
+       NOW(), NOW()
+     )
+     ON CONFLICT (player_id, season, competition)
+     DO UPDATE SET
+       appearances = EXCLUDED.appearances,
+       starts = EXCLUDED.starts,
+       minutes = EXCLUDED.minutes,
+       goals = EXCLUDED.goals,
+       assists = EXCLUDED.assists,
+       yellow_cards = EXCLUDED.yellow_cards,
+       red_cards = EXCLUDED.red_cards,
+       clean_sheets = EXCLUDED.clean_sheets,
+       key_passes = EXCLUDED.key_passes,
+       successful_dribbles = EXCLUDED.successful_dribbles,
+       aerial_duels_won = EXCLUDED.aerial_duels_won,
+       extended_stats = EXCLUDED.extended_stats,
+       data_source = 'PulseLive',
+       updated_at = NOW()`,
+    {
+      replacements: {
+        playerId,
+        season,
+        competition,
+        appearances,
+        starts,
+        minutes,
+        goals,
+        assists,
+        yellowCards,
+        redCards,
+        cleanSheets,
+        keyPasses,
+        successfulDribbles,
+        aerialDuelsWon,
+        extendedStats: JSON.stringify(plStats),
+      },
+    },
+  );
+}
+
+// ── Sync detailed stats for a single player via PulseLive ──
+
+export async function syncPlayerDetailedStats(
+  playerId: string,
+  pulseLivePlayerId: number,
+  season?: string,
+): Promise<boolean> {
+  const result = await fetchPlayerStats(pulseLivePlayerId);
+  if (!result) {
+    logger.debug(
+      `[PulseLive Sync] No stats for player PL#${pulseLivePlayerId}`,
+    );
+    return false;
+  }
+
+  await upsertDetailedPerformance(playerId, result.stats, season);
+  logger.debug(
+    `[PulseLive Sync] ✓ ${result.entity.name?.display ?? pulseLivePlayerId}: ${Object.keys(result.stats).length} stats`,
+  );
+  return true;
+}
+
+// ── Sync detailed stats for ALL players with PulseLive mappings ──
+
+export async function syncAllDetailedStats(
+  onProgress?: (name: string, i: number, total: number) => void,
+): Promise<{
+  total: number;
+  synced: number;
+  skipped: number;
+  errors: number;
+}> {
+  // Find all players with a PulseLive mapping
+  const mappings = await ExternalProviderMapping.findAll({
+    where: { providerName: PROVIDER_PULSELIVE, isActive: true },
+  });
+
+  let synced = 0,
+    skipped = 0,
+    errors = 0;
+
+  for (let i = 0; i < mappings.length; i++) {
+    const m = mappings[i];
+    const plId = parseInt(m.externalPlayerId, 10);
+    if (isNaN(plId)) {
+      skipped++;
+      continue;
+    }
+
+    try {
+      if (onProgress) onProgress(m.externalPlayerId, i, mappings.length);
+      const ok = await syncPlayerDetailedStats(m.playerId, plId);
+      if (ok) synced++;
+      else skipped++;
+    } catch (err: any) {
+      logger.error(`[PulseLive Sync] Error PL#${plId}: ${err.message}`);
+      errors++;
+    }
+  }
+
+  logger.info(
+    `[PulseLive Sync] ✓ Complete: ${synced} synced, ${skipped} skipped, ${errors} errors`,
+  );
+  return { total: mappings.length, synced, skipped, errors };
 }
 
 // ══════════════════════════════════════════

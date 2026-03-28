@@ -57,6 +57,12 @@ jest.mock('../../../src/modules/contracts/contractAutoTasks', () => ({
   generateContractTransitionTask: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock('../../../src/modules/approvals/approval.service', () => ({
+  isApprovalChainResolved: jest.fn().mockResolvedValue({ resolved: true, status: 'none' }),
+  createApprovalRequest: jest.fn().mockResolvedValue(null),
+  resolveApprovalByEntity: jest.fn().mockResolvedValue(null),
+}));
+
 import * as contractService from '../../../src/modules/contracts/contract.service';
 
 describe('Contract Service', () => {
