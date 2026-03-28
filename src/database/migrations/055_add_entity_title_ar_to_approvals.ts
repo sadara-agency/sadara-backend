@@ -1,12 +1,15 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { sequelize } from "@config/database";
 
-export async function up(queryInterface: QueryInterface) {
-  await queryInterface.addColumn("approval_requests", "entity_title_ar", {
-    type: DataTypes.STRING(500),
-    allowNull: true,
-  });
+export async function up() {
+  await sequelize.query(`
+    ALTER TABLE approval_requests
+    ADD COLUMN IF NOT EXISTS entity_title_ar VARCHAR(500);
+  `);
 }
 
-export async function down(queryInterface: QueryInterface) {
-  await queryInterface.removeColumn("approval_requests", "entity_title_ar");
+export async function down() {
+  await sequelize.query(`
+    ALTER TABLE approval_requests
+    DROP COLUMN IF EXISTS entity_title_ar;
+  `);
 }
