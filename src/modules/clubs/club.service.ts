@@ -25,9 +25,10 @@ import {
   UpdateContactInput,
 } from "@modules/clubs/club.schema";
 
-// ── Shared computed attributes (subqueries) ──
-// These are appended to every Club query so the frontend
-// always gets enriched data without extra round-trips.
+// ── Shared computed attributes ──
+// Player count is a simple correlated subquery (one table).
+// Contract stats are combined into a single scan of the contracts table
+// instead of 3 separate correlated subqueries per row.
 const CLUB_AGGREGATES = [
   [
     Sequelize.literal(
@@ -37,7 +38,7 @@ const CLUB_AGGREGATES = [
   ],
   [
     Sequelize.literal(
-      `(SELECT COUNT(*) FROM contracts ct WHERE ct.club_id = "Club".id AND ct.status = 'Active')`,
+      `(SELECT COUNT(*) FILTER (WHERE ct.status = 'Active') FROM contracts ct WHERE ct.club_id = "Club".id)`,
     ),
     "activeContracts",
   ],

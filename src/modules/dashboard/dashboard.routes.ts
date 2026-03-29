@@ -21,23 +21,25 @@ router.put(
   asyncHandler(configController.updateConfig),
 );
 
-// ── Volatile, per-user data — SHORT (60s) ──
+// ── Volatile, per-user data — MEDIUM (5 min) ──
+// SSE handles real-time updates on the frontend, so backend
+// cache can be longer without staleness concerns.
 router.get(
   "/matches/upcoming",
   authorizeModule("dashboard", "read"),
-  cacheRoute("dash", CacheTTL.SHORT, { perUser: true }),
+  cacheRoute("dash", CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(dashboardController.getUpcomingMatches),
 );
 router.get(
   "/tasks/urgent",
   authorizeModule("dashboard", "read"),
-  cacheRoute("dash", CacheTTL.SHORT, { perUser: true }),
+  cacheRoute("dash", CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(dashboardController.getUrgentTasks),
 );
 router.get(
   "/activity",
   authorizeModule("dashboard", "read"),
-  cacheRoute("dash", CacheTTL.SHORT),
+  cacheRoute("dash", CacheTTL.MEDIUM),
   asyncHandler(dashboardController.getRecentActivity),
 );
 
