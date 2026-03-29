@@ -32,9 +32,9 @@ const sequelizeOptions: Options = {
   benchmark: env.nodeEnv === "production",
 
   pool: {
-    max: env.nodeEnv === "production" ? 20 : 5,
-    min: env.nodeEnv === "production" ? 2 : 0,
-    acquire: 30000,
+    max: env.nodeEnv === "production" ? 50 : 5,
+    min: env.nodeEnv === "production" ? 5 : 0,
+    acquire: 10000,
     idle: 10000,
   },
 
