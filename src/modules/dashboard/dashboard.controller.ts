@@ -133,3 +133,41 @@ export async function getKpiTrends(req: AuthRequest, res: Response) {
   const data = await dashboardService.getKpiTrends();
   sendSuccess(res, data);
 }
+
+// ── Executive Dashboard ──
+
+// GET /dashboard/executive/employee-performance
+export async function getEmployeePerformance(req: AuthRequest, res: Response) {
+  const limit = Number(req.query.limit) || 20;
+  const data = await dashboardService.getEmployeePerformance(limit);
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/platform-stats
+export async function getPlatformStats(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getPlatformStats();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/financial-summary
+export async function getFinancialSummary(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getFinancialSummary();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/operational-efficiency
+export async function getOperationalEfficiency(
+  _req: AuthRequest,
+  res: Response,
+) {
+  const data = await dashboardService.getOperationalEfficiency();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/player-attention — players needing attention (Version A)
+export async function getPlayerAttention(_req: AuthRequest, res: Response) {
+  const { getPlayerAttentionData } =
+    await import("@modules/dashboard/dashboard.attention");
+  const data = await getPlayerAttentionData();
+  sendSuccess(res, data);
+}

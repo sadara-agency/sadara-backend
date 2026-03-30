@@ -178,11 +178,13 @@ export function setupAssociations() {
   Gate.hasMany(GateChecklist, { foreignKey: "gateId", as: "checklist" });
   GateChecklist.belongsTo(Gate, { foreignKey: "gateId", as: "gate" });
 
-  // Referral
+  // Referral (Case)
   Referral.belongsTo(Player, { foreignKey: "playerId", as: "player" });
   Player.hasMany(Referral, { foreignKey: "playerId", as: "referrals" });
   Referral.belongsTo(User, { foreignKey: "assignedTo", as: "assignee" });
   Referral.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  Referral.belongsTo(Injury, { foreignKey: "injuryId", as: "injury" });
+  Injury.hasOne(Referral, { foreignKey: "injuryId", as: "case" });
 
   // Scouting
   Watchlist.belongsTo(User, { foreignKey: "scoutedBy", as: "scout" });

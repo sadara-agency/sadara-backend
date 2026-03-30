@@ -18,12 +18,14 @@ import type {
   AddInjuryUpdateInput,
 } from "@modules/injuries/injury.schema";
 import { generateCriticalInjuryTask } from "@modules/injuries/injuryAutoTasks";
+import { generateAutoReferralForInjury } from "@modules/injuries/injuryAutoReferral";
 import { AuthUser } from "@shared/types";
 import {
   buildRowScope,
   mergeScope,
   checkRowAccess,
 } from "@shared/utils/rowScope";
+import { Referral } from "@modules/referrals/referral.model";
 
 const PLAYER_ATTRS = [
   "id",
@@ -175,7 +177,47 @@ export async function createInjury(
     }),
   );
 
+  // Fire-and-forget: auto-create Medical case for every injury
+  generateAutoReferralForInjury(injury.id, input.playerId, createdBy).catch(
+    (err) =>
+      logger.warn("Injury auto-case generation failed", {
+        injuryId: injury.id,
+        error: (err as Error).message,
+      }),
+  );
+
   return getInjuryById(injury.id);
+}
+
+// ── Sync linked case status when injury status changes ──
+
+const INJURY_TO_CASE_STATUS: Record<string, string> = {
+  Recovered: "Resolved",
+  Relapsed: "Open",
+  Chronic: "InProgress",
+  UnderTreatment: "InProgress",
+};
+
+async function syncCaseFromInjury(
+  injuryId: string,
+  injuryStatus: string,
+  t?: any,
+) {
+  const linkedCase = await Referral.findOne({
+    where: { injuryId } as any,
+    ...(t ? { transaction: t } : {}),
+  });
+  if (!linkedCase) return;
+
+  const newCaseStatus = INJURY_TO_CASE_STATUS[injuryStatus];
+  if (!newCaseStatus || linkedCase.status === newCaseStatus) return;
+
+  const updateData: Record<string, unknown> = { status: newCaseStatus };
+  if (newCaseStatus === "Resolved") updateData.resolvedAt = new Date();
+  if (newCaseStatus === "Open" && linkedCase.resolvedAt)
+    updateData.resolvedAt = null;
+
+  await linkedCase.update(updateData, t ? { transaction: t } : undefined);
 }
 
 // ── Update ──
@@ -184,6 +226,16 @@ export async function updateInjury(id: string, input: UpdateInjuryInput) {
   const injury = await findOrThrow(Injury, id, "Injury");
 
   const updated = await injury.update(input as any);
+
+  // Sync linked case status
+  if (input.status) {
+    syncCaseFromInjury(id, input.status).catch((err) =>
+      logger.warn("Case sync from injury failed", {
+        injuryId: id,
+        error: (err as Error).message,
+      }),
+    );
+  }
 
   // If recovered, update player status back to active
   if (input.status === "Recovered" && input.actualReturnDate) {
@@ -233,6 +285,9 @@ export async function addInjuryUpdate(
         statusUpdate.actualReturnDate = new Date().toISOString().split("T")[0];
       }
       await injury.update(statusUpdate, { transaction: t });
+
+      // Sync linked case status within the same transaction
+      await syncCaseFromInjury(injuryId, input.status, t);
 
       if (input.status === "Recovered") {
         const activeCount = await Injury.count({

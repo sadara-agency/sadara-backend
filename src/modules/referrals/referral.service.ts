@@ -5,6 +5,7 @@ import {
 } from "@modules/referrals/referral.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
+import { Injury } from "@modules/injuries/injury.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
@@ -288,7 +289,47 @@ export async function updateReferralStatus(
   }
 
   await referral.update(updateData);
+
+  // Reverse sync: if case resolved and has linked injury, recover the injury
+  if (input.status === "Resolved" && referral.injuryId) {
+    syncInjuryFromCase(referral.injuryId, referral.playerId).catch((err) =>
+      logger.warn("Injury sync from case failed", {
+        referralId: id,
+        error: (err as Error).message,
+      }),
+    );
+  }
+
   return refetchWithIncludes(id);
+}
+
+/**
+ * When a Medical case is resolved, mark the linked injury as Recovered
+ * and reset the player's status to active if no other active injuries remain.
+ */
+async function syncInjuryFromCase(
+  injuryId: string,
+  playerId: string,
+): Promise<void> {
+  const injury = await Injury.findByPk(injuryId);
+  if (!injury || injury.status === "Recovered") return;
+
+  await injury.update({
+    status: "Recovered",
+    actualReturnDate: new Date().toISOString().split("T")[0],
+  } as any);
+
+  // Check if player has other active injuries
+  const activeCount = await Injury.count({
+    where: {
+      playerId,
+      status: { [Op.in]: ["UnderTreatment", "Relapsed"] },
+      id: { [Op.ne]: injuryId },
+    },
+  });
+  if (activeCount === 0) {
+    await Player.update({ status: "active" }, { where: { id: playerId } });
+  }
 }
 
 // ── Delete ──

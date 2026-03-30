@@ -65,6 +65,12 @@ router.post(
 );
 
 router.get(
+  "/:id/timeline",
+  authorizeModule("players", "read"),
+  asyncHandler(playerController.getTimeline),
+);
+
+router.get(
   "/:id/club-history",
   authorizeModule("players", "read"),
   asyncHandler(playerController.getClubHistory),

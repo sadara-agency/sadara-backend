@@ -23,6 +23,13 @@ export interface MatchAttributes {
   homeTeamName?: string | null;
   awayTeamName?: string | null;
   providerSource?: string | null;
+  // Cup/knockout fields
+  round?: string | null;
+  leg?: number | null;
+  penaltyHome?: number | null;
+  penaltyAway?: number | null;
+  extraTime?: boolean;
+  isNeutralVenue?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -57,6 +64,13 @@ export class Match
   declare homeTeamName: string | null;
   declare awayTeamName: string | null;
   declare providerSource: string | null;
+  // Cup/knockout fields
+  declare round: string | null;
+  declare leg: number | null;
+  declare penaltyHome: number | null;
+  declare penaltyAway: number | null;
+  declare extraTime: boolean;
+  declare isNeutralVenue: boolean;
   declare createdAt: Date;
   declare updatedAt: Date;
 
@@ -145,6 +159,21 @@ Match.init(
     providerSource: {
       type: DataTypes.STRING(50),
       field: "provider_source",
+    },
+    // Cup/knockout fields
+    round: { type: DataTypes.STRING(50) },
+    leg: { type: DataTypes.INTEGER, defaultValue: 1 },
+    penaltyHome: { type: DataTypes.INTEGER, field: "penalty_home" },
+    penaltyAway: { type: DataTypes.INTEGER, field: "penalty_away" },
+    extraTime: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "extra_time",
+    },
+    isNeutralVenue: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_neutral_venue",
     },
   },
   {

@@ -95,6 +95,17 @@ export async function removeProvider(req: AuthRequest, res: Response) {
   sendSuccess(res, result, "Provider mapping removed");
 }
 
+export async function getTimeline(req: AuthRequest, res: Response) {
+  const { getPlayerTimeline } = await import("./player.timeline");
+  const { limit, offset, types } = req.query as any;
+  const result = await getPlayerTimeline(req.params.id, {
+    limit: limit ? Number(limit) : 50,
+    offset: offset ? Number(offset) : 0,
+    types: types ? String(types).split(",") : undefined,
+  });
+  sendSuccess(res, result);
+}
+
 export async function refreshStats(req: AuthRequest, res: Response) {
   const { provider, dateFrom, dateTo } = req.body;
   if (!provider) {

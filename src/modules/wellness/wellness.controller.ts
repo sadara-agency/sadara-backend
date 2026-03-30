@@ -281,12 +281,19 @@ export async function myDailyTotals(req: AuthRequest, res: Response) {
 // ══════════════════════════════════════════
 
 export async function playerDashboard(req: AuthRequest, res: Response) {
-  const data = await svc.getPlayerDashboard(req.params.playerId);
+  const days = Number(req.query.days) || 7;
+  const data = await svc.getPlayerDashboard(req.params.playerId, days);
   sendSuccess(res, data);
 }
 
 export async function coachOverview(req: AuthRequest, res: Response) {
   const data = await svc.getCoachOverview();
+  sendSuccess(res, data);
+}
+
+export async function coachHeatmap(req: AuthRequest, res: Response) {
+  const days = Number(req.query.days) || 14;
+  const data = await svc.getHeatmapData(days);
   sendSuccess(res, data);
 }
 
@@ -296,6 +303,7 @@ export async function myDashboard(req: AuthRequest, res: Response) {
     sendSuccess(res, null, "Player account not linked");
     return;
   }
-  const data = await svc.getPlayerDashboard(playerId);
+  const days = Number(req.query.days) || 7;
+  const data = await svc.getPlayerDashboard(playerId, days);
   sendSuccess(res, data);
 }

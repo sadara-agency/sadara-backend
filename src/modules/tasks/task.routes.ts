@@ -61,6 +61,19 @@ router.patch(
   asyncHandler(taskController.updateStatus),
 );
 
+// ── Sub-Tasks ──
+router.post(
+  "/:id/subtasks",
+  authorizeModule("tasks", "create"),
+  validate(createTaskSchema),
+  asyncHandler(taskController.createSubTask),
+);
+router.put(
+  "/:id/subtasks/reorder",
+  authorizeModule("tasks", "update"),
+  asyncHandler(taskController.reorderSubTasks),
+);
+
 // ── Delete (Admin / Manager only) ──
 router.delete(
   "/:id",

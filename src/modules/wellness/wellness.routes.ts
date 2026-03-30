@@ -210,6 +210,11 @@ router.get(
   asyncHandler(ctrl.coachOverview),
 );
 router.get(
+  "/dashboard/heatmap",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.coachHeatmap),
+);
+router.get(
   "/dashboard/player/:playerId",
   authorizeModule("wellness", "read"),
   asyncHandler(ctrl.playerDashboard),

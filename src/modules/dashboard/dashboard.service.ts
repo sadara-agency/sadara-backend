@@ -646,3 +646,141 @@ export async function getKpiTrends(months = 6) {
     CacheTTL.MEDIUM,
   );
 }
+
+// ════════════════════════════════════════════════════════════════
+// EXECUTIVE DASHBOARD
+// ════════════════════════════════════════════════════════════════
+
+/** Employee performance — top users by actions in the last 30 days. */
+export async function getEmployeePerformance(limit = 20) {
+  const cacheKey = buildCacheKey(`${P}:exec:employees`, { limit });
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           u.id, u.full_name, u.full_name_ar, u.role, u.avatar_url,
+           u.last_login,
+           (SELECT COUNT(*)::int FROM audit_logs al
+            WHERE al.user_id = u.id AND al.logged_at >= NOW() - INTERVAL '30 days'
+           ) AS actions_30d,
+           (SELECT COUNT(*)::int FROM tasks t
+            WHERE t.assigned_to = u.id AND t.status = 'Completed'
+            AND t.completed_at >= NOW() - INTERVAL '30 days'
+           ) AS tasks_completed_30d,
+           (SELECT COUNT(*)::int FROM tasks t
+            WHERE t.assigned_to = u.id
+            AND t.status NOT IN ('Completed', 'Canceled')
+            AND t.due_date < CURRENT_DATE
+           ) AS overdue_tasks
+         FROM users u
+         WHERE u.is_active = true AND u.role != 'Player'
+         ORDER BY actions_30d DESC
+         LIMIT $1`,
+        { bind: [limit], type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys(rows);
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Platform-wide stats: active users, module usage, actions this month. */
+export async function getPlatformStats() {
+  const cacheKey = buildCacheKey(`${P}:exec:platform`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const [stats] = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           (SELECT COUNT(*)::int FROM users WHERE is_active = true
+            AND last_login >= NOW() - INTERVAL '7 days') AS active_7d,
+           (SELECT COUNT(*)::int FROM users WHERE is_active = true
+            AND last_login >= NOW() - INTERVAL '30 days') AS active_30d,
+           (SELECT COUNT(*)::int FROM users WHERE is_active = true) AS total_active,
+           (SELECT COUNT(*)::int FROM audit_logs
+            WHERE logged_at >= DATE_TRUNC('month', NOW())) AS actions_this_month`,
+        { type: QueryTypes.SELECT },
+      );
+
+      const moduleUsage = await sequelize.query<Record<string, unknown>>(
+        `SELECT entity AS module, COUNT(*)::int AS action_count
+         FROM audit_logs
+         WHERE logged_at >= NOW() - INTERVAL '30 days'
+         GROUP BY entity ORDER BY action_count DESC LIMIT 10`,
+        { type: QueryTypes.SELECT },
+      );
+
+      return {
+        ...camelCaseKeys([stats])[0],
+        moduleUsage: camelCaseKeys(moduleUsage),
+      };
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Financial summary: portfolio value, revenue YTD, outstanding payments. */
+export async function getFinancialSummary() {
+  const cacheKey = buildCacheKey(`${P}:exec:financial`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const [result] = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           (SELECT COALESCE(SUM(market_value), 0)::numeric FROM players
+            WHERE status = 'active') AS total_portfolio_value,
+           (SELECT COALESCE(SUM(amount), 0)::numeric FROM payments
+            WHERE status = 'Paid'
+            AND paid_date >= DATE_TRUNC('year', NOW())) AS revenue_ytd,
+           (SELECT COALESCE(SUM(amount), 0)::numeric FROM payments
+            WHERE status != 'Paid'
+            AND due_date < CURRENT_DATE) AS outstanding_payments,
+           (SELECT COUNT(*)::int FROM payments
+            WHERE status != 'Paid'
+            AND due_date < CURRENT_DATE) AS overdue_payment_count,
+           (SELECT COALESCE(SUM(amount), 0)::numeric FROM payments
+            WHERE payment_type = 'Commission'
+            AND status = 'Paid'
+            AND paid_date >= DATE_TRUNC('year', NOW())) AS commission_ytd`,
+        { type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys([result])[0];
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Operational efficiency: task completion rate, avg time, overdue count. */
+export async function getOperationalEfficiency() {
+  const cacheKey = buildCacheKey(`${P}:exec:ops`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const [result] = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           (SELECT ROUND(
+             COUNT(*) FILTER (WHERE status = 'Completed')::numeric /
+             NULLIF(COUNT(*), 0) * 100, 1
+           ) FROM tasks WHERE created_at >= NOW() - INTERVAL '30 days') AS completion_rate_30d,
+           (SELECT ROUND(AVG(
+             EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600
+           ), 1) FROM tasks
+            WHERE status = 'Completed'
+            AND completed_at >= NOW() - INTERVAL '30 days') AS avg_completion_hours,
+           (SELECT COUNT(*)::int FROM tasks
+            WHERE status NOT IN ('Completed', 'Canceled')
+            AND due_date < CURRENT_DATE) AS total_overdue_tasks,
+           (SELECT COUNT(*)::int FROM approval_requests
+            WHERE status = 'Pending') AS pending_approvals`,
+        { type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys([result])[0];
+    },
+    CacheTTL.MEDIUM,
+  );
+}

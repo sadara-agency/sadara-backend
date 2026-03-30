@@ -14,6 +14,16 @@ import { AppError } from "@middleware/errorHandler";
 
 const BYPASS_ROLES = ["Admin", "Manager", "Executive"];
 
+/** All roles that share coach-level row access (coach_id FK on players). */
+const COACH_ROLES = [
+  "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
+];
+
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -229,7 +239,7 @@ export async function checkRowAccess(
     case "offers":
       if (role === "Player") return record.playerId === user.playerId;
       if (role === "Scout") return record.createdBy === user.id;
-      if (role === "Coach" || role === "Analyst")
+      if (COACH_ROLES.includes(role) || role === "Analyst")
         return isPlayerOwnedBy(record.playerId, user);
       return true;
 
@@ -243,7 +253,7 @@ export async function checkRowAccess(
 
     case "injuries":
       if (role === "Player") return record.playerId === user.playerId;
-      if (role === "Coach" || role === "Analyst")
+      if (COACH_ROLES.includes(role) || role === "Analyst")
         return isPlayerOwnedBy(record.playerId, user);
       return true;
 
@@ -274,7 +284,7 @@ async function isPlayerOwnedBy(
 ): Promise<boolean> {
   if (!playerId) return false;
 
-  const column = user.role === "Coach" ? "coach_id" : "analyst_id";
+  const column = COACH_ROLES.includes(user.role) ? "coach_id" : "analyst_id";
   const [result] = await sequelize.query<{ exists: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM players WHERE id = :playerId AND ${column} = :userId) AS "exists"`,
     {
