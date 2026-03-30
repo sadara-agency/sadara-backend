@@ -6,8 +6,7 @@ import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
-import { parsePagination, buildMeta } from "@shared/utils/pagination";
-import { logger } from "@config/logger";
+import { buildMeta } from "@shared/utils/pagination";
 import type {
   PlayerCareQuery,
   CreateCaseInput,

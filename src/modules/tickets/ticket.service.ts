@@ -7,9 +7,6 @@ import type {
   TicketQuery,
 } from "./ticket.schema";
 
-// ── Priority order for sorting ──
-const PRIORITY_ORDER = { urgent: 1, high: 2, medium: 3, low: 4 };
-
 // ── List with filters + pagination ──
 export async function listTickets(query: TicketQuery) {
   const where: WhereOptions = {};

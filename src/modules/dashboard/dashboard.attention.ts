@@ -4,7 +4,6 @@ import { Player } from "@modules/players/player.model";
 import { Journey } from "@modules/journey/journey.model";
 import { Ticket } from "@modules/tickets/ticket.model";
 import { Injury } from "@modules/injuries/injury.model";
-import { Referral } from "@modules/referrals/referral.model";
 
 export type AttentionLevel = "red" | "amber" | "green";
 
@@ -229,11 +228,9 @@ export async function getPlayerAttentionData(): Promise<PlayerAttention[]> {
     let journeyProgress = null;
     if (stages.length) {
       const completed = stages.filter(
-        (s: any) => (s.status ?? s.status) === "Completed",
+        (s: any) => s.status === "Completed",
       ).length;
-      const current = stages.find(
-        (s: any) => (s.status ?? s.status) === "InProgress",
-      );
+      const current = stages.find((s: any) => s.status === "InProgress");
       journeyProgress = {
         current: completed,
         total: stages.length,
@@ -243,11 +240,7 @@ export async function getPlayerAttentionData(): Promise<PlayerAttention[]> {
       // Check if any stage is overdue
       const overdueStage = stages.find((s: any) => {
         const endDate = s.expected_end_date ?? s.expectedEndDate;
-        return (
-          endDate &&
-          (s.status ?? s.status) !== "Completed" &&
-          new Date(endDate) < now
-        );
+        return endDate && s.status !== "Completed" && new Date(endDate) < now;
       });
       if (overdueStage) {
         if (level !== "red") level = "amber";

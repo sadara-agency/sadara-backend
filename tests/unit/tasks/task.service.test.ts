@@ -9,11 +9,14 @@ jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn(), authenticate: jest.fn() },
 }));
 
+const mockTaskCount = jest.fn();
+
 jest.mock('../../../src/modules/tasks/task.model', () => ({
   Task: {
     findAndCountAll: (...a: unknown[]) => mockFindAndCountAll(...a),
     findByPk: (...a: unknown[]) => mockFindByPk(...a),
     create: (...a: unknown[]) => mockTaskCreate(...a),
+    count: (...a: unknown[]) => mockTaskCount(...a),
   },
 }));
 

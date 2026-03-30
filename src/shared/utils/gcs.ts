@@ -6,7 +6,7 @@
  */
 
 import { Storage } from "@google-cloud/storage";
-import { env } from "@config/env";
+import "@config/env";
 import { logger } from "@config/logger";
 
 const storage = new Storage();

@@ -3,7 +3,7 @@ import { Injury } from "@modules/injuries/injury.model";
 import { Journey } from "@modules/journey/journey.model";
 import { Ticket } from "@modules/tickets/ticket.model";
 import { Referral } from "@modules/referrals/referral.model";
-import { sequelize } from "@config/database";
+import "@config/database";
 
 // ── Timeline Event Types ──
 export interface TimelineEvent {
