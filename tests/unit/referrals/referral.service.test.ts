@@ -26,6 +26,9 @@ jest.mock('../../../src/modules/players/player.model', () => ({
 jest.mock('../../../src/modules/users/user.model', () => ({
   User: { findByPk: (...a: unknown[]) => mockUserFindByPk(...a), name: 'User' },
 }));
+jest.mock('../../../src/modules/injuries/injury.model', () => ({
+  Injury: { findByPk: jest.fn(), findAll: jest.fn(), name: 'Injury' },
+}));
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
   notifyUser: jest.fn().mockResolvedValue(null),

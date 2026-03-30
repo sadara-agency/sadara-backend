@@ -715,3 +715,87 @@ export async function getCoachOverview(): Promise<CoachOverviewResponse> {
     },
   };
 }
+
+// ── Heatmap Data (per-player daily ring scores) ──
+
+export async function getHeatmapData(days = 14) {
+  const today = todayLocal();
+  const startDate = new Date(today);
+  startDate.setDate(startDate.getDate() - days + 1);
+  const startStr = startDate.toISOString().split("T")[0];
+
+  const rows: any[] = await sequelize.query(
+    `SELECT
+       p.id AS player_id,
+       p.first_name, p.last_name,
+       p.first_name_ar, p.last_name_ar,
+       p.photo_url,
+       ds.summary_date AS date,
+       ds.ring_score
+     FROM players p
+     INNER JOIN wellness_profiles wp ON wp.player_id = p.id
+     LEFT JOIN wellness_daily_summaries ds
+       ON ds.player_id = p.id
+       AND ds.summary_date >= :startDate
+       AND ds.summary_date <= :today
+     WHERE p.status = 'active'
+     ORDER BY p.first_name, p.last_name, ds.summary_date`,
+    {
+      replacements: { startDate: startStr, today },
+      type: QueryTypes.SELECT,
+    },
+  );
+
+  // Generate all dates in range
+  const allDates: string[] = [];
+  const d = new Date(startStr);
+  const end = new Date(today);
+  while (d <= end) {
+    allDates.push(d.toISOString().split("T")[0]);
+    d.setDate(d.getDate() + 1);
+  }
+
+  // Group by player, fill missing dates with 0
+  const playerMap = new Map<
+    string,
+    {
+      playerId: string;
+      playerName: string;
+      playerNameAr: string;
+      photoUrl: string | null;
+      scores: Map<string, number>;
+    }
+  >();
+
+  for (const row of rows) {
+    const pid = row.player_id;
+    if (!playerMap.has(pid)) {
+      playerMap.set(pid, {
+        playerId: pid,
+        playerName: `${row.first_name || ""} ${row.last_name || ""}`.trim(),
+        playerNameAr:
+          `${row.first_name_ar || ""} ${row.last_name_ar || ""}`.trim(),
+        photoUrl: row.photo_url,
+        scores: new Map(),
+      });
+    }
+    if (row.date) {
+      const dateStr =
+        typeof row.date === "string"
+          ? row.date
+          : (row.date as Date).toISOString().split("T")[0];
+      playerMap.get(pid)!.scores.set(dateStr, Number(row.ring_score) || 0);
+    }
+  }
+
+  return Array.from(playerMap.values()).map((p) => ({
+    playerId: p.playerId,
+    playerName: p.playerName,
+    playerNameAr: p.playerNameAr,
+    photoUrl: p.photoUrl,
+    dailyScores: allDates.map((date) => ({
+      date,
+      ringScore: p.scores.get(date) ?? 0,
+    })),
+  }));
+}

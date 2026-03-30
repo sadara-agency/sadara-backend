@@ -7,6 +7,7 @@ interface TaskAttributes {
   title: string;
   titleAr: string | null;
   description: string | null;
+  descriptionHtml: string | null;
   type: "Match" | "Contract" | "Health" | "Report" | "Offer" | "General";
   status: "Open" | "InProgress" | "Completed" | "Canceled";
   priority: "low" | "medium" | "high" | "critical";
@@ -20,6 +21,8 @@ interface TaskAttributes {
   isAutoCreated: boolean;
   referralId: string | null;
   triggerRuleId: string | null;
+  parentTaskId: string | null;
+  sortOrder: number;
   notes: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -30,6 +33,7 @@ interface TaskCreationAttributes extends Optional<
   | "id"
   | "titleAr"
   | "description"
+  | "descriptionHtml"
   | "type"
   | "status"
   | "priority"
@@ -43,6 +47,8 @@ interface TaskCreationAttributes extends Optional<
   | "isAutoCreated"
   | "referralId"
   | "triggerRuleId"
+  | "parentTaskId"
+  | "sortOrder"
   | "notes"
   | "createdAt"
   | "updatedAt"
@@ -56,6 +62,7 @@ export class Task
   declare title: string;
   declare titleAr: string | null;
   declare description: string | null;
+  declare descriptionHtml: string | null;
   declare type:
     | "Match"
     | "Contract"
@@ -75,7 +82,13 @@ export class Task
   declare isAutoCreated: boolean;
   declare referralId: string | null;
   declare triggerRuleId: string | null;
+  declare parentTaskId: string | null;
+  declare sortOrder: number;
   declare notes: string | null;
+
+  // Associations (populated by include)
+  declare subTasks?: Task[];
+  declare parentTask?: Task;
 }
 
 Task.init(
@@ -95,6 +108,10 @@ Task.init(
     },
     description: {
       type: DataTypes.TEXT,
+    },
+    descriptionHtml: {
+      type: DataTypes.TEXT,
+      field: "description_html",
     },
     type: {
       type: DataTypes.ENUM(
@@ -156,6 +173,16 @@ Task.init(
       type: DataTypes.STRING,
       field: "trigger_rule_id",
     },
+    parentTaskId: {
+      type: DataTypes.UUID,
+      field: "parent_task_id",
+      references: { model: "tasks", key: "id" },
+    },
+    sortOrder: {
+      type: DataTypes.INTEGER,
+      field: "sort_order",
+      defaultValue: 0,
+    },
     notes: {
       type: DataTypes.TEXT,
     },
@@ -171,6 +198,11 @@ Task.init(
       { fields: ["status"] },
       { fields: ["match_id"] },
       { fields: ["referral_id"] },
+      { fields: ["parent_task_id"] },
     ],
   },
 );
+
+// ── Self-referential associations (parent ↔ sub-tasks) ──
+Task.hasMany(Task, { as: "subTasks", foreignKey: "parentTaskId" });
+Task.belongsTo(Task, { as: "parentTask", foreignKey: "parentTaskId" });

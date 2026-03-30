@@ -25,6 +25,7 @@ export const createTaskSchema = z.object({
   title: z.string().min(1, "Title is required"),
   titleAr: z.string().optional(),
   description: z.string().optional(),
+  descriptionHtml: z.string().optional(),
   type: z.enum(TASK_TYPES).default("General"),
   priority: z.enum(TASK_PRIORITIES).default("medium"),
   assignedTo: z.string().uuid("Invalid user ID").optional(),
@@ -44,6 +45,7 @@ export const updateTaskSchema = z.object({
   title: z.string().min(1).optional(),
   titleAr: z.string().optional(),
   description: z.string().optional(),
+  descriptionHtml: z.string().nullable().optional(),
   type: z.enum(TASK_TYPES).optional(),
   priority: z.enum(TASK_PRIORITIES).optional(),
   assignedTo: z.string().uuid("Invalid user ID").nullable().optional(),
@@ -90,6 +92,8 @@ export const taskQuerySchema = z.object({
   assignedTo: z.string().uuid().optional(),
   playerId: z.string().uuid().optional(),
   referralId: z.string().uuid().optional(),
+  parentTaskId: z.string().uuid().optional(),
+  topLevelOnly: z.string().optional(),
 });
 
 // ── Inferred types ──

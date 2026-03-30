@@ -59,6 +59,13 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
 
   const where: any = {};
 
+  // By default, only show top-level tasks (exclude sub-tasks)
+  if (queryParams.parentTaskId) {
+    where.parentTaskId = queryParams.parentTaskId;
+  } else if (queryParams.topLevelOnly !== "false") {
+    where.parentTaskId = { [Op.is]: null };
+  }
+
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.priority) where.priority = queryParams.priority;
@@ -102,7 +109,22 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
 // ────────────────────────────────────────────────────────────
 export async function getTaskById(id: string, user?: AuthUser) {
   const task = await Task.findByPk(id, {
-    include: TASK_INCLUDES,
+    include: [
+      ...TASK_INCLUDES,
+      {
+        model: Task,
+        as: "subTasks",
+        include: [
+          {
+            model: User,
+            as: "assignee",
+            attributes: ["id", "fullName", "fullNameAr"],
+          },
+        ],
+        separate: true,
+        order: [["sortOrder", "ASC"]],
+      },
+    ],
   });
 
   if (!task) throw new AppError("Task not found", 404);
@@ -158,12 +180,119 @@ export async function updateTaskStatus(
 ) {
   const task = await findOrThrow(Task, id, "Task");
 
+  // Prevent completing a parent task that has open/in-progress sub-tasks
+  if (status === "Completed" && !task.parentTaskId) {
+    const openSubTasks = await Task.count({
+      where: {
+        parentTaskId: id,
+        status: { [Op.in]: ["Open", "InProgress"] },
+      },
+    });
+    if (openSubTasks > 0) {
+      throw new AppError(
+        "Cannot complete a task with open or in-progress sub-tasks",
+        400,
+      );
+    }
+  }
+
   // Auto-set or clear completedAt based on status
   const completedAt =
     status === "Completed" || status === "Canceled" ? new Date() : null;
   await task.update({ status, completedAt });
 
+  // Sync parent status if this is a sub-task
+  if (task.parentTaskId) {
+    await syncParentStatus(task.parentTaskId);
+  }
+
   return getTaskById(id);
+}
+
+// ────────────────────────────────────────────────────────────
+// Create Sub-Task
+// ────────────────────────────────────────────────────────────
+export async function createSubTask(
+  parentTaskId: string,
+  input: CreateTaskInput,
+  assignedBy: string,
+) {
+  const parent = await findOrThrow(Task, parentTaskId, "Parent task");
+
+  // Enforce max depth = 1 (sub-tasks cannot have their own sub-tasks)
+  if (parent.parentTaskId) {
+    throw new AppError("Cannot nest sub-tasks deeper than one level", 400);
+  }
+
+  // Determine sort order (append at end)
+  const maxOrder = await Task.max<number, Task>("sortOrder", {
+    where: { parentTaskId },
+  });
+
+  const task = await Task.create({
+    title: input.title,
+    titleAr: input.titleAr,
+    description: input.description,
+    type: input.type ?? parent.type,
+    priority: input.priority ?? parent.priority,
+    assignedTo: input.assignedTo,
+    assignedBy,
+    playerId: input.playerId ?? parent.playerId,
+    matchId: input.matchId ?? parent.matchId,
+    contractId: input.contractId ?? parent.contractId,
+    dueDate: input.dueDate ?? parent.dueDate,
+    notes: input.notes,
+    parentTaskId,
+    sortOrder: (maxOrder ?? 0) + 1,
+  });
+
+  // If parent is still Open, move it to InProgress
+  if (parent.status === "Open") {
+    await parent.update({ status: "InProgress" });
+  }
+
+  return getTaskById(task.id);
+}
+
+// ────────────────────────────────────────────────────────────
+// Reorder Sub-Tasks
+// ────────────────────────────────────────────────────────────
+export async function reorderSubTasks(
+  parentTaskId: string,
+  orderedIds: string[],
+) {
+  await findOrThrow(Task, parentTaskId, "Parent task");
+
+  const updates = orderedIds.map((id, index) =>
+    Task.update({ sortOrder: index }, { where: { id, parentTaskId } }),
+  );
+  await Promise.all(updates);
+}
+
+// ────────────────────────────────────────────────────────────
+// Sync Parent Status (called after sub-task status change)
+// ────────────────────────────────────────────────────────────
+async function syncParentStatus(parentTaskId: string) {
+  const subTasks = await Task.findAll({
+    where: { parentTaskId },
+    attributes: ["status"],
+  });
+
+  if (subTasks.length === 0) return;
+
+  const statuses = subTasks.map((t) => t.status);
+  const parent = await Task.findByPk(parentTaskId);
+  if (!parent || parent.parentTaskId) return; // Only sync top-level parents
+
+  if (statuses.every((s) => s === "Completed")) {
+    await parent.update({ status: "Completed", completedAt: new Date() });
+  } else if (statuses.every((s) => s === "Canceled")) {
+    await parent.update({ status: "Canceled", completedAt: new Date() });
+  } else if (statuses.some((s) => s === "InProgress" || s === "Completed")) {
+    if (parent.status === "Open") {
+      await parent.update({ status: "InProgress" });
+    }
+  }
 }
 
 // ────────────────────────────────────────────────────────────

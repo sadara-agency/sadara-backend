@@ -27,6 +27,7 @@ import offerRoutes from "@modules/offers/offer.routes";
 import matchRoutes from "@modules/matches/match.routes";
 import gateRoutes from "@modules/gates/gate.routes";
 import referralRoutes from "@modules/referrals/referral.routes";
+import playerCareRoutes from "@modules/playercare/playercare.routes";
 import scoutingRoutes from "@modules/scouting/scouting.routes";
 import financeRoutes from "@modules/finance/finance.routes";
 import documentRoutes from "@modules/documents/document.routes";
@@ -53,6 +54,8 @@ import esignatureRoutes from "@modules/esignatures/esignature.routes";
 import wellnessRoutes from "@modules/wellness/wellness.routes";
 import fitnessRoutes from "@modules/wellness/fitness.routes";
 import mediaRoutes from "@modules/media/media.routes";
+import journeyRoutes from "@modules/journey/journey.routes";
+import ticketRoutes from "@modules/tickets/ticket.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -247,6 +250,7 @@ app.use("/api/v1/offers", offerRoutes);
 app.use("/api/v1/matches", matchRoutes);
 app.use("/api/v1/gates", gateRoutes);
 app.use("/api/v1/referrals", referralRoutes);
+app.use("/api/v1/playercare", playerCareRoutes);
 app.use("/api/v1/scouting", scoutingRoutes);
 app.use("/api/v1/finance", financeRoutes);
 app.use("/api/v1/documents", documentRoutes);
@@ -273,6 +277,8 @@ app.use("/api/v1/esignatures", esignatureRoutes);
 app.use("/api/v1/wellness", wellnessRoutes);
 app.use("/api/v1/wellness", fitnessRoutes);
 app.use("/api/v1/media", mediaRoutes);
+app.use("/api/v1/journey", journeyRoutes);
+app.use("/api/v1/tickets", ticketRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(

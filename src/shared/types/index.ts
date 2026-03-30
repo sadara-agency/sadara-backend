@@ -10,6 +10,10 @@ export type UserRole =
   | "Legal"
   | "Finance"
   | "Coach"
+  | "SkillCoach"
+  | "TacticalCoach"
+  | "FitnessCoach"
+  | "NutritionSpecialist"
   | "GymCoach"
   | "Media"
   | "Executive";

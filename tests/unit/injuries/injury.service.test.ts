@@ -53,6 +53,21 @@ jest.mock('../../../src/modules/injuries/injuryAutoTasks', () => ({
   checkInjuryTreatmentStale: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/modules/injuries/injuryAutoReferral', () => ({
+  generateAutoReferralForInjury: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('../../../src/modules/referrals/referral.model', () => ({
+  Referral: {
+    findAll: jest.fn(),
+    findByPk: jest.fn(),
+    findOne: jest.fn().mockResolvedValue(null),
+    create: jest.fn(),
+    update: jest.fn(),
+    name: 'Referral',
+  },
+}));
+
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));

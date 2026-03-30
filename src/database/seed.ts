@@ -79,9 +79,13 @@ const ALL_ROLES = [
   "Legal",
   "Finance",
   "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
   "Media",
   "Executive",
-  "GymCoach",
 ];
 
 function allRoles(module: string, flags: Partial<Perm>): Perm[] {
@@ -134,9 +138,19 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("clubs", ["Analyst", "Scout", "Coach", "Media", "Executive"], {
-    canRead: true,
-  }),
+  ...forRoles(
+    "clubs",
+    [
+      "Analyst",
+      "Scout",
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "Media",
+      "Executive",
+    ],
+    { canRead: true },
+  ),
 
   ...forRoles("matches", ["Admin"], {
     canCreate: true,
@@ -144,11 +158,17 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("matches", ["Manager", "Coach"], {
+  ...forRoles("matches", ["Manager", "Coach", "TacticalCoach"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
+  ...forRoles("matches", ["SkillCoach"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("matches", ["FitnessCoach"], { canRead: true }),
   ...forRoles("matches", ["Analyst"], { canRead: true, canUpdate: true }),
   ...forRoles("matches", ["Scout", "Player", "Media", "Executive"], {
     canRead: true,
@@ -254,9 +274,23 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("injuries", ["Analyst", "Executive", "Media"], {
+  ...forRoles("injuries", ["FitnessCoach"], {
     canRead: true,
+    canCreate: true,
+    canUpdate: true,
   }),
+  ...forRoles(
+    "injuries",
+    [
+      "SkillCoach",
+      "TacticalCoach",
+      "NutritionSpecialist",
+      "Analyst",
+      "Executive",
+      "Media",
+    ],
+    { canRead: true },
+  ),
   // Player injuries access is via the Player Portal, not the staff dashboard
 
   ...forRoles("training", ["Admin"], {
@@ -271,13 +305,17 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("training", ["Coach"], {
-    canRead: true,
-    canCreate: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("training", ["Analyst", "Scout"], {
+  ...forRoles(
+    "training",
+    ["Coach", "SkillCoach", "TacticalCoach", "FitnessCoach"],
+    {
+      canRead: true,
+      canCreate: true,
+      canUpdate: true,
+      canDelete: true,
+    },
+  ),
+  ...forRoles("training", ["NutritionSpecialist", "Analyst", "Scout"], {
     canRead: true,
   }),
   ...forRoles("training", ["Executive"], { canRead: true }),
@@ -310,12 +348,43 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("reports", ["Analyst"], { canRead: true, canCreate: true }),
   ...forRoles(
     "reports",
-    ["Scout", "Legal", "Finance", "Coach", "Media", "Executive"],
+    [
+      "Scout",
+      "Legal",
+      "Finance",
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "NutritionSpecialist",
+      "Media",
+      "Executive",
+    ],
     { canRead: true },
   ),
 
   ...allRoles("tasks", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("tasks", ["Admin", "Manager"], { canDelete: true }),
+
+  // Journey stages
+  ...allRoles("journey", { canRead: true }),
+  ...forRoles("journey", ["Admin", "Manager"], {
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "journey",
+    ["Coach", "FitnessCoach", "SkillCoach", "TacticalCoach"],
+    {
+      canCreate: true,
+      canUpdate: true,
+    },
+  ),
+
+  // Tickets
+  ...allRoles("tickets", { canRead: true, canCreate: true, canUpdate: true }),
+  ...forRoles("tickets", ["Admin", "Manager"], { canDelete: true }),
 
   ...allRoles("notifications", {
     canRead: true,
@@ -335,9 +404,20 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
   ...forRoles("documents", ["Analyst"], { canRead: true, canCreate: true }),
-  ...forRoles("documents", ["Finance", "Coach", "Media", "Executive"], {
-    canRead: true,
-  }),
+  ...forRoles(
+    "documents",
+    [
+      "Finance",
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "NutritionSpecialist",
+      "Media",
+      "Executive",
+    ],
+    { canRead: true },
+  ),
   // Scout and Player intentionally excluded from documents
 
   // Notes — polymorphic, tied to players/contracts/etc.
@@ -420,9 +500,22 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
     canUpdate: true,
   }),
-  ...forRoles("wellness", ["Coach", "Analyst", "Executive"], {
+  ...forRoles("wellness", ["NutritionSpecialist"], {
+    canCreate: true,
     canRead: true,
+    canUpdate: true,
+    canDelete: true,
   }),
+  ...forRoles("wellness", ["FitnessCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles(
+    "wellness",
+    ["Coach", "SkillCoach", "TacticalCoach", "Analyst", "Executive"],
+    { canRead: true },
+  ),
   ...forRoles("wellness", ["Player"], {
     canCreate: true,
     canRead: true,

@@ -125,4 +125,39 @@ router.get(
   asyncHandler(dashboardController.getKpiTrends),
 );
 
+// ── Player Attention (Version A) ──
+router.get(
+  "/player-attention",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getPlayerAttention),
+);
+
+// ── Executive Dashboard (Admin/Executive only) ──
+
+router.get(
+  "/executive/employee-performance",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getEmployeePerformance),
+);
+router.get(
+  "/executive/platform-stats",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getPlatformStats),
+);
+router.get(
+  "/executive/financial-summary",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getFinancialSummary),
+);
+router.get(
+  "/executive/operational-efficiency",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getOperationalEfficiency),
+);
+
 export default router;

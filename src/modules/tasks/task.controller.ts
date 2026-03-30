@@ -37,3 +37,28 @@ export async function updateStatus(req: AuthRequest, res: Response) {
 
   sendSuccess(res, task, "Task status updated");
 }
+
+// ── Create Sub-Task ──
+export async function createSubTask(req: AuthRequest, res: Response) {
+  const task = await taskService.createSubTask(
+    req.params.id,
+    req.body,
+    req.user!.id,
+  );
+
+  await logAudit(
+    "CREATE",
+    "tasks",
+    task!.id,
+    buildAuditContext(req.user!, req.ip),
+    `Sub-task created under ${req.params.id}`,
+  );
+
+  sendSuccess(res, task, "Sub-task created", 201);
+}
+
+// ── Reorder Sub-Tasks ──
+export async function reorderSubTasks(req: AuthRequest, res: Response) {
+  await taskService.reorderSubTasks(req.params.id, req.body.orderedIds);
+  sendSuccess(res, null, "Sub-tasks reordered");
+}

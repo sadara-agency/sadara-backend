@@ -17,7 +17,8 @@ interface ContractAttributes {
     | "Renewal"
     | "Sponsorship"
     | "ImageRights"
-    | "MedicalAuth";
+    | "MedicalAuth"
+    | "Termination";
   playerContractType: PlayerContractType | null;
   status:
     | "Active"
@@ -56,6 +57,17 @@ interface ContractAttributes {
   // Alerts & Termination
   expiryAlertSent: boolean;
   terminatedByClearanceId: string | null;
+  // Termination-type specific fields
+  terminationReason: string | null;
+  terminationDate: string | null;
+  clearanceNumber: string | null;
+  outstandingAmount: number | null;
+  outstandingCurrency: string | null;
+  outstandingDetails: string | null;
+  hasOutstanding: boolean;
+  noClaimsDeclaration: boolean;
+  declarationText: string | null;
+  parentContractId: string | null;
   // Meta
   notes: string | null;
   createdBy: string | null;
@@ -92,6 +104,16 @@ interface ContractCreationAttributes extends Optional<
   | "agentSigningMethod"
   | "expiryAlertSent"
   | "terminatedByClearanceId"
+  | "terminationReason"
+  | "terminationDate"
+  | "clearanceNumber"
+  | "outstandingAmount"
+  | "outstandingCurrency"
+  | "outstandingDetails"
+  | "hasOutstanding"
+  | "noClaimsDeclaration"
+  | "declarationText"
+  | "parentContractId"
   | "notes"
   | "createdBy"
   | "createdAt"
@@ -114,7 +136,8 @@ export class Contract
     | "Renewal"
     | "Sponsorship"
     | "ImageRights"
-    | "MedicalAuth";
+    | "MedicalAuth"
+    | "Termination";
   declare playerContractType: PlayerContractType | null;
   declare status:
     | "Active"
@@ -149,6 +172,16 @@ export class Contract
   declare agentSigningMethod: string | null;
   declare expiryAlertSent: boolean;
   declare terminatedByClearanceId: string | null;
+  declare terminationReason: string | null;
+  declare terminationDate: string | null;
+  declare clearanceNumber: string | null;
+  declare outstandingAmount: number | null;
+  declare outstandingCurrency: string | null;
+  declare outstandingDetails: string | null;
+  declare hasOutstanding: boolean;
+  declare noClaimsDeclaration: boolean;
+  declare declarationText: string | null;
+  declare parentContractId: string | null;
   declare notes: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
@@ -187,6 +220,7 @@ Contract.init(
         "Sponsorship",
         "ImageRights",
         "MedicalAuth",
+        "Termination",
       ),
       defaultValue: "Representation",
       field: "contract_type",
@@ -316,6 +350,52 @@ Contract.init(
     terminatedByClearanceId: {
       type: DataTypes.UUID,
       field: "terminated_by_clearance_id",
+    },
+    terminationReason: {
+      type: DataTypes.TEXT,
+      field: "termination_reason",
+    },
+    terminationDate: {
+      type: DataTypes.DATEONLY,
+      field: "termination_date",
+    },
+    clearanceNumber: {
+      type: DataTypes.STRING(50),
+      unique: true,
+      field: "clearance_number",
+    },
+    outstandingAmount: {
+      type: DataTypes.DECIMAL(15, 2),
+      defaultValue: 0,
+      field: "outstanding_amount",
+    },
+    outstandingCurrency: {
+      type: DataTypes.STRING(3),
+      defaultValue: "SAR",
+      field: "outstanding_currency",
+    },
+    outstandingDetails: {
+      type: DataTypes.TEXT,
+      field: "outstanding_details",
+    },
+    hasOutstanding: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "has_outstanding",
+    },
+    noClaimsDeclaration: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "no_claims_declaration",
+    },
+    declarationText: {
+      type: DataTypes.TEXT,
+      field: "declaration_text",
+    },
+    parentContractId: {
+      type: DataTypes.UUID,
+      field: "parent_contract_id",
+      references: { model: "contracts", key: "id" },
     },
     notes: {
       type: DataTypes.TEXT,

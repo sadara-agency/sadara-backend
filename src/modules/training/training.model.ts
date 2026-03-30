@@ -224,6 +224,9 @@ TrainingActivity.init(
         "Clicked",
         "VideoStarted",
         "VideoCompleted",
+        "VideoPaused",
+        "VideoProgress",
+        "VideoResumed",
         "Downloaded",
         "Viewed",
       ),
@@ -239,3 +242,129 @@ TrainingActivity.init(
     updatedAt: false, // append-only log — no updates
   },
 );
+
+// ── Training Media (native video/document storage) ──
+
+export type MediaType = "video" | "pdf" | "document";
+export type EncodingStatus = "pending" | "processing" | "ready" | "failed";
+
+interface MediaAttributes {
+  id: string;
+  courseId: string;
+  type: MediaType;
+  title: string | null;
+  titleAr: string | null;
+  storageProvider: "gcs" | "external";
+  storagePath: string | null;
+  externalUrl: string | null;
+  durationSec: number | null;
+  fileSizeMb: number | null;
+  mimeType: string | null;
+  thumbnailPath: string | null;
+  encodingStatus: EncodingStatus;
+  sortOrder: number;
+  createdBy: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface MediaCreation extends Optional<
+  MediaAttributes,
+  | "id"
+  | "type"
+  | "title"
+  | "titleAr"
+  | "storageProvider"
+  | "storagePath"
+  | "externalUrl"
+  | "durationSec"
+  | "fileSizeMb"
+  | "mimeType"
+  | "thumbnailPath"
+  | "encodingStatus"
+  | "sortOrder"
+  | "createdBy"
+  | "createdAt"
+  | "updatedAt"
+> {}
+
+export class TrainingMedia
+  extends Model<MediaAttributes, MediaCreation>
+  implements MediaAttributes
+{
+  declare id: string;
+  declare courseId: string;
+  declare type: MediaType;
+  declare title: string | null;
+  declare titleAr: string | null;
+  declare storageProvider: "gcs" | "external";
+  declare storagePath: string | null;
+  declare externalUrl: string | null;
+  declare durationSec: number | null;
+  declare fileSizeMb: number | null;
+  declare mimeType: string | null;
+  declare thumbnailPath: string | null;
+  declare encodingStatus: EncodingStatus;
+  declare sortOrder: number;
+  declare createdBy: string | null;
+}
+
+TrainingMedia.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    courseId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "course_id",
+      references: { model: "training_courses", key: "id" },
+    },
+    type: {
+      type: DataTypes.STRING(20),
+      defaultValue: "video",
+    },
+    title: { type: DataTypes.STRING(500) },
+    titleAr: { type: DataTypes.STRING(500), field: "title_ar" },
+    storageProvider: {
+      type: DataTypes.STRING(10),
+      defaultValue: "gcs",
+      field: "storage_provider",
+    },
+    storagePath: { type: DataTypes.TEXT, field: "storage_path" },
+    externalUrl: { type: DataTypes.TEXT, field: "external_url" },
+    durationSec: { type: DataTypes.INTEGER, field: "duration_sec" },
+    fileSizeMb: { type: DataTypes.DECIMAL(10, 2), field: "file_size_mb" },
+    mimeType: { type: DataTypes.STRING(100), field: "mime_type" },
+    thumbnailPath: { type: DataTypes.TEXT, field: "thumbnail_path" },
+    encodingStatus: {
+      type: DataTypes.STRING(20),
+      defaultValue: "pending",
+      field: "encoding_status",
+    },
+    sortOrder: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: "sort_order",
+    },
+    createdBy: { type: DataTypes.UUID, field: "created_by" },
+  },
+  {
+    sequelize,
+    tableName: "training_media",
+    underscored: true,
+    timestamps: true,
+  },
+);
+
+// ── Associations ──
+TrainingCourse.hasMany(TrainingMedia, {
+  foreignKey: "courseId",
+  as: "media",
+});
+TrainingMedia.belongsTo(TrainingCourse, {
+  foreignKey: "courseId",
+  as: "course",
+});
