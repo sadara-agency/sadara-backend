@@ -754,6 +754,199 @@ export async function getFinancialSummary() {
   );
 }
 
+// ════════════════════════════════════════════════════════════════
+// ADMIN METRICS
+// ════════════════════════════════════════════════════════════════
+
+/** Task turnaround time grouped by assignee role (last 30 days). */
+export async function getTaskTurnaround() {
+  const cacheKey = buildCacheKey(`${P}:exec:task-turnaround`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           u.role,
+           COUNT(*)::INT AS tasks_completed,
+           ROUND(AVG(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600), 1) AS avg_hours,
+           ROUND(MIN(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600), 1) AS min_hours,
+           ROUND(MAX(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600), 1) AS max_hours,
+           ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (
+             ORDER BY EXTRACT(EPOCH FROM (t.completed_at - t.created_at))
+           )) / 3600, 1) AS median_hours
+         FROM tasks t
+         JOIN users u ON t.assigned_to = u.id
+         WHERE t.status = 'Completed'
+           AND t.completed_at >= NOW() - INTERVAL '30 days'
+         GROUP BY u.role
+         ORDER BY avg_hours ASC`,
+        { type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys(rows);
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Stuck / overdue volume grouped by assignee role. */
+export async function getStuckVolume() {
+  const cacheKey = buildCacheKey(`${P}:exec:stuck-volume`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           u.role,
+           COUNT(*) FILTER (WHERE t.status = 'Open' AND t.due_date < CURRENT_DATE)::INT AS overdue_open,
+           COUNT(*) FILTER (WHERE t.status = 'InProgress' AND t.due_date < CURRENT_DATE)::INT AS overdue_in_progress,
+           COUNT(*) FILTER (WHERE t.status NOT IN ('Completed', 'Canceled'))::INT AS total_active,
+           COUNT(*) FILTER (WHERE t.priority = 'critical' AND t.status NOT IN ('Completed', 'Canceled'))::INT AS critical_stuck,
+           ROUND(AVG(
+             CASE WHEN t.due_date < CURRENT_DATE AND t.status NOT IN ('Completed', 'Canceled')
+             THEN CURRENT_DATE - t.due_date ELSE NULL END
+           ), 1) AS avg_days_overdue
+         FROM tasks t
+         JOIN users u ON t.assigned_to = u.id
+         WHERE t.status NOT IN ('Completed', 'Canceled')
+         GROUP BY u.role
+         ORDER BY (
+           COUNT(*) FILTER (WHERE t.status = 'Open' AND t.due_date < CURRENT_DATE) +
+           COUNT(*) FILTER (WHERE t.status = 'InProgress' AND t.due_date < CURRENT_DATE)
+         ) DESC`,
+        { type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys(rows);
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Efficiency: assigned vs completed per role in last 30 days. */
+export async function getEfficiency() {
+  const cacheKey = buildCacheKey(`${P}:exec:efficiency`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           u.role,
+           COUNT(*)::INT AS tasks_assigned,
+           COUNT(*) FILTER (WHERE t.status = 'Completed')::INT AS tasks_completed,
+           COUNT(*) FILTER (WHERE t.status = 'Canceled')::INT AS tasks_canceled,
+           ROUND(
+             COUNT(*) FILTER (WHERE t.status = 'Completed')::NUMERIC /
+             NULLIF(COUNT(*), 0) * 100, 1
+           ) AS efficiency_pct
+         FROM tasks t
+         JOIN users u ON t.assigned_to = u.id
+         WHERE t.created_at >= NOW() - INTERVAL '30 days'
+         GROUP BY u.role
+         ORDER BY efficiency_pct DESC`,
+        { type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys(rows);
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Legal turnaround: avg time contracts spend in Review status. */
+export async function getLegalTurnaround() {
+  const cacheKey = buildCacheKey(`${P}:exec:legal-turnaround`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const [summary] = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           COUNT(CASE WHEN completed_log.logged_at IS NOT NULL THEN 1 END)::INT AS contracts_reviewed,
+           ROUND(AVG(
+             CASE WHEN completed_log.logged_at IS NOT NULL
+             THEN EXTRACT(EPOCH FROM (completed_log.logged_at - review_log.logged_at)) / 3600
+             END
+           ), 1) AS avg_review_hours,
+           ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (
+             ORDER BY CASE WHEN completed_log.logged_at IS NOT NULL
+               THEN EXTRACT(EPOCH FROM (completed_log.logged_at - review_log.logged_at))
+               ELSE NULL END
+           )) / 3600, 1) AS median_review_hours,
+           COUNT(*) FILTER (WHERE c.status = 'Review')::INT AS currently_in_review
+         FROM contracts c
+         LEFT JOIN LATERAL (
+           SELECT logged_at FROM audit_logs
+           WHERE entity = 'contracts' AND entity_id = c.id::TEXT
+             AND detail ILIKE '%Review%'
+           ORDER BY logged_at ASC LIMIT 1
+         ) review_log ON true
+         LEFT JOIN LATERAL (
+           SELECT logged_at FROM audit_logs
+           WHERE entity = 'contracts' AND entity_id = c.id::TEXT
+             AND detail ILIKE '%Signing%'
+             AND logged_at > review_log.logged_at
+           ORDER BY logged_at ASC LIMIT 1
+         ) completed_log ON true
+         WHERE review_log.logged_at IS NOT NULL`,
+        { type: QueryTypes.SELECT },
+      );
+
+      // Oldest contract still in Review
+      const [oldest] = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           c.id AS contract_id,
+           c.title,
+           EXTRACT(DAY FROM NOW() - al.logged_at)::INT AS days_in_review
+         FROM contracts c
+         JOIN LATERAL (
+           SELECT logged_at FROM audit_logs
+           WHERE entity = 'contracts' AND entity_id = c.id::TEXT
+             AND detail ILIKE '%Review%'
+           ORDER BY logged_at DESC LIMIT 1
+         ) al ON true
+         WHERE c.status = 'Review'
+         ORDER BY al.logged_at ASC
+         LIMIT 1`,
+        { type: QueryTypes.SELECT },
+      );
+
+      return {
+        ...camelCaseKeys([summary])[0],
+        oldest: oldest ? camelCaseKeys([oldest])[0] : null,
+      };
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
+/** Approval bottleneck: pending approvals grouped by assigned role. */
+export async function getApprovalBottleneck() {
+  const cacheKey = buildCacheKey(`${P}:exec:approval-bottleneck`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT
+           ar.assigned_role AS role,
+           COUNT(*)::INT AS pending_count,
+           ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - ar.created_at)) / 3600), 1) AS avg_wait_hours,
+           COUNT(*) FILTER (WHERE ar.priority IN ('high', 'critical'))::INT AS high_priority,
+           MIN(ar.created_at) AS oldest_request,
+           ROUND(EXTRACT(EPOCH FROM (NOW() - MIN(ar.created_at))) / 86400, 1) AS oldest_days
+         FROM approval_requests ar
+         WHERE ar.status = 'Pending'
+         GROUP BY ar.assigned_role
+         ORDER BY avg_wait_hours DESC`,
+        { type: QueryTypes.SELECT },
+      );
+      return camelCaseKeys(rows);
+    },
+    CacheTTL.MEDIUM,
+  );
+}
+
 /** Operational efficiency: task completion rate, avg time, overdue count. */
 export async function getOperationalEfficiency() {
   const cacheKey = buildCacheKey(`${P}:exec:ops`, {});

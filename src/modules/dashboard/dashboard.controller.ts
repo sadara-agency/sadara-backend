@@ -164,6 +164,36 @@ export async function getOperationalEfficiency(
   sendSuccess(res, data);
 }
 
+// GET /dashboard/executive/task-turnaround
+export async function getTaskTurnaround(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getTaskTurnaround();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/stuck-volume
+export async function getStuckVolume(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getStuckVolume();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/efficiency
+export async function getEfficiency(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getEfficiency();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/legal-turnaround
+export async function getLegalTurnaround(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getLegalTurnaround();
+  sendSuccess(res, data);
+}
+
+// GET /dashboard/executive/approval-bottleneck
+export async function getApprovalBottleneck(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getApprovalBottleneck();
+  sendSuccess(res, data);
+}
+
 // GET /dashboard/player-attention — players needing attention (Version A)
 export async function getPlayerAttention(_req: AuthRequest, res: Response) {
   const { getPlayerAttentionData } =
