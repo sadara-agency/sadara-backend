@@ -160,4 +160,37 @@ router.get(
   asyncHandler(dashboardController.getOperationalEfficiency),
 );
 
+// ── Admin Metrics ──
+
+router.get(
+  "/executive/task-turnaround",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getTaskTurnaround),
+);
+router.get(
+  "/executive/stuck-volume",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getStuckVolume),
+);
+router.get(
+  "/executive/efficiency",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getEfficiency),
+);
+router.get(
+  "/executive/legal-turnaround",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getLegalTurnaround),
+);
+router.get(
+  "/executive/approval-bottleneck",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getApprovalBottleneck),
+);
+
 export default router;
