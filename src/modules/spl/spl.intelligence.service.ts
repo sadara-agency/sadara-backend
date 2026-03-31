@@ -5,12 +5,14 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Op } from "sequelize";
+import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
 import {
   SplCompetition,
   SplInsight,
   SplTrackedPlayer,
 } from "@modules/spl/spl.intelligence.model";
+import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
 import { Watchlist } from "@modules/scouting/scouting.model";
 import { fetchPlayerStats } from "@modules/spl/spl.pulselive";
 import {
@@ -37,10 +39,53 @@ export async function listInsights(query: InsightQuery) {
   const page = query.page ?? 0;
   const pageSize = Math.min(query.pageSize ?? 20, 50);
 
+  // Map broad position categories to PulseLive position patterns
+  const POSITION_GROUPS: Record<string, string[]> = {
+    Forward: [
+      "Forward",
+      "Striker",
+      "Winger",
+      "Left Winger",
+      "Right Winger",
+      "Centre Forward",
+      "Second Striker",
+      "Left/Right Striker",
+      "Left/Centre/Right Striker",
+    ],
+    Midfielder: [
+      "Midfielder",
+      "Central Midfielder",
+      "Defensive Midfielder",
+      "Attacking Midfielder",
+      "Left Midfielder",
+      "Right Midfielder",
+      "Left/Right Midfielder",
+    ],
+    Defender: [
+      "Defender",
+      "Centre Back",
+      "Centre Central Defender",
+      "Central Defender",
+      "Left Back",
+      "Right Back",
+      "Full Back",
+      "Left Full Back",
+      "Right Full Back",
+      "Wing Back",
+      "Left Wing Back",
+      "Right Wing Back",
+    ],
+    Goalkeeper: ["Goalkeeper", "Keeper"],
+  };
+
   const where: Record<string, unknown> = {};
   if (!query.showDismissed) where.isDismissed = false;
   if (query.insightType) where.insightType = query.insightType;
-  if (query.position) where.position = query.position;
+  if (query.position && POSITION_GROUPS[query.position]) {
+    where.position = { [Op.in]: POSITION_GROUPS[query.position] };
+  } else if (query.position) {
+    where.position = query.position;
+  }
   if (query.nationality)
     where.nationality = { [Op.iLike]: `%${query.nationality}%` };
   if (query.competitionId) where.competitionId = query.competitionId;
@@ -257,6 +302,43 @@ export async function toggleCompetition(id: string, isActive: boolean) {
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
+
+export async function getIntelligenceStatus() {
+  const config = getSplIntelligenceConfig();
+
+  const [
+    totalInsights,
+    activeInsights,
+    totalTracked,
+    pulseLiveMappings,
+    lastInsight,
+  ] = await Promise.all([
+    SplInsight.count(),
+    SplInsight.count({
+      where: {
+        isDismissed: false,
+        [Op.or]: [{ expiresAt: null }, { expiresAt: { [Op.gt]: new Date() } }],
+      },
+    }),
+    SplTrackedPlayer.count(),
+    ExternalProviderMapping.count({
+      where: { providerName: "PulseLive", isActive: true },
+    }),
+    SplInsight.findOne({
+      order: [["detectedAt", "DESC"]],
+      attributes: ["detectedAt"],
+    }),
+  ]);
+
+  return {
+    lastAnalysisRun: lastInsight?.detectedAt ?? null,
+    totalInsights,
+    activeInsights,
+    totalTrackedPlayers: totalTracked,
+    pulseLiveMappings,
+    isEnabled: config.enabled,
+  };
+}
 
 export function getIntelligenceConfig(): SplIntelligenceConfig {
   return getSplIntelligenceConfig();

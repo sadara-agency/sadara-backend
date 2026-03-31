@@ -3,23 +3,21 @@ import { z } from "zod";
 // ── Insight queries ──
 
 export const insightQuerySchema = z.object({
-  query: z.object({
-    page: z.coerce.number().int().min(0).optional(),
-    pageSize: z.coerce.number().int().min(1).max(50).optional(),
-    insightType: z
-      .enum([
-        "rising_star",
-        "form_surge",
-        "hidden_gem",
-        "defensive_rock",
-        "available_soon",
-      ])
-      .optional(),
-    position: z.string().optional(),
-    nationality: z.string().optional(),
-    competitionId: z.string().uuid().optional(),
-    showDismissed: z.coerce.boolean().optional(),
-  }),
+  page: z.coerce.number().int().min(0).optional(),
+  pageSize: z.coerce.number().int().min(1).max(50).optional(),
+  insightType: z
+    .enum([
+      "rising_star",
+      "form_surge",
+      "hidden_gem",
+      "defensive_rock",
+      "available_soon",
+    ])
+    .optional(),
+  position: z.string().optional(),
+  nationality: z.string().optional(),
+  competitionId: z.string().uuid().optional(),
+  showDismissed: z.coerce.boolean().optional(),
 });
 
 export const insightIdSchema = z.object({
