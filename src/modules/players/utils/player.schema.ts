@@ -60,6 +60,10 @@ export const createPlayerSchema = z.object({
     .string()
     .min(1, "Phone number is required")
     .regex(/^[+\d][\d\s\-().]{4,25}$/, "Invalid phone number format"),
+  overallGrade: z
+    .string()
+    .max(10, "Grade must be 10 characters or less")
+    .optional(),
   notes: z
     .string()
     .max(1000, "Notes must be 1000 characters or less")

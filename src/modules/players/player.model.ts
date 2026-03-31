@@ -45,6 +45,7 @@ interface PlayerAttributes {
   guardianName?: string | null;
   guardianPhone?: string | null;
   guardianRelation?: string | null;
+  overallGrade?: string | null;
   notes?: string | null;
   photoUrl?: string | null;
   createdBy: string;
@@ -103,6 +104,7 @@ export class Player
   declare guardianName: string | null;
   declare guardianPhone: string | null;
   declare guardianRelation: string | null;
+  declare overallGrade: string | null;
   declare notes: string | null;
   declare photoUrl: string | null;
   declare createdBy: string;
@@ -199,6 +201,10 @@ Player.init(
     guardianRelation: {
       type: DataTypes.STRING(100),
       field: "guardian_relation",
+    },
+    overallGrade: {
+      type: DataTypes.STRING(10),
+      field: "overall_grade",
     },
     notes: { type: DataTypes.TEXT },
     photoUrl: { type: DataTypes.STRING },

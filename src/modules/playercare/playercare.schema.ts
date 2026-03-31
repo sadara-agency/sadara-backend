@@ -29,6 +29,7 @@ export const createCaseSchema = z.object({
     .optional(),
   notes: z.string().optional(),
   restrictedTo: z.array(z.string().uuid()).optional(),
+  resultingTicketId: z.string().uuid().optional(),
 });
 
 // ── Create Medical Case (injury + case in one) ──
@@ -89,6 +90,7 @@ export const updateCaseSchema = z.object({
     .nullable()
     .optional(),
   notes: z.string().nullable().optional(),
+  resultingTicketId: z.string().uuid().nullable().optional(),
 });
 
 // ── Update Case Status ──

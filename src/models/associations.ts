@@ -68,6 +68,7 @@ import {
   SplInsight,
   SplTrackedPlayer,
 } from "@modules/spl/spl.intelligence.model";
+import { Ticket } from "@modules/tickets/ticket.model";
 
 let associationsReady = false;
 
@@ -185,6 +186,10 @@ export function setupAssociations() {
   Referral.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
   Referral.belongsTo(Injury, { foreignKey: "injuryId", as: "injury" });
   Injury.hasOne(Referral, { foreignKey: "injuryId", as: "case" });
+  Referral.belongsTo(Ticket, {
+    foreignKey: "resultingTicketId",
+    as: "resultingTicket",
+  });
 
   // Scouting
   Watchlist.belongsTo(User, { foreignKey: "scoutedBy", as: "scout" });
