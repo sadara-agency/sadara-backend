@@ -14,6 +14,7 @@ const config: Config = {
     '^@middleware/(.*)$': '<rootDir>/src/middleware/$1',
     '^@modules/(.*)$': '<rootDir>/src/modules/$1',
     '^@shared/(.*)$': '<rootDir>/src/shared/$1',
+    '^@cron/(.*)$': '<rootDir>/src/cron/$1',
   },
   setupFilesAfterEnv: ['<rootDir>/tests/setup/jest.setup.ts'],
   coverageDirectory: 'coverage',

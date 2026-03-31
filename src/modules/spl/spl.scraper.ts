@@ -141,6 +141,16 @@ function extractBio(
         : `https://static-files.saudi-pro-league.pulselive.com${src}`;
   });
 
+  if (!photoUrl) {
+    logger.debug(
+      `[SPL Scraper] No photo URL found for SPL#${splPlayerId} (${sanitize($("h1").first().text() || "unknown")})`,
+    );
+  } else if (!extractPulseLiveId(photoUrl)) {
+    logger.debug(
+      `[SPL Scraper] Photo URL found but no PulseLive ID extracted for SPL#${splPlayerId}: ${photoUrl}`,
+    );
+  }
+
   let splTeamId: string | null = null;
   $('a[href*="/en/teams/"]').each((_, el) => {
     const m = ($(el).attr("href") || "").match(/\/teams\/(\d+)/);

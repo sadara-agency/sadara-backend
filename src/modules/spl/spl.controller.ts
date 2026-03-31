@@ -19,6 +19,7 @@ import {
 } from "@modules/spl/spl.service";
 import { SPL_CLUB_REGISTRY } from "@modules/spl/spl.registry";
 import type { PulseLiveRankedStat } from "@modules/spl/spl.types";
+import { analyzeLeagueIntelligence } from "@cron/engines/spl.intelligence.engine";
 
 export async function syncPlayer(req: AuthRequest, res: Response) {
   const { splPlayerId, slug } = req.body;
@@ -64,11 +65,22 @@ export async function syncAll(req: AuthRequest, res: Response) {
     .syncAllTeams((name, i, total) => {
       logger.info(`[SPL] Syncing ${name} (${i + 1}/${total})...`);
     })
-    .then((result) => {
+    .then(async (result) => {
       updateSyncState({ isRunning: false, lastResult: result });
       logger.info(
         `[SPL] ✓ Complete: ${result.totalPlayers} players, ${result.teams} teams`,
       );
+
+      // Auto-trigger intelligence analysis after successful sync
+      logger.info("[SPL] Auto-triggering intelligence analysis...");
+      try {
+        const intel = await analyzeLeagueIntelligence();
+        logger.info(
+          `[SPL Intelligence] ✓ Complete: ${intel.insightsCreated} insights from ${intel.playersAnalyzed} players across ${intel.competitionsScanned} competitions`,
+        );
+      } catch (err: any) {
+        logger.error(`[SPL Intelligence] ✗ Failed: ${err.message}`);
+      }
     })
     .catch((err) => {
       updateSyncState({ isRunning: false });
@@ -191,5 +203,28 @@ export async function syncDetailedStats(req: AuthRequest, res: Response) {
     null,
     buildAuditContext(req.user!, req.ip),
     "PulseLive detailed stats sync triggered (background)",
+  );
+}
+
+// ── Trigger Intelligence Analysis (manual) ──
+export async function triggerIntelligence(req: AuthRequest, res: Response) {
+  sendSuccess(res, null, "Intelligence analysis started in background.");
+
+  analyzeLeagueIntelligence()
+    .then((result) => {
+      logger.info(
+        `[SPL Intelligence] ✓ Complete: ${result.insightsCreated} insights from ${result.playersAnalyzed} players across ${result.competitionsScanned} competitions`,
+      );
+    })
+    .catch((err) => {
+      logger.error(`[SPL Intelligence] ✗ Failed: ${err.message}`);
+    });
+
+  await logAudit(
+    "CREATE",
+    "players",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    "Intelligence analysis triggered manually",
   );
 }

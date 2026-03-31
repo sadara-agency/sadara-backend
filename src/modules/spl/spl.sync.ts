@@ -224,6 +224,10 @@ async function createMappings(
       apiBaseUrl: bio.photoUrl || undefined,
       lastSyncedAt: new Date(),
     } as any);
+  } else {
+    logger.warn(
+      `[SPL Sync] No PulseLive ID for player "${bio.fullName}" (SPL#${bio.splPlayerId}) — photo URL: ${bio.photoUrl ?? "none"}`,
+    );
   }
 }
 

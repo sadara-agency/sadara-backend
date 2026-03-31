@@ -25,7 +25,7 @@ router.use(authenticate);
 router.get(
   "/insights",
   authorizeModule("spl-sync", "read"),
-  validate(insightQuerySchema),
+  validate(insightQuerySchema, "query"),
   asyncHandler(ctrl.getInsights),
 );
 
@@ -92,6 +92,22 @@ router.patch(
   authorizeModule("spl-sync", "update"),
   validate(toggleCompetitionSchema),
   asyncHandler(ctrl.toggleComp),
+);
+
+// ── Status ──
+
+router.get(
+  "/status",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(ctrl.getStatus),
+);
+
+// ── Manual Analysis Trigger ──
+
+router.post(
+  "/analyze",
+  authorizeModule("spl-sync", "create"),
+  asyncHandler(ctrl.triggerAnalysis),
 );
 
 // ── Config ──

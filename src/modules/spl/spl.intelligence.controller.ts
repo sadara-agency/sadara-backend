@@ -4,8 +4,10 @@
 
 import { Response } from "express";
 import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import { logger } from "@config/logger";
 import { AuthRequest } from "@shared/types";
 import * as service from "@modules/spl/spl.intelligence.service";
+import { analyzeLeagueIntelligence } from "@cron/engines/spl.intelligence.engine";
 
 // ── Insights ──
 
@@ -61,6 +63,22 @@ export async function getTrackedDetail(req: AuthRequest, res: Response) {
   sendSuccess(res, result);
 }
 
+// ── Manual Analysis Trigger ──
+
+export async function triggerAnalysis(_req: AuthRequest, res: Response) {
+  sendSuccess(res, null, "Intelligence analysis started in background.");
+
+  analyzeLeagueIntelligence()
+    .then((result) => {
+      logger.info(
+        `[SPL Intelligence] ✓ Manual: ${result.insightsCreated} insights from ${result.playersAnalyzed} players across ${result.competitionsScanned} competitions`,
+      );
+    })
+    .catch((err) => {
+      logger.error(`[SPL Intelligence] ✗ Manual failed: ${err.message}`);
+    });
+}
+
 // ── Competitions ──
 
 export async function getCompetitions(_req: AuthRequest, res: Response) {
@@ -74,6 +92,13 @@ export async function toggleComp(req: AuthRequest, res: Response) {
     req.body.isActive,
   );
   sendSuccess(res, comp);
+}
+
+// ── Status ──
+
+export async function getStatus(_req: AuthRequest, res: Response) {
+  const status = await service.getIntelligenceStatus();
+  sendSuccess(res, status);
 }
 
 // ── Config ──
