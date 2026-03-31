@@ -10,6 +10,16 @@ const STAGE_STATUSES = [
 
 const STAGE_HEALTH = ["OnTrack", "AtRisk", "Overdue", "Blocked"] as const;
 
+const STAGE_TYPES = [
+  "PhysicalTraining",
+  "TechnicalTraining",
+  "TacticalTraining",
+  "Assessment",
+  "Recovery",
+  "MentalDevelopment",
+  "General",
+] as const;
+
 // ── Create Journey Stage ──
 export const createJourneySchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
@@ -18,6 +28,7 @@ export const createJourneySchema = z.object({
   stageOrder: z.number().int().min(0).default(0),
   status: z.enum(STAGE_STATUSES).default("NotStarted"),
   health: z.enum(STAGE_HEALTH).default("OnTrack"),
+  stageType: z.enum(STAGE_TYPES).default("General"),
   startDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
@@ -40,6 +51,7 @@ export const updateJourneySchema = z.object({
   stageOrder: z.number().int().min(0).optional(),
   status: z.enum(STAGE_STATUSES).optional(),
   health: z.enum(STAGE_HEALTH).optional(),
+  stageType: z.enum(STAGE_TYPES).optional(),
   startDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
@@ -69,6 +81,7 @@ export const journeyQuerySchema = z.object({
   playerId: z.string().uuid().optional(),
   status: z.enum(STAGE_STATUSES).optional(),
   health: z.enum(STAGE_HEALTH).optional(),
+  stageType: z.enum(STAGE_TYPES).optional(),
   assignedTo: z.string().uuid().optional(),
   sort: z
     .enum([

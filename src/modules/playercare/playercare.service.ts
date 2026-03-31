@@ -3,6 +3,7 @@ import { sequelize } from "@config/database";
 import { transaction } from "@config/database";
 import { Referral } from "@modules/referrals/referral.model";
 import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { Ticket } from "@modules/tickets/ticket.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
@@ -73,6 +74,19 @@ export async function listCases(query: PlayerCareQuery) {
           "surgeryDate",
         ],
       },
+      {
+        model: Ticket,
+        as: "resultingTicket",
+        required: false,
+        attributes: [
+          "id",
+          "title",
+          "titleAr",
+          "status",
+          "ticketType",
+          "priority",
+        ],
+      },
     ],
     limit,
     offset,
@@ -104,6 +118,19 @@ export async function getCaseById(id: string) {
           },
         ],
       },
+      {
+        model: Ticket,
+        as: "resultingTicket",
+        required: false,
+        attributes: [
+          "id",
+          "title",
+          "titleAr",
+          "status",
+          "ticketType",
+          "priority",
+        ],
+      },
     ],
   });
 
@@ -125,6 +152,7 @@ export async function createCase(input: CreateCaseInput, createdBy: string) {
     notes: input.notes,
     isRestricted: input.caseType === "Mental",
     restrictedTo: input.restrictedTo,
+    resultingTicketId: input.resultingTicketId,
     createdBy,
   } as any);
 

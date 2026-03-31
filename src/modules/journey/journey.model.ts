@@ -10,6 +10,15 @@ export type JourneyStageStatus =
 
 export type JourneyStageHealth = "OnTrack" | "AtRisk" | "Overdue" | "Blocked";
 
+export type JourneyStageType =
+  | "PhysicalTraining"
+  | "TechnicalTraining"
+  | "TacticalTraining"
+  | "Assessment"
+  | "Recovery"
+  | "MentalDevelopment"
+  | "General";
+
 interface JourneyAttributes {
   id: string;
   playerId: string;
@@ -18,6 +27,7 @@ interface JourneyAttributes {
   stageOrder: number;
   status: JourneyStageStatus;
   health: JourneyStageHealth;
+  stageType: JourneyStageType;
   startDate: string | null;
   expectedEndDate: string | null;
   actualEndDate: string | null;
@@ -37,6 +47,7 @@ interface JourneyCreationAttributes extends Optional<
   | "stageNameAr"
   | "status"
   | "health"
+  | "stageType"
   | "startDate"
   | "expectedEndDate"
   | "actualEndDate"
@@ -61,6 +72,7 @@ export class Journey
   declare stageOrder: number;
   declare status: JourneyStageStatus;
   declare health: JourneyStageHealth;
+  declare stageType: JourneyStageType;
   declare startDate: string | null;
   declare expectedEndDate: string | null;
   declare actualEndDate: string | null;
@@ -109,6 +121,11 @@ Journey.init(
     health: {
       type: DataTypes.STRING(50),
       defaultValue: "OnTrack",
+    },
+    stageType: {
+      type: DataTypes.STRING(50),
+      defaultValue: "General",
+      field: "stage_type",
     },
     startDate: {
       type: DataTypes.DATEONLY,

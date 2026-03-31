@@ -44,6 +44,7 @@ import {
 } from "@modules/wellness/wellness.model";
 
 import { IDS } from "./ids";
+import { seedNotionData } from "./seedNotionData";
 
 // ── Helpers ──
 
@@ -3047,6 +3048,13 @@ export async function seedDatabase(): Promise<void> {
     console.error("❌ Seed failed, rolled back:", (err as Error).message);
     console.error((err as Error).stack);
     throw err;
+  }
+
+  // 5. Notion operational data — idempotent, outside main transaction
+  try {
+    await seedNotionData();
+  } catch (err) {
+    console.error("❌ Notion data seed failed:", (err as Error).message);
   }
 
   console.log("");

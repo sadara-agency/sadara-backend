@@ -28,6 +28,7 @@ export interface ReferralAttributes {
   outcome?: string | null;
   notes?: string | null;
   isRestricted: boolean;
+  resultingTicketId?: string | null;
   restrictedTo?: string[] | null;
   createdBy?: string | null;
   createdAt?: Date;
@@ -42,6 +43,7 @@ interface ReferralCreationAttributes extends Optional<
   | "priority"
   | "evidenceCount"
   | "sessionCount"
+  | "resultingTicketId"
   | "isRestricted"
   | "createdAt"
   | "updatedAt"
@@ -71,6 +73,7 @@ export class Referral
   declare outcome: string | null;
   declare notes: string | null;
   declare isRestricted: boolean;
+  declare resultingTicketId: string | null;
   declare restrictedTo: string[] | null;
   declare createdBy: string | null;
   declare createdAt: Date;
@@ -154,6 +157,11 @@ Referral.init(
     },
     notes: {
       type: DataTypes.TEXT,
+    },
+    resultingTicketId: {
+      type: DataTypes.UUID,
+      field: "resulting_ticket_id",
+      references: { model: "tickets", key: "id" },
     },
     isRestricted: {
       type: DataTypes.BOOLEAN,
