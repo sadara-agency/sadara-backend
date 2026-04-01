@@ -9,7 +9,7 @@ import {
   createMyMealLogSchema,
   copyDaySchema,
   copyMyDaySchema,
-} from '../../../src/modules/wellness/wellness.schema';
+} from '../../../src/modules/wellness/wellness.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

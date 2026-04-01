@@ -12,7 +12,7 @@ import type {
   PlayerCareQuery,
   CreateCaseInput,
   CreateMedicalCaseInput,
-} from "./playercare.schema";
+} from "./playercare.validation";
 
 const PLAYER_ATTRS = [
   "id",
@@ -238,10 +238,6 @@ export async function updateCase(id: string, input: Record<string, unknown>) {
   const caseRecord = await Referral.findByPk(id);
   if (!caseRecord) throw new AppError("Case not found", 404);
 
-  if (caseRecord.status === "Resolved") {
-    throw new AppError("Cannot update a resolved case", 400);
-  }
-
   await caseRecord.update(input);
   return getCaseById(id);
 }
@@ -253,6 +249,7 @@ export async function updateCaseStatus(
   status: string,
   outcome?: string,
   notes?: string,
+  closureNotes?: string,
 ) {
   const caseRecord = await Referral.findByPk(id);
   if (!caseRecord) throw new AppError("Case not found", 404);
@@ -260,12 +257,20 @@ export async function updateCaseStatus(
   const updateData: Record<string, unknown> = { status };
   if (outcome) updateData.outcome = outcome;
   if (notes) updateData.notes = notes;
-  if (status === "Resolved") updateData.resolvedAt = new Date();
+  if (status === "Closed") {
+    updateData.closedAt = new Date();
+    if (closureNotes) updateData.closureNotes = closureNotes;
+  }
+
+  // Handle re-opening
+  if (caseRecord.status === "Closed" && status !== "Closed") {
+    updateData.closedAt = null;
+  }
 
   await caseRecord.update(updateData);
 
-  // Reverse sync: resolve linked injury when case is resolved
-  if (status === "Resolved" && caseRecord.injuryId) {
+  // Reverse sync: resolve linked injury when case is closed
+  if (status === "Closed" && caseRecord.injuryId) {
     const injury = await Injury.findByPk(caseRecord.injuryId);
     if (injury && injury.status !== "Recovered") {
       await injury.update({
@@ -299,8 +304,8 @@ export async function deleteCase(id: string) {
   const caseRecord = await Referral.findByPk(id);
   if (!caseRecord) throw new AppError("Case not found", 404);
 
-  if (caseRecord.status === "Resolved") {
-    throw new AppError("Cannot delete a resolved case", 400);
+  if (caseRecord.status === "Closed") {
+    throw new AppError("Cannot delete a closed case", 400);
   }
 
   // If Medical with linked injury, delete the injury too
@@ -360,7 +365,7 @@ export async function getCaseStats() {
   ]);
 
   const totalActive = statusStats
-    .filter((r) => r.status !== "Resolved")
+    .filter((r) => r.status !== "Closed")
     .reduce((s, r) => s + Number(r.count), 0);
 
   const totalMedical = statusStats

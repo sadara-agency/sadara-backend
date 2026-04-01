@@ -9,8 +9,15 @@ const ROLES = [
   "Legal",
   "Finance",
   "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
   "Media",
   "Executive",
+  "GoalkeeperCoach",
+  "MentalCoach",
 ] as const;
 
 const MODULES = [
@@ -38,6 +45,7 @@ const MODULES = [
   "sportmonks",
   "saff-data",
   "spl-sync",
+  "sessions",
 ] as const;
 
 export const updatePermissionsSchema = z.object({

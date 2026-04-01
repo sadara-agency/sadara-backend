@@ -13,7 +13,7 @@ import {
   updateEnrollmentSchema,
   trackActivitySchema,
   selfUpdateProgressSchema,
-} from "@modules/training/training.schema";
+} from "@modules/training/training.validation";
 import * as ctrl from "@modules/training/training.controller";
 
 const router = Router();

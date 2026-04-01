@@ -12,7 +12,7 @@ import {
   RegisterInput,
   LoginInput,
   InviteInput,
-} from "@modules/auth/auth.schema";
+} from "@modules/auth/auth.validation";
 import {
   sendPasswordResetEmail,
   sendPasswordChangedEmail,

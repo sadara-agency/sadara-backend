@@ -21,7 +21,7 @@ import type {
   StandingQuery,
   FixtureQuery,
   TeamMapQuery,
-} from "@modules/saff/saff.schema";
+} from "@modules/saff/saff.validation";
 
 // ── Tournaments ──
 

@@ -7,7 +7,7 @@ import {
   updateTicketSchema,
   updateTicketStatusSchema,
   ticketQuerySchema,
-} from "./ticket.schema";
+} from "./ticket.validation";
 import * as ticketController from "./ticket.controller";
 
 const router = Router();

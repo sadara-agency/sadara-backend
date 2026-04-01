@@ -1,8 +1,8 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/users/user.schema.ts
+// src/modules/users/user.validation.ts
 // Zod validation schemas for the User CRUD module.
 //
-// NOTE: This is separate from auth.schema.ts (register/login).
+// NOTE: This is separate from auth.validation.ts (register/login).
 // This module is for admin user management — creating users
 // on behalf of the org, updating roles, deactivating, etc.
 // ─────────────────────────────────────────────────────────────
@@ -18,8 +18,15 @@ const USER_ROLES = [
   "Legal",
   "Finance",
   "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
   "Media",
   "Executive",
+  "GoalkeeperCoach",
+  "MentalCoach",
 ] as const;
 
 // ── Create User (Admin creates a new team member) ──

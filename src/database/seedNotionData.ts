@@ -415,7 +415,7 @@ async function seedNotionSessions() {
     id: string;
     playerId: string;
     triggerDesc: string;
-    status: "Open" | "Resolved";
+    status: "Open" | "Closed";
     notes?: string;
     resultingTicketId?: string;
   }
@@ -425,19 +425,19 @@ async function seedNotionSessions() {
       id: IDS.notionSessions[0],
       playerId: pid(7),
       triggerDesc: "تحليل مباراة هجر",
-      status: "Resolved",
+      status: "Closed",
     },
     {
       id: IDS.notionSessions[1],
       playerId: pid(16),
       triggerDesc: "تحليل مباراة التعاون",
-      status: "Resolved",
+      status: "Closed",
     },
     {
       id: IDS.notionSessions[2],
       playerId: pid(3),
       triggerDesc: "تحليل مباراة الحزم",
-      status: "Resolved",
+      status: "Closed",
     },
     {
       id: IDS.notionSessions[3],
@@ -449,55 +449,55 @@ async function seedNotionSessions() {
       id: IDS.notionSessions[4],
       playerId: pid(13),
       triggerDesc: "تحليل مباراة الوطن",
-      status: "Resolved",
+      status: "Closed",
       notes: "مناقشة تأثير لعب المباراناة المترة السابقة",
     },
     {
       id: IDS.notionSessions[5],
       playerId: pid(7),
       triggerDesc: "تحليل مباراة الكلوب",
-      status: "Resolved",
+      status: "Closed",
     },
     {
       id: IDS.notionSessions[6],
       playerId: pid(10),
       triggerDesc: "تحليل مباراة مجد الملوذة",
-      status: "Resolved",
+      status: "Closed",
       notes: "نقاش حول اسلوب التعامل مع الكرات العالية",
     },
     {
       id: IDS.notionSessions[7],
       playerId: pid(7),
       triggerDesc: "تحليل مباراة الصفا",
-      status: "Resolved",
+      status: "Closed",
       notes: "تطور في اختراق العمق الجانبي",
     },
     {
       id: IDS.notionSessions[8],
       playerId: pid(1),
       triggerDesc: "تحليل مباراة التعاون",
-      status: "Resolved",
+      status: "Closed",
       notes: "اسيست في المباراة",
     },
     {
       id: IDS.notionSessions[9],
       playerId: pid(3),
       triggerDesc: "تحليل مباراة التعاون",
-      status: "Resolved",
+      status: "Closed",
       notes: "اداء ممتاز و احراز هدفين",
     },
     {
       id: IDS.notionSessions[10],
       playerId: pid(12),
       triggerDesc: "تحليل مباراة الشباب",
-      status: "Resolved",
+      status: "Closed",
       notes: "اخطاء عدم طلب الكرة",
     },
     {
       id: IDS.notionSessions[11],
       playerId: pid(11),
       triggerDesc: "تحليل مباراة الشباب",
-      status: "Resolved",
+      status: "Closed",
       notes: "التعامل الارضي ممتاز",
       resultingTicketId: IDS.notionTickets[4], // تمرين مسح بصري
     },
@@ -512,35 +512,35 @@ async function seedNotionSessions() {
       id: IDS.notionSessions[13],
       playerId: pid(3),
       triggerDesc: "تحليل مباراة احد",
-      status: "Resolved",
+      status: "Closed",
       notes: "احراز هدفين",
     },
     {
       id: IDS.notionSessions[14],
       playerId: pid(1),
       triggerDesc: "تحليل مباراة احد",
-      status: "Resolved",
+      status: "Closed",
       notes: "اداء جيد",
     },
     {
       id: IDS.notionSessions[15],
       playerId: pid(12),
       triggerDesc: "تحليل مباراة الباطن",
-      status: "Resolved",
+      status: "Closed",
       notes: "تحسن في القرار",
     },
     {
       id: IDS.notionSessions[16],
       playerId: pid(11),
       triggerDesc: "تحليل مباراة الباطن",
-      status: "Resolved",
+      status: "Closed",
       notes: "خروج لاصابة",
     },
     {
       id: IDS.notionSessions[17],
       playerId: pid(8),
       triggerDesc: "تحليل مباراة الروضة",
-      status: "Resolved",
+      status: "Closed",
       notes: "تحسن في اللعب الجماعي",
     },
     {
@@ -554,35 +554,35 @@ async function seedNotionSessions() {
       id: IDS.notionSessions[19],
       playerId: pid(13),
       triggerDesc: "تحليل مباراة الرائد",
-      status: "Resolved",
+      status: "Closed",
       notes: "تحسن في الراسيات و اللعب الجماعي",
     },
     {
       id: IDS.notionSessions[20],
       playerId: pid(3),
       triggerDesc: "تحليل مباراة الاهلي",
-      status: "Resolved",
+      status: "Closed",
       notes: "مروقيات ممسية",
     },
     {
       id: IDS.notionSessions[21],
       playerId: pid(1),
       triggerDesc: "تحليل مباراة الاهلي",
-      status: "Resolved",
+      status: "Closed",
       notes: "اداء جيد و زيادي بدنية",
     },
     {
       id: IDS.notionSessions[22],
       playerId: pid(4),
       triggerDesc: "تحليل مباراة الوطن",
-      status: "Resolved",
+      status: "Closed",
       notes: "اداء في تحسن",
     },
     {
       id: IDS.notionSessions[23],
       playerId: pid(10),
       triggerDesc: "تحليل مباراة العروبة",
-      status: "Resolved",
+      status: "Closed",
       notes: "تحليل المباراة مع ذكر المزايا و العيوب",
       resultingTicketId: IDS.notionTickets[0], // تمرين على الارتقاء
     },
@@ -590,7 +590,7 @@ async function seedNotionSessions() {
       id: IDS.notionSessions[24],
       playerId: pid(10),
       triggerDesc: "تحليل مباراة الفتح",
-      status: "Resolved",
+      status: "Closed",
       notes: "اداء جيد",
     },
   ];
@@ -609,7 +609,7 @@ async function seedNotionSessions() {
         resultingTicketId: s.resultingTicketId ?? null,
         assignedTo: IDS.users.analyst, // محلل أداء
         createdBy: IDS.users.analyst,
-        resolvedAt: s.status === "Resolved" ? new Date() : null,
+        closedAt: s.status === "Closed" ? new Date() : null,
       } as any,
     });
   }

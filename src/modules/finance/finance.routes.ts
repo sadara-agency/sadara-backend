@@ -18,7 +18,7 @@ import {
   updateExpenseSchema,
   expenseQuerySchema,
   dashboardQuerySchema,
-} from "@modules/finance/finance.schema";
+} from "@modules/finance/finance.validation";
 import * as ctrl from "@modules/finance/finance.controller";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 

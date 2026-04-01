@@ -11,8 +11,15 @@ const ROLES = [
   "Legal",
   "Finance",
   "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
   "Media",
   "Executive",
+  "GoalkeeperCoach",
+  "MentalCoach",
 ] as const;
 
 const templateStepSchema = z.object({

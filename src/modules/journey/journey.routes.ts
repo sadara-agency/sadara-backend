@@ -7,7 +7,7 @@ import {
   updateJourneySchema,
   journeyQuerySchema,
   reorderStagesSchema,
-} from "./journey.schema";
+} from "./journey.validation";
 import * as journeyController from "./journey.controller";
 
 const router = Router();

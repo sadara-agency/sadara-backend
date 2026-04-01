@@ -3,7 +3,7 @@ import {
   updateReferralSchema,
   updateReferralStatusSchema,
   referralQuerySchema,
-} from '../../../src/modules/referrals/referral.schema';
+} from '../../../src/modules/referrals/referral.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 
@@ -28,9 +28,12 @@ describe('Referral Schemas', () => {
 
   describe('updateReferralStatusSchema', () => {
     it('should accept valid status', () => {
-      expect(updateReferralStatusSchema.safeParse({ status: 'Resolved' }).success).toBe(true);
+      expect(updateReferralStatusSchema.safeParse({ status: 'Closed', closureNotes: 'Done' }).success).toBe(true);
     });
     it('should reject invalid status', () => {
+      expect(updateReferralStatusSchema.safeParse({ status: 'Resolved' }).success).toBe(false);
+    });
+    it('should require closureNotes when closing', () => {
       expect(updateReferralStatusSchema.safeParse({ status: 'Closed' }).success).toBe(false);
     });
   });

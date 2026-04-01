@@ -23,7 +23,7 @@ import {
   UpdateClubInput,
   CreateContactInput,
   UpdateContactInput,
-} from "@modules/clubs/club.schema";
+} from "@modules/clubs/club.validation";
 
 // ── Shared computed attributes ──
 // Player count is a simple correlated subquery (one table).

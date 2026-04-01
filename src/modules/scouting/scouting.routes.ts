@@ -12,7 +12,7 @@ import {
   updateScreeningSchema,
   markPackReadySchema,
   createDecisionSchema,
-} from "@modules/scouting/scouting.schema";
+} from "@modules/scouting/scouting.validation";
 import * as ctrl from "@modules/scouting/scouting.controller";
 import { generatePackPdf } from "@modules/scouting/scouting.pdf.controller";
 

@@ -16,7 +16,7 @@ import type {
   CreateInjuryInput,
   UpdateInjuryInput,
   AddInjuryUpdateInput,
-} from "@modules/injuries/injury.schema";
+} from "@modules/injuries/injury.validation";
 import { generateCriticalInjuryTask } from "@modules/injuries/injuryAutoTasks";
 import { generateAutoReferralForInjury } from "@modules/injuries/injuryAutoReferral";
 import { AuthUser } from "@shared/types";
@@ -192,7 +192,7 @@ export async function createInjury(
 // ── Sync linked case status when injury status changes ──
 
 const INJURY_TO_CASE_STATUS: Record<string, string> = {
-  Recovered: "Resolved",
+  Recovered: "Closed",
   Relapsed: "Open",
   Chronic: "InProgress",
   UnderTreatment: "InProgress",
@@ -213,9 +213,9 @@ async function syncCaseFromInjury(
   if (!newCaseStatus || linkedCase.status === newCaseStatus) return;
 
   const updateData: Record<string, unknown> = { status: newCaseStatus };
-  if (newCaseStatus === "Resolved") updateData.resolvedAt = new Date();
-  if (newCaseStatus === "Open" && linkedCase.resolvedAt)
-    updateData.resolvedAt = null;
+  if (newCaseStatus === "Closed") updateData.closedAt = new Date();
+  if (newCaseStatus === "Open" && linkedCase.closedAt)
+    updateData.closedAt = null;
 
   await linkedCase.update(updateData, t ? { transaction: t } : undefined);
 }

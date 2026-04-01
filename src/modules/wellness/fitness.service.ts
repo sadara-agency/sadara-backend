@@ -24,7 +24,7 @@ import type {
   CreateAssignmentInput,
   UpdateAssignmentInput,
   LogWorkoutInput,
-} from "./wellness.schema";
+} from "./wellness.validation";
 
 // ══════════════════════════════════════════
 // EXERCISES

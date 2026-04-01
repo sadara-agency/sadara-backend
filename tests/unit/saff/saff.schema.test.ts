@@ -3,7 +3,7 @@ import {
   fetchRequestSchema,
   mapTeamSchema,
   importRequestSchema,
-} from '../../../src/modules/saff/saff.schema';
+} from '../../../src/modules/saff/saff.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

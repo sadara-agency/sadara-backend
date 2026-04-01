@@ -78,6 +78,8 @@ export async function listReferrals(
 
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.referralType) where.referralType = queryParams.referralType;
+  if (queryParams.referralTarget)
+    where.referralTarget = queryParams.referralTarget;
   if (queryParams.priority) where.priority = queryParams.priority;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   if (queryParams.assignedTo) where.assignedTo = queryParams.assignedTo;
@@ -133,6 +135,25 @@ export async function getReferralById(
   return referral;
 }
 
+// ── Check Duplicate ──
+
+export async function checkDuplicate(playerId: string, referralType: string) {
+  const existing = await Referral.findAll({
+    where: {
+      playerId,
+      referralType,
+      status: { [Op.in]: ["Open", "InProgress", "Waiting"] },
+    },
+    include: [
+      { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+      { model: User, as: "assignee", attributes: [...USER_ATTRS] },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  return { duplicates: existing };
+}
+
 // ── Create ──
 
 export async function createReferral(input: any, userId: string) {
@@ -140,6 +161,17 @@ export async function createReferral(input: any, userId: string) {
 
   if (input.assignedTo) {
     await findOrThrow(User, input.assignedTo, "Assigned user");
+  }
+
+  // Auto-assignment: if referralTarget is provided but no assignedTo
+  if (input.referralTarget && !input.assignedTo) {
+    const targetUser = await User.findOne({
+      where: { role: input.referralTarget, isActive: true } as any,
+      attributes: ["id"],
+    });
+    if (targetUser) {
+      input.assignedTo = targetUser.id;
+    }
   }
 
   // Mental referrals are automatically restricted
@@ -215,10 +247,6 @@ export async function updateReferral(
 ) {
   const referral = await getReferralById(id, userId, userRole);
 
-  if (referral.status === "Resolved") {
-    throw new AppError("Cannot modify a resolved referral", 400);
-  }
-
   // Track assignment change
   if (input.assignedTo && input.assignedTo !== referral.assignedTo) {
     input.assignedAt = new Date();
@@ -263,35 +291,36 @@ export async function updateReferralStatus(
   if (input.outcome) updateData.outcome = input.outcome;
   if (input.notes) updateData.notes = input.notes;
 
-  if (input.status === "Resolved") {
-    updateData.resolvedAt = new Date();
+  if (input.status === "Closed") {
+    updateData.closedAt = new Date();
+    if (input.closureNotes) updateData.closureNotes = input.closureNotes;
   }
 
-  // Notify on escalation
-  if (input.status === "Escalated") {
+  // Handle re-opening: from Closed to another status
+  if (referral.status === "Closed" && input.status !== "Closed") {
+    updateData.closedAt = null;
+
     const player = referral.get("player") as any;
     const playerName = player
       ? `${player.firstName} ${player.lastName}`.trim()
       : "";
 
-    notifyByRole(["Admin"], {
+    notifyByRole(["Admin", "Manager"], {
       type: "referral",
-      title: `Referral ESCALATED: ${playerName}`,
-      titleAr: `إحالة مصعّدة: ${playerName}`,
-      body: input.notes || `Referral ${id} escalated`,
+      title: `Referral re-opened: ${playerName}`,
+      titleAr: `إحالة أعيد فتحها: ${playerName}`,
+      body: input.notes || `Referral ${id} re-opened`,
       link: `/dashboard/referrals/${id}`,
       sourceType: "referral",
       sourceId: id,
-      priority: "critical",
-    }).catch((err) =>
-      logger.error("Failed to send escalation notification", err),
-    );
+      priority: "high",
+    }).catch((err) => logger.error("Failed to send re-open notification", err));
   }
 
   await referral.update(updateData);
 
-  // Reverse sync: if case resolved and has linked injury, recover the injury
-  if (input.status === "Resolved" && referral.injuryId) {
+  // Reverse sync: if case closed and has linked injury, recover the injury
+  if (input.status === "Closed" && referral.injuryId) {
     syncInjuryFromCase(referral.injuryId, referral.playerId).catch((err) =>
       logger.warn("Injury sync from case failed", {
         referralId: id,
@@ -304,7 +333,7 @@ export async function updateReferralStatus(
 }
 
 /**
- * When a Medical case is resolved, mark the linked injury as Recovered
+ * When a Medical case is closed, mark the linked injury as Recovered
  * and reset the player's status to active if no other active injuries remain.
  */
 async function syncInjuryFromCase(
@@ -341,8 +370,8 @@ export async function deleteReferral(
 ) {
   const referral = await getReferralById(id, userId, userRole);
 
-  if (referral.status === "Resolved") {
-    throw new AppError("Cannot delete a resolved referral", 400);
+  if (referral.status === "Closed") {
+    throw new AppError("Cannot delete a closed referral", 400);
   }
 
   await referral.destroy();

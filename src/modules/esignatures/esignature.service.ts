@@ -23,7 +23,7 @@ import type {
   CreateSignatureRequestInput,
   SubmitSignatureInput,
   SignatureRequestQuery,
-} from "./esignature.schema";
+} from "./esignature.validation";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr", "email"] as const;
 const TOKEN_EXPIRY_DAYS = 7;

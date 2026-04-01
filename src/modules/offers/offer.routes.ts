@@ -8,7 +8,7 @@ import {
   updateOfferSchema,
   updateOfferStatusSchema,
   offerQuerySchema,
-} from "@modules/offers/offer.schema";
+} from "@modules/offers/offer.validation";
 import * as offerController from "@modules/offers/offer.controller";
 
 const router = Router();

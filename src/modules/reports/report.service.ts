@@ -5,7 +5,7 @@ import { Club } from "@modules/clubs/club.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
-import { CreateReportInput } from "@modules/reports/report.schema";
+import { CreateReportInput } from "@modules/reports/report.validation";
 import { generateReportPdf } from "@modules/reports/report.pdf";
 import { logger } from "@config/logger";
 import { generateReportFailedTask } from "@modules/reports/reportAutoTasks";

@@ -6,7 +6,7 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   CreateMediaContactInput,
   UpdateMediaContactInput,
-} from "./mediaContact.schema";
+} from "./mediaContact.validation";
 
 // ── List ──
 

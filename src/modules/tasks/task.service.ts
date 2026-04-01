@@ -16,7 +16,10 @@ import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
-import { CreateTaskInput, UpdateTaskInput } from "@modules/tasks/task.schema";
+import {
+  CreateTaskInput,
+  UpdateTaskInput,
+} from "@modules/tasks/task.validation";
 import { AuthUser } from "@shared/types";
 import {
   buildRowScope,

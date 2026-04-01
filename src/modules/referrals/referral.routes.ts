@@ -7,7 +7,8 @@ import {
   updateReferralSchema,
   updateReferralStatusSchema,
   referralQuerySchema,
-} from "@modules/referrals/referral.schema";
+  checkDuplicateSchema,
+} from "@modules/referrals/referral.validation";
 import * as referralController from "@modules/referrals/referral.controller";
 
 const router = Router();
@@ -19,6 +20,12 @@ router.get(
   authorizeModule("referrals", "read"),
   validate(referralQuerySchema, "query"),
   asyncHandler(referralController.list),
+);
+router.get(
+  "/check-duplicate",
+  authorizeModule("referrals", "read"),
+  validate(checkDuplicateSchema, "query"),
+  asyncHandler(referralController.checkDuplicate),
 );
 router.get(
   "/:id",

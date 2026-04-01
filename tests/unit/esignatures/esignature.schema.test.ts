@@ -4,7 +4,7 @@ import {
   submitSignatureSchema,
   declineSignatureSchema,
   signatureRequestQuerySchema,
-} from '../../../src/modules/esignatures/esignature.schema';
+} from '../../../src/modules/esignatures/esignature.validation';
 
 describe('E-Signature Schemas', () => {
   describe('createSignatureRequestSchema', () => {

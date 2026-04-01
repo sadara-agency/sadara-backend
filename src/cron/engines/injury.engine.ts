@@ -332,7 +332,7 @@ export async function checkInjuryRecurrence(): Promise<{
           playerId: row.player_id,
           referralType: "Medical",
           triggerRuleId: "injury_recurrence" as any,
-          status: { [Op.notIn]: ["Resolved"] },
+          status: { [Op.notIn]: ["Closed"] },
         },
       });
 

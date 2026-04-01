@@ -3,7 +3,7 @@ import { AppError } from "@middleware/errorHandler";
 import type {
   CreateContractTemplateInput,
   UpdateContractTemplateInput,
-} from "@modules/contracts/contractTemplate.schema";
+} from "@modules/contracts/contractTemplate.validation";
 
 export async function listContractTemplates() {
   return ContractTemplate.findAll({

@@ -136,10 +136,11 @@ describe('Referral Service', () => {
       expect(ref.update).toHaveBeenCalled();
     });
 
-    it('should throw 400 if resolved', async () => {
-      const ref = mockModelInstance(mockReferral({ status: 'Resolved', isRestricted: false }));
+    it('should allow updating any status (no block on Closed)', async () => {
+      const ref = mockModelInstance(mockReferral({ status: 'Closed', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await expect(referralService.updateReferral('ref-001', {}, 'user-001', 'Admin')).rejects.toThrow('Cannot modify a resolved referral');
+      await referralService.updateReferral('ref-001', { notes: 'Reopened' }, 'user-001', 'Admin');
+      expect(ref.update).toHaveBeenCalled();
     });
   });
 
@@ -151,11 +152,11 @@ describe('Referral Service', () => {
       expect(ref.update).toHaveBeenCalled();
     });
 
-    it('should set resolvedAt when Resolved', async () => {
+    it('should set closedAt when Closed', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'InProgress', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await referralService.updateReferralStatus('ref-001', { status: 'Resolved' }, 'user-001', 'Admin');
-      expect(ref.update).toHaveBeenCalledWith(expect.objectContaining({ resolvedAt: expect.any(Date) }));
+      await referralService.updateReferralStatus('ref-001', { status: 'Closed', closureNotes: 'Done' }, 'user-001', 'Admin');
+      expect(ref.update).toHaveBeenCalledWith(expect.objectContaining({ closedAt: expect.any(Date) }));
     });
   });
 
@@ -168,10 +169,10 @@ describe('Referral Service', () => {
       expect(result).toEqual({ id: 'ref-001' });
     });
 
-    it('should throw 400 if resolved', async () => {
-      const ref = mockModelInstance(mockReferral({ status: 'Resolved', isRestricted: false }));
+    it('should throw 400 if closed', async () => {
+      const ref = mockModelInstance(mockReferral({ status: 'Closed', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await expect(referralService.deleteReferral('ref-001', 'user-001', 'Admin')).rejects.toThrow('Cannot delete a resolved referral');
+      await expect(referralService.deleteReferral('ref-001', 'user-001', 'Admin')).rejects.toThrow('Cannot delete a closed referral');
     });
   });
 });

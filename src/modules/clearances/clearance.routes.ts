@@ -12,7 +12,7 @@ import {
   updateClearanceSchema,
   completeClearanceSchema,
   clearanceQuerySchema,
-} from "@modules/clearances/clearance.schema";
+} from "@modules/clearances/clearance.validation";
 
 const router = Router();
 

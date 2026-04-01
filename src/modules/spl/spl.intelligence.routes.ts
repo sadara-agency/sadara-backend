@@ -15,7 +15,7 @@ import {
   updateAlertConfigSchema,
   toggleCompetitionSchema,
   updateConfigSchema,
-} from "@modules/spl/spl.intelligence.schema";
+} from "@modules/spl/spl.intelligence.validation";
 
 const router = Router();
 router.use(authenticate);

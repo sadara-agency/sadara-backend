@@ -15,7 +15,10 @@ import { env } from "@config/env";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
-import { CreateUserInput, UpdateUserInput } from "@modules/users/user.schema";
+import {
+  CreateUserInput,
+  UpdateUserInput,
+} from "@modules/users/user.validation";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {

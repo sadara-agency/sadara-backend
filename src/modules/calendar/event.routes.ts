@@ -7,7 +7,7 @@ import {
   createEventSchema,
   updateEventSchema,
   eventQuerySchema,
-} from "@modules/calendar/event.schema";
+} from "@modules/calendar/event.validation";
 import * as eventController from "@modules/calendar/event.controller";
 
 const router = Router();

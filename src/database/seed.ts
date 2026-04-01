@@ -87,6 +87,8 @@ const ALL_ROLES = [
   "GymCoach",
   "Media",
   "Executive",
+  "GoalkeeperCoach",
+  "MentalCoach",
 ];
 
 function allRoles(module: string, flags: Partial<Perm>): Perm[] {
@@ -386,6 +388,10 @@ const RAW_PERMISSIONS: Perm[] = [
   // Tickets
   ...allRoles("tickets", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("tickets", ["Admin", "Manager"], { canDelete: true }),
+
+  // Sessions
+  ...allRoles("sessions", { canRead: true, canCreate: true, canUpdate: true }),
+  ...forRoles("sessions", ["Admin", "Manager"], { canDelete: true }),
 
   ...allRoles("notifications", {
     canRead: true,
@@ -2200,7 +2206,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
         referralType: "Mental" as any,
         playerId: IDS.players[3],
         triggerDesc: "Post-match anxiety, resolved with counseling",
-        status: "Resolved" as any,
+        status: "Closed" as any,
         priority: "Low" as any,
         assignedTo: IDS.users.analyst,
         createdBy: IDS.users.agent,

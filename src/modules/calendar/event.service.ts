@@ -9,7 +9,7 @@ import { sequelize } from "@config/database";
 import type {
   CreateEventInput,
   UpdateEventInput,
-} from "@modules/calendar/event.schema";
+} from "@modules/calendar/event.validation";
 
 // ── Shared includes ──
 const EVENT_INCLUDES = [

@@ -12,7 +12,7 @@ import {
   syncAllSchema,
   seedClubIdsSchema,
   syncDetailedStatsSchema,
-} from "@modules/spl/spl.schema";
+} from "@modules/spl/spl.validation";
 import * as c from "@modules/spl/spl.controller";
 
 const router = Router();

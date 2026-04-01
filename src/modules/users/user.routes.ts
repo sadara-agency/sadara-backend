@@ -17,7 +17,7 @@ import {
   updateUserSchema,
   resetPasswordSchema,
   userQuerySchema,
-} from "@modules/users/user.schema";
+} from "@modules/users/user.validation";
 import * as userController from "@modules/users/user.controller";
 
 const router = Router();

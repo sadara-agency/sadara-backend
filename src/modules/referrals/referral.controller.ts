@@ -43,6 +43,14 @@ export async function getById(req: AuthRequest, res: Response) {
 
 export const { create } = crud;
 
+export async function checkDuplicate(req: AuthRequest, res: Response) {
+  const result = await referralService.checkDuplicate(
+    req.query.playerId as string,
+    req.query.referralType as string,
+  );
+  sendSuccess(res, result);
+}
+
 // Override update/remove to pass user context
 export async function update(req: AuthRequest, res: Response) {
   const referral = await referralService.updateReferral(

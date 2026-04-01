@@ -6,7 +6,7 @@ import * as svc from "@modules/contracts/contractTemplate.service";
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
-} from "@modules/contracts/contractTemplate.schema";
+} from "@modules/contracts/contractTemplate.validation";
 
 export async function listTemplates(_req: AuthRequest, res: Response) {
   const data = await svc.listContractTemplates();
