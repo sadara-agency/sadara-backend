@@ -8,7 +8,7 @@ import {
   competitionQuerySchema,
   addClubSchema,
   clubsQuerySchema,
-} from "@modules/competitions/competition.schema";
+} from "@modules/competitions/competition.validation";
 import * as ctrl from "@modules/competitions/competition.controller";
 
 const router = Router();

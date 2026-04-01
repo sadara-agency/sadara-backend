@@ -7,7 +7,7 @@ import {
   createMediaContactSchema,
   updateMediaContactSchema,
   mediaContactQuerySchema,
-} from "./mediaContact.schema";
+} from "./mediaContact.validation";
 import * as mediaContactController from "./mediaContact.controller";
 
 const router = Router();

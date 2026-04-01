@@ -5,7 +5,7 @@ import { validate } from "@middleware/validate";
 import {
   createReportSchema,
   reportQuerySchema,
-} from "@modules/reports/report.schema";
+} from "@modules/reports/report.validation";
 import * as ctrl from "@modules/reports/report.controller";
 
 const router = Router();

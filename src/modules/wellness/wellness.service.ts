@@ -31,7 +31,7 @@ import type {
   CreateMealLogInput,
   UpdateMealLogInput,
   CopyDayInput,
-} from "./wellness.schema";
+} from "./wellness.validation";
 import type {
   MacroComputeResponse,
   WeightTrendResponse,

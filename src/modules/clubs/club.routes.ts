@@ -9,7 +9,7 @@ import {
   clubQuerySchema,
   createContactSchema,
   updateContactSchema,
-} from "@modules/clubs/club.schema";
+} from "@modules/clubs/club.validation";
 import * as clubController from "@modules/clubs/club.controller";
 
 const router = Router();

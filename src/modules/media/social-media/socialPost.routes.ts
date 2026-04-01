@@ -7,7 +7,7 @@ import {
   updateSocialPostSchema,
   updateSocialPostStatusSchema,
   socialPostQuerySchema,
-} from "./socialPost.schema";
+} from "./socialPost.validation";
 import * as socialPostController from "./socialPost.controller";
 
 const router = Router();

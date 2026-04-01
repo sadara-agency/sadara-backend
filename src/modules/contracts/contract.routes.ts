@@ -10,14 +10,14 @@ import {
   contractQuerySchema,
   transitionStatusSchema,
   terminateContractSchema,
-} from "@modules/contracts/contract.schema";
+} from "@modules/contracts/contract.validation";
 import * as contractController from "@modules/contracts/contract.controller";
 import * as templateController from "@modules/contracts/contractTemplate.controller";
 import { getByContract as getClearancesByContract } from "@modules/clearances/clearance.controller";
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
-} from "@modules/contracts/contractTemplate.schema";
+} from "@modules/contracts/contractTemplate.validation";
 import { transitionContract } from "@modules/contracts/contract.transition.controller";
 import { generatePdf } from "@modules/contracts/contract.pdf.controller";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";

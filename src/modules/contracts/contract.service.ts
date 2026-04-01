@@ -18,7 +18,7 @@ import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
   CreateContractInput,
   UpdateContractInput,
-} from "@modules/contracts/contract.schema";
+} from "@modules/contracts/contract.validation";
 import { generateContractCreationTask } from "@modules/contracts/contractAutoTasks";
 import { isApprovalChainResolved } from "@modules/approvals/approval.service";
 import { logger } from "@config/logger";

@@ -11,7 +11,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-} from "@modules/auth/auth.schema";
+} from "@modules/auth/auth.validation";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
 import * as authController from "@modules/auth/auth.controller";
 

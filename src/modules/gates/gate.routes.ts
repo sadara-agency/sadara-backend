@@ -10,7 +10,7 @@ import {
   createChecklistItemSchema,
   toggleChecklistItemSchema,
   gateQuerySchema,
-} from "@modules/gates/gate.schema";
+} from "@modules/gates/gate.validation";
 import * as gateController from "@modules/gates/gate.controller";
 
 const router = Router();

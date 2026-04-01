@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/clearances/clearance.schema.ts
+// src/modules/clearances/clearance.validation.ts
 // Zod validation schemas for clearance (مخالصة) endpoints.
 // ─────────────────────────────────────────────────────────────
 import { z } from "zod";

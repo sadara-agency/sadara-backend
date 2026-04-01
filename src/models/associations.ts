@@ -9,6 +9,7 @@ import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
+import { Session } from "@modules/sessions/session.model";
 import {
   Watchlist,
   ScreeningCase,
@@ -190,6 +191,14 @@ export function setupAssociations() {
     foreignKey: "resultingTicketId",
     as: "resultingTicket",
   });
+
+  // Sessions
+  Session.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Player.hasMany(Session, { foreignKey: "playerId", as: "sessions" });
+  Session.belongsTo(Referral, { foreignKey: "referralId", as: "referral" });
+  Referral.hasMany(Session, { foreignKey: "referralId", as: "sessions" });
+  Session.belongsTo(User, { foreignKey: "responsibleId", as: "responsible" });
+  Session.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 
   // Scouting
   Watchlist.belongsTo(User, { foreignKey: "scoutedBy", as: "scout" });

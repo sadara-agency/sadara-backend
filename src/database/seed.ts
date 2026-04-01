@@ -87,6 +87,8 @@ const ALL_ROLES = [
   "GymCoach",
   "Media",
   "Executive",
+  "GoalkeeperCoach",
+  "MentalCoach",
 ];
 
 function allRoles(module: string, flags: Partial<Perm>): Perm[] {
@@ -386,6 +388,10 @@ const RAW_PERMISSIONS: Perm[] = [
   // Tickets
   ...allRoles("tickets", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("tickets", ["Admin", "Manager"], { canDelete: true }),
+
+  // Sessions
+  ...allRoles("sessions", { canRead: true, canCreate: true, canUpdate: true }),
+  ...forRoles("sessions", ["Admin", "Manager"], { canDelete: true }),
 
   ...allRoles("notifications", {
     canRead: true,

@@ -11,7 +11,7 @@ import type {
   UpdateCompetitionInput,
   CompetitionQuery,
   AddClubInput,
-} from "@modules/competitions/competition.schema";
+} from "@modules/competitions/competition.validation";
 
 // ── List ──
 

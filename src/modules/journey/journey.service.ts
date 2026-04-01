@@ -7,7 +7,7 @@ import type {
   UpdateJourneyInput,
   JourneyQuery,
   ReorderStagesInput,
-} from "./journey.schema";
+} from "./journey.validation";
 import { sequelize } from "@config/database";
 
 // ── List with filters + pagination ──

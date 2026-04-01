@@ -8,7 +8,7 @@ import * as chainSvc from "@modules/approvals/approvalChain.service";
 import {
   createTemplateSchema,
   updateTemplateSchema,
-} from "@modules/approvals/approvalChain.schema";
+} from "@modules/approvals/approvalChain.validation";
 
 // ── List Approvals ──
 

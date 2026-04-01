@@ -5,8 +5,21 @@ import { z } from "zod";
 export const playerCareQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  category: z.enum(["Performance", "Mental", "Medical"]).optional(),
-  status: z.enum(["Open", "InProgress", "Resolved", "Escalated"]).optional(),
+  category: z
+    .enum([
+      "Performance",
+      "Physical",
+      "Skill",
+      "Tactical",
+      "Mental",
+      "Nutrition",
+      "Medical",
+      "Administrative",
+      "SportDecision",
+      "Goalkeeper",
+    ])
+    .optional(),
+  status: z.enum(["Open", "InProgress", "Waiting", "Closed"]).optional(),
   priority: z.enum(["Low", "Medium", "High", "Critical"]).optional(),
   playerId: z.string().uuid().optional(),
   assignedTo: z.string().uuid().optional(),
@@ -96,7 +109,8 @@ export const updateCaseSchema = z.object({
 // ── Update Case Status ──
 
 export const updateCaseStatusSchema = z.object({
-  status: z.enum(["Open", "InProgress", "Resolved", "Escalated"]),
+  status: z.enum(["Open", "InProgress", "Waiting", "Closed"]),
+  closureNotes: z.string().optional(),
   outcome: z.string().optional(),
   notes: z.string().optional(),
 });

@@ -16,7 +16,7 @@ import { logger } from "@config/logger";
 import type {
   CreateTemplateInput,
   UpdateTemplateInput,
-} from "@modules/approvals/approvalChain.schema";
+} from "@modules/approvals/approvalChain.validation";
 
 const USER_ATTRS = ["id", "fullName", "role"] as const;
 

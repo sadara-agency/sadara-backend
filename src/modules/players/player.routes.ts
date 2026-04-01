@@ -10,7 +10,7 @@ import {
   createPlayerSchema,
   updatePlayerSchema,
   playerQuerySchema,
-} from "@modules/players/utils/player.schema";
+} from "@modules/players/utils/player.validation";
 import * as playerController from "@modules/players/player.controller";
 
 const router = Router();

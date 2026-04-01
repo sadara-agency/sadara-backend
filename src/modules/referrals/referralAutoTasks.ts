@@ -84,7 +84,7 @@ export async function checkReferralOverdue(): Promise<{ created: number }> {
 
   const overdue = await Referral.findAll({
     where: {
-      status: { [Op.in]: ["Open", "InProgress"] },
+      status: { [Op.in]: ["Open", "InProgress", "Waiting"] },
       dueDate: { [Op.lt]: today },
     },
     include: [

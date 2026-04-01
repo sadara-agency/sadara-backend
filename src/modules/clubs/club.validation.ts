@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/clubs/club.schema.ts
+// src/modules/clubs/club.validation.ts
 // Zod validation schemas for the Club module.
 //
 // Updated: Added exported inferred types to match the pattern
-// used in player.schema.ts, user.schema.ts, task.schema.ts,
-// and contract.schema.ts.
+// used in player.validation.ts, user.validation.ts, task.validation.ts,
+// and contract.validation.ts.
 // ─────────────────────────────────────────────────────────────
 import { z } from "zod";
 

@@ -297,3 +297,12 @@ export async function getPlayerAttention(_req: AuthRequest, res: Response) {
   const data = await getPlayerAttentionData();
   sendSuccess(res, data);
 }
+
+// GET /dashboard/sports-manager — operational overview for sports manager
+export async function getSportsManagerOverview(
+  _req: AuthRequest,
+  res: Response,
+) {
+  const data = await dashboardService.getSportsManagerOverview();
+  sendSuccess(res, camelCaseKeys(data as Record<string, unknown>));
+}

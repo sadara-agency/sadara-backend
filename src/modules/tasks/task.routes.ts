@@ -22,7 +22,7 @@ import {
   updateTaskSchema,
   updateStatusSchema,
   taskQuerySchema,
-} from "@modules/tasks/task.schema";
+} from "@modules/tasks/task.validation";
 import * as taskController from "@modules/tasks/task.controller";
 
 const router = Router();

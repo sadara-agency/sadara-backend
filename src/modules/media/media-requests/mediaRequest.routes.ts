@@ -8,7 +8,7 @@ import {
   updateMediaRequestSchema,
   updateMediaRequestStatusSchema,
   mediaRequestQuerySchema,
-} from "./mediaRequest.schema";
+} from "./mediaRequest.validation";
 import * as mediaRequestController from "./mediaRequest.controller";
 
 const router = Router();

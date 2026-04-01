@@ -16,7 +16,9 @@ export type UserRole =
   | "NutritionSpecialist"
   | "GymCoach"
   | "Media"
-  | "Executive";
+  | "Executive"
+  | "GoalkeeperCoach"
+  | "MentalCoach";
 
 export interface ApiResponse<T = any> {
   success: boolean;

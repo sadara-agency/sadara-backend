@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// src/modules/tasks/task.schema.ts
+// src/modules/tasks/task.validation.ts
 // Zod validation schemas for the Task module.
 //
 // These were previously defined inline in task.routes.ts.

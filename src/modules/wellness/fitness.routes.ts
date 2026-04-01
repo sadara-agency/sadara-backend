@@ -14,7 +14,7 @@ import {
   createAssignmentSchema,
   updateAssignmentSchema,
   logWorkoutSchema,
-} from "./wellness.schema";
+} from "./wellness.validation";
 import * as ctrl from "./fitness.controller";
 
 const router = Router();

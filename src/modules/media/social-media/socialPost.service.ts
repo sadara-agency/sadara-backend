@@ -10,7 +10,7 @@ import {
   CreateSocialPostInput,
   UpdateSocialPostInput,
   UpdateSocialPostStatusInput,
-} from "./socialPost.schema";
+} from "./socialPost.validation";
 
 // ── Includes ──
 

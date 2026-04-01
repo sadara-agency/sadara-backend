@@ -9,7 +9,7 @@ import {
   CreateMediaRequestInput,
   UpdateMediaRequestInput,
   UpdateMediaRequestStatusInput,
-} from "./mediaRequest.schema";
+} from "./mediaRequest.validation";
 
 // ── Valid status transitions ──
 

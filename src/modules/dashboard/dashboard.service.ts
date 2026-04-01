@@ -991,3 +991,141 @@ export async function getOperationalEfficiency() {
     CacheTTL.MEDIUM,
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// SPORTS MANAGER DASHBOARD
+// ═══════════════════════════════════════════════════════════════
+
+export async function getSportsManagerOverview() {
+  return cacheOrFetch(
+    `${P}:sports-manager`,
+    async () => {
+      const [
+        sessionsByOwner,
+        thisWeekSessions,
+        incompleteSessions,
+        lateSessions,
+        openReferralsCount,
+        referralsByResponsible,
+        criticalReferrals,
+        waitingReferrals,
+      ] = await Promise.all([
+        // 1. Sessions grouped by program_owner
+        sequelize.query(
+          `SELECT program_owner, completion_status, COUNT(*)::int AS count
+           FROM sessions
+           GROUP BY program_owner, completion_status
+           ORDER BY program_owner`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 2. This week's sessions
+        sequelize.query(
+          `SELECT s.id, s.session_type, s.program_owner, s.session_date,
+                  s.completion_status, s.notes,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar,
+                  u.full_name AS responsible_name
+           FROM sessions s
+           JOIN players p ON s.player_id = p.id
+           LEFT JOIN users u ON s.responsible_id = u.id
+           WHERE s.session_date >= date_trunc('week', CURRENT_DATE)
+             AND s.session_date < date_trunc('week', CURRENT_DATE) + INTERVAL '7 days'
+           ORDER BY s.session_date ASC
+           LIMIT 50`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 3. Incomplete sessions (Scheduled, not past date)
+        sequelize.query(
+          `SELECT s.id, s.session_type, s.program_owner, s.session_date,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
+           FROM sessions s
+           JOIN players p ON s.player_id = p.id
+           WHERE s.completion_status = 'Scheduled'
+           ORDER BY s.session_date ASC
+           LIMIT 20`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 4. Late sessions (past date, not completed)
+        sequelize.query(
+          `SELECT s.id, s.session_type, s.program_owner, s.session_date,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
+           FROM sessions s
+           JOIN players p ON s.player_id = p.id
+           WHERE s.session_date < CURRENT_DATE
+             AND s.completion_status NOT IN ('Completed', 'Cancelled')
+           ORDER BY s.session_date ASC
+           LIMIT 20`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 5. Open referrals count
+        sequelize.query(
+          `SELECT COUNT(*)::int AS count
+           FROM referrals
+           WHERE status IN ('Open', 'InProgress', 'Waiting')`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 6. Referrals by responsible
+        sequelize.query(
+          `SELECT u.full_name AS responsible_name,
+                  COALESCE(u.full_name_ar, u.full_name) AS responsible_name_ar,
+                  COUNT(*)::int AS count
+           FROM referrals r
+           JOIN users u ON r.assigned_to = u.id
+           WHERE r.status IN ('Open', 'InProgress', 'Waiting')
+           GROUP BY u.id, u.full_name, u.full_name_ar
+           ORDER BY count DESC`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 7. Critical/urgent referrals
+        sequelize.query(
+          `SELECT r.id, r.referral_type, r.referral_target, r.priority, r.status,
+                  r.created_at, r.due_date,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
+           FROM referrals r
+           JOIN players p ON r.player_id = p.id
+           WHERE r.priority IN ('Critical', 'High')
+             AND r.status IN ('Open', 'InProgress', 'Waiting')
+           ORDER BY CASE r.priority WHEN 'Critical' THEN 1 WHEN 'High' THEN 2 END,
+                    r.created_at ASC
+           LIMIT 10`,
+          { type: QueryTypes.SELECT },
+        ),
+
+        // 8. Waiting referrals
+        sequelize.query(
+          `SELECT r.id, r.referral_type, r.referral_target, r.priority,
+                  r.created_at, r.due_date,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar
+           FROM referrals r
+           JOIN players p ON r.player_id = p.id
+           WHERE r.status = 'Waiting'
+           ORDER BY r.created_at ASC
+           LIMIT 20`,
+          { type: QueryTypes.SELECT },
+        ),
+      ]);
+
+      return {
+        sessionsByOwner,
+        thisWeekSessions,
+        incompleteSessions,
+        lateSessions,
+        openReferralsCount: (openReferralsCount as any[])[0]?.count ?? 0,
+        referralsByResponsible,
+        criticalReferrals,
+        waitingReferrals,
+      };
+    },
+    CacheTTL.SHORT,
+  );
+}

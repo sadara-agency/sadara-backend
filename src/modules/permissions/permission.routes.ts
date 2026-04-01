@@ -18,7 +18,7 @@ import { CONFIGURABLE_FIELDS } from "@modules/permissions/fieldPermission.config
 import {
   updatePermissionsSchema,
   updateFieldPermissionsSchema,
-} from "@modules/permissions/permission.schema";
+} from "@modules/permissions/permission.validation";
 import { permissionMutationLimiter } from "@middleware/rateLimiter";
 
 const router = Router();

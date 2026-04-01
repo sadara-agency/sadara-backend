@@ -8,7 +8,7 @@ import {
   updateInjurySchema,
   addInjuryUpdateSchema,
   injuryQuerySchema,
-} from "@modules/injuries/injury.schema";
+} from "@modules/injuries/injury.validation";
 import * as ctrl from "@modules/injuries/injury.controller";
 
 const router = Router();

@@ -16,7 +16,7 @@ import type {
   CreateInjuryInput,
   UpdateInjuryInput,
   AddInjuryUpdateInput,
-} from "@modules/injuries/injury.schema";
+} from "@modules/injuries/injury.validation";
 import { generateCriticalInjuryTask } from "@modules/injuries/injuryAutoTasks";
 import { generateAutoReferralForInjury } from "@modules/injuries/injuryAutoReferral";
 import { AuthUser } from "@shared/types";

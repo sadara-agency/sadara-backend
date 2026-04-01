@@ -5,7 +5,7 @@ import type {
   CreateTicketInput,
   UpdateTicketInput,
   TicketQuery,
-} from "./ticket.schema";
+} from "./ticket.validation";
 
 // ── List with filters + pagination ──
 export async function listTickets(query: TicketQuery) {

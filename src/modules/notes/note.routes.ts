@@ -7,7 +7,7 @@ import {
   createNoteSchema,
   updateNoteSchema,
   noteQuerySchema,
-} from "@modules/notes/note.schema";
+} from "@modules/notes/note.validation";
 import * as noteController from "@modules/notes/note.controller";
 
 const router = Router();

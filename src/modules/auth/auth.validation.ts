@@ -36,6 +36,8 @@ export const inviteSchema = z.object({
     "GymCoach",
     "Media",
     "Executive",
+    "GoalkeeperCoach",
+    "MentalCoach",
   ]),
 });
 

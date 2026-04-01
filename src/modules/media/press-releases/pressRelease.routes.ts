@@ -8,7 +8,7 @@ import {
   updatePressReleaseSchema,
   updatePressReleaseStatusSchema,
   pressReleaseQuerySchema,
-} from "./pressRelease.schema";
+} from "./pressRelease.validation";
 import * as pressReleaseController from "./pressRelease.controller";
 
 const router = Router();

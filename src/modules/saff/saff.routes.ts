@@ -10,7 +10,7 @@ import {
   teamMapQuerySchema,
   mapTeamSchema,
   importRequestSchema,
-} from "@modules/saff/saff.schema";
+} from "@modules/saff/saff.validation";
 import * as saffController from "@modules/saff/saff.controller";
 
 const router = Router();

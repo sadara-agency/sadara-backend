@@ -6,7 +6,7 @@ import {
   generatePlayerKitSchema,
   generateSquadKitSchema,
   mediaKitHistoryQuerySchema,
-} from "./mediaKit.schema";
+} from "./mediaKit.validation";
 import * as mediaKitController from "./mediaKit.controller";
 
 const router = Router();

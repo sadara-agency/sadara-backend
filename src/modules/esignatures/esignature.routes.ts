@@ -7,7 +7,7 @@ import {
   submitSignatureSchema,
   declineSignatureSchema,
   signatureRequestQuerySchema,
-} from "./esignature.schema";
+} from "./esignature.validation";
 import * as ctrl from "./esignature.controller";
 
 const router = Router();

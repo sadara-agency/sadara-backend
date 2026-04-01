@@ -9,7 +9,7 @@ import {
   CreatePressReleaseInput,
   UpdatePressReleaseInput,
   UpdatePressReleaseStatusInput,
-} from "./pressRelease.schema";
+} from "./pressRelease.validation";
 
 // ── Valid status transitions ──
 

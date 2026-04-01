@@ -201,4 +201,22 @@ router.get(
   asyncHandler(dashboardController.getApprovalBottleneck),
 );
 
+// ── Sports Manager Dashboard ──
+router.get(
+  "/sports-manager",
+  authorize(
+    "Admin",
+    "Manager",
+    "Coach",
+    "SkillCoach",
+    "TacticalCoach",
+    "FitnessCoach",
+    "NutritionSpecialist",
+    "GoalkeeperCoach",
+    "MentalCoach",
+  ),
+  cacheRoute("dash", CacheTTL.SHORT),
+  asyncHandler(dashboardController.getSportsManagerOverview),
+);
+
 export default router;

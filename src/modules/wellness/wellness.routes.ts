@@ -17,7 +17,7 @@ import {
   createMyMealLogSchema,
   copyDaySchema,
   copyMyDaySchema,
-} from "./wellness.schema";
+} from "./wellness.validation";
 import * as ctrl from "./wellness.controller";
 
 const router = Router();

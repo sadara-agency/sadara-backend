@@ -1,19 +1,39 @@
 import { z } from "zod";
 
-const referralTypes = ["Performance", "Mental", "Medical"] as const;
-const referralStatuses = [
-  "Open",
-  "InProgress",
-  "Resolved",
-  "Escalated",
+const referralTypes = [
+  "Performance", // legacy
+  "Physical",
+  "Skill",
+  "Tactical",
+  "Mental",
+  "Nutrition",
+  "Medical",
+  "Administrative",
+  "SportDecision",
+  "Goalkeeper",
 ] as const;
+
+const referralStatuses = ["Open", "InProgress", "Waiting", "Closed"] as const;
 const referralPriorities = ["Low", "Medium", "High", "Critical"] as const;
+
+const referralTargets = [
+  "FitnessCoach",
+  "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "GoalkeeperCoach",
+  "Analyst",
+  "NutritionSpecialist",
+  "MentalCoach",
+  "Manager",
+] as const;
 
 // ── Create Referral ──
 
 export const createReferralSchema = z.object({
   referralType: z.enum(referralTypes),
   playerId: z.string().uuid("Invalid player ID"),
+  referralTarget: z.enum(referralTargets).optional(),
   triggerDesc: z.string().optional(),
   priority: z.enum(referralPriorities).default("Medium"),
   assignedTo: z.string().uuid().optional(),
@@ -27,6 +47,7 @@ export const createReferralSchema = z.object({
 
 export const updateReferralSchema = z.object({
   referralType: z.enum(referralTypes).optional(),
+  referralTarget: z.enum(referralTargets).nullable().optional(),
   priority: z.enum(referralPriorities).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   dueDate: z.string().nullable().optional(),
@@ -39,10 +60,28 @@ export const updateReferralSchema = z.object({
 
 // ── Update Status ──
 
-export const updateReferralStatusSchema = z.object({
-  status: z.enum(referralStatuses),
-  outcome: z.string().optional(),
-  notes: z.string().optional(),
+export const updateReferralStatusSchema = z
+  .object({
+    status: z.enum(referralStatuses),
+    outcome: z.string().optional(),
+    notes: z.string().optional(),
+    closureNotes: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      data.status !== "Closed" ||
+      (data.closureNotes && data.closureNotes.length > 0),
+    {
+      message: "closureNotes is required when closing a referral",
+      path: ["closureNotes"],
+    },
+  );
+
+// ── Check Duplicate ──
+
+export const checkDuplicateSchema = z.object({
+  playerId: z.string().uuid("Invalid player ID"),
+  referralType: z.enum(referralTypes),
 });
 
 // ── Query Referrals ──
@@ -64,6 +103,7 @@ export const referralQuerySchema = z.object({
   search: z.string().optional(),
   status: z.enum(referralStatuses).optional(),
   referralType: z.enum(referralTypes).optional(),
+  referralTarget: z.enum(referralTargets).optional(),
   priority: z.enum(referralPriorities).optional(),
   playerId: z.string().uuid().optional(),
   assignedTo: z.string().uuid().optional(),
@@ -76,4 +116,5 @@ export type UpdateReferralInput = z.infer<typeof updateReferralSchema>;
 export type UpdateReferralStatusInput = z.infer<
   typeof updateReferralStatusSchema
 >;
+export type CheckDuplicateInput = z.infer<typeof checkDuplicateSchema>;
 export type ReferralQuery = z.infer<typeof referralQuerySchema>;

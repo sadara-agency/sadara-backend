@@ -6,7 +6,7 @@ import {
   createDocumentSchema,
   updateDocumentSchema,
   documentQuerySchema,
-} from "@modules/documents/document.schema";
+} from "@modules/documents/document.validation";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
 import { uploadLimiter } from "@middleware/rateLimiter";
 import * as ctrl from "@modules/documents/document.controller";

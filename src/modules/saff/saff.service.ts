@@ -32,7 +32,7 @@ import type {
   TeamMapQuery,
   MapTeamInput,
   ImportRequest,
-} from "@modules/saff/saff.schema";
+} from "@modules/saff/saff.validation";
 
 // ══════════════════════════════════════════
 // HELPERS

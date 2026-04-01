@@ -17,7 +17,7 @@ import {
   playerMatchesQuerySchema,
   createMatchAnalysisSchema,
   updateMatchAnalysisSchema,
-} from "@modules/matches/match.schema";
+} from "@modules/matches/match.validation";
 import * as ctrl from "@modules/matches/match.controller";
 
 const router = Router();

@@ -18,7 +18,7 @@ import type {
   UpdateEnrollmentInput,
   TrackActivityInput,
   SelfUpdateProgressInput,
-} from "@modules/training/training.schema";
+} from "@modules/training/training.validation";
 
 const PLAYER_ATTRS = [
   "id",
