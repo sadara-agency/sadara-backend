@@ -5,7 +5,7 @@ import {
   ConversationParticipant,
   Message,
 } from "./conversation.model";
-import User from "@modules/users/user.model";
+import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { publishMessageEvent } from "@modules/notifications/notification.sse";
 import type {

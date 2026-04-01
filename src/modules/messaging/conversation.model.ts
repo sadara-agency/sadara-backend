@@ -256,7 +256,7 @@ Message.init(
 // Associations
 // ═══════════════════════════════════════
 
-import User from "@modules/users/user.model";
+import { User } from "@modules/users/user.model";
 
 Conversation.hasMany(ConversationParticipant, {
   as: "participants",
