@@ -9,6 +9,25 @@ const EVENT_TYPES = [
   "Custom",
 ] as const;
 
+/** Extended types returned by the aggregated endpoint (includes virtual sources). */
+const ALL_EVENT_TYPES = [
+  ...EVENT_TYPES,
+  "Session",
+  "Match",
+  "TaskDeadline",
+  "ReferralDeadline",
+] as const;
+
+const SOURCE_TYPES = [
+  "calendar",
+  "session",
+  "match",
+  "task",
+  "referral",
+  "contract",
+  "gate",
+] as const;
+
 const ATTENDEE_TYPES = ["player", "user"] as const;
 
 const attendeeSchema = z.object({
@@ -73,7 +92,8 @@ export const eventQuerySchema = z.object({
     .default("start_date"),
   order: z.enum(["asc", "desc"]).default("asc"),
   search: z.string().optional(),
-  eventType: z.enum(EVENT_TYPES).optional(),
+  eventType: z.enum(ALL_EVENT_TYPES).optional(),
+  sourceType: z.enum(SOURCE_TYPES).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
   playerId: z.string().uuid().optional(),

@@ -17,9 +17,13 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("calendar", "read"),
-  dynamicFieldAccess("calendar"),
   validate(eventQuerySchema, "query"),
   asyncHandler(eventController.list),
+);
+router.get(
+  "/source/:sourceType/:sourceId",
+  authorizeModule("calendar", "read"),
+  asyncHandler(eventController.getSourceDetail),
 );
 router.get(
   "/:id",
