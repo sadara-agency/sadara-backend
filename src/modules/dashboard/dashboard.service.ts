@@ -659,22 +659,36 @@ export async function getEmployeePerformance(limit = 20) {
     cacheKey,
     async () => {
       const rows = await sequelize.query<Record<string, unknown>>(
-        `SELECT
+        `WITH action_counts AS (
+           SELECT user_id, COUNT(*)::int AS actions_30d
+           FROM audit_logs
+           WHERE logged_at >= NOW() - INTERVAL '30 days'
+           GROUP BY user_id
+         ),
+         completed_counts AS (
+           SELECT assigned_to, COUNT(*)::int AS tasks_completed_30d
+           FROM tasks
+           WHERE status = 'Completed'
+             AND completed_at >= NOW() - INTERVAL '30 days'
+           GROUP BY assigned_to
+         ),
+         overdue_counts AS (
+           SELECT assigned_to, COUNT(*)::int AS overdue_tasks
+           FROM tasks
+           WHERE status NOT IN ('Completed', 'Canceled')
+             AND due_date < CURRENT_DATE
+           GROUP BY assigned_to
+         )
+         SELECT
            u.id, u.full_name, u.full_name_ar, u.role, u.avatar_url,
            u.last_login,
-           (SELECT COUNT(*)::int FROM audit_logs al
-            WHERE al.user_id = u.id AND al.logged_at >= NOW() - INTERVAL '30 days'
-           ) AS actions_30d,
-           (SELECT COUNT(*)::int FROM tasks t
-            WHERE t.assigned_to = u.id AND t.status = 'Completed'
-            AND t.completed_at >= NOW() - INTERVAL '30 days'
-           ) AS tasks_completed_30d,
-           (SELECT COUNT(*)::int FROM tasks t
-            WHERE t.assigned_to = u.id
-            AND t.status NOT IN ('Completed', 'Canceled')
-            AND t.due_date < CURRENT_DATE
-           ) AS overdue_tasks
+           COALESCE(a.actions_30d, 0) AS actions_30d,
+           COALESCE(c.tasks_completed_30d, 0) AS tasks_completed_30d,
+           COALESCE(o.overdue_tasks, 0) AS overdue_tasks
          FROM users u
+         LEFT JOIN action_counts a ON a.user_id = u.id
+         LEFT JOIN completed_counts c ON c.assigned_to = u.id
+         LEFT JOIN overdue_counts o ON o.assigned_to = u.id
          WHERE u.is_active = true AND u.role != 'Player'
          ORDER BY actions_30d DESC
          LIMIT $1`,
@@ -878,13 +892,13 @@ export async function getLegalTurnaround() {
          LEFT JOIN LATERAL (
            SELECT logged_at FROM audit_logs
            WHERE entity = 'contracts' AND entity_id = c.id::TEXT
-             AND detail ILIKE '%Review%'
+             AND action = 'UPDATE' AND detail ILIKE '%Review%'
            ORDER BY logged_at ASC LIMIT 1
          ) review_log ON true
          LEFT JOIN LATERAL (
            SELECT logged_at FROM audit_logs
            WHERE entity = 'contracts' AND entity_id = c.id::TEXT
-             AND detail ILIKE '%Signing%'
+             AND action = 'UPDATE' AND detail ILIKE '%Signing%'
              AND logged_at > review_log.logged_at
            ORDER BY logged_at ASC LIMIT 1
          ) completed_log ON true
@@ -902,7 +916,7 @@ export async function getLegalTurnaround() {
          JOIN LATERAL (
            SELECT logged_at FROM audit_logs
            WHERE entity = 'contracts' AND entity_id = c.id::TEXT
-             AND detail ILIKE '%Review%'
+             AND action = 'UPDATE' AND detail ILIKE '%Review%'
            ORDER BY logged_at DESC LIMIT 1
          ) al ON true
          WHERE c.status = 'Review'

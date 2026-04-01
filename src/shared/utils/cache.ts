@@ -76,7 +76,7 @@ export async function cacheDel(key: string): Promise<boolean> {
 
   try {
     const client = getRedisClient()!;
-    await client.del(key);
+    await client.unlink(key);
     return true;
   } catch (err: any) {
     logger.warn(`Cache DEL failed [${key}]`, { error: err.message });
@@ -107,7 +107,7 @@ export async function invalidateByPrefix(prefix: string): Promise<number> {
       cursor = String(result.cursor);
 
       if (result.keys.length > 0) {
-        await client.del(result.keys);
+        await client.unlink(result.keys);
         deletedCount += result.keys.length;
       }
     } while (cursor !== "0");
