@@ -61,9 +61,29 @@ function sendToUser(userId: string, payload: SSENotificationPayload): void {
   }
 }
 
+// ── Generic SSE sender (used by both notifications and messaging) ──
+
+function sendEventToUser(userId: string, event: string, data: unknown): void {
+  const userConns = connections.get(userId);
+  if (!userConns || userConns.size === 0) return;
+
+  for (const res of userConns) {
+    const ok = sendSSE(res, event, data);
+    if (!ok) {
+      userConns.delete(res);
+      logger.debug(`Removed dead SSE connection for user ${userId}`);
+    }
+  }
+
+  if (userConns.size === 0) {
+    connections.delete(userId);
+  }
+}
+
 // ── Redis Pub/Sub ──
 
 const CHANNEL_PREFIX = "notifications:";
+const MSG_CHANNEL_PREFIX = "messages:";
 
 export async function initSSESubscriber(): Promise<void> {
   const mainClient = getRedisClient();
@@ -90,6 +110,24 @@ export async function initSSESubscriber(): Promise<void> {
           sendToUser(userId, payload);
         } catch (err) {
           logger.error("SSE: Failed to parse Redis message", {
+            channel,
+            error: (err as Error).message,
+          });
+        }
+      },
+    );
+
+    // Subscribe to messaging channels: messages:{userId}
+    await subscriberClient.pSubscribe(
+      `${MSG_CHANNEL_PREFIX}*`,
+      (message: string, channel: string) => {
+        const userId = channel.slice(MSG_CHANNEL_PREFIX.length);
+        if (!userId) return;
+        try {
+          const { event, data } = JSON.parse(message);
+          sendEventToUser(userId, event, data);
+        } catch (err) {
+          logger.error("SSE: Failed to parse messaging event", {
             channel,
             error: (err as Error).message,
           });
@@ -133,12 +171,41 @@ export async function publishNotification(
   sendToUser(userId, payload);
 }
 
+// ── Messaging Event Publisher ──
+
+export async function publishMessageEvent(
+  userId: string,
+  event: string,
+  data: unknown,
+): Promise<void> {
+  const mainClient = getRedisClient();
+  const payload = JSON.stringify({ event, data });
+
+  if (mainClient) {
+    try {
+      await mainClient.publish(`${MSG_CHANNEL_PREFIX}${userId}`, payload);
+      return;
+    } catch (err) {
+      logger.debug(
+        "SSE: Redis publish (messaging) failed, falling back to local",
+        {
+          error: (err as Error).message,
+        },
+      );
+    }
+  }
+
+  // Fallback: deliver directly to local connections
+  sendEventToUser(userId, event, data);
+}
+
 export async function closeSSESubscriber(): Promise<void> {
   if (subscriberClient) {
     try {
       await withTimeout(
         subscriberClient
           .pUnsubscribe(`${CHANNEL_PREFIX}*`)
+          .then(() => subscriberClient!.pUnsubscribe(`${MSG_CHANNEL_PREFIX}*`))
           .then(() => subscriberClient!.quit()),
         5_000,
         "SSE Redis close",

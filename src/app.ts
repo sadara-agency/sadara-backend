@@ -57,6 +57,7 @@ import mediaRoutes from "@modules/media/media.routes";
 import journeyRoutes from "@modules/journey/journey.routes";
 import ticketRoutes from "@modules/tickets/ticket.routes";
 import sessionRoutes from "@modules/sessions/session.routes";
+import messagingRoutes from "@modules/messaging/messaging.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -281,6 +282,7 @@ app.use("/api/v1/media", mediaRoutes);
 app.use("/api/v1/journey", journeyRoutes);
 app.use("/api/v1/tickets", ticketRoutes);
 app.use("/api/v1/sessions", sessionRoutes);
+app.use("/api/v1/messaging", messagingRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(
