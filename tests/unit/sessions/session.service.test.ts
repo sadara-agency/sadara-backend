@@ -93,7 +93,7 @@ describe('Session Service', () => {
     it('should create session and increment referral sessionCount', async () => {
       const player = mockModelInstance(mockPlayer());
       mockPlayerFindByPk.mockResolvedValue(player);
-      const referral = mockModelInstance({ id: 'referral-001', sessionCount: 0 });
+      const referral = mockModelInstance({ id: 'referral-001', playerId: 'player-001', sessionCount: 0 });
       mockReferralFindByPk.mockResolvedValue(referral);
       const created = mockSession();
       mockSessionCreate.mockResolvedValue(created);
