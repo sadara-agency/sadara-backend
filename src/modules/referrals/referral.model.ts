@@ -46,7 +46,6 @@ export interface ReferralAttributes {
   assignedAt?: Date | null;
   dueDate?: string | null;
   closedAt?: Date | null;
-  resolvedAt?: Date | null;
   closureNotes?: string | null;
   evidenceCount: number;
   sessionCount: number;
@@ -97,7 +96,6 @@ export class Referral
   declare assignedAt: Date | null;
   declare dueDate: string | null;
   declare closedAt: Date | null;
-  declare resolvedAt: Date | null;
   declare closureNotes: string | null;
   declare evidenceCount: number;
   declare sessionCount: number;
@@ -176,10 +174,6 @@ Referral.init(
     closedAt: {
       type: DataTypes.DATE,
       field: "closed_at",
-    },
-    resolvedAt: {
-      type: DataTypes.DATE,
-      field: "resolved_at",
     },
     closureNotes: {
       type: DataTypes.TEXT,

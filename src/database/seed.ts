@@ -2206,7 +2206,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
         referralType: "Mental" as any,
         playerId: IDS.players[3],
         triggerDesc: "Post-match anxiety, resolved with counseling",
-        status: "Resolved" as any,
+        status: "Closed" as any,
         priority: "Low" as any,
         assignedTo: IDS.users.analyst,
         createdBy: IDS.users.agent,

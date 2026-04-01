@@ -1,4 +1,5 @@
 import { sequelize } from "@config/database";
+import { QueryTypes } from "sequelize";
 
 /**
  * Migration 064: Unified Case Model
@@ -46,14 +47,21 @@ export async function up() {
     )
   `);
 
-  // 2. Set resolved_at for migrated recovered injuries
+  // 2. Set resolved/closed date for migrated recovered injuries
+  // Column may be resolved_at (existing DB) or closed_at (fresh DB from model sync)
+  const [hasResolved] = await sequelize.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'referrals' AND column_name = 'resolved_at'`,
+    { type: QueryTypes.SELECT },
+  );
+  const dateCol = hasResolved ? "resolved_at" : "closed_at";
   await sequelize.query(`
     UPDATE referrals r
-    SET resolved_at = i.actual_return_date::timestamp
+    SET ${dateCol} = i.actual_return_date::timestamp
     FROM injuries i
     WHERE r.injury_id = i.id
       AND r.status = 'Resolved'
-      AND r.resolved_at IS NULL
+      AND r.${dateCol} IS NULL
       AND i.actual_return_date IS NOT NULL
   `);
 

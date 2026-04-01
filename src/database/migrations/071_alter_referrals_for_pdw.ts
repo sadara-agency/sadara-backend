@@ -81,18 +81,33 @@ export async function up() {
   );
 
   // ── 4. Rename resolved_at → closed_at ──
-  // Check if resolved_at exists before renaming (idempotency)
+  // On fresh DBs, model sync already creates closed_at (no resolved_at exists).
+  // On existing DBs, resolved_at exists and needs renaming.
   const [resolvedCol] = await sequelize.query<{ column_name: string }>(
     `SELECT column_name FROM information_schema.columns
      WHERE table_name = 'referrals' AND column_name = 'resolved_at'`,
     { type: QueryTypes.SELECT },
   );
+  const [closedCol] = await sequelize.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'referrals' AND column_name = 'closed_at'`,
+    { type: QueryTypes.SELECT },
+  );
 
-  if (resolvedCol) {
+  if (resolvedCol && !closedCol) {
+    // Existing DB: rename the column
     await sequelize.query(
       `ALTER TABLE referrals RENAME COLUMN resolved_at TO closed_at`,
     );
+  } else if (resolvedCol && closedCol) {
+    // Both exist (model sync created closed_at, resolved_at from old migration):
+    // copy data then drop old column
+    await sequelize.query(
+      `UPDATE referrals SET closed_at = resolved_at WHERE resolved_at IS NOT NULL AND closed_at IS NULL`,
+    );
+    await sequelize.query(`ALTER TABLE referrals DROP COLUMN resolved_at`);
   }
+  // If only closed_at exists (fresh DB): nothing to do
 
   // ── 5. Add indexes ──
   await sequelize.query(`
