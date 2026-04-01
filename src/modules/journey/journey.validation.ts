@@ -38,6 +38,7 @@ export const createJourneySchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
     .optional(),
   assignedTo: z.string().uuid("Invalid user ID").optional(),
+  referralId: z.string().uuid("Invalid referral ID").optional(),
   responsibleParty: z.string().optional(),
   responsiblePartyAr: z.string().optional(),
   notes: z.string().optional(),
@@ -68,6 +69,7 @@ export const updateJourneySchema = z.object({
     .nullable()
     .optional(),
   assignedTo: z.string().uuid("Invalid user ID").nullable().optional(),
+  referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
   responsibleParty: z.string().nullable().optional(),
   responsiblePartyAr: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),

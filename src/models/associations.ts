@@ -10,6 +10,7 @@ import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
+import { Journey } from "@modules/journey/journey.model";
 import {
   Watchlist,
   ScreeningCase,
@@ -199,6 +200,18 @@ export function setupAssociations() {
   Referral.hasMany(Session, { foreignKey: "referralId", as: "sessions" });
   Session.belongsTo(User, { foreignKey: "responsibleId", as: "responsible" });
   Session.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  Session.belongsTo(Journey, {
+    foreignKey: "journeyStageId",
+    as: "journeyStage",
+  });
+  Journey.hasMany(Session, { foreignKey: "journeyStageId", as: "sessions" });
+
+  // Journey ↔ Referral
+  Journey.belongsTo(Referral, { foreignKey: "referralId", as: "referral" });
+  Referral.hasMany(Journey, { foreignKey: "referralId", as: "journeyStages" });
+
+  // Journey ↔ Player
+  Journey.belongsTo(Player, { foreignKey: "playerId", as: "player" });
 
   // Scouting
   Watchlist.belongsTo(User, { foreignKey: "scoutedBy", as: "scout" });

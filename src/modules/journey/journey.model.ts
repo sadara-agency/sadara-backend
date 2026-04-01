@@ -32,6 +32,7 @@ interface JourneyAttributes {
   expectedEndDate: string | null;
   actualEndDate: string | null;
   assignedTo: string | null;
+  referralId: string | null;
   responsibleParty: string | null;
   responsiblePartyAr: string | null;
   notes: string | null;
@@ -52,6 +53,7 @@ interface JourneyCreationAttributes extends Optional<
   | "expectedEndDate"
   | "actualEndDate"
   | "assignedTo"
+  | "referralId"
   | "responsibleParty"
   | "responsiblePartyAr"
   | "notes"
@@ -77,6 +79,7 @@ export class Journey
   declare expectedEndDate: string | null;
   declare actualEndDate: string | null;
   declare assignedTo: string | null;
+  declare referralId: string | null;
   declare responsibleParty: string | null;
   declare responsiblePartyAr: string | null;
   declare notes: string | null;
@@ -142,6 +145,10 @@ Journey.init(
     assignedTo: {
       type: DataTypes.UUID,
       field: "assigned_to",
+    },
+    referralId: {
+      type: DataTypes.UUID,
+      field: "referral_id",
     },
     responsibleParty: {
       type: DataTypes.STRING(255),

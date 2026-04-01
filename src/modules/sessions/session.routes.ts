@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 import { validate } from "@middleware/validate";
 import {
   createSessionSchema,
@@ -16,27 +19,36 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("sessions", "read"),
+  dynamicFieldAccess("sessions"),
+  cacheRoute("sessions", CacheTTL.MEDIUM),
   validate(sessionQuerySchema, "query"),
   asyncHandler(sessionController.list),
 );
 router.get(
   "/stats",
   authorizeModule("sessions", "read"),
+  cacheRoute("sessions-stats", CacheTTL.SHORT),
   asyncHandler(sessionController.stats),
 );
 router.get(
   "/referral/:referralId",
   authorizeModule("sessions", "read"),
+  dynamicFieldAccess("sessions"),
+  cacheRoute("sessions", CacheTTL.MEDIUM),
   asyncHandler(sessionController.listByReferral),
 );
 router.get(
   "/player/:playerId",
   authorizeModule("sessions", "read"),
+  dynamicFieldAccess("sessions"),
+  cacheRoute("sessions", CacheTTL.MEDIUM),
   asyncHandler(sessionController.listByPlayer),
 );
 router.get(
   "/:id",
   authorizeModule("sessions", "read"),
+  dynamicFieldAccess("sessions"),
+  cacheRoute("session", CacheTTL.MEDIUM),
   asyncHandler(sessionController.getById),
 );
 

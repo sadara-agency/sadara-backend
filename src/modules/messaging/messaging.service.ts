@@ -132,9 +132,14 @@ export async function listConversations(
        (
          SELECT json_build_object(
            'id', m.id, 'content', m.content, 'contentAr', m.content_ar,
-           'senderId', m.sender_id, 'createdAt', m.created_at
+           'senderId', m.sender_id, 'createdAt', m.created_at,
+           'sender', json_build_object(
+             'id', u2.id, 'fullName', u2.full_name,
+             'fullNameAr', u2.full_name_ar, 'avatarUrl', u2.avatar_url
+           )
          )
          FROM messages m
+         LEFT JOIN users u2 ON u2.id = m.sender_id
          WHERE m.conversation_id = c.id
          ORDER BY m.created_at DESC LIMIT 1
        ) AS "lastMessage"
@@ -187,10 +192,18 @@ export async function listConversations(
   const data = rows.map((r) => ({
     ...r,
     participants: (participantMap.get(r.id as string) ?? []).map((p) => ({
+      id: p.id,
       userId: p.userId,
-      fullName: p.user?.fullName ?? "",
-      fullNameAr: p.user?.fullNameAr ?? null,
-      avatarUrl: p.user?.avatarUrl ?? null,
+      isArchived: p.isArchived,
+      isMuted: p.isMuted,
+      lastReadAt: p.lastReadAt,
+      joinedAt: p.joinedAt,
+      user: {
+        id: p.userId,
+        fullName: p.user?.fullName ?? "",
+        fullNameAr: p.user?.fullNameAr ?? null,
+        avatarUrl: p.user?.avatarUrl ?? null,
+      },
     })),
   }));
 

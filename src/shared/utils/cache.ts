@@ -28,6 +28,9 @@ export const CachePrefix = {
   REPORTS: "reports",
   CLEARANCES: "clearances",
   WELLNESS: "wellness",
+  SESSIONS: "sessions",
+  JOURNEY: "journey",
+  INJURIES: "injuries",
 } as const;
 
 // ── Core Operations ──

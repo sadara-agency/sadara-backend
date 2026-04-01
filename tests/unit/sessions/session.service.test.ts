@@ -29,6 +29,9 @@ jest.mock('../../../src/modules/referrals/referral.model', () => ({
 jest.mock('../../../src/modules/users/user.model', () => ({
   User: { findByPk: jest.fn(), name: 'User' },
 }));
+jest.mock('../../../src/modules/journey/journey.model', () => ({
+  Journey: { findByPk: jest.fn(), name: 'Journey' },
+}));
 
 import * as sessionService from '../../../src/modules/sessions/session.service';
 
@@ -90,7 +93,7 @@ describe('Session Service', () => {
     it('should create session and increment referral sessionCount', async () => {
       const player = mockModelInstance(mockPlayer());
       mockPlayerFindByPk.mockResolvedValue(player);
-      const referral = mockModelInstance({ id: 'referral-001', sessionCount: 0 });
+      const referral = mockModelInstance({ id: 'referral-001', playerId: 'player-001', sessionCount: 0 });
       mockReferralFindByPk.mockResolvedValue(referral);
       const created = mockSession();
       mockSessionCreate.mockResolvedValue(created);
