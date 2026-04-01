@@ -12,6 +12,12 @@ import {
   createEmptyTechnicalAttributes,
 } from "@modules/players/utils/attributeConfig";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
+import {
+  cacheOrFetch,
+  buildCacheKey,
+  CacheTTL,
+  CachePrefix,
+} from "@shared/utils/cache";
 import { logger } from "@config/logger";
 import { AuthUser } from "@shared/types";
 import {
@@ -173,120 +179,147 @@ export async function listPlayers(queryParams: any, user?: AuthUser) {
     "createdAt",
   );
 
-  const where: any = {};
-
-  if (queryParams.status) where.status = queryParams.status;
-  if (queryParams.playerType) where.playerType = queryParams.playerType;
-  if (queryParams.clubId) where.currentClubId = queryParams.clubId;
-  if (queryParams.position) where.position = queryParams.position;
-  if (queryParams.nationality) where.nationality = queryParams.nationality;
-  if (queryParams.contractType) where.contractType = queryParams.contractType;
-
-  if (search) {
-    where[Op.or] = [
-      { firstName: { [Op.iLike]: `%${search}%` } },
-      { lastName: { [Op.iLike]: `%${search}%` } },
-      { firstNameAr: { [Op.iLike]: `%${search}%` } },
-      { lastNameAr: { [Op.iLike]: `%${search}%` } },
-      Sequelize.where(
-        Sequelize.fn(
-          "concat",
-          Sequelize.col("Player.first_name"),
-          " ",
-          Sequelize.col("Player.last_name"),
-        ),
-        { [Op.iLike]: `%${search}%` },
-      ),
-    ];
-  }
-
-  // Row-level scoping
-  const scope = buildRowScope("players", user);
-  if (scope) mergeScope(where, scope);
-
-  // Step 1: Base query with only lightweight computed attributes (name, age)
-  const { count, rows } = await Player.findAndCountAll({
-    where,
+  const cacheKey = buildCacheKey(CachePrefix.PLAYERS, {
     limit,
-    offset,
-    order: [[sort, order]],
-    attributes: { include: COMPUTED_ATTRIBUTES },
-    include: [
-      {
-        model: Club,
-        as: "club",
-        attributes: ["id", "name", "nameAr", "logoUrl"],
-      },
-      { model: User, as: "agent", attributes: ["id", "fullName"] },
-    ],
-    distinct: true,
-    subQuery: false,
+    page,
+    sort,
+    order,
+    search: search || undefined,
+    status: queryParams.status,
+    playerType: queryParams.playerType,
+    clubId: queryParams.clubId,
+    position: queryParams.position,
+    nationality: queryParams.nationality,
+    contractType: queryParams.contractType,
+    userId: user?.id,
   });
 
-  // Step 2: Batch-load stats for all player IDs in a single query
-  const playerIds = rows.map((r) => r.id);
-  const statsMap = await batchLoadPlayerStats(playerIds);
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const where: any = {};
 
-  // Step 3: Merge stats (converted to camelCase) into each player's plain object
-  const data = rows.map((row) => {
-    const plain = row.get({ plain: true });
-    const rawStats = statsMap.get(row.id) || {};
-    const stats = camelCaseKeys<Record<string, any>>(rawStats);
-    return {
-      ...plain,
-      contractStatus: stats.contractStatus ?? null,
-      contractEnd: stats.contractEnd ?? null,
-      commissionRate: stats.commissionRate ?? null,
-      matches: stats.matches ?? 0,
-      minutesPlayed: stats.minutesPlayed ?? 0,
-      goals: stats.goals ?? 0,
-      assists: stats.assists ?? 0,
-      rating: stats.rating ?? null,
-      performance: stats.performance ?? null,
-      tackles: stats.tackles ?? 0,
-      interceptions: stats.interceptions ?? 0,
-      duelsWon: stats.duelsWon ?? 0,
-      duelsTotal: stats.duelsTotal ?? 0,
-      dribblesCompleted: stats.dribblesCompleted ?? 0,
-      dribblesAttempted: stats.dribblesAttempted ?? 0,
-      keyPasses: stats.keyPasses ?? 0,
-      shotsOnTarget: stats.shotsOnTarget ?? 0,
-      saves: stats.saves ?? 0,
-      cleanSheets: stats.cleanSheets ?? 0,
-      goalsConceded: stats.goalsConceded ?? 0,
-      penaltiesSaved: stats.penaltiesSaved ?? 0,
-      hasProviderMapping: stats.hasProviderMapping ?? false,
-    };
-  });
+      if (queryParams.status) where.status = queryParams.status;
+      if (queryParams.playerType) where.playerType = queryParams.playerType;
+      if (queryParams.clubId) where.currentClubId = queryParams.clubId;
+      if (queryParams.position) where.position = queryParams.position;
+      if (queryParams.nationality) where.nationality = queryParams.nationality;
+      if (queryParams.contractType)
+        where.contractType = queryParams.contractType;
 
-  return { data, meta: buildMeta(count, page, limit) };
+      if (search) {
+        where[Op.or] = [
+          { firstName: { [Op.iLike]: `%${search}%` } },
+          { lastName: { [Op.iLike]: `%${search}%` } },
+          { firstNameAr: { [Op.iLike]: `%${search}%` } },
+          { lastNameAr: { [Op.iLike]: `%${search}%` } },
+          Sequelize.where(
+            Sequelize.fn(
+              "concat",
+              Sequelize.col("Player.first_name"),
+              " ",
+              Sequelize.col("Player.last_name"),
+            ),
+            { [Op.iLike]: `%${search}%` },
+          ),
+        ];
+      }
+
+      // Row-level scoping
+      const scope = buildRowScope("players", user);
+      if (scope) mergeScope(where, scope);
+
+      // Step 1: Base query with only lightweight computed attributes (name, age)
+      const { count, rows } = await Player.findAndCountAll({
+        where,
+        limit,
+        offset,
+        order: [[sort, order]],
+        attributes: { include: COMPUTED_ATTRIBUTES },
+        include: [
+          {
+            model: Club,
+            as: "club",
+            attributes: ["id", "name", "nameAr", "logoUrl"],
+          },
+          { model: User, as: "agent", attributes: ["id", "fullName"] },
+        ],
+        distinct: true,
+        subQuery: false,
+      });
+
+      // Step 2: Batch-load stats for all player IDs in a single query
+      const playerIds = rows.map((r) => r.id);
+      const statsMap = await batchLoadPlayerStats(playerIds);
+
+      // Step 3: Merge stats (converted to camelCase) into each player's plain object
+      const data = rows.map((row) => {
+        const plain = row.get({ plain: true });
+        const rawStats = statsMap.get(row.id) || {};
+        const stats = camelCaseKeys<Record<string, any>>(rawStats);
+        return {
+          ...plain,
+          contractStatus: stats.contractStatus ?? null,
+          contractEnd: stats.contractEnd ?? null,
+          commissionRate: stats.commissionRate ?? null,
+          matches: stats.matches ?? 0,
+          minutesPlayed: stats.minutesPlayed ?? 0,
+          goals: stats.goals ?? 0,
+          assists: stats.assists ?? 0,
+          rating: stats.rating ?? null,
+          performance: stats.performance ?? null,
+          tackles: stats.tackles ?? 0,
+          interceptions: stats.interceptions ?? 0,
+          duelsWon: stats.duelsWon ?? 0,
+          duelsTotal: stats.duelsTotal ?? 0,
+          dribblesCompleted: stats.dribblesCompleted ?? 0,
+          dribblesAttempted: stats.dribblesAttempted ?? 0,
+          keyPasses: stats.keyPasses ?? 0,
+          shotsOnTarget: stats.shotsOnTarget ?? 0,
+          saves: stats.saves ?? 0,
+          cleanSheets: stats.cleanSheets ?? 0,
+          goalsConceded: stats.goalsConceded ?? 0,
+          penaltiesSaved: stats.penaltiesSaved ?? 0,
+          hasProviderMapping: stats.hasProviderMapping ?? false,
+        };
+      });
+
+      return { data, meta: buildMeta(count, page, limit) };
+    },
+    CacheTTL.MEDIUM,
+  );
 }
 
 // ── Get Player by ID (With Aggregates) ──
 // Uses batchLoadPlayerStats (LATERAL joins) instead of 13+ correlated subqueries.
 export async function getPlayerById(id: string, user?: AuthUser) {
   // Run lightweight base query + batch stats + sidebar counts + perf history in parallel
-  const [player, statsMap, counts, performanceHistory] = await Promise.all([
-    Player.findByPk(id, {
-      attributes: { include: COMPUTED_ATTRIBUTES },
-      include: ["club", "agent"],
-    }),
-    batchLoadPlayerStats([id]),
-    getPlayerCounts(id),
-    sequelize
-      .query(
-        `SELECT
-         TO_CHAR(perf.created_at, 'YYYY-MM') as month,
-         ROUND(AVG(perf.average_rating), 1) as rating
-       FROM performances perf
-       WHERE perf.player_id = :id
-       GROUP BY TO_CHAR(perf.created_at, 'YYYY-MM')
-       ORDER BY month DESC
-       LIMIT 12`,
-        { replacements: { id }, type: QueryTypes.SELECT },
-      )
-      .catch(() => []),
-  ]);
+  const [player, statsMap, counts, performanceHistory, portalUser] =
+    await Promise.all([
+      Player.findByPk(id, {
+        attributes: { include: COMPUTED_ATTRIBUTES },
+        include: ["club", "agent"],
+      }),
+      batchLoadPlayerStats([id]),
+      getPlayerCounts(id),
+      sequelize
+        .query(
+          `SELECT
+           TO_CHAR(perf.created_at, 'YYYY-MM') as month,
+           ROUND(AVG(perf.average_rating), 1) as rating
+         FROM performances perf
+         WHERE perf.player_id = :id
+         GROUP BY TO_CHAR(perf.created_at, 'YYYY-MM')
+         ORDER BY month DESC
+         LIMIT 12`,
+          { replacements: { id }, type: QueryTypes.SELECT },
+        )
+        .catch(() => []),
+      User.findOne({
+        where: { playerId: id },
+        attributes: ["isActive", "inviteTokenExpiry"],
+      }),
+    ]);
 
   if (!player) throw new AppError("Player not found", 404);
 
@@ -300,10 +333,6 @@ export async function getPlayerById(id: string, user?: AuthUser) {
 
   // Determine portal account status for this player
   let portalStatus: "active" | "pending" | "expired" | null = null;
-  const portalUser = await User.findOne({
-    where: { playerId: id },
-    attributes: ["isActive", "inviteTokenExpiry"],
-  });
   if (portalUser) {
     if (portalUser.isActive) {
       portalStatus = "active";

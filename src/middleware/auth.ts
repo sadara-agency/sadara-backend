@@ -14,7 +14,7 @@ import { logger } from "@config/logger";
 // Throttle activity updates — at most once per 5 minutes per user
 const activityCache = new Map<string, number>();
 const ACTIVITY_THROTTLE_MS = 5 * 60 * 1000;
-const MAX_ACTIVITY_CACHE_SIZE = 5000;
+const MAX_ACTIVITY_CACHE_SIZE = 1000;
 
 function trackActivity(userId: string) {
   const now = Date.now();

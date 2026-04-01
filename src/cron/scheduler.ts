@@ -721,23 +721,27 @@ async function checkDocumentExpiry() {
       { replacements: { targetDate: dateStr }, type: QueryTypes.SELECT },
     );
 
+    const notifPromises: Promise<unknown>[] = [];
     for (const doc of docs) {
       const playerName = doc.first_name
         ? `${doc.first_name} ${doc.last_name}`.trim()
         : "";
       const context = playerName ? ` (${playerName})` : "";
 
-      await notifyByRole(["Admin", "Manager", "Legal"], {
-        type: "document",
-        title: `Document expiring in ${t.days} days: ${doc.name}${context}`,
-        titleAr: `مستند ينتهي خلال ${t.days} يوم: ${doc.name}${context}`,
-        link: "/dashboard/documents",
-        sourceType: "document",
-        sourceId: doc.id,
-        priority: t.priority,
-      });
+      notifPromises.push(
+        notifyByRole(["Admin", "Manager", "Legal"], {
+          type: "document",
+          title: `Document expiring in ${t.days} days: ${doc.name}${context}`,
+          titleAr: `مستند ينتهي خلال ${t.days} يوم: ${doc.name}${context}`,
+          link: "/dashboard/documents",
+          sourceType: "document",
+          sourceId: doc.id,
+          priority: t.priority,
+        }),
+      );
       total++;
     }
+    await Promise.all(notifPromises);
   }
 
   return { documentsExpiring: total };
@@ -1059,7 +1063,7 @@ export async function startCronJobs() {
   schedule("0 8 * * *", "payment-reminders"); // 8:00 AM  (was 9:00)
   schedule("10 8 * * *", "approval-step-overdue"); // 8:10 AM  (was 9:00)
   schedule("20 8 * * *", "checklist-follow-up"); // 8:20 AM  (was 9:30)
-  schedule("30 8 * * *", "body-metric-target-deadline"); // 8:30 AM  (was 9:15)
+  // "body-metric-target-deadline" removed — no registerJob handler exists
 
   // ── Mid-morning: analytics (9:00–9:50 AM) ──
   schedule("0 9 * * *", "consecutive-low-ratings"); // 9:00 AM  (was 10:00)
@@ -1092,7 +1096,7 @@ export async function startCronJobs() {
   schedule("0 9 * * 3", "commission-due-calculator"); // Wednesday 9:00 AM
   schedule("0 10 * * 3", "watchlist-staleness"); // Wednesday 10:00 AM
   schedule("30 10 * * 3", "screening-incomplete"); // Wednesday 10:30 AM
-  schedule("0 11 * * 3", "metric-target-achieved"); // Wednesday 11:00 AM
+  // "metric-target-achieved" removed — no registerJob handler exists
 
   // Thursday
   schedule("0 10 * * 4", "revenue-anomaly-detector"); // Thursday 10:00 AM
