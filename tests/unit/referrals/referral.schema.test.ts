@@ -28,9 +28,12 @@ describe('Referral Schemas', () => {
 
   describe('updateReferralStatusSchema', () => {
     it('should accept valid status', () => {
-      expect(updateReferralStatusSchema.safeParse({ status: 'Resolved' }).success).toBe(true);
+      expect(updateReferralStatusSchema.safeParse({ status: 'Closed', closureNotes: 'Done' }).success).toBe(true);
     });
     it('should reject invalid status', () => {
+      expect(updateReferralStatusSchema.safeParse({ status: 'Resolved' }).success).toBe(false);
+    });
+    it('should require closureNotes when closing', () => {
       expect(updateReferralStatusSchema.safeParse({ status: 'Closed' }).success).toBe(false);
     });
   });
