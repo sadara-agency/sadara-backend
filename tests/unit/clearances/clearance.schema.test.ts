@@ -3,7 +3,7 @@ import {
   updateClearanceSchema,
   completeClearanceSchema,
   clearanceQuerySchema,
-} from '../../../src/modules/clearances/clearance.schema';
+} from '../../../src/modules/clearances/clearance.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

@@ -6,7 +6,7 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-} from '../../../src/modules/auth/auth.schema';
+} from '../../../src/modules/auth/auth.validation';
 
 describe('Auth Schemas', () => {
   describe('registerSchema', () => {

@@ -3,7 +3,7 @@ import {
   updateTaskSchema,
   updateStatusSchema,
   taskQuerySchema,
-} from '../../../src/modules/tasks/task.schema';
+} from '../../../src/modules/tasks/task.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

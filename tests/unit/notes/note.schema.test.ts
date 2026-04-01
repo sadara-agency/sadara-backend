@@ -2,7 +2,7 @@ import {
   createNoteSchema,
   updateNoteSchema,
   noteQuerySchema,
-} from '../../../src/modules/notes/note.schema';
+} from '../../../src/modules/notes/note.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

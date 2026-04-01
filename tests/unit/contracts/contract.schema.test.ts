@@ -6,7 +6,7 @@ import {
   createContractSchema,
   updateContractSchema,
   contractQuerySchema,
-} from '../../../src/modules/contracts/contract.schema';
+} from '../../../src/modules/contracts/contract.validation';
 
 // Helper: generate a future date string YYYY-MM-DD
 function futureDate(yearsFromNow: number): string {

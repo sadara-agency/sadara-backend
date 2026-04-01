@@ -3,7 +3,7 @@ import {
   syncTeamSchema,
   syncAllSchema,
   seedClubIdsSchema,
-} from '../../../src/modules/spl/spl.schema';
+} from '../../../src/modules/spl/spl.validation';
 
 describe('SPL Schemas', () => {
   describe('syncPlayerSchema', () => {

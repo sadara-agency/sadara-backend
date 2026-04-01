@@ -5,7 +5,7 @@ import {
   matchQuerySchema,
   assignPlayersSchema,
   createMatchAnalysisSchema,
-} from '../../../src/modules/matches/match.schema';
+} from '../../../src/modules/matches/match.validation';
 
 const UUID_HOME = '550e8400-e29b-41d4-a716-446655440001';
 const UUID_AWAY = '550e8400-e29b-41d4-a716-446655440002';

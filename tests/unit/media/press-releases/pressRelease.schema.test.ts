@@ -3,7 +3,7 @@ import {
   updatePressReleaseSchema,
   updatePressReleaseStatusSchema,
   pressReleaseQuerySchema,
-} from '../../../../src/modules/media/press-releases/pressRelease.schema';
+} from '../../../../src/modules/media/press-releases/pressRelease.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

@@ -3,7 +3,7 @@ import {
   updateReferralSchema,
   updateReferralStatusSchema,
   referralQuerySchema,
-} from '../../../src/modules/referrals/referral.schema';
+} from '../../../src/modules/referrals/referral.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

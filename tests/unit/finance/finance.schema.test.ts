@@ -5,7 +5,7 @@ import {
   updatePaymentStatusSchema,
   createLedgerEntrySchema,
   createValuationSchema,
-} from '../../../src/modules/finance/finance.schema';
+} from '../../../src/modules/finance/finance.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

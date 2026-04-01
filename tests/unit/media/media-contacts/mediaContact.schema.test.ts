@@ -2,7 +2,7 @@ import {
   createMediaContactSchema,
   updateMediaContactSchema,
   mediaContactQuerySchema,
-} from '../../../../src/modules/media/media-contacts/mediaContact.schema';
+} from '../../../../src/modules/media/media-contacts/mediaContact.validation';
 
 describe('Media Contact Schemas', () => {
   describe('createMediaContactSchema', () => {

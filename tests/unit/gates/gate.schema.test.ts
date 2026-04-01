@@ -6,7 +6,7 @@ import {
   createChecklistItemSchema,
   toggleChecklistItemSchema,
   gateQuerySchema,
-} from '../../../src/modules/gates/gate.schema';
+} from '../../../src/modules/gates/gate.validation';
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 

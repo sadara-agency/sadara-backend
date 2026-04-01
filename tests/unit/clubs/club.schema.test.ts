@@ -4,7 +4,7 @@ import {
   clubQuerySchema,
   createContactSchema,
   updateContactSchema,
-} from '../../../src/modules/clubs/club.schema';
+} from '../../../src/modules/clubs/club.validation';
 
 describe('Club Schemas', () => {
   describe('createClubSchema', () => {
