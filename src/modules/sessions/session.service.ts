@@ -5,6 +5,7 @@ import { Session } from "./session.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
+import { Journey } from "@modules/journey/journey.model";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import type {
@@ -40,6 +41,12 @@ function sessionIncludes() {
     },
     { model: User, as: "responsible", attributes: [...USER_ATTRS] },
     { model: User, as: "creator", attributes: [...USER_ATTRS] },
+    {
+      model: Journey,
+      as: "journeyStage",
+      attributes: ["id", "stageName", "stageNameAr", "stageType", "status"],
+      required: false,
+    },
   ];
 }
 
@@ -111,6 +118,26 @@ export async function getSessionById(id: string) {
 export async function createSession(body: CreateSessionInput, userId: string) {
   await findOrThrow(Player, body.playerId, "Player");
   const referral = await findOrThrow(Referral, body.referralId, "Referral");
+
+  // Ensure referral belongs to the same player
+  if ((referral as any).playerId !== body.playerId) {
+    throw new AppError("Session player does not match referral player", 400);
+  }
+
+  // Validate journey stage belongs to same player if provided
+  if (body.journeyStageId) {
+    const stage = await findOrThrow(
+      Journey,
+      body.journeyStageId,
+      "Journey stage",
+    );
+    if ((stage as any).playerId !== body.playerId) {
+      throw new AppError(
+        "Journey stage does not belong to the same player",
+        400,
+      );
+    }
+  }
 
   const session = await Session.create({
     ...body,

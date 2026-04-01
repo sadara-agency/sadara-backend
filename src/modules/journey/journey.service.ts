@@ -1,6 +1,7 @@
 import { Op, WhereOptions } from "sequelize";
 import { Journey } from "./journey.model";
 import { Ticket } from "@modules/tickets/ticket.model";
+import { Referral } from "@modules/referrals/referral.model";
 import { AppError } from "@middleware/errorHandler";
 import type {
   CreateJourneyInput,
@@ -27,6 +28,14 @@ export async function listJourneys(query: JourneyQuery) {
     ],
     limit: query.limit,
     offset,
+    include: [
+      {
+        model: Referral,
+        as: "referral",
+        attributes: ["id", "referralType", "status", "priority"],
+        required: false,
+      },
+    ],
   });
 
   // Attach ticket stats per stage
@@ -77,7 +86,16 @@ export async function listJourneys(query: JourneyQuery) {
 
 // ── Get by ID ──
 export async function getJourneyById(id: string) {
-  const stage = await Journey.findByPk(id);
+  const stage = await Journey.findByPk(id, {
+    include: [
+      {
+        model: Referral,
+        as: "referral",
+        attributes: ["id", "referralType", "status", "priority"],
+        required: false,
+      },
+    ],
+  });
   if (!stage) throw new AppError("Journey stage not found", 404);
 
   // Attach tickets for this stage

@@ -36,6 +36,7 @@ export const createSessionSchema = z.object({
   sessionType: z.enum(SESSION_TYPES),
   programOwner: z.enum(PROGRAM_OWNERS),
   responsibleId: z.string().uuid("Invalid user ID").optional(),
+  journeyStageId: z.string().uuid("Invalid journey stage ID").optional(),
   sessionDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
@@ -50,6 +51,7 @@ export const updateSessionSchema = z.object({
   sessionType: z.enum(SESSION_TYPES).optional(),
   programOwner: z.enum(PROGRAM_OWNERS).optional(),
   responsibleId: z.string().uuid().nullable().optional(),
+  journeyStageId: z.string().uuid().nullable().optional(),
   sessionDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)

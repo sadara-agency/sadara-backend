@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 import { validate } from "@middleware/validate";
 import {
   createReferralSchema,
@@ -18,6 +21,8 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("referrals", "read"),
+  dynamicFieldAccess("referrals"),
+  cacheRoute("referrals", CacheTTL.MEDIUM),
   validate(referralQuerySchema, "query"),
   asyncHandler(referralController.list),
 );
@@ -30,6 +35,8 @@ router.get(
 router.get(
   "/:id",
   authorizeModule("referrals", "read"),
+  dynamicFieldAccess("referrals"),
+  cacheRoute("referral", CacheTTL.MEDIUM),
   asyncHandler(referralController.getById),
 );
 

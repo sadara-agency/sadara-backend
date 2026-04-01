@@ -1,6 +1,9 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 import { validate } from "@middleware/validate";
 import {
   createJourneySchema,
@@ -17,6 +20,8 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("journey", "read"),
+  dynamicFieldAccess("journey"),
+  cacheRoute("journey", CacheTTL.MEDIUM),
   validate(journeyQuerySchema, "query"),
   asyncHandler(journeyController.list),
 );
@@ -24,12 +29,16 @@ router.get(
 router.get(
   "/player/:playerId",
   authorizeModule("journey", "read"),
+  dynamicFieldAccess("journey"),
+  cacheRoute("journey", CacheTTL.MEDIUM),
   asyncHandler(journeyController.getPlayerJourney),
 );
 
 router.get(
   "/:id",
   authorizeModule("journey", "read"),
+  dynamicFieldAccess("journey"),
+  cacheRoute("journey", CacheTTL.MEDIUM),
   asyncHandler(journeyController.getById),
 );
 
