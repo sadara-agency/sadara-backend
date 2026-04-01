@@ -30,13 +30,13 @@ export async function up() {
         WHEN i.status = 'Recovered' THEN 'Resolved'
         WHEN i.status = 'Chronic'   THEN 'InProgress'
         ELSE 'Open'
-      END)::"enum_referrals_status",
+      END),
       (CASE
         WHEN i.severity = 'Critical' THEN 'Critical'
         WHEN i.severity = 'Severe'   THEN 'High'
         WHEN i.severity = 'Moderate' THEN 'Medium'
         ELSE 'Low'
-      END)::"enum_referrals_priority",
+      END),
       i.created_by,
       i.created_at,
       i.updated_at
