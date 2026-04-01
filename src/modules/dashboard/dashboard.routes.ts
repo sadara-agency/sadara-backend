@@ -9,6 +9,14 @@ import * as configController from "@modules/dashboard/dashboardConfig.controller
 const router = Router();
 router.use(authenticate);
 
+// ── Batched: all dashboard data in one request (15 → 1) ──
+router.get(
+  "/all",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.MEDIUM, { perUser: true }),
+  asyncHandler(dashboardController.getAll),
+);
+
 // ── Widget layout config ──
 router.get(
   "/config",

@@ -194,6 +194,102 @@ export async function getApprovalBottleneck(_req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+// GET /dashboard/all — batched fetch for all dashboard sections (15 → 1 request)
+export async function getAll(req: AuthRequest, res: Response) {
+  const role = req.user!.role;
+  const userId = req.user!.id;
+  const playerId = req.user!.playerId;
+
+  // Check per-module permissions in parallel
+  const [
+    canPlayers,
+    canContracts,
+    canOffers,
+    canMatches,
+    canTasks,
+    canFinance,
+    canAudit,
+    canGates,
+    canInjuries,
+  ] = await Promise.all([
+    canRead(req, "players"),
+    canRead(req, "contracts"),
+    canRead(req, "offers"),
+    canRead(req, "matches"),
+    canRead(req, "tasks"),
+    canRead(req, "finance"),
+    canRead(req, "audit"),
+    canRead(req, "gates"),
+    canRead(req, "injuries"),
+  ]);
+
+  // Fire all service calls in parallel, respecting permissions
+  const results = await Promise.allSettled([
+    /* 0  */ dashboardService.getKpis(),
+    /* 1  */ dashboardService.getAlerts(),
+    /* 2  */ dashboardService.getTodayOverview(),
+    /* 3  */ canPlayers
+      ? dashboardService.getTopPlayers(5)
+      : Promise.resolve([]),
+    /* 4  */ canContracts
+      ? dashboardService.getContractStatusDistribution()
+      : Promise.resolve([]),
+    /* 5  */ canPlayers
+      ? dashboardService.getPlayerDistribution()
+      : Promise.resolve([]),
+    /* 6  */ canOffers
+      ? dashboardService.getRecentOffers(5)
+      : Promise.resolve([]),
+    /* 7  */ canMatches
+      ? dashboardService.getUpcomingMatches(5, userId, role, playerId)
+      : Promise.resolve([]),
+    /* 8  */ canTasks
+      ? dashboardService.getUrgentTasks(5, userId, role, playerId)
+      : Promise.resolve([]),
+    /* 9  */ canFinance
+      ? dashboardService.getRevenueChart(12)
+      : Promise.resolve([]),
+    /* 10 */ canPlayers
+      ? dashboardService.getPerformanceAverages()
+      : Promise.resolve([]),
+    /* 11 */ canAudit
+      ? dashboardService.getRecentActivity(10)
+      : Promise.resolve([]),
+    /* 12 */ canGates ? dashboardService.getQuickStats() : Promise.resolve({}),
+    /* 13 */ canOffers
+      ? dashboardService.getOfferPipeline()
+      : Promise.resolve([]),
+    /* 14 */ canInjuries
+      ? dashboardService.getInjuryTrends()
+      : Promise.resolve([]),
+    /* 15 */ dashboardService.getKpiTrends(),
+  ]);
+
+  const val = (i: number, fallback: unknown = null) => {
+    const r = results[i];
+    return r.status === "fulfilled" ? r.value : fallback;
+  };
+
+  sendSuccess(res, {
+    kpis: camelCaseKeys(val(0, {}) as Record<string, unknown>),
+    alerts: camelCaseKeys(val(1, {}) as Record<string, unknown>),
+    today: camelCaseKeys(val(2, {}) as Record<string, unknown>),
+    topPlayers: val(3, []),
+    contractStatus: camelCaseKeys(val(4, []) as Record<string, unknown>),
+    playerDistribution: camelCaseKeys(val(5, []) as Record<string, unknown>),
+    recentOffers: camelCaseKeys(val(6, []) as Record<string, unknown>),
+    upcomingMatches: camelCaseKeys(val(7, []) as Record<string, unknown>),
+    urgentTasks: camelCaseKeys(val(8, []) as Record<string, unknown>),
+    revenue: camelCaseKeys(val(9, []) as Record<string, unknown>),
+    performance: camelCaseKeys(val(10, []) as Record<string, unknown>),
+    activity: camelCaseKeys(val(11, []) as Record<string, unknown>),
+    quickStats: val(12, {}),
+    offerPipeline: camelCaseKeys(val(13, []) as Record<string, unknown>),
+    injuryTrends: camelCaseKeys(val(14, []) as Record<string, unknown>),
+    kpiTrends: val(15, {}),
+  });
+}
+
 // GET /dashboard/player-attention — players needing attention (Version A)
 export async function getPlayerAttention(_req: AuthRequest, res: Response) {
   const { getPlayerAttentionData } =
