@@ -403,6 +403,8 @@ export function mockModelInstance(data: Record<string, any>) {
     }),
     destroy: jest.fn(async () => undefined),
     reload: jest.fn(async function (this: any) { return this; }),
+    increment: jest.fn(async () => undefined),
+    decrement: jest.fn(async () => undefined),
     toJSON: jest.fn(() => ({ ...data })),
   };
 }
