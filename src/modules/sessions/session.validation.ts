@@ -40,6 +40,10 @@ export const createSessionSchema = z.object({
   sessionDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  title: z.string().max(255).optional(),
+  titleAr: z.string().max(255).optional(),
+  summary: z.string().optional(),
+  summaryAr: z.string().optional(),
   notes: z.string().optional(),
   notesAr: z.string().optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).default("Scheduled"),
@@ -56,6 +60,10 @@ export const updateSessionSchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  title: z.string().max(255).nullable().optional(),
+  titleAr: z.string().max(255).nullable().optional(),
+  summary: z.string().nullable().optional(),
+  summaryAr: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
   notesAr: z.string().nullable().optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).optional(),
@@ -73,6 +81,8 @@ export const sessionQuerySchema = z.object({
       "session_date",
       "completion_status",
       "program_owner",
+      "title",
+      "session_type",
     ])
     .default("session_date"),
   order: z.enum(["asc", "desc"]).default("desc"),

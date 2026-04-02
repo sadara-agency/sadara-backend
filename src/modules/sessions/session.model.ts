@@ -38,6 +38,10 @@ export interface SessionAttributes {
   programOwner: ProgramOwner;
   responsibleId: string | null;
   sessionDate: string;
+  title: string | null;
+  titleAr: string | null;
+  summary: string | null;
+  summaryAr: string | null;
   notes: string | null;
   notesAr: string | null;
   completionStatus: SessionCompletionStatus;
@@ -51,6 +55,10 @@ interface SessionCreationAttributes extends Optional<
   SessionAttributes,
   | "id"
   | "responsibleId"
+  | "title"
+  | "titleAr"
+  | "summary"
+  | "summaryAr"
   | "notes"
   | "notesAr"
   | "completionStatus"
@@ -73,6 +81,10 @@ export class Session
   declare programOwner: ProgramOwner;
   declare responsibleId: string | null;
   declare sessionDate: string;
+  declare title: string | null;
+  declare titleAr: string | null;
+  declare summary: string | null;
+  declare summaryAr: string | null;
   declare notes: string | null;
   declare notesAr: string | null;
   declare completionStatus: SessionCompletionStatus;
@@ -119,6 +131,20 @@ Session.init(
       type: DataTypes.DATEONLY,
       allowNull: false,
       field: "session_date",
+    },
+    title: {
+      type: DataTypes.STRING(255),
+    },
+    titleAr: {
+      type: DataTypes.STRING(255),
+      field: "title_ar",
+    },
+    summary: {
+      type: DataTypes.TEXT,
+    },
+    summaryAr: {
+      type: DataTypes.TEXT,
+      field: "summary_ar",
     },
     notes: {
       type: DataTypes.TEXT,

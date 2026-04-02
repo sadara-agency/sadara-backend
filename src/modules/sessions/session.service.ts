@@ -68,6 +68,10 @@ function buildWhere(query: SessionQuery): WhereOptions {
 
   if (query.search) {
     where[Op.or] = [
+      { title: { [Op.iLike]: `%${query.search}%` } },
+      { titleAr: { [Op.iLike]: `%${query.search}%` } },
+      { summary: { [Op.iLike]: `%${query.search}%` } },
+      { summaryAr: { [Op.iLike]: `%${query.search}%` } },
       { notes: { [Op.iLike]: `%${query.search}%` } },
       { notesAr: { [Op.iLike]: `%${query.search}%` } },
     ];
