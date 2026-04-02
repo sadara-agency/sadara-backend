@@ -76,7 +76,11 @@ export async function listReferrals(
   );
   const where: any = {};
 
-  if (queryParams.status) where.status = queryParams.status;
+  if (queryParams.status) {
+    where.status = Array.isArray(queryParams.status)
+      ? { [Op.in]: queryParams.status }
+      : queryParams.status;
+  }
   if (queryParams.referralType) where.referralType = queryParams.referralType;
   if (queryParams.referralTarget)
     where.referralTarget = queryParams.referralTarget;
