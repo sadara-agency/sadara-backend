@@ -18,14 +18,14 @@
  *         schema: { type: integer, default: 20 }
  *       - in: query
  *         name: sort
- *         schema: { type: string, enum: [created_at, updated_at, session_date, completion_status, program_owner], default: session_date }
+ *         schema: { type: string, enum: [created_at, updated_at, session_date, completion_status, program_owner, title, session_type], default: session_date }
  *       - in: query
  *         name: order
  *         schema: { type: string, enum: [asc, desc], default: desc }
  *       - in: query
  *         name: search
  *         schema: { type: string }
- *         description: Search by player name
+ *         description: Search by title, summary, or notes
  *       - in: query
  *         name: playerId
  *         schema: { type: string, format: uuid }
@@ -71,6 +71,10 @@
  *               programOwner: { type: string, enum: [FitnessCoach, Coach, SkillCoach, TacticalCoach, GoalkeeperCoach, Analyst, NutritionSpecialist, MentalCoach] }
  *               responsibleId: { type: string, format: uuid }
  *               sessionDate: { type: string, format: date }
+ *               title: { type: string, maxLength: 255 }
+ *               titleAr: { type: string, maxLength: 255 }
+ *               summary: { type: string }
+ *               summaryAr: { type: string }
  *               notes: { type: string }
  *               notesAr: { type: string }
  *               completionStatus: { type: string, enum: [Scheduled, Completed, Cancelled, NoShow], default: Scheduled }
@@ -143,6 +147,10 @@
  *               programOwner: { type: string, enum: [FitnessCoach, Coach, SkillCoach, TacticalCoach, GoalkeeperCoach, Analyst, NutritionSpecialist, MentalCoach] }
  *               responsibleId: { type: string, format: uuid, nullable: true }
  *               sessionDate: { type: string, format: date }
+ *               title: { type: string, maxLength: 255, nullable: true }
+ *               titleAr: { type: string, maxLength: 255, nullable: true }
+ *               summary: { type: string, nullable: true }
+ *               summaryAr: { type: string, nullable: true }
  *               notes: { type: string, nullable: true }
  *               notesAr: { type: string, nullable: true }
  *               completionStatus: { type: string, enum: [Scheduled, Completed, Cancelled, NoShow] }

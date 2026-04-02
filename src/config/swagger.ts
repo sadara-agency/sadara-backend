@@ -1,3 +1,4 @@
+import path from "path";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import type { Express } from "express";
@@ -234,7 +235,12 @@ const options: swaggerJsdoc.Options = {
     },
     security: [{ bearerAuth: [] }],
   },
-  apis: ["./src/modules/**/*.swagger.ts", "./src/modules/**/*.swagger.docs.ts"],
+  apis: [
+    path.resolve(__dirname, "../modules/**/*.swagger.ts"),
+    path.resolve(__dirname, "../modules/**/*.swagger.docs.ts"),
+    path.resolve(__dirname, "../modules/**/*.swagger.js"),
+    path.resolve(__dirname, "../modules/**/*.swagger.docs.js"),
+  ],
 };
 
 const swaggerSpec = swaggerJsdoc(options);
