@@ -101,7 +101,11 @@ export const referralQuerySchema = z.object({
     .default("created_at"),
   order: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
-  status: z.enum(referralStatuses).optional(),
+  status: z
+    .string()
+    .optional()
+    .transform((v) => v?.split(",").filter(Boolean))
+    .pipe(z.array(z.enum(referralStatuses)).optional()),
   referralType: z.enum(referralTypes).optional(),
   referralTarget: z.enum(referralTargets).optional(),
   priority: z.enum(referralPriorities).optional(),
