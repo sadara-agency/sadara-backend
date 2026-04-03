@@ -43,6 +43,7 @@ export const createPlayerSchema = z.object({
   nationality: z.string().min(1, "Nationality is required"),
   secondaryNationality: z.string().optional(),
   playerType: z.enum(["Pro", "Youth", "Amateur"]).default("Pro"),
+  playerPackage: z.enum(["A", "B", "C"]).default("C"),
   contractType: z
     .enum(["Professional", "Amateur", "Youth"])
     .default("Professional"),
@@ -107,6 +108,7 @@ export const playerQuerySchema = z.object({
   search: z.string().optional(),
   status: z.enum(["active", "injured", "inactive"]).optional(),
   playerType: z.enum(["Pro", "Youth", "Amateur"]).optional(),
+  playerPackage: z.enum(["A", "B", "C"]).optional(),
   contractType: z.enum(["Professional", "Amateur", "Youth"]).optional(),
   clubId: z.string().uuid().optional(),
   position: z.string().optional(),

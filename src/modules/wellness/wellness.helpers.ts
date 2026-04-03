@@ -79,15 +79,89 @@ export function calculateBMI(weightKg: number, heightCm: number): number {
 
 /**
  * Composite ring score (0-100).
- * Weights: calories 40%, protein 30%, workout 30%
+ * When readiness is available:  calories 30% + protein 20% + workout 20% + readiness 30%
+ * Without readiness (legacy):   calories 40% + protein 30% + workout 30%
  */
 export function calculateRingScore(
   calorieAdherencePct: number,
   proteinAdherencePct: number,
   workoutCompleted: boolean,
+  readinessScore?: number | null,
 ): number {
   const cal = Math.min(100, Math.max(0, calorieAdherencePct));
   const prot = Math.min(100, Math.max(0, proteinAdherencePct));
   const workout = workoutCompleted ? 100 : 0;
+
+  if (readinessScore != null) {
+    const readiness = Math.min(100, Math.max(0, readinessScore));
+    return Math.round(cal * 0.3 + prot * 0.2 + workout * 0.2 + readiness * 0.3);
+  }
+  // Legacy fallback (no checkin submitted)
   return Math.round(cal * 0.4 + prot * 0.3 + workout * 0.3);
+}
+
+/**
+ * Calculate readiness score (0-100) from daily checkin responses.
+ * Each metric is rated 1-5. Higher values = better except fatigue, soreness, stress
+ * where higher = worse (inverted).
+ *
+ * Components:
+ *   sleepQuality (25%) — 1=bad, 5=great
+ *   fatigue (20%) — inverted: 1=fresh, 5=exhausted → score = (6 - fatigue)
+ *   muscleSoreness (20%) — inverted: 1=none, 5=severe → score = (6 - soreness)
+ *   mood (15%) — 1=low, 5=great
+ *   stress (10%) — inverted: 1=none, 5=extreme → score = (6 - stress)
+ *   sleepHours (10%) — mapped: 7-9h=100, <5h=20, >10h=60
+ */
+export function calculateReadinessScore(checkin: {
+  sleepHours?: number | null;
+  sleepQuality?: number | null;
+  fatigue?: number | null;
+  muscleSoreness?: number | null;
+  mood?: number | null;
+  stress?: number | null;
+}): number {
+  const components: { score: number; weight: number }[] = [];
+
+  if (checkin.sleepQuality != null) {
+    components.push({
+      score: ((checkin.sleepQuality - 1) / 4) * 100,
+      weight: 0.25,
+    });
+  }
+  if (checkin.fatigue != null) {
+    components.push({ score: ((5 - checkin.fatigue) / 4) * 100, weight: 0.2 });
+  }
+  if (checkin.muscleSoreness != null) {
+    components.push({
+      score: ((5 - checkin.muscleSoreness) / 4) * 100,
+      weight: 0.2,
+    });
+  }
+  if (checkin.mood != null) {
+    components.push({ score: ((checkin.mood - 1) / 4) * 100, weight: 0.15 });
+  }
+  if (checkin.stress != null) {
+    components.push({ score: ((5 - checkin.stress) / 4) * 100, weight: 0.1 });
+  }
+  if (checkin.sleepHours != null) {
+    let sleepScore: number;
+    if (checkin.sleepHours >= 7 && checkin.sleepHours <= 9) sleepScore = 100;
+    else if (checkin.sleepHours < 5) sleepScore = 20;
+    else if (checkin.sleepHours < 7)
+      sleepScore = 40 + ((checkin.sleepHours - 5) / 2) * 60;
+    else sleepScore = 60; // > 9h (oversleep)
+    components.push({ score: sleepScore, weight: 0.1 });
+  }
+
+  if (components.length === 0) return 50; // default if no data
+
+  // Normalize weights to sum to 1
+  const totalWeight = components.reduce((s, c) => s + c.weight, 0);
+  const weighted = components.reduce(
+    (s, c) => s + c.score * (c.weight / totalWeight),
+    0,
+  );
+
+  return Math.round(Math.min(100, Math.max(0, weighted)));
 }

@@ -444,6 +444,7 @@ interface DailySummaryAttributes {
   workoutCompleted: boolean;
   weightLogged: boolean;
   ringScore: number;
+  readinessScore?: number | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -469,6 +470,7 @@ export class WellnessDailySummary
   declare workoutCompleted: boolean;
   declare weightLogged: boolean;
   declare ringScore: number;
+  declare readinessScore: number | null;
 }
 
 WellnessDailySummary.init(
@@ -528,6 +530,10 @@ WellnessDailySummary.init(
       type: DataTypes.INTEGER,
       defaultValue: 0,
       field: "ring_score",
+    },
+    readinessScore: {
+      type: DataTypes.INTEGER,
+      field: "readiness_score",
     },
   },
   {

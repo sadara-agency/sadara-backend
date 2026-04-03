@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
@@ -33,6 +34,7 @@ router.get(
 router.get(
   "/referral/:referralId",
   authorizeModule("sessions", "read"),
+  validate(sessionQuerySchema, "query"),
   dynamicFieldAccess("sessions"),
   cacheRoute("sessions", CacheTTL.MEDIUM),
   asyncHandler(sessionController.listByReferral),
@@ -40,6 +42,8 @@ router.get(
 router.get(
   "/player/:playerId",
   authorizeModule("sessions", "read"),
+  authorizePlayerPackage("sessions", "read"),
+  validate(sessionQuerySchema, "query"),
   dynamicFieldAccess("sessions"),
   cacheRoute("sessions", CacheTTL.MEDIUM),
   asyncHandler(sessionController.listByPlayer),
@@ -56,6 +60,7 @@ router.get(
 router.post(
   "/",
   authorizeModule("sessions", "create"),
+  authorizePlayerPackage("sessions", "create"),
   validate(createSessionSchema),
   asyncHandler(sessionController.create),
 );

@@ -217,3 +217,42 @@ export type UpdateTemplateInput = z.infer<typeof updateTemplateSchema>;
 export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
 export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;
 export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
+
+// ── Daily Checkin (Readiness Survey) ──
+
+const rating1to5 = z.coerce.number().int().min(1).max(5);
+
+export const createCheckinSchema = z.object({
+  playerId: z.string().uuid("Invalid player ID"),
+  checkinDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  sleepHours: z.coerce.number().min(0).max(24).optional(),
+  sleepQuality: rating1to5.optional(),
+  fatigue: rating1to5.optional(),
+  muscleSoreness: rating1to5.optional(),
+  mood: rating1to5.optional(),
+  stress: rating1to5.optional(),
+  sorenessAreas: z.array(z.string().max(50)).max(20).optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+export const createMyCheckinSchema = createCheckinSchema.omit({
+  playerId: true,
+});
+
+export const checkinQuerySchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(20),
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
+export type CreateCheckinInput = z.infer<typeof createCheckinSchema>;
+export type CheckinQuery = z.infer<typeof checkinQuerySchema>;

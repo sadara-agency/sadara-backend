@@ -296,9 +296,8 @@ export async function deleteContract(id: string) {
 // ────────────────────────────────────────────────────────────
 export interface TerminateContractInput {
   reason: string;
-  terminationDate?: string; // defaults to today
-  clearanceId?: string; // optional reference to a clearance record
-  method?: "quick" | "clearance";
+  terminationDate?: string;
+  terminationType?: "mutual" | "unilateral";
   hasOutstanding?: boolean;
   outstandingAmount?: number;
   outstandingCurrency?: string;
@@ -338,42 +337,27 @@ export async function terminateContract(
     );
   }
 
-  // ── Clearance method: create a clearance record, don't terminate yet ──
-  if (input.method === "clearance") {
-    const { createClearance } = await import("../clearances/clearance.service");
-    const clearance = await createClearance(
-      {
-        contractId: id,
-        reason: input.reason,
-        terminationDate: termDate,
-        hasOutstanding: input.hasOutstanding ?? false,
-        outstandingAmount: input.outstandingAmount ?? 0,
-        outstandingCurrency: input.outstandingCurrency ?? "SAR",
-        outstandingDetails: input.outstandingDetails,
-      },
-      terminatedBy,
-    );
-    // Contract stays active — it will be terminated when clearance is completed
-    return { contract: await getContractById(id), clearance };
-  }
-
-  // ── Quick method: terminate immediately ──
+  // Set termination fields
   const existing = contract.notes || "";
   const timestamp = new Date().toISOString().split("T")[0];
   const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
 
   const updatePayload: Record<string, unknown> = {
     status: "Terminated",
+    terminationDate: termDate,
+    terminationReason: input.reason,
+    terminationType: input.terminationType ?? "mutual",
     notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
-    endDate: termDate, // Override end date to termination date
+    endDate: termDate,
+    commissionLocked: true,
   };
 
-  if (input.clearanceId) {
-    updatePayload.terminatedByClearanceId = input.clearanceId;
+  if (input.hasOutstanding) {
+    updatePayload.hasOutstanding = true;
+    updatePayload.outstandingAmount = input.outstandingAmount ?? 0;
+    updatePayload.outstandingCurrency = input.outstandingCurrency ?? "SAR";
+    updatePayload.outstandingDetails = input.outstandingDetails ?? null;
   }
-
-  // Lock commission so it can't be recalculated after termination
-  updatePayload.commissionLocked = true;
 
   await contract.update(updatePayload);
 

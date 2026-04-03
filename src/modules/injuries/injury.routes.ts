@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
@@ -29,6 +30,7 @@ router.get(
 router.get(
   "/player/:playerId",
   authorizeModule("injuries", "read"),
+  authorizePlayerPackage("injuries", "read"),
   dynamicFieldAccess("injuries"),
   asyncHandler(ctrl.getByPlayer),
 );
@@ -41,6 +43,7 @@ router.get(
 router.post(
   "/",
   authorizeModule("injuries", "create"),
+  authorizePlayerPackage("injuries", "create"),
   validate(createInjurySchema),
   asyncHandler(ctrl.create),
 );

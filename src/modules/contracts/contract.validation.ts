@@ -10,6 +10,7 @@ const CONTRACT_TYPES = [
   "Sponsorship",
   "ImageRights",
   "MedicalAuth",
+  "Termination",
 ] as const;
 const PLAYER_CONTRACT_TYPES = ["Professional", "Amateur", "Youth"] as const;
 const CONTRACT_STATUSES = [
@@ -59,6 +60,16 @@ export const createContractSchema = z
     agentLicense: z.string().optional(),
     playerContractType: z.enum(PLAYER_CONTRACT_TYPES).optional(),
     notes: z.string().optional(),
+    // Termination-specific (when contractType = "Termination")
+    terminationDate: z
+      .string()
+      .regex(DATE_REGEX, "Date must be YYYY-MM-DD")
+      .optional(),
+    terminationReason: z.string().max(1000).optional(),
+    terminationType: z.enum(["mutual", "unilateral"]).optional(),
+    parentContractId: z.string().uuid().optional(),
+    outstandingAmount: z.number().min(0).optional(),
+    outstandingCurrency: z.enum(CURRENCIES).optional(),
   })
   .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
     message: "End date must be after start date",
@@ -105,15 +116,14 @@ export const transitionStatusSchema = z.object({
   notes: z.string().optional(),
 });
 
-// ── Terminate Contract (NEW) ──
+// ── Terminate Contract ──
 export const terminateContractSchema = z.object({
   reason: z.string().min(1, "Termination reason is required").max(1000),
   terminationDate: z
     .string()
     .regex(DATE_REGEX, "Date must be YYYY-MM-DD")
     .optional(),
-  clearanceId: z.string().uuid().optional(),
-  method: z.enum(["quick", "clearance"]).default("quick"),
+  terminationType: z.enum(["mutual", "unilateral"]).default("mutual"),
   hasOutstanding: z.boolean().optional(),
   outstandingAmount: z.number().min(0).optional(),
   outstandingCurrency: z.enum(CURRENCIES).optional(),

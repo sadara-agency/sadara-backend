@@ -368,6 +368,100 @@ WellnessMealLog.init(
   },
 );
 
+// ── Wellness Checkin (Daily Readiness Survey) ──
+
+interface WellnessCheckinAttributes {
+  id: string;
+  playerId: string;
+  checkinDate: string;
+  sleepHours: number | null;
+  sleepQuality: number | null;
+  fatigue: number | null;
+  muscleSoreness: number | null;
+  mood: number | null;
+  stress: number | null;
+  sorenessAreas: string[] | null;
+  readinessScore: number | null;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface WellnessCheckinCreation extends Optional<
+  WellnessCheckinAttributes,
+  | "id"
+  | "sleepHours"
+  | "sleepQuality"
+  | "fatigue"
+  | "muscleSoreness"
+  | "mood"
+  | "stress"
+  | "sorenessAreas"
+  | "readinessScore"
+  | "notes"
+  | "createdBy"
+  | "createdAt"
+  | "updatedAt"
+> {}
+
+export class WellnessCheckin
+  extends Model<WellnessCheckinAttributes, WellnessCheckinCreation>
+  implements WellnessCheckinAttributes
+{
+  declare id: string;
+  declare playerId: string;
+  declare checkinDate: string;
+  declare sleepHours: number | null;
+  declare sleepQuality: number | null;
+  declare fatigue: number | null;
+  declare muscleSoreness: number | null;
+  declare mood: number | null;
+  declare stress: number | null;
+  declare sorenessAreas: string[] | null;
+  declare readinessScore: number | null;
+  declare notes: string | null;
+  declare createdBy: string | null;
+  declare createdAt: Date;
+  declare updatedAt: Date;
+}
+
+WellnessCheckin.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
+    checkinDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      field: "checkin_date",
+    },
+    sleepHours: { type: DataTypes.FLOAT, field: "sleep_hours" },
+    sleepQuality: { type: DataTypes.INTEGER, field: "sleep_quality" },
+    fatigue: { type: DataTypes.INTEGER },
+    muscleSoreness: { type: DataTypes.INTEGER, field: "muscle_soreness" },
+    mood: { type: DataTypes.INTEGER },
+    stress: { type: DataTypes.INTEGER },
+    sorenessAreas: {
+      type: DataTypes.JSONB,
+      defaultValue: [],
+      field: "soreness_areas",
+    },
+    readinessScore: { type: DataTypes.INTEGER, field: "readiness_score" },
+    notes: { type: DataTypes.TEXT },
+    createdBy: { type: DataTypes.UUID, field: "created_by" },
+  },
+  {
+    sequelize,
+    tableName: "wellness_checkins",
+    underscored: true,
+    timestamps: true,
+  },
+);
+
 // ── Associations ──
 
 WellnessMealLog.belongsTo(WellnessFoodItem, {

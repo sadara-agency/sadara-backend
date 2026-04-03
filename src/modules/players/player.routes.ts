@@ -12,6 +12,12 @@ import {
   playerQuerySchema,
 } from "@modules/players/utils/player.validation";
 import * as playerController from "@modules/players/player.controller";
+import {
+  getFullAccessMap,
+  type PlayerPackage,
+} from "@shared/utils/packageAccess";
+import { sendSuccess } from "@shared/utils/apiResponse";
+import { Player } from "@modules/players/player.model";
 
 const router = Router();
 router.use(authenticate);
@@ -36,6 +42,22 @@ router.get(
   dynamicFieldAccess("players"),
   cacheRoute("player", CacheTTL.MEDIUM),
   asyncHandler(playerController.getById),
+);
+
+// ── Package access map ──
+router.get(
+  "/:id/package-access",
+  authorizeModule("players", "read"),
+  asyncHandler(async (req, res) => {
+    const player = await Player.findByPk(req.params.id, {
+      attributes: ["id", "playerPackage"],
+    });
+    if (!player) {
+      return sendSuccess(res, { package: "C", access: getFullAccessMap("C") });
+    }
+    const pkg = player.playerPackage as PlayerPackage;
+    sendSuccess(res, { package: pkg, access: getFullAccessMap(pkg) });
+  }),
 );
 
 // ── Write (no cache — these invalidate) ──

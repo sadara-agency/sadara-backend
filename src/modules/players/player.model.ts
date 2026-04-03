@@ -19,6 +19,7 @@ interface PlayerAttributes {
   nationality?: string | null;
   secondaryNationality?: string | null;
   playerType: "Pro" | "Youth" | "Amateur";
+  playerPackage: "A" | "B" | "C";
   contractType: "Professional" | "Amateur" | "Youth";
   position?: string | null;
   secondaryPosition?: string | null;
@@ -58,6 +59,7 @@ interface PlayerCreationAttributes extends Optional<
   | "id"
   | "dateOfBirth"
   | "playerType"
+  | "playerPackage"
   | "contractType"
   | "marketValueCurrency"
   | "status"
@@ -78,6 +80,7 @@ export class Player
   declare nationality: string | null;
   declare secondaryNationality: string | null;
   declare playerType: "Pro" | "Youth" | "Amateur";
+  declare playerPackage: "A" | "B" | "C";
   declare contractType: "Professional" | "Amateur" | "Youth";
   declare position: string | null;
   declare secondaryPosition: string | null;
@@ -146,6 +149,11 @@ Player.init(
     playerType: {
       type: DataTypes.ENUM("Pro", "Youth", "Amateur"),
       defaultValue: "Pro",
+    },
+    playerPackage: {
+      type: DataTypes.STRING(10),
+      defaultValue: "C",
+      field: "player_package",
     },
     contractType: {
       type: DataTypes.STRING(20),
