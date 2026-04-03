@@ -8,6 +8,7 @@ import {
   sendSuccess,
   sendCreated,
   sendPaginated,
+  sendForbidden,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple } from "@shared/utils/cache";
@@ -305,5 +306,72 @@ export async function myDashboard(req: AuthRequest, res: Response) {
   }
   const days = Number(req.query.days) || 7;
   const data = await svc.getPlayerDashboard(playerId, days);
+  sendSuccess(res, data);
+}
+
+// ── Daily Checkin (Readiness Survey) ──
+
+export async function createCheckin(req: AuthRequest, res: Response) {
+  const data = await svc.createCheckin(req.body, (req.user as any)?.id);
+  invalidateMultiple(WELLNESS_CACHES).catch(() => {});
+  sendCreated(res, data, "Checkin saved");
+}
+
+export async function myCheckin(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    sendForbidden(res, "Player account not linked");
+    return;
+  }
+  const data = await svc.createCheckin(
+    { ...req.body, playerId },
+    (req.user as any)?.id,
+  );
+  invalidateMultiple(WELLNESS_CACHES).catch(() => {});
+  sendCreated(res, data, "Checkin saved");
+}
+
+export async function myCheckinToday(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, null, "Player account not linked");
+    return;
+  }
+  const today = new Date().toISOString().split("T")[0];
+  const data = await svc.getCheckinByDate(playerId, today);
+  sendSuccess(res, data);
+}
+
+export async function listCheckins(req: AuthRequest, res: Response) {
+  const { playerId } = req.params;
+  const result = await svc.listCheckins(playerId, req.query as any);
+  sendPaginated(res, result.data, result.meta);
+}
+
+export async function myCheckins(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, [], "Player account not linked");
+    return;
+  }
+  const result = await svc.listCheckins(playerId, req.query as any);
+  sendPaginated(res, result.data, result.meta);
+}
+
+export async function checkinTrend(req: AuthRequest, res: Response) {
+  const { playerId } = req.params;
+  const days = Number(req.query.days) || 28;
+  const data = await svc.getCheckinTrend(playerId, days);
+  sendSuccess(res, data);
+}
+
+export async function myCheckinTrend(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, null, "Player account not linked");
+    return;
+  }
+  const days = Number(req.query.days) || 28;
+  const data = await svc.getCheckinTrend(playerId, days);
   sendSuccess(res, data);
 }

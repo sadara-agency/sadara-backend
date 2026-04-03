@@ -9,6 +9,7 @@ import {
   WellnessWeightLog,
   WellnessFoodItem,
   WellnessMealLog,
+  WellnessCheckin,
 } from "./wellness.model";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
@@ -18,6 +19,7 @@ import {
   calculateTDEE,
   calculateMacros,
   calculateBMI,
+  calculateReadinessScore,
 } from "./wellness.helpers";
 import {
   searchFood as nutritionixSearch,
@@ -798,4 +800,125 @@ export async function getHeatmapData(days = 14) {
       ringScore: p.scores.get(date) ?? 0,
     })),
   }));
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DAILY CHECKIN (Readiness Survey)
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Create or update a daily checkin for a player (upsert by player+date).
+ * Auto-calculates readinessScore from the responses.
+ */
+export async function createCheckin(
+  body: {
+    playerId: string;
+    checkinDate: string;
+    sleepHours?: number;
+    sleepQuality?: number;
+    fatigue?: number;
+    muscleSoreness?: number;
+    mood?: number;
+    stress?: number;
+    sorenessAreas?: string[];
+    notes?: string;
+  },
+  userId?: string,
+) {
+  const readinessScore = calculateReadinessScore(body);
+
+  const [checkin] = await WellnessCheckin.upsert(
+    {
+      playerId: body.playerId,
+      checkinDate: body.checkinDate,
+      sleepHours: body.sleepHours ?? null,
+      sleepQuality: body.sleepQuality ?? null,
+      fatigue: body.fatigue ?? null,
+      muscleSoreness: body.muscleSoreness ?? null,
+      mood: body.mood ?? null,
+      stress: body.stress ?? null,
+      sorenessAreas: body.sorenessAreas ?? [],
+      readinessScore,
+      notes: body.notes ?? null,
+      createdBy: userId ?? null,
+    },
+    { returning: true },
+  );
+
+  return checkin;
+}
+
+/**
+ * List checkins for a player with pagination and date filtering.
+ */
+export async function listCheckins(
+  playerId: string,
+  query: { page?: number; limit?: number; from?: string; to?: string },
+) {
+  const { limit, offset, page } = parsePagination(query);
+  const where: any = { playerId };
+
+  if (query.from || query.to) {
+    where.checkinDate = {};
+    if (query.from) where.checkinDate[Op.gte] = query.from;
+    if (query.to) where.checkinDate[Op.lte] = query.to;
+  }
+
+  const { rows: data, count: total } = await WellnessCheckin.findAndCountAll({
+    where,
+    order: [["checkinDate", "DESC"]],
+    limit,
+    offset,
+  });
+
+  return { data, meta: buildMeta(total, page, limit) };
+}
+
+/**
+ * Get a single checkin for a player on a specific date.
+ */
+export async function getCheckinByDate(playerId: string, date: string) {
+  return WellnessCheckin.findOne({
+    where: { playerId, checkinDate: date },
+  });
+}
+
+/**
+ * Get readiness trend for a player over the last N days.
+ */
+export async function getCheckinTrend(playerId: string, days = 28) {
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - days);
+  const fromStr = fromDate.toISOString().split("T")[0];
+
+  const checkins = await WellnessCheckin.findAll({
+    where: {
+      playerId,
+      checkinDate: { [Op.gte]: fromStr },
+    },
+    order: [["checkinDate", "ASC"]],
+    attributes: [
+      "checkinDate",
+      "sleepHours",
+      "sleepQuality",
+      "fatigue",
+      "muscleSoreness",
+      "mood",
+      "stress",
+      "readinessScore",
+    ],
+  });
+
+  const scores = checkins.map((c) => c.readinessScore ?? 0);
+  const avg =
+    scores.length > 0
+      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
+      : null;
+
+  return {
+    days,
+    checkins: checkins.map((c) => c.get({ plain: true })),
+    averageReadiness: avg,
+    totalCheckins: checkins.length,
+  };
 }

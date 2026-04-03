@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import {
   createInvoiceSchema,
@@ -57,6 +58,7 @@ router.get(
 router.post(
   "/invoices",
   authorizeModule("finance", "create"),
+  authorizePlayerPackage("finance", "create"),
   validate(createInvoiceSchema),
   asyncHandler(ctrl.createInvoice),
 );
@@ -89,6 +91,7 @@ router.get(
 router.post(
   "/payments",
   authorizeModule("finance", "create"),
+  authorizePlayerPackage("finance", "create"),
   validate(createPaymentSchema),
   asyncHandler(ctrl.createPayment),
 );
@@ -110,6 +113,7 @@ router.get(
 router.post(
   "/ledger",
   authorizeModule("finance", "create"),
+  authorizePlayerPackage("finance", "create"),
   validate(createLedgerEntrySchema),
   asyncHandler(ctrl.createLedgerEntry),
 );
@@ -125,6 +129,7 @@ router.get(
 router.post(
   "/valuations",
   authorizeModule("finance", "create"),
+  authorizePlayerPackage("finance", "create"),
   validate(createValuationSchema),
   asyncHandler(ctrl.createValuation),
 );
@@ -140,6 +145,7 @@ router.get(
 router.post(
   "/expenses",
   authorizeModule("finance", "create"),
+  authorizePlayerPackage("finance", "create"),
   validate(createExpenseSchema),
   asyncHandler(ctrl.createExpense),
 );

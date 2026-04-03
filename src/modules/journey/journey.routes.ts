@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
@@ -29,6 +30,7 @@ router.get(
 router.get(
   "/player/:playerId",
   authorizeModule("journey", "read"),
+  authorizePlayerPackage("journey", "read"),
   dynamicFieldAccess("journey"),
   cacheRoute("journey", CacheTTL.MEDIUM),
   asyncHandler(journeyController.getPlayerJourney),
@@ -46,6 +48,7 @@ router.get(
 router.post(
   "/",
   authorizeModule("journey", "create"),
+  authorizePlayerPackage("journey", "create"),
   validate(createJourneySchema),
   asyncHandler(journeyController.create),
 );
@@ -60,6 +63,7 @@ router.patch(
 router.post(
   "/reorder",
   authorizeModule("journey", "update"),
+  authorizePlayerPackage("journey", "update"),
   validate(reorderStagesSchema),
   asyncHandler(journeyController.reorder),
 );

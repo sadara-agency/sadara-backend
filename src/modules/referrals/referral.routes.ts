@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
@@ -44,6 +45,7 @@ router.get(
 router.post(
   "/",
   authorizeModule("referrals", "create"),
+  authorizePlayerPackage("referrals", "create"),
   validate(createReferralSchema),
   asyncHandler(referralController.create),
 );

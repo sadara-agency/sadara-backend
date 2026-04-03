@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import {
   createCourseSchema,
@@ -68,6 +69,7 @@ router.get(
 router.get(
   "/player/:playerId",
   authorizeModule("training", "read"),
+  authorizePlayerPackage("training", "read"),
   asyncHandler(ctrl.playerEnrollments),
 );
 router.get(
@@ -100,6 +102,7 @@ router.delete(
 router.post(
   "/:id/enroll",
   authorizeModule("training", "create"),
+  authorizePlayerPackage("training", "create"),
   validate(enrollPlayersSchema),
   asyncHandler(ctrl.enrollPlayers),
 );

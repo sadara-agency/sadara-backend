@@ -113,11 +113,27 @@ export async function aggregateDailySummaries(): Promise<{
       );
       const weightLogged = Number(weightRow?.cnt || 0) > 0;
 
-      // Ring score
+      // Readiness score from daily checkin
+      const [checkinRow]: any = await sequelize.query(
+        `SELECT readiness_score
+         FROM wellness_checkins
+         WHERE player_id = :playerId AND checkin_date = :date`,
+        {
+          replacements: { playerId: player.player_id, date: today },
+          type: QueryTypes.SELECT,
+        },
+      );
+      const readinessScore: number | null =
+        checkinRow?.readiness_score != null
+          ? Number(checkinRow.readiness_score)
+          : null;
+
+      // Ring score (includes readiness when available)
       const ringScore = calculateRingScore(
         calorieAdherencePct ?? 0,
         proteinAdherencePct ?? 0,
         workoutCompleted,
+        readinessScore,
       );
 
       // Upsert into daily summaries
@@ -125,10 +141,10 @@ export async function aggregateDailySummaries(): Promise<{
         `INSERT INTO wellness_daily_summaries
            (id, player_id, summary_date, total_calories, total_protein_g, total_carbs_g, total_fat_g,
             calorie_adherence_pct, protein_adherence_pct, workout_completed, weight_logged, ring_score,
-            created_at, updated_at)
+            readiness_score, created_at, updated_at)
          VALUES (gen_random_uuid(), :playerId, :date, :totalCalories, :totalProteinG, :totalCarbsG, :totalFatG,
                  :calorieAdherencePct, :proteinAdherencePct, :workoutCompleted, :weightLogged, :ringScore,
-                 NOW(), NOW())
+                 :readinessScore, NOW(), NOW())
          ON CONFLICT (player_id, summary_date)
          DO UPDATE SET
            total_calories = :totalCalories,
@@ -140,6 +156,7 @@ export async function aggregateDailySummaries(): Promise<{
            workout_completed = :workoutCompleted,
            weight_logged = :weightLogged,
            ring_score = :ringScore,
+           readiness_score = :readinessScore,
            updated_at = NOW()`,
         {
           replacements: {
@@ -154,6 +171,7 @@ export async function aggregateDailySummaries(): Promise<{
             workoutCompleted,
             weightLogged,
             ringScore,
+            readinessScore,
           },
         },
       );

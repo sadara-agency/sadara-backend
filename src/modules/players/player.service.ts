@@ -201,6 +201,8 @@ export async function listPlayers(queryParams: any, user?: AuthUser) {
 
       if (queryParams.status) where.status = queryParams.status;
       if (queryParams.playerType) where.playerType = queryParams.playerType;
+      if (queryParams.playerPackage)
+        where.playerPackage = queryParams.playerPackage;
       if (queryParams.clubId) where.currentClubId = queryParams.clubId;
       if (queryParams.position) where.position = queryParams.position;
       if (queryParams.nationality) where.nationality = queryParams.nationality;

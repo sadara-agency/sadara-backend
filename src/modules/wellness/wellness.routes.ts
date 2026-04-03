@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import {
   createProfileSchema,
@@ -17,6 +18,9 @@ import {
   createMyMealLogSchema,
   copyDaySchema,
   copyMyDaySchema,
+  createCheckinSchema,
+  createMyCheckinSchema,
+  checkinQuerySchema,
 } from "./wellness.validation";
 import * as ctrl from "./wellness.controller";
 
@@ -81,6 +85,30 @@ router.get(
   asyncHandler(ctrl.myDailyTotals),
 );
 
+// Player checkin (readiness survey)
+router.post(
+  "/my/checkin",
+  authorizeModule("wellness", "create"),
+  validate(createMyCheckinSchema),
+  asyncHandler(ctrl.myCheckin),
+);
+router.get(
+  "/my/checkin/today",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.myCheckinToday),
+);
+router.get(
+  "/my/checkins",
+  authorizeModule("wellness", "read"),
+  validate(checkinQuerySchema, "query"),
+  asyncHandler(ctrl.myCheckins),
+);
+router.get(
+  "/my/checkins/trend",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.myCheckinTrend),
+);
+
 // Player ring dashboard
 router.get(
   "/my/dashboard",
@@ -95,28 +123,33 @@ router.get(
 router.get(
   "/profiles/:playerId",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.getProfile),
 );
 router.post(
   "/profiles",
   authorizeModule("wellness", "create"),
+  authorizePlayerPackage("wellness", "create"),
   validate(createProfileSchema),
   asyncHandler(ctrl.createProfile),
 );
 router.patch(
   "/profiles/:playerId",
   authorizeModule("wellness", "update"),
+  authorizePlayerPackage("wellness", "update"),
   validate(updateProfileSchema),
   asyncHandler(ctrl.updateProfile),
 );
 router.get(
   "/profiles/:playerId/macros",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.computeMacros),
 );
 router.post(
   "/profiles/:playerId/recalculate",
   authorizeModule("wellness", "update"),
+  authorizePlayerPackage("wellness", "update"),
   asyncHandler(ctrl.recalculateTargets),
 );
 
@@ -127,17 +160,20 @@ router.post(
 router.get(
   "/weight/:playerId",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.listWeightLogs),
 );
 router.post(
   "/weight",
   authorizeModule("wellness", "create"),
+  authorizePlayerPackage("wellness", "create"),
   validate(createWeightLogSchema),
   asyncHandler(ctrl.createWeightLog),
 );
 router.get(
   "/weight/:playerId/trend",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.getWeightTrend),
 );
 
@@ -169,11 +205,13 @@ router.post(
 router.get(
   "/meals/:playerId",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.listMealLogs),
 );
 router.post(
   "/meals",
   authorizeModule("wellness", "create"),
+  authorizePlayerPackage("wellness", "create"),
   validate(createMealLogSchema),
   asyncHandler(ctrl.createMealLog),
 );
@@ -191,12 +229,14 @@ router.delete(
 router.post(
   "/meals/copy-day",
   authorizeModule("wellness", "create"),
+  authorizePlayerPackage("wellness", "create"),
   validate(copyDaySchema),
   asyncHandler(ctrl.copyDay),
 );
 router.get(
   "/meals/:playerId/daily-totals",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.getDailyTotals),
 );
 
@@ -217,7 +257,33 @@ router.get(
 router.get(
   "/dashboard/player/:playerId",
   authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.playerDashboard),
+);
+
+// ══════════════════════════════════════════
+// CHECKINS (Coach / Admin)
+// ══════════════════════════════════════════
+
+router.post(
+  "/checkins",
+  authorizeModule("wellness", "create"),
+  authorizePlayerPackage("wellness", "create"),
+  validate(createCheckinSchema),
+  asyncHandler(ctrl.createCheckin),
+);
+router.get(
+  "/checkins/:playerId",
+  authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
+  validate(checkinQuerySchema, "query"),
+  asyncHandler(ctrl.listCheckins),
+);
+router.get(
+  "/checkins/:playerId/trend",
+  authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
+  asyncHandler(ctrl.checkinTrend),
 );
 
 export default router;

@@ -60,6 +60,7 @@ interface ContractAttributes {
   // Termination-type specific fields
   terminationReason: string | null;
   terminationDate: string | null;
+  terminationType: "mutual" | "unilateral" | null;
   clearanceNumber: string | null;
   outstandingAmount: number | null;
   outstandingCurrency: string | null;
@@ -106,6 +107,7 @@ interface ContractCreationAttributes extends Optional<
   | "terminatedByClearanceId"
   | "terminationReason"
   | "terminationDate"
+  | "terminationType"
   | "clearanceNumber"
   | "outstandingAmount"
   | "outstandingCurrency"
@@ -174,6 +176,7 @@ export class Contract
   declare terminatedByClearanceId: string | null;
   declare terminationReason: string | null;
   declare terminationDate: string | null;
+  declare terminationType: "mutual" | "unilateral" | null;
   declare clearanceNumber: string | null;
   declare outstandingAmount: number | null;
   declare outstandingCurrency: string | null;
@@ -358,6 +361,10 @@ Contract.init(
     terminationDate: {
       type: DataTypes.DATEONLY,
       field: "termination_date",
+    },
+    terminationType: {
+      type: DataTypes.STRING(20),
+      field: "termination_type",
     },
     clearanceNumber: {
       type: DataTypes.STRING(50),

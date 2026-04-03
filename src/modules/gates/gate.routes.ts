@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import {
   createGateSchema,
@@ -28,12 +29,14 @@ router.get(
 router.post(
   "/initialize",
   authorizeModule("gates", "create"),
+  authorizePlayerPackage("gates", "create"),
   validate(initializeGateSchema),
   asyncHandler(gateController.initialize),
 );
 router.get(
   "/player/:playerId",
   authorizeModule("gates", "read"),
+  authorizePlayerPackage("gates", "read"),
   asyncHandler(gateController.getPlayerGates),
 );
 
@@ -45,6 +48,7 @@ router.get(
 router.post(
   "/",
   authorizeModule("gates", "create"),
+  authorizePlayerPackage("gates", "create"),
   validate(createGateSchema),
   asyncHandler(gateController.create),
 );
