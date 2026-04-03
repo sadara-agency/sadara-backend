@@ -4,6 +4,7 @@ import {
   calculateMacros,
   calculateBMI,
   calculateRingScore,
+  calculateReadinessScore,
 } from '../../../src/modules/wellness/wellness.helpers';
 
 describe('Wellness Helpers', () => {
@@ -140,32 +141,120 @@ describe('Wellness Helpers', () => {
   // ══════════════════════════════════════════
 
   describe('calculateRingScore', () => {
-    it('should return 100 for perfect adherence', () => {
+    it('should return 100 for perfect adherence (legacy, no readiness)', () => {
       expect(calculateRingScore(100, 100, true)).toBe(100);
     });
 
-    it('should return 0 for zero adherence', () => {
+    it('should return 0 for zero adherence (legacy)', () => {
       expect(calculateRingScore(0, 0, false)).toBe(0);
     });
 
-    it('should weight calories at 40%', () => {
+    it('should use legacy weights without readiness (40/30/30)', () => {
       expect(calculateRingScore(100, 0, false)).toBe(40);
-    });
-
-    it('should weight protein at 30%', () => {
       expect(calculateRingScore(0, 100, false)).toBe(30);
+      expect(calculateRingScore(0, 0, true)).toBe(30);
     });
 
-    it('should weight workout at 30%', () => {
-      expect(calculateRingScore(0, 0, true)).toBe(30);
+    it('should use new weights with readiness (30/20/20/30)', () => {
+      expect(calculateRingScore(100, 100, true, 100)).toBe(100);
+      expect(calculateRingScore(0, 0, false, 0)).toBe(0);
+      expect(calculateRingScore(100, 0, false, 0)).toBe(30);
+      expect(calculateRingScore(0, 100, false, 0)).toBe(20);
+      expect(calculateRingScore(0, 0, true, 0)).toBe(20);
+      expect(calculateRingScore(0, 0, false, 100)).toBe(30);
     });
 
     it('should cap at 100 even with over-adherence', () => {
       expect(calculateRingScore(150, 150, true)).toBe(100);
+      expect(calculateRingScore(150, 150, true, 150)).toBe(100);
     });
 
     it('should floor at 0 for negative input', () => {
       expect(calculateRingScore(-10, -10, false)).toBe(0);
+    });
+
+    it('should handle null readiness as legacy mode', () => {
+      expect(calculateRingScore(100, 100, true, null)).toBe(100);
+      expect(calculateRingScore(100, 0, false, null)).toBe(40);
+    });
+  });
+
+  // ══════════════════════════════════════════
+  // Readiness Score
+  // ══════════════════════════════════════════
+
+  describe('calculateReadinessScore', () => {
+    it('should return 100 for best possible values', () => {
+      const score = calculateReadinessScore({
+        sleepHours: 8,
+        sleepQuality: 5,
+        fatigue: 1,
+        muscleSoreness: 1,
+        mood: 5,
+        stress: 1,
+      });
+      expect(score).toBe(100);
+    });
+
+    it('should return 0 for worst possible values', () => {
+      const score = calculateReadinessScore({
+        sleepHours: 3,
+        sleepQuality: 1,
+        fatigue: 5,
+        muscleSoreness: 5,
+        mood: 1,
+        stress: 5,
+      });
+      expect(score).toBeLessThanOrEqual(10);
+    });
+
+    it('should return 50 when no data provided', () => {
+      expect(calculateReadinessScore({})).toBe(50);
+    });
+
+    it('should handle partial data (only sleep)', () => {
+      const score = calculateReadinessScore({ sleepQuality: 5 });
+      expect(score).toBe(100);
+    });
+
+    it('should invert fatigue (higher = worse)', () => {
+      const fresh = calculateReadinessScore({ fatigue: 1 });
+      const exhausted = calculateReadinessScore({ fatigue: 5 });
+      expect(fresh).toBeGreaterThan(exhausted);
+    });
+
+    it('should invert stress (higher = worse)', () => {
+      const calm = calculateReadinessScore({ stress: 1 });
+      const stressed = calculateReadinessScore({ stress: 5 });
+      expect(calm).toBeGreaterThan(stressed);
+    });
+
+    it('should score optimal sleep hours (7-9h) at 100', () => {
+      const score = calculateReadinessScore({ sleepHours: 8 });
+      expect(score).toBe(100);
+    });
+
+    it('should score low sleep hours poorly', () => {
+      const score = calculateReadinessScore({ sleepHours: 4 });
+      expect(score).toBeLessThanOrEqual(25);
+    });
+
+    it('should score oversleep moderately', () => {
+      const score = calculateReadinessScore({ sleepHours: 11 });
+      expect(score).toBe(60);
+    });
+
+    it('should return value between 0 and 100', () => {
+      const score = calculateReadinessScore({
+        sleepHours: 6,
+        sleepQuality: 3,
+        fatigue: 3,
+        muscleSoreness: 3,
+        mood: 3,
+        stress: 3,
+      });
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
     });
   });
 });
