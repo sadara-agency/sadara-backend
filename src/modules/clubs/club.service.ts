@@ -12,6 +12,8 @@
 // - Consistent with player/user/task/contract service patterns
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, QueryTypes } from "sequelize";
+import https from "https";
+import http from "http";
 import { Club } from "@modules/clubs/club.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
@@ -69,6 +71,17 @@ export async function listClubs(queryParams: any) {
 
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.league) where.league = queryParams.league;
+  if (queryParams.competitionId) {
+    const seasonClause = queryParams.season
+      ? ` AND season = '${queryParams.season.replace(/'/g, "")}'`
+      : "";
+    where.id = {
+      ...(where.id || {}),
+      [Op.in]: Sequelize.literal(
+        `(SELECT DISTINCT club_id FROM club_competitions WHERE competition_id = '${queryParams.competitionId.replace(/'/g, "")}'${seasonClause})`,
+      ),
+    };
+  }
   if (queryParams.country)
     where.country = { [Op.iLike]: `%${queryParams.country}%` };
 
@@ -397,4 +410,81 @@ export async function deleteContact(contactId: string, clubId: string) {
   if ((metadata as any)?.rowCount === 0)
     throw new AppError("Contact not found", 404);
   return { id: contactId };
+}
+
+// ────────────────────────────────────────────────────────────
+// Logo Audit — check all clubs for missing or broken logos
+// ────────────────────────────────────────────────────────────
+
+function headCheck(url: string, timeout = 5000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const mod = url.startsWith("https") ? https : http;
+    const req = mod.request(url, { method: "HEAD", timeout }, (res) => {
+      resolve(res.statusCode !== undefined && res.statusCode < 400);
+    });
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+export async function auditLogos() {
+  const clubs = await Club.findAll({
+    attributes: ["id", "name", "nameAr", "logoUrl"],
+    order: [["name", "ASC"]],
+  });
+
+  const missing: { id: string; name: string; nameAr: string | null }[] = [];
+  const broken: {
+    id: string;
+    name: string;
+    nameAr: string | null;
+    logoUrl: string;
+  }[] = [];
+  const valid: { id: string; name: string; logoUrl: string }[] = [];
+
+  // Check logos in parallel (batch of 10)
+  const BATCH = 10;
+  for (let i = 0; i < clubs.length; i += BATCH) {
+    const batch = clubs.slice(i, i + BATCH);
+    await Promise.all(
+      batch.map(async (club) => {
+        if (!club.logoUrl) {
+          missing.push({
+            id: club.id,
+            name: club.name,
+            nameAr: club.nameAr,
+          });
+          return;
+        }
+        const ok = await headCheck(club.logoUrl);
+        if (ok) {
+          valid.push({
+            id: club.id,
+            name: club.name,
+            logoUrl: club.logoUrl,
+          });
+        } else {
+          broken.push({
+            id: club.id,
+            name: club.name,
+            nameAr: club.nameAr,
+            logoUrl: club.logoUrl,
+          });
+        }
+      }),
+    );
+  }
+
+  return {
+    total: clubs.length,
+    valid: valid.length,
+    missing: missing.length,
+    broken: broken.length,
+    missingClubs: missing,
+    brokenClubs: broken,
+  };
 }

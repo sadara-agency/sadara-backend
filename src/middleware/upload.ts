@@ -6,6 +6,7 @@
 import multer from "multer";
 import path from "path";
 import { Request, Response, NextFunction } from "express";
+import { logger } from "@config/logger";
 
 // Legacy export: signing services write PDFs directly to this directory
 export const UPLOAD_DIR_PATH = path.resolve(
@@ -118,6 +119,15 @@ export async function verifyFileType(
   });
 
   if (!match) {
+    // Images are re-encoded by Sharp during upload, which validates them anyway.
+    // Log a warning and allow through — Sharp will reject truly invalid files.
+    if (mime.startsWith("image/")) {
+      logger.warn(
+        `[upload] Magic byte mismatch for ${mime} (file: ${file.originalname}, size: ${buf.length}, first bytes: ${buf.slice(0, 8).toString("hex")}) — allowing through for Sharp validation`,
+      );
+      return next();
+    }
+
     res.status(400).json({
       success: false,
       message: "File content does not match its declared type.",

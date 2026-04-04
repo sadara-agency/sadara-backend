@@ -28,6 +28,7 @@ interface ClubAttributes {
   isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  squadType?: string | null;
   splTeamId?: number | null;
   espnTeamId?: number | null;
   sportmonksTeamId?: number | null;
@@ -58,6 +59,7 @@ export class Club
   declare secondaryColor: string | null;
   declare notes: string | null;
   declare isActive: boolean;
+  declare squadType: string | null;
   declare splTeamId: number | null;
   declare espnTeamId: number | null;
   declare sportmonksTeamId: number | null;
@@ -120,6 +122,11 @@ Club.init(
     },
     notes: {
       type: DataTypes.TEXT,
+    },
+    squadType: {
+      type: DataTypes.STRING(20),
+      field: "squad_type",
+      defaultValue: "Senior",
     },
     splTeamId: {
       type: DataTypes.INTEGER,

@@ -24,6 +24,9 @@ export const createClubSchema = z.object({
   primaryColor: z.string().optional(),
   secondaryColor: z.string().optional(),
   notes: z.string().optional(),
+  squadType: z
+    .enum(["Senior", "U21", "U18", "U17", "U16", "U15", "Reserve"])
+    .optional(),
 });
 
 // ── Update Club (partial) ──
@@ -40,6 +43,8 @@ export const clubQuerySchema = z.object({
   search: z.string().optional(),
   type: z.enum(["Club", "Sponsor"]).optional(),
   league: z.string().optional(),
+  competitionId: z.string().uuid().optional(),
+  season: z.string().optional(),
   country: z.string().optional(),
 });
 

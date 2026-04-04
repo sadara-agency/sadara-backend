@@ -91,7 +91,7 @@ export async function upload(req: AuthRequest, res: Response) {
   sendCreated(res, doc);
 }
 
-// ── Download (signed URL redirect for private files) ──
+// ── Download (serve local files or redirect to signed URL) ──
 
 export async function download(req: AuthRequest, res: Response) {
   const doc = await svc.getDocumentById(req.params.id, req.user);
@@ -100,5 +100,18 @@ export async function download(req: AuthRequest, res: Response) {
   }
 
   const url = await resolveFileUrl(doc.fileUrl, 15); // 15 min expiry
+
+  // Local files: serve directly (avoids redirect issues with iframes/embeds)
+  if (url.startsWith("/uploads/")) {
+    const path = await import("path");
+    const fs = await import("fs");
+    const filePath = path.resolve(url.slice(1)); // strip leading /
+    if (!fs.existsSync(filePath)) {
+      throw new AppError("File not found on disk", 404);
+    }
+    return res.sendFile(filePath);
+  }
+
+  // Remote URLs (GCS signed URLs etc.): redirect
   res.redirect(url);
 }

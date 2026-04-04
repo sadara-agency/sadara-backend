@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Op } from "sequelize";
+import { Op, Transaction } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import {
@@ -245,7 +245,7 @@ export async function submitSignature(
         },
       ],
       transaction: t,
-      lock: true,
+      lock: { level: Transaction.LOCK.UPDATE, of: SignatureSigner },
     });
 
     if (!signer) throw new AppError("Signer not found", 404);
@@ -362,7 +362,7 @@ export async function declineSignature(
         },
       ],
       transaction: t,
-      lock: true,
+      lock: { level: Transaction.LOCK.UPDATE, of: SignatureSigner },
     });
 
     if (!signer) throw new AppError("Signer not found", 404);
