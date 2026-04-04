@@ -51,7 +51,7 @@ export async function listOffers(queryParams: any, user?: AuthUser) {
   }
 
   // Row-level scoping
-  const scope = buildRowScope("offers", user);
+  const scope = await buildRowScope("offers", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Offer.findAndCountAll({

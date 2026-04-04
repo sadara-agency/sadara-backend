@@ -38,7 +38,7 @@ const envSchema = z.object({
         .min(64, "JWT_SECRET must be ≥64 hex chars (256-bit) in production")
     : z.string().default(devJwtSecret),
   JWT_EXPIRES_IN: z.string().default("7d"),
-  JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
 
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
@@ -90,6 +90,12 @@ const envSchema = z.object({
   // Nutritionix Food API (optional)
   NUTRITIONIX_APP_ID: z.string().default(""),
   NUTRITIONIX_API_KEY: z.string().default(""),
+
+  // CSRF protection (enable enforcement after frontend is updated)
+  CSRF_ENFORCE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 
   // Puppeteer (optional — override Chromium binary path)
   PUPPETEER_EXECUTABLE_PATH: z.string().default(""),
@@ -209,6 +215,10 @@ export const env = {
   nutritionix: {
     appId: validated.NUTRITIONIX_APP_ID,
     apiKey: validated.NUTRITIONIX_API_KEY,
+  },
+
+  csrf: {
+    enforce: validated.CSRF_ENFORCE,
   },
 
   puppeteer: {

@@ -52,7 +52,7 @@ export async function listWatchlist(queryParams: any, user?: AuthUser) {
   }
 
   // Row-level scoping
-  const scope = buildRowScope("scouting", user);
+  const scope = await buildRowScope("scouting", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Watchlist.findAndCountAll({

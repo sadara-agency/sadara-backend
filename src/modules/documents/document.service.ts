@@ -187,7 +187,7 @@ export async function listDocuments(
   }
 
   // Row-level scoping
-  const scope = buildRowScope("documents", user);
+  const scope = await buildRowScope("documents", user);
   if (scope) mergeScope(where, scope);
 
   if (search) {

@@ -20,7 +20,12 @@ export {
 export { validate } from "./validate";
 
 // Upload
-export { UPLOAD_DIR_PATH, uploadSingle, verifyFileType } from "./upload";
+export {
+  UPLOAD_DIR_PATH,
+  uploadSingle,
+  verifyFileType,
+  sanitizeCsv,
+} from "./upload";
 
 // Cache
 export { cacheRoute } from "./cache.middleware";
