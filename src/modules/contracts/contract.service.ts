@@ -100,7 +100,7 @@ export async function listContracts(queryParams: any, user?: AuthUser) {
   }
 
   // Row-level scoping
-  const scope = buildRowScope("contracts", user);
+  const scope = await buildRowScope("contracts", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Contract.findAndCountAll({

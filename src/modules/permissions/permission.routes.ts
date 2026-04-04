@@ -13,6 +13,7 @@ import {
   getFieldPermissions,
   loadFieldPermissions,
 } from "@modules/permissions/permission.service";
+import { verifyUserRole } from "@shared/utils/verifyRole";
 import { RoleFieldPermission } from "@modules/permissions/fieldPermission.model";
 import { CONFIGURABLE_FIELDS } from "@modules/permissions/fieldPermission.config";
 import {
@@ -31,6 +32,7 @@ router.get(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const perms = await getPermissions();
     if (req.user?.role === "Admin") {
+      await verifyUserRole(req.user.id, "Admin");
       sendSuccess(res, perms);
     } else {
       const role = req.user?.role ?? "";
@@ -100,6 +102,7 @@ router.get(
   asyncHandler(async (req: AuthRequest, res: Response) => {
     const perms = await getFieldPermissions();
     if (req.user?.role === "Admin") {
+      await verifyUserRole(req.user.id, "Admin");
       sendSuccess(res, perms);
     } else {
       const role = req.user?.role ?? "";

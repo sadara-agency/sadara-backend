@@ -137,3 +137,89 @@ export async function verifyFileType(
 
   next();
 }
+
+// ── CSV injection sanitization middleware ──
+// Neutralizes formula injection characters (=, +, -, @, \t, \r) at the start
+// of CSV cell values. These characters trigger formula evaluation when the CSV
+// is opened in Excel/Calc, enabling DDE command execution or data exfiltration.
+
+const CSV_INJECTION_CHARS = new Set(["=", "+", "-", "@", "\t", "\r"]);
+
+/**
+ * Sanitize a CSV file buffer to prevent formula injection.
+ * Prefixes dangerous cell values with a single quote (') which Excel
+ * treats as a text indicator, neutralizing any formula interpretation.
+ *
+ * Place after verifyFileType in the middleware chain.
+ */
+export function sanitizeCsv(
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void {
+  const file = req.file;
+  if (!file) return next();
+
+  // Only sanitize actual .csv files
+  const ext = path.extname(file.originalname).toLowerCase();
+  if (ext !== ".csv") return next();
+
+  const content = file.buffer.toString("utf-8");
+  const lines = content.split("\n");
+
+  const sanitized = lines
+    .map((line) => {
+      // Simple CSV parse: handle quoted fields and commas
+      const cells: string[] = [];
+      let current = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++; // Skip escaped quote
+          } else {
+            inQuotes = !inQuotes;
+            current += ch;
+          }
+        } else if (ch === "," && !inQuotes) {
+          cells.push(current);
+          current = "";
+        } else {
+          current += ch;
+        }
+      }
+      cells.push(current);
+
+      // Sanitize each cell
+      return cells
+        .map((cell) => {
+          // Strip surrounding quotes to check the actual value
+          const trimmed = cell.trim();
+          let inner = trimmed;
+          const isQuoted =
+            inner.length >= 2 &&
+            inner[0] === '"' &&
+            inner[inner.length - 1] === '"';
+          if (isQuoted) {
+            inner = inner.slice(1, -1);
+          }
+
+          if (inner.length > 0 && CSV_INJECTION_CHARS.has(inner[0])) {
+            // Prefix with single quote inside quotes to neutralize
+            if (isQuoted) {
+              return `"'${inner}"`;
+            }
+            return `'${cell}`;
+          }
+          return cell;
+        })
+        .join(",");
+    })
+    .join("\n");
+
+  file.buffer = Buffer.from(sanitized, "utf-8");
+  next();
+}

@@ -289,7 +289,7 @@ export async function listInvoices(
   }
 
   // Row-level scoping
-  const scope = buildRowScope("finance", user);
+  const scope = await buildRowScope("finance", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Invoice.findAndCountAll({
@@ -376,7 +376,7 @@ export async function listPayments(
   if (queryParams.playerId) where.playerId = queryParams.playerId;
 
   // Row-level scoping
-  const scope = buildRowScope("finance", user);
+  const scope = await buildRowScope("finance", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Payment.findAndCountAll({
@@ -431,7 +431,7 @@ export async function listLedger(
   }
 
   // Row-level scoping
-  const scope = buildRowScope("finance", user);
+  const scope = await buildRowScope("finance", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await LedgerEntry.findAndCountAll({
@@ -501,7 +501,7 @@ export async function listValuations(
   if (queryParams.playerId) where.playerId = queryParams.playerId;
 
   // Row-level scoping
-  const scope = buildRowScope("finance", user);
+  const scope = await buildRowScope("finance", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Valuation.findAndCountAll({
@@ -885,7 +885,7 @@ export async function listExpenses(
   if (queryParams.playerId) where.playerId = queryParams.playerId;
 
   // Row-level scoping
-  const scope = buildRowScope("finance", user);
+  const scope = await buildRowScope("finance", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Expense.findAndCountAll({

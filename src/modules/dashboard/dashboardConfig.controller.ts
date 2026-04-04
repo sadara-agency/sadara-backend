@@ -1,14 +1,16 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
 import { sendSuccess, sendError } from "@shared/utils/apiResponse";
+import { verifyUserRole } from "@shared/utils/verifyRole";
 import * as configService from "@modules/dashboard/dashboardConfig.service";
 
 // GET /dashboard/config — returns widget config for the requesting user's role
 export async function getConfig(req: AuthRequest, res: Response) {
   const role = req.user!.role;
 
-  // Admin gets full map for all roles
+  // Admin gets full map for all roles — verify role is current in DB
   if (role === "Admin") {
+    await verifyUserRole(req.user!.id, "Admin");
     const all = await configService.getAllConfigs();
     return sendSuccess(res, all);
   }

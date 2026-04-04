@@ -9,6 +9,7 @@ import { Op, literal, QueryTypes } from "sequelize";
 import { AuthUser } from "@shared/types";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
+import { verifyUserRole } from "@shared/utils/verifyRole";
 
 // ── Helpers ──
 
@@ -155,12 +156,15 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
  *
  * Usage: merge into your existing `where` object before querying.
  */
-export function buildRowScope(
+export async function buildRowScope(
   module: string,
   user?: AuthUser,
-): WhereClause | null {
+): Promise<WhereClause | null> {
   if (!user) return null;
-  if (BYPASS_ROLES.includes(user.role)) return null;
+  if (BYPASS_ROLES.includes(user.role)) {
+    await verifyUserRole(user.id, user.role);
+    return null;
+  }
 
   const moduleRules = SCOPE_RULES[module];
   if (!moduleRules) return null;
@@ -219,7 +223,10 @@ export async function checkRowAccess(
   user?: AuthUser,
 ): Promise<boolean> {
   if (!user) return true;
-  if (BYPASS_ROLES.includes(user.role)) return true;
+  if (BYPASS_ROLES.includes(user.role)) {
+    await verifyUserRole(user.id, user.role);
+    return true;
+  }
 
   const moduleRules = SCOPE_RULES[module];
   if (!moduleRules) return true;

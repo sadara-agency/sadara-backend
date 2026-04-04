@@ -62,7 +62,7 @@ export async function listInjuries(queryParams: any, user?: AuthUser) {
   }
 
   // Row-level scoping
-  const scope = buildRowScope("injuries", user);
+  const scope = await buildRowScope("injuries", user);
   if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Injury.findAndCountAll({

@@ -1,6 +1,7 @@
 import { RolePermission } from "@modules/permissions/permission.model";
 import { RoleFieldPermission } from "@modules/permissions/fieldPermission.model";
 import { cacheGet, cacheSet, cacheDel, CacheTTL } from "@shared/utils/cache";
+import { verifyUserRole } from "@shared/utils/verifyRole";
 
 // ── Types ──
 
@@ -66,9 +67,13 @@ export async function hasPermission(
   role: string,
   module: string,
   action: CrudAction,
+  userId?: string,
 ): Promise<boolean> {
-  // Admin always has full access (safety net)
-  if (role === "Admin") return true;
+  // Admin always has full access, but verify the role is current in DB
+  if (role === "Admin") {
+    if (userId) await verifyUserRole(userId, "Admin");
+    return true;
+  }
 
   const perms = await getPermissions();
   const mp = perms[role]?.[module];
@@ -151,8 +156,12 @@ export async function getFieldPermissions(): Promise<FieldPermissionMap> {
 export async function getHiddenFields(
   role: string,
   module: string,
+  userId?: string,
 ): Promise<string[]> {
-  if (role === "Admin") return [];
+  if (role === "Admin") {
+    if (userId) await verifyUserRole(userId, "Admin");
+    return [];
+  }
   const perms = await getFieldPermissions();
   return perms[role]?.[module] ?? [];
 }

@@ -86,7 +86,7 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
   }
 
   // Row-level scoping
-  const scope = buildRowScope("tasks", user);
+  const scope = await buildRowScope("tasks", user);
   if (scope) mergeScope(where, scope);
 
   // Default sort: priority (critical first) → due_date ascending

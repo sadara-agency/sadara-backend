@@ -9,6 +9,7 @@ import fs from "fs";
 import { env } from "@config/env";
 import { errorHandler } from "@middleware/errorHandler";
 import { apiLimiter, authLimiter } from "@middleware/rateLimiter";
+import { csrfProtection } from "@middleware/csrf";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import type { AuthRequest } from "@shared/types";
@@ -107,11 +108,12 @@ app.use(
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-CSRF-Token"],
   }),
 );
 app.use(express.json({ limit: "1mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(csrfProtection);
 app.use(morgan(env.nodeEnv === "production" ? "combined" : "dev"));
 
 // Rate limiting (auth-specific limits are applied per-route in auth.routes.ts)

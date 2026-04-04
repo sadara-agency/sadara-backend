@@ -1,6 +1,7 @@
 import { Response, NextFunction } from "express";
 import { AuthRequest, UserRole } from "@shared/types";
 import { getHiddenFields } from "@modules/permissions/permission.service";
+import { verifyUserRole } from "@shared/utils/verifyRole";
 import { logger } from "@config/logger";
 
 /**
@@ -94,13 +95,25 @@ export function dynamicFieldAccess(module: string) {
     next: NextFunction,
   ): Promise<void> => {
     const role = req.user?.role;
-    if (!role || role === "Admin") {
+    if (!role) {
+      next();
+      return;
+    }
+
+    // Admin sees all fields, but verify the role is current in DB
+    if (role === "Admin") {
+      try {
+        if (req.user?.id) await verifyUserRole(req.user.id, "Admin");
+      } catch (err) {
+        next(err);
+        return;
+      }
       next();
       return;
     }
 
     try {
-      const fieldsToStrip = await getHiddenFields(role, module);
+      const fieldsToStrip = await getHiddenFields(role, module, req.user?.id);
       if (fieldsToStrip.length > 0) {
         const originalJson = res.json.bind(res);
         res.json = function (body: any) {

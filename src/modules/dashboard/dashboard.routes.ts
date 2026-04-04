@@ -207,6 +207,7 @@ router.get(
   authorize(
     "Admin",
     "Manager",
+    "Executive",
     "Coach",
     "SkillCoach",
     "TacticalCoach",

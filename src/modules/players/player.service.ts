@@ -228,7 +228,7 @@ export async function listPlayers(queryParams: any, user?: AuthUser) {
       }
 
       // Row-level scoping
-      const scope = buildRowScope("players", user);
+      const scope = await buildRowScope("players", user);
       if (scope) mergeScope(where, scope);
 
       // Step 1: Base query with only lightweight computed attributes (name, age)

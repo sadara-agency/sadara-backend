@@ -116,7 +116,12 @@ export function authorizeModule(module: string, action: CrudAction) {
         return;
       }
 
-      const allowed = await hasPermission(req.user.role, module, action);
+      const allowed = await hasPermission(
+        req.user.role,
+        module,
+        action,
+        req.user.id,
+      );
       if (!allowed) {
         sendForbidden(
           res,

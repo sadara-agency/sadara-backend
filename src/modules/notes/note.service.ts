@@ -33,7 +33,7 @@ export async function listNotes(
   if (queryParams.ownerId) where.ownerId = queryParams.ownerId;
 
   // Row-level scoping
-  const scope = buildRowScope("notes", user);
+  const scope = await buildRowScope("notes", user);
   if (scope) mergeScope(where, scope);
 
   // RBAC: Exclude notes attached to entities the role cannot read
