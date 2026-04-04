@@ -1575,32 +1575,33 @@ async function seedAllData(tx: Transaction): Promise<void> {
   console.log("  ✅ Contracts seeded (12)");
 
   // ── 5. Matches (8) ──
+  // Dates include kickoff times (stored in UTC; +3h = Saudi local time)
   const matchDefs = [
     {
       home: "alHilal",
       away: "alNassr",
-      date: "2026-03-05",
+      date: "2026-03-05T17:00:00Z",
       comp: "Saudi Pro League",
       status: "upcoming",
     },
     {
       home: "alAhli",
       away: "alIttihad",
-      date: "2026-03-08",
+      date: "2026-03-08T15:00:00Z",
       comp: "Saudi Pro League",
       status: "upcoming",
     },
     {
       home: "alShabab",
       away: "alFateh",
-      date: "2026-03-12",
+      date: "2026-03-12T16:30:00Z",
       comp: "Saudi Pro League",
       status: "upcoming",
     },
     {
       home: "alHilal",
       away: "alAhli",
-      date: "2026-02-20",
+      date: "2026-02-20T17:00:00Z",
       comp: "Saudi Pro League",
       status: "completed",
       hs: 2,
@@ -1609,7 +1610,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
     {
       home: "alNassr",
       away: "alShabab",
-      date: "2026-02-15",
+      date: "2026-02-15T15:30:00Z",
       comp: "Saudi Pro League",
       status: "completed",
       hs: 3,
@@ -1618,7 +1619,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
     {
       home: "alIttihad",
       away: "alTaawoun",
-      date: "2026-02-10",
+      date: "2026-02-10T14:00:00Z",
       comp: "Saudi Pro League",
       status: "completed",
       hs: 1,
@@ -1627,14 +1628,14 @@ async function seedAllData(tx: Transaction): Promise<void> {
     {
       home: "alHilal",
       away: "alIttihad",
-      date: "2026-03-20",
+      date: "2026-03-20T18:00:00Z",
       comp: "King's Cup",
       status: "upcoming",
     },
     {
       home: "alRaed",
       away: "alFateh",
-      date: "2026-03-22",
+      date: "2026-03-22T16:00:00Z",
       comp: "Saudi Pro League",
       status: "upcoming",
     },

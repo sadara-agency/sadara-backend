@@ -84,6 +84,13 @@ router.post(
   asyncHandler(saffController.fetchTeamLogos),
 );
 
+// ── Bulk Fetch Men's Leagues ──
+router.post(
+  "/bulk-fetch-men",
+  authorizeModule("saff-data", "create"),
+  asyncHandler(saffController.bulkFetchMenLeagues),
+);
+
 // ── Stats ──
 router.get(
   "/stats",

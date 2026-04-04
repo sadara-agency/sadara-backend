@@ -105,3 +105,14 @@ export async function deleteContact(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, result, "Contact deleted");
 }
+
+// ── Logo Audit ──
+
+export async function logoAudit(req: AuthRequest, res: Response) {
+  const result = await clubService.auditLogos();
+  sendSuccess(
+    res,
+    result,
+    `Logo audit: ${result.valid} valid, ${result.missing} missing, ${result.broken} broken`,
+  );
+}

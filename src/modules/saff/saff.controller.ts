@@ -126,6 +126,25 @@ export async function fetchTeamLogos(req: AuthRequest, res: Response) {
   sendSuccess(res, result, `Fetched ${result.fetched} logos`);
 }
 
+// ── Bulk Fetch Men's Leagues ──
+
+export async function bulkFetchMenLeagues(req: AuthRequest, res: Response) {
+  const season = req.body.season || getCurrentSeason();
+  const result = await saffService.bulkFetchMenLeagues(season);
+  await logAudit(
+    "CREATE",
+    "saff_tournaments",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Bulk fetch ${result.leagues} men's leagues for ${season}: ${result.fetch.results} tournaments, ${result.import.matches} matches`,
+  );
+  sendSuccess(
+    res,
+    result,
+    `Bulk fetch completed for ${result.leagues} leagues`,
+  );
+}
+
 // ── Stats ──
 
 export async function getStats(req: AuthRequest, res: Response) {

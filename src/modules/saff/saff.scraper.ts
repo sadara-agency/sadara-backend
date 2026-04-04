@@ -3,8 +3,10 @@ import * as cheerio from "cheerio";
 import * as iconv from "iconv-lite";
 import { logger } from "@config/logger";
 
+// /en/ subpath may 404 depending on SAFF server config — scrapeChampionship
+// falls back to root URL if the English page fails.
 const BASE_URL_EN = "https://www.saff.com.sa/en";
-const BASE_URL_AR = "https://www.saff.com.sa"; // Root path serves Arabic content; /ar/ returns 404
+const BASE_URL_AR = "https://www.saff.com.sa";
 const REQUEST_DELAY = 1500; // ms between requests to be respectful
 
 // Standard browser UA — SAFF's WAF rejects non-browser User-Agents
@@ -102,15 +104,17 @@ async function fetchPage(
 
       const response = await axios.get(url, {
         responseType: "arraybuffer",
-        timeout: 15000,
+        timeout: 30000,
+        maxRedirects: 5,
         headers: {
           "User-Agent": BROWSER_UA,
           Accept:
             "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
           "Accept-Language": lang === "ar" ? "ar,en;q=0.5" : "en,ar;q=0.5",
-          "Accept-Encoding": "gzip, deflate, br",
+          "Accept-Encoding": "gzip, deflate",
           Connection: "keep-alive",
           "Cache-Control": "no-cache",
+          Referer: "https://www.saff.com.sa/",
         },
       });
 
@@ -147,13 +151,21 @@ export async function scrapeChampionship(
   season: string,
 ): Promise<ScrapeResult> {
   const urlEn = `${BASE_URL_EN}/championship.php?id=${saffId}`;
-  const urlAr = `${BASE_URL_AR}/championship.php?id=${saffId}`;
+  const urlArFallback = `${BASE_URL_AR}/championship.php?id=${saffId}`;
 
-  // Fetch both EN and AR pages in parallel for bilingual data
-  const [$en, $ar] = await Promise.all([
-    fetchPage(urlEn, "en"),
-    fetchPage(urlAr, "ar"),
-  ]);
+  // Fetch EN page with fallback to root URL if /en/ path 404s
+  let $en: cheerio.CheerioAPI;
+  try {
+    $en = await fetchPage(urlEn, "en");
+  } catch {
+    logger.warn(
+      `[SAFF Scraper] EN page failed for saffId=${saffId}, falling back to root URL`,
+    );
+    $en = await fetchPage(urlArFallback, "en");
+  }
+
+  // Fetch AR page (always uses root URL)
+  const $ar = await fetchPage(urlArFallback, "ar");
 
   // Scrape English data (primary)
   const standingsEn = scrapeStandings($en);
