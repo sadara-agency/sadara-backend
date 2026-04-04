@@ -492,20 +492,30 @@ export async function scrapeTeamLogos(
   saffTeamIds: number[],
 ): Promise<Map<number, string>> {
   const logos = new Map<number, string>();
+  const BATCH_SIZE = 5; // parallel requests per batch
 
-  for (let i = 0; i < saffTeamIds.length; i++) {
-    const id = saffTeamIds[i];
-    try {
-      const logo = await scrapeTeamLogo(id);
-      if (logo) logos.set(id, logo);
-    } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : String(error);
-      logger.warn(`[SAFF Scraper] Failed to fetch logo for team ${id}: ${msg}`);
+  for (let i = 0; i < saffTeamIds.length; i += BATCH_SIZE) {
+    const batch = saffTeamIds.slice(i, i + BATCH_SIZE);
+    const results = await Promise.allSettled(
+      batch.map(async (id) => {
+        const logo = await scrapeTeamLogo(id);
+        return { id, logo };
+      }),
+    );
+
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.logo) {
+        logos.set(r.value.id, r.value.logo);
+      } else if (r.status === "rejected") {
+        const msg =
+          r.reason instanceof Error ? r.reason.message : String(r.reason);
+        logger.warn(`[SAFF Scraper] Failed to fetch logo: ${msg}`);
+      }
     }
 
-    // Respectful delay
-    if (i < saffTeamIds.length - 1) {
-      await delay(REQUEST_DELAY);
+    // Respectful delay between batches
+    if (i + BATCH_SIZE < saffTeamIds.length) {
+      await delay(800);
     }
   }
 
