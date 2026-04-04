@@ -1,5 +1,7 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
+import { logAudit } from "@shared/utils/audit";
+import type { UserRole } from "@shared/types";
 
 // ── Attribute interfaces ──
 interface TaskAttributes {
@@ -202,6 +204,24 @@ Task.init(
     ],
   },
 );
+
+// ── Audit hook: log system-created tasks so "System Actions" KPI is accurate ──
+Task.afterCreate(async (task) => {
+  if (task.isAutoCreated) {
+    logAudit(
+      "CREATE",
+      "tasks",
+      task.id,
+      {
+        userId: null as unknown as string,
+        userName: "System",
+        userRole: "System" as UserRole,
+        ip: undefined,
+      },
+      `Auto-task: ${task.title}`,
+    ).catch(() => {}); // fire-and-forget — don't block task creation
+  }
+});
 
 // ── Self-referential associations (parent ↔ sub-tasks) ──
 Task.hasMany(Task, { as: "subTasks", foreignKey: "parentTaskId" });
