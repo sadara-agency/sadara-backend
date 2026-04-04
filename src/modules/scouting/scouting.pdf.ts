@@ -8,6 +8,71 @@ import {
   mergeWithBrandPages,
 } from "@shared/utils/pdf";
 
+// ── Translation Maps ──
+
+const NATIONALITY_AR: Record<string, string> = {
+  "Saudi Arabia": "السعودية",
+  Egypt: "مصر",
+  Jordan: "الأردن",
+  UAE: "الإمارات",
+  Kuwait: "الكويت",
+  Qatar: "قطر",
+  Bahrain: "البحرين",
+  Oman: "عُمان",
+  Iraq: "العراق",
+  Morocco: "المغرب",
+  Algeria: "الجزائر",
+  Tunisia: "تونس",
+  Brazil: "البرازيل",
+  Argentina: "الأرجنتين",
+  France: "فرنسا",
+  Spain: "إسبانيا",
+  Portugal: "البرتغال",
+  Nigeria: "نيجيريا",
+  Senegal: "السنغال",
+  Japan: "اليابان",
+  "South Korea": "كوريا الجنوبية",
+  Colombia: "كولومبيا",
+  Germany: "ألمانيا",
+  Italy: "إيطاليا",
+  England: "إنجلترا",
+  Netherlands: "هولندا",
+  Croatia: "كرواتيا",
+  Uruguay: "الأوروغواي",
+  Ghana: "غانا",
+  "Ivory Coast": "ساحل العاج",
+};
+
+const POSITION_AR: Record<string, string> = {
+  Goalkeeper: "حارس مرمى",
+  "Center Back": "قلب دفاع",
+  "Right Back": "ظهير أيمن",
+  "Left Back": "ظهير أيسر",
+  "Defensive Mid": "وسط دفاعي",
+  Midfielder: "وسط",
+  "Attacking Mid": "وسط هجومي",
+  "Right Winger": "جناح أيمن",
+  "Left Winger": "جناح أيسر",
+  Striker: "مهاجم",
+  "Center Forward": "مهاجم صريح",
+};
+
+const PRIORITY_AR: Record<string, string> = {
+  High: "عالية",
+  Medium: "متوسطة",
+  Low: "منخفضة",
+};
+
+function natAr(en: string): string {
+  return NATIONALITY_AR[en] || en;
+}
+function posAr(en: string): string {
+  return POSITION_AR[en] || en;
+}
+function prioAr(en: string): string {
+  return PRIORITY_AR[en] || en;
+}
+
 // ── CSS ──
 
 const CSS = `
@@ -17,10 +82,10 @@ body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#1a1a2e;background:
 .hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #0f3460;padding-bottom:10px;margin-bottom:12px}
 .hd-r{text-align:right}.hd-r .lt{font-size:13pt;font-weight:700;color:#0f3460}.hd-r .ls{font-size:7pt;color:#666}
 .hd-l{text-align:left;direction:ltr;font-size:7pt;color:#666}
-.title{text-align:center;font-size:16pt;font-weight:700;color:#0f3460;margin:8px 0 14px;letter-spacing:1px}
+.title{text-align:center;font-size:16pt;font-weight:700;color:#0f3460;margin:8px 0 14px;letter-spacing:1px;word-break:break-word;overflow-wrap:break-word}
 .sub{font-size:10pt;font-weight:700;background:#0f3460;color:#fff;display:inline-block;padding:2px 12px;margin:10px 0 6px;border-radius:2px}
 .bio-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;font-size:8.5pt;margin-bottom:10px}
-.bio-grid .label{color:#666;font-weight:600}.bio-grid .val{font-weight:700}
+.bio-grid .label{color:#666;font-weight:600}.bio-grid .val{font-weight:700;word-break:break-word;overflow-wrap:break-word}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px}
 .stat-card{background:#f0f4ff;border:1px solid #d0d8ef;border-radius:4px;padding:6px 8px;text-align:center}
 .stat-card .num{font-size:16pt;font-weight:700;color:#0f3460}.stat-card .lbl{font-size:7pt;color:#666}
@@ -31,10 +96,10 @@ body{font-family:Tahoma,Arial,sans-serif;direction:rtl;color:#1a1a2e;background:
 .bar-val{width:24px;font-weight:700;text-align:left;color:#0f3460}
 table{width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:8px}
 th{background:#0f3460;color:#fff;padding:5px 8px;text-align:right;font-weight:600}
-td{border-bottom:1px solid #e0e0e0;padding:4px 8px}
+td{border-bottom:1px solid #e0e0e0;padding:4px 8px;word-break:break-word;overflow-wrap:break-word}
 tr:nth-child(even){background:#f8f9fc}
 .ok{color:#22c55e;font-weight:700}.nok{color:#ef4444;font-weight:700}.pend{color:#f59e0b;font-weight:700}
-.note-box{background:#fffbe6;border:1px solid #fde68a;border-radius:4px;padding:6px 10px;font-size:8pt;margin-top:8px}
+.note-box{background:#fffbe6;border:1px solid #fde68a;border-radius:4px;padding:6px 10px;font-size:8pt;margin-top:8px;word-break:break-word;overflow-wrap:break-word}
 .footer{text-align:center;font-size:7pt;color:#999;border-top:1px solid #ddd;padding-top:6px;margin-top:12px}
 .radar-wrap{display:flex;justify-content:center;margin:10px 0}
 `;
@@ -50,10 +115,10 @@ const dateFmt = (s: string | Date | null) => fmtDate(s, { fallback: "\u2014" });
 function buildRadarSvg(
   ratings: { label: string; labelAr: string; value: number }[],
 ): string {
-  const size = 200;
+  const size = 240;
   const cx = size / 2;
   const cy = size / 2;
-  const maxR = 80;
+  const maxR = 75;
   const n = ratings.length;
 
   function polar(i: number, r: number): [number, number] {
@@ -149,11 +214,11 @@ function buildProfilePage(watchlist: any): string {
       <div><span class="label">الاسم:</span> <span class="val">${escHtml(name)}</span></div>
       <div><span class="label">Name:</span> <span class="val">${escHtml(nameEn)}</span></div>
       <div><span class="label">العمر:</span> <span class="val">${escHtml(age)}</span></div>
-      <div><span class="label">الجنسية:</span> <span class="val">${escHtml(watchlist.nationality || "\u2014")}</span></div>
-      <div><span class="label">المركز:</span> <span class="val">${escHtml(watchlist.position || "\u2014")}</span></div>
+      <div><span class="label">الجنسية:</span> <span class="val">${escHtml(natAr(watchlist.nationality || "\u2014"))}</span></div>
+      <div><span class="label">المركز:</span> <span class="val">${escHtml(posAr(watchlist.position || "\u2014"))}</span></div>
       <div><span class="label">النادي:</span> <span class="val">${escHtml(watchlist.currentClub || "\u2014")}</span></div>
       <div><span class="label">الدوري:</span> <span class="val">${escHtml(watchlist.currentLeague || "\u2014")}</span></div>
-      <div><span class="label">الأولوية:</span> <span class="val">${escHtml(watchlist.priority || "\u2014")}</span></div>
+      <div><span class="label">الأولوية:</span> <span class="val">${escHtml(prioAr(watchlist.priority || "\u2014"))}</span></div>
     </div>
 
     <div class="sub">التقييمات — Ratings</div>
