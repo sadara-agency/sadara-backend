@@ -1,13 +1,19 @@
 // ─────────────────────────────────────────────────────────────
 // src/database/production.seed.ts
 // Production seed — creates the minimum data needed for the
-// platform to be operational: admin user + SPL clubs.
+// platform to be operational: permissions, approval chains,
+// admin user, and SPL clubs.
 // ─────────────────────────────────────────────────────────────
 import bcrypt from "bcryptjs";
 import { User } from "@modules/users/user.model";
 import { Club } from "@modules/clubs/club.model";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import {
+  seedPermissions,
+  seedApprovalChains,
+  seedPackageConfigs,
+} from "./seed-shared";
 
 // ── Admin User ──
 
@@ -257,4 +263,43 @@ export async function seedProdClubs(): Promise<void> {
 
   await Club.bulkCreate(SPL_CLUBS, { ignoreDuplicates: true });
   logger.info(`Seeded ${SPL_CLUBS.length} SPL clubs`);
+}
+
+// ── Production Orchestrator ──
+
+/**
+ * Seeds everything needed for production: RBAC permissions,
+ * approval chain templates, admin user, and SPL clubs.
+ * All sub-functions are idempotent — safe to run on every startup.
+ */
+export async function seedProduction(): Promise<void> {
+  try {
+    await seedPermissions();
+  } catch (err) {
+    logger.error(`Permissions seed failed: ${(err as Error).message}`);
+  }
+
+  try {
+    await seedApprovalChains();
+  } catch (err) {
+    logger.error(`Approval chains seed failed: ${(err as Error).message}`);
+  }
+
+  try {
+    await seedProdAdmin();
+  } catch (err) {
+    logger.error(`Admin seed failed: ${(err as Error).message}`);
+  }
+
+  try {
+    await seedProdClubs();
+  } catch (err) {
+    logger.error(`Club seed failed: ${(err as Error).message}`);
+  }
+
+  try {
+    await seedPackageConfigs();
+  } catch (err) {
+    logger.error(`Package configs seed failed: ${(err as Error).message}`);
+  }
 }

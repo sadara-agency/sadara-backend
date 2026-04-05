@@ -32,6 +32,9 @@ jest.mock('../../../src/modules/users/user.model', () => ({
 jest.mock('../../../src/modules/journey/journey.model', () => ({
   Journey: { findByPk: jest.fn(), name: 'Journey' },
 }));
+jest.mock('../../../src/modules/tickets/ticket.model', () => ({
+  Ticket: { findByPk: jest.fn(), name: 'Ticket' },
+}));
 
 import * as sessionService from '../../../src/modules/sessions/session.service';
 

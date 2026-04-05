@@ -200,6 +200,10 @@ export function setupAssociations() {
   Referral.hasMany(Session, { foreignKey: "referralId", as: "sessions" });
   Session.belongsTo(User, { foreignKey: "responsibleId", as: "responsible" });
   Session.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  Session.belongsTo(Ticket, {
+    foreignKey: "resultingTicketId",
+    as: "resultingTicket",
+  });
   Session.belongsTo(Journey, {
     foreignKey: "journeyStageId",
     as: "journeyStage",

@@ -47,6 +47,7 @@ export const createSessionSchema = z.object({
   notes: z.string().optional(),
   notesAr: z.string().optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).default("Scheduled"),
+  resultingTicketId: z.string().uuid("Invalid ticket ID").nullable().optional(),
 });
 
 // ── Update Session ──
@@ -67,6 +68,7 @@ export const updateSessionSchema = z.object({
   notes: z.string().nullable().optional(),
   notesAr: z.string().nullable().optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).optional(),
+  resultingTicketId: z.string().uuid().nullable().optional(),
 });
 
 // ── Query Sessions ──

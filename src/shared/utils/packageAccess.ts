@@ -3,7 +3,13 @@
  *
  * Defines which modules/features each player package tier can access.
  * Package A = Premium (full), B = Standard (core+), C = Basic (essential).
+ *
+ * Config is loaded from DB (package_configs table) with Redis caching.
+ * Hardcoded defaults serve as fallback when DB is empty.
  */
+
+import { cacheOrFetch } from "@shared/utils/cache";
+import { logger } from "@config/logger";
 
 export type PlayerPackage = "A" | "B" | "C";
 export type CrudAction = "create" | "read" | "update" | "delete";
@@ -40,7 +46,8 @@ const NONE: PackageModuleAccess = {
   canDelete: false,
 };
 
-// ── Package C (Basic) ──
+// ── Hardcoded Defaults (fallback when DB is empty) ──
+
 const PACKAGE_C: Record<string, PackageModuleAccess> = {
   players: FULL,
   contracts: READ_ONLY,
@@ -53,7 +60,6 @@ const PACKAGE_C: Record<string, PackageModuleAccess> = {
   tasks: READ_ONLY,
 };
 
-// ── Package B (Standard) — inherits C + additions ──
 const PACKAGE_B: Record<string, PackageModuleAccess> = {
   ...PACKAGE_C,
   sessions: CREATE_READ,
@@ -69,17 +75,69 @@ const PACKAGE_B: Record<string, PackageModuleAccess> = {
   matches: CREATE_READ,
 };
 
-// ── Package A (Premium) — all modules full access ──
-// No restrictions — returns FULL for any module
-
-const PACKAGE_MAP: Record<
+const HARDCODED_MAP: Record<
   PlayerPackage,
   Record<string, PackageModuleAccess>
 > = {
   C: PACKAGE_C,
   B: PACKAGE_B,
-  A: {}, // empty map = no restrictions (getPackageAccess returns FULL)
+  A: {},
 };
+
+// ── DB-Driven Config (loaded lazily, cached 1hr) ──
+
+let dbConfigLoaded = false;
+let dbConfigMap: Record<PlayerPackage, Record<string, PackageModuleAccess>> = {
+  A: {},
+  B: {},
+  C: {},
+};
+
+/**
+ * Load package configs from DB into memory. Redis cached for 1hr.
+ * Called lazily on first access check, or can be called at startup.
+ */
+export async function loadPackageConfigsFromDB(): Promise<void> {
+  try {
+    // Dynamic import to avoid circular dependency at module load time
+    const { PackageConfig } =
+      await import("@modules/packages/packageConfig.model");
+
+    const rows = await PackageConfig.findAll();
+    if (rows.length === 0) {
+      // No DB config — use hardcoded defaults
+      dbConfigLoaded = false;
+      return;
+    }
+
+    const map: Record<PlayerPackage, Record<string, PackageModuleAccess>> = {
+      A: {},
+      B: {},
+      C: {},
+    };
+
+    for (const row of rows) {
+      const pkg = row.package as PlayerPackage;
+      if (map[pkg]) {
+        map[pkg][row.module] = {
+          canCreate: row.canCreate,
+          canRead: row.canRead,
+          canUpdate: row.canUpdate,
+          canDelete: row.canDelete,
+        };
+      }
+    }
+
+    dbConfigMap = map;
+    dbConfigLoaded = true;
+    logger.info(`Loaded ${rows.length} package config entries from DB`);
+  } catch (err) {
+    logger.warn(
+      "Failed to load package configs from DB, using hardcoded defaults",
+    );
+    dbConfigLoaded = false;
+  }
+}
 
 /**
  * Get the access level for a module given a player package.
@@ -90,7 +148,10 @@ export function getPackageAccess(
   module: string,
 ): PackageModuleAccess {
   if (pkg === "A") return FULL;
-  return PACKAGE_MAP[pkg]?.[module] ?? NONE;
+
+  // Use DB config if loaded, otherwise hardcoded defaults
+  const configMap = dbConfigLoaded ? dbConfigMap : HARDCODED_MAP;
+  return configMap[pkg]?.[module] ?? NONE;
 }
 
 /**
@@ -141,9 +202,21 @@ export function getFullAccessMap(
       "integrations",
       "fitness",
     ]);
+
+    // Also include any DB-configured modules
+    if (dbConfigLoaded) {
+      for (const pkg of Object.values(dbConfigMap)) {
+        for (const mod of Object.keys(pkg)) {
+          allModules.add(mod);
+        }
+      }
+    }
+
     const map: Record<string, PackageModuleAccess> = {};
     for (const m of allModules) map[m] = FULL;
     return map;
   }
-  return PACKAGE_MAP[pkg] ?? {};
+
+  const configMap = dbConfigLoaded ? dbConfigMap : HARDCODED_MAP;
+  return configMap[pkg] ?? {};
 }

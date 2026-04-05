@@ -5,6 +5,7 @@ import { env } from "@config/env";
 import { testConnection, sequelize } from "@config/database";
 import { initRedis, closeRedis } from "@config/redis";
 import { seedDatabase } from "./database/seed";
+import { seedProduction } from "./database/production.seed";
 import { migrator, setMigrationTimeouts } from "@config/migrator";
 import { startSaffScheduler } from "@modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
@@ -129,11 +130,24 @@ async function initApplication(): Promise<void> {
   const CFG_TIMEOUT = 15_000;
 
   logger.info("[app] Seeding database...");
-  await withTimeout(seedDatabase(), 120_000, "seedDatabase");
+  if (env.nodeEnv === "production") {
+    await withTimeout(seedProduction(), 60_000, "seedProduction");
+  } else {
+    await withTimeout(seedDatabase(), 120_000, "seedDatabase");
+  }
   logger.info("[app] Database seeded");
 
   logger.info("[app] Loading permissions...");
   await withTimeout(loadPermissions(), CFG_TIMEOUT, "loadPermissions");
+
+  logger.info("[app] Loading package configs...");
+  const { loadPackageConfigsFromDB } =
+    await import("@shared/utils/packageAccess");
+  await withTimeout(
+    loadPackageConfigsFromDB(),
+    CFG_TIMEOUT,
+    "loadPackageConfigs",
+  );
 
   logger.info("[app] Loading engine configs...");
   await withTimeout(

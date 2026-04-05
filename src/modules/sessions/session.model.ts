@@ -45,6 +45,7 @@ export interface SessionAttributes {
   notes: string | null;
   notesAr: string | null;
   completionStatus: SessionCompletionStatus;
+  resultingTicketId: string | null;
   journeyStageId: string | null;
   createdBy: string | null;
   createdAt?: Date;
@@ -62,6 +63,7 @@ interface SessionCreationAttributes extends Optional<
   | "notes"
   | "notesAr"
   | "completionStatus"
+  | "resultingTicketId"
   | "journeyStageId"
   | "createdBy"
   | "createdAt"
@@ -88,6 +90,7 @@ export class Session
   declare notes: string | null;
   declare notesAr: string | null;
   declare completionStatus: SessionCompletionStatus;
+  declare resultingTicketId: string | null;
   declare journeyStageId: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
@@ -157,6 +160,10 @@ Session.init(
       type: DataTypes.STRING(50),
       defaultValue: "Scheduled",
       field: "completion_status",
+    },
+    resultingTicketId: {
+      type: DataTypes.UUID,
+      field: "resulting_ticket_id",
     },
     journeyStageId: {
       type: DataTypes.UUID,
