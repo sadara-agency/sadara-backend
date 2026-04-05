@@ -69,3 +69,9 @@ postman/
 *-credentials.json
 *service-account*.json
 sadara-*.json
+
+# CSV import data (real client data — NEVER commit)
+src/database/csv-import/data/
+
+# Database backups
+backup_*.dump

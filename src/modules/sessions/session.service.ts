@@ -6,6 +6,7 @@ import { Referral } from "@modules/referrals/referral.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { Journey } from "@modules/journey/journey.model";
+import { Ticket } from "@modules/tickets/ticket.model";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import type {
@@ -45,6 +46,12 @@ function sessionIncludes() {
       model: Journey,
       as: "journeyStage",
       attributes: ["id", "stageName", "stageNameAr", "stageType", "status"],
+      required: false,
+    },
+    {
+      model: Ticket,
+      as: "resultingTicket",
+      attributes: ["id", "title", "titleAr", "status", "ticketType"],
       required: false,
     },
   ];

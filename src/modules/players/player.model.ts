@@ -152,7 +152,7 @@ Player.init(
     },
     playerPackage: {
       type: DataTypes.STRING(10),
-      defaultValue: "C",
+      defaultValue: "A",
       field: "player_package",
     },
     contractType: {
