@@ -23,6 +23,25 @@ export function parseCsvFile(filePath: string): Record<string, string>[] {
     raw = raw.slice(1);
   }
 
+  return parseCsvString(raw);
+}
+
+/**
+ * Parse a CSV from a Buffer (e.g. from multer memory storage).
+ */
+export function parseCsvBuffer(buffer: Buffer): Record<string, string>[] {
+  let raw = buffer.toString("utf-8");
+  // Strip BOM
+  if (raw.charCodeAt(0) === 0xfeff) {
+    raw = raw.slice(1);
+  }
+  return parseCsvString(raw);
+}
+
+/**
+ * Parse a raw CSV string into an array of records.
+ */
+function parseCsvString(raw: string): Record<string, string>[] {
   const rows = parseCsvRows(raw);
   if (rows.length < 2) {
     return [];

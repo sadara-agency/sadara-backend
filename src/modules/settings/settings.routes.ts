@@ -592,4 +592,327 @@ router.patch(
   }),
 );
 
+// ── CSV Data Import (Admin-only, file upload) ──
+
+import multer from "multer";
+import { parseCsvBuffer } from "../../database/csv-import/parse-csv";
+import {
+  mapPlayerRow,
+  resolveClubIds,
+  resolveCreatedBy,
+} from "../../database/csv-import/mappers/player.mapper";
+import { mapSessionRow } from "../../database/csv-import/mappers/session.mapper";
+import { mapTrainingSessionRow } from "../../database/csv-import/mappers/ticket.mapper";
+import { mapGateRow } from "../../database/csv-import/mappers/journey.mapper";
+import { Player } from "@modules/players/player.model";
+import { Referral } from "@modules/referrals/referral.model";
+import { Session } from "@modules/sessions/session.model";
+import { Gate } from "@modules/gates/gate.model";
+
+const csvUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (
+      file.mimetype === "text/csv" ||
+      file.originalname.endsWith(".csv") ||
+      file.mimetype === "application/vnd.ms-excel"
+    ) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only CSV files are allowed"));
+    }
+  },
+}).array("files", 10);
+
+// Detect CSV type from headers
+function detectCsvType(
+  headers: string[],
+): "players" | "sessions" | "training" | "gates" | "unknown" {
+  const joined = headers.join(",").toLowerCase();
+  if (joined.includes("أسم_الاعب") || joined.includes("أسم الاعب"))
+    return "players";
+  if (joined.includes("session_title") || joined.includes("عنوان_الجلسة"))
+    return "sessions";
+  if (joined.includes("ticket_title") || joined.includes("عنوان_التذكرة"))
+    return "training";
+  if (joined.includes("stage_name") || joined.includes("اسم_المرحلة"))
+    return "gates";
+  return "unknown";
+}
+
+// Build player name → ID map
+async function buildPlayerMap(): Promise<Map<string, string>> {
+  const players = await Player.findAll({
+    attributes: ["id", "firstName", "lastName", "firstNameAr", "lastNameAr"],
+  });
+  const map = new Map<string, string>();
+  for (const p of players) {
+    const fullAr =
+      `${p.firstNameAr ?? p.firstName} ${p.lastNameAr ?? p.lastName}`.trim();
+    const fullEn = `${p.firstName} ${p.lastName}`.trim();
+    if (fullAr) map.set(fullAr, p.id);
+    if (fullEn && fullEn !== fullAr) map.set(fullEn, p.id);
+    if (p.firstNameAr) map.set(p.firstNameAr, p.id);
+  }
+  return map;
+}
+
+function resolvePlayer(name: string, map: Map<string, string>): string | null {
+  if (!name) return null;
+  const cleaned = name.trim().replace(/\s+/g, " ");
+  if (map.has(cleaned)) return map.get(cleaned)!;
+  for (const [key, id] of map) {
+    if (key.includes(cleaned) || cleaned.includes(key)) return id;
+  }
+  return null;
+}
+
+interface ImportResult {
+  entity: string;
+  type: string;
+  fileName: string;
+  total: number;
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+router.post(
+  "/import-csv",
+  authorizeModule("settings", "create"),
+  (req: AuthRequest, res: Response, next: any) => {
+    csvUpload(req as any, res, (err: any) => {
+      if (err) return next(new AppError(err.message, 400));
+      next();
+    });
+  },
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const files = (req as any).files as Express.Multer.File[];
+    const mode = (req.query.mode as string) || "import";
+
+    if (!files || files.length === 0) {
+      throw new AppError("No CSV files uploaded", 400);
+    }
+
+    const results: ImportResult[] = [];
+    const adminId = (req as any).user?.id;
+
+    // Sort files: players first (others depend on them)
+    const sorted = [...files].sort((a, b) => {
+      const aRows = parseCsvBuffer(a.buffer);
+      const bRows = parseCsvBuffer(b.buffer);
+      const aType = detectCsvType(
+        aRows.length > 0 ? Object.keys(aRows[0]) : [],
+      );
+      const bType = detectCsvType(
+        bRows.length > 0 ? Object.keys(bRows[0]) : [],
+      );
+      const order = {
+        players: 0,
+        sessions: 1,
+        training: 2,
+        gates: 3,
+        unknown: 4,
+      };
+      return (order[aType] ?? 4) - (order[bType] ?? 4);
+    });
+
+    for (const file of sorted) {
+      const rows = parseCsvBuffer(file.buffer);
+      if (rows.length === 0) continue;
+
+      const headers = Object.keys(rows[0]);
+      const type = detectCsvType(headers);
+
+      if (type === "unknown") {
+        results.push({
+          entity: "unknown",
+          type: "unknown",
+          fileName: file.originalname,
+          total: rows.length,
+          imported: 0,
+          skipped: rows.length,
+          errors: ["Could not detect CSV type from headers"],
+        });
+        continue;
+      }
+
+      // Preview mode — just return counts
+      if (mode === "preview") {
+        results.push({
+          entity: type,
+          type,
+          fileName: file.originalname,
+          total: rows.length,
+          imported: 0,
+          skipped: 0,
+          errors: [],
+        });
+        continue;
+      }
+
+      // Import mode
+      if (type === "players") {
+        const filtered = rows.filter(
+          (r) => (r["أسم_الاعب"] || "").trim() !== "",
+        );
+        const mapped = filtered.map((row, i) => mapPlayerRow(row, i + 2));
+        await resolveClubIds(mapped);
+        await resolveCreatedBy(mapped);
+        const valid = mapped.filter((m) => m.errors.length === 0);
+        let imported = 0;
+        const tx = await sequelize.transaction();
+        try {
+          for (const m of valid) {
+            const [, created] = await Player.findOrCreate({
+              where: {
+                firstName: m.data.firstName as string,
+                lastName: m.data.lastName as string,
+              },
+              defaults: m.data as any,
+              transaction: tx,
+            });
+            if (created) imported++;
+          }
+          await tx.commit();
+        } catch {
+          await tx.rollback();
+        }
+        results.push({
+          entity: "players",
+          type,
+          fileName: file.originalname,
+          total: filtered.length,
+          imported,
+          skipped: filtered.length - imported,
+          errors: mapped.flatMap((m) => m.errors).slice(0, 5),
+        });
+      }
+
+      if (type === "sessions" || type === "training") {
+        const playerMap = await buildPlayerMap();
+        const isSession = type === "sessions";
+
+        const filterKey = isSession
+          ? "عنوان_الجلسة_session_title"
+          : "عنوان_التذكرة_ticket_title";
+        const filtered = rows.filter((r) => (r[filterKey] || "").trim() !== "");
+        const mapped = isSession
+          ? filtered.map((row, i) => mapSessionRow(row, i + 2))
+          : filtered.map((row, i) => mapTrainingSessionRow(row, i + 2));
+
+        for (const m of mapped) {
+          const pid = resolvePlayer(m.playerName, playerMap);
+          if (pid) {
+            m.referralData.playerId = pid;
+            m.sessionData.playerId = pid;
+          }
+          m.referralData.createdBy = adminId;
+          m.sessionData.createdBy = adminId;
+          if ((m.sessionData as any)._resultingTicketName) {
+            delete (m.sessionData as any)._resultingTicketName;
+          }
+        }
+        const valid = mapped.filter(
+          (m) => m.errors.length === 0 && m.referralData.playerId,
+        );
+        let imported = 0;
+        const tx = await sequelize.transaction();
+        try {
+          for (const m of valid) {
+            const [referral] = await Referral.findOrCreate({
+              where: {
+                triggerDesc: m.referralData.triggerDesc as string,
+                playerId: m.referralData.playerId as string,
+                referralType: m.referralData.referralType as string,
+              },
+              defaults: m.referralData as any,
+              transaction: tx,
+            });
+            m.sessionData.referralId = referral.id;
+            const [, created] = await Session.findOrCreate({
+              where: {
+                title: m.sessionData.title as string,
+                playerId: m.sessionData.playerId as string,
+                referralId: referral.id,
+              },
+              defaults: m.sessionData as any,
+              transaction: tx,
+            });
+            if (created) imported++;
+          }
+          await tx.commit();
+        } catch {
+          await tx.rollback();
+        }
+        results.push({
+          entity: isSession ? "sessions" : "training_sessions",
+          type,
+          fileName: file.originalname,
+          total: filtered.length,
+          imported,
+          skipped: filtered.length - imported,
+          errors: mapped.flatMap((m) => m.errors).slice(0, 5),
+        });
+      }
+
+      if (type === "gates") {
+        const playerMap = await buildPlayerMap();
+        const filtered = rows.filter(
+          (r) => (r["اسم_المرحلة_stage_name"] || "").trim() !== "",
+        );
+        const mapped = filtered.map((row, i) => mapGateRow(row, i + 2));
+        for (const m of mapped) {
+          const pid = resolvePlayer(m.playerName, playerMap);
+          if (pid) m.data.playerId = pid;
+        }
+        const valid = mapped.filter(
+          (m) => m.errors.length === 0 && m.data.playerId,
+        );
+        const playerGateCount = new Map<string, number>();
+        for (const m of valid) {
+          const pid = m.data.playerId as string;
+          const gateNum = playerGateCount.get(pid) ?? 0;
+          m.data.gateNumber = String(gateNum);
+          playerGateCount.set(pid, gateNum + 1);
+        }
+        let imported = 0;
+        const tx = await sequelize.transaction();
+        try {
+          for (const m of valid) {
+            const [, created] = await Gate.findOrCreate({
+              where: {
+                playerId: m.data.playerId as string,
+                gateNumber: m.data.gateNumber as string,
+              },
+              defaults: m.data as any,
+              transaction: tx,
+            });
+            if (created) imported++;
+          }
+          await tx.commit();
+        } catch {
+          await tx.rollback();
+        }
+        results.push({
+          entity: "gates",
+          type,
+          fileName: file.originalname,
+          total: filtered.length,
+          imported,
+          skipped: filtered.length - imported,
+          errors: mapped.flatMap((m) => m.errors).slice(0, 5),
+        });
+      }
+    }
+
+    sendSuccess(
+      res,
+      results,
+      mode === "preview" ? "CSV preview" : "CSV import completed",
+    );
+  }),
+);
+
 export default router;
