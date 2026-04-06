@@ -29,6 +29,10 @@ jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn(), authenticate: jest.fn(), QueryTypes: { SELECT: 'SELECT' } },
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('MTH-26-0001'),
+}));
+
 jest.mock('../../../src/modules/matches/match.model', () => ({
   Match: {
     findAndCountAll: (...a: unknown[]) => mockMatchFindAndCountAll(...a),

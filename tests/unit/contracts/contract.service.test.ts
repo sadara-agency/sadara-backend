@@ -20,6 +20,10 @@ jest.mock('../../../src/config/database', () => ({
   },
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('CON-26-0001'),
+}));
+
 jest.mock('../../../src/modules/contracts/contract.model', () => ({
   Contract: {
     findAndCountAll: (...args: unknown[]) => mockFindAndCountAll(...args),

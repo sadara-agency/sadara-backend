@@ -12,6 +12,10 @@ jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn().mockResolvedValue([]), authenticate: jest.fn() },
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('SES-26-0001'),
+}));
+
 jest.mock('../../../src/modules/sessions/session.model', () => ({
   Session: {
     findAndCountAll: (...a: unknown[]) => mockSessionFindAndCountAll(...a),

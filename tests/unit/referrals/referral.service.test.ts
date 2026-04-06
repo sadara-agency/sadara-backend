@@ -12,6 +12,10 @@ jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn(), authenticate: jest.fn() },
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('TKT-26-0001'),
+}));
+
 jest.mock('../../../src/modules/referrals/referral.model', () => ({
   Referral: {
     findAndCountAll: (...a: unknown[]) => mockReferralFindAndCountAll(...a),

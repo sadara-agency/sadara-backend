@@ -20,24 +20,35 @@ describe('Match Schemas', () => {
         homeClubId: UUID_HOME,
         awayClubId: UUID_AWAY,
         matchDate: FUTURE_DATE,
+        competition: 'SPL',
       }).success).toBe(true);
+    });
+    it('should reject missing competition', () => {
+      expect(createMatchSchema.safeParse({
+        homeClubId: UUID_HOME,
+        awayClubId: UUID_AWAY,
+        matchDate: FUTURE_DATE,
+      }).success).toBe(false);
     });
     it('should reject missing matchDate', () => {
       expect(createMatchSchema.safeParse({
         homeClubId: UUID_HOME,
         awayClubId: UUID_AWAY,
+        competition: 'SPL',
       }).success).toBe(false);
     });
     it('should reject missing homeClubId', () => {
       expect(createMatchSchema.safeParse({
         awayClubId: UUID_AWAY,
         matchDate: FUTURE_DATE,
+        competition: 'SPL',
       }).success).toBe(false);
     });
     it('should reject missing awayClubId', () => {
       expect(createMatchSchema.safeParse({
         homeClubId: UUID_HOME,
         matchDate: FUTURE_DATE,
+        competition: 'SPL',
       }).success).toBe(false);
     });
     it('should reject same home and away club', () => {
@@ -45,6 +56,7 @@ describe('Match Schemas', () => {
         homeClubId: UUID_HOME,
         awayClubId: UUID_HOME,
         matchDate: FUTURE_DATE,
+        competition: 'SPL',
       }).success).toBe(false);
     });
     it('should default status to upcoming', () => {
@@ -52,6 +64,7 @@ describe('Match Schemas', () => {
         homeClubId: UUID_HOME,
         awayClubId: UUID_AWAY,
         matchDate: FUTURE_DATE,
+        competition: 'SPL',
       });
       expect(result.status).toBe('upcoming');
     });
@@ -60,6 +73,7 @@ describe('Match Schemas', () => {
         homeClubId: UUID_HOME,
         awayClubId: UUID_AWAY,
         matchDate: FUTURE_DATE,
+        competition: 'SPL',
         homeScore: -1,
       }).success).toBe(false);
     });
