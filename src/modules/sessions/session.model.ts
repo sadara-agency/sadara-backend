@@ -47,6 +47,7 @@ export interface SessionAttributes {
   completionStatus: SessionCompletionStatus;
   resultingTicketId: string | null;
   journeyStageId: string | null;
+  displayId?: string | null;
   createdBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -65,6 +66,7 @@ interface SessionCreationAttributes extends Optional<
   | "completionStatus"
   | "resultingTicketId"
   | "journeyStageId"
+  | "displayId"
   | "createdBy"
   | "createdAt"
   | "updatedAt"
@@ -92,6 +94,7 @@ export class Session
   declare completionStatus: SessionCompletionStatus;
   declare resultingTicketId: string | null;
   declare journeyStageId: string | null;
+  declare displayId: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -168,6 +171,11 @@ Session.init(
     journeyStageId: {
       type: DataTypes.UUID,
       field: "journey_stage_id",
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
+      field: "display_id",
     },
     createdBy: {
       type: DataTypes.UUID,

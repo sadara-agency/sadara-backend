@@ -21,6 +21,10 @@ jest.mock('../../../src/config/database', () => ({
   transaction: (cb: any) => mockTransaction(cb),
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('OFR-26-0001'),
+}));
+
 jest.mock('../../../src/modules/offers/offer.model', () => ({
   Offer: {
     findAndCountAll: (...a: unknown[]) => mockFindAndCountAll(...a),

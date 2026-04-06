@@ -9,7 +9,7 @@
 import { z } from "zod";
 
 // ── Create Club ──
-export const createClubSchema = z.object({
+const createClubBaseSchema = z.object({
   name: z.string().min(1, "Club name is required"),
   nameAr: z.string().optional(),
   type: z.enum(["Club", "Sponsor"]).default("Club"),
@@ -29,8 +29,29 @@ export const createClubSchema = z.object({
     .optional(),
 });
 
+export const createClubSchema = createClubBaseSchema.superRefine(
+  (data, ctx) => {
+    if (data.type === "Club") {
+      if (!data.country || data.country.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Country is required for clubs",
+          path: ["country"],
+        });
+      }
+      if (!data.league || data.league.trim().length === 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "League is required for clubs",
+          path: ["league"],
+        });
+      }
+    }
+  },
+);
+
 // ── Update Club (partial) ──
-export const updateClubSchema = createClubSchema.partial();
+export const updateClubSchema = createClubBaseSchema.partial();
 
 // ── Query / List Clubs ──
 export const clubQuerySchema = z.object({

@@ -28,6 +28,7 @@ import {
   mergeScope,
   checkRowAccess,
 } from "@shared/utils/rowScope";
+import { generateDisplayId } from "@shared/utils/displayId";
 
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
@@ -174,6 +175,8 @@ export async function createContract(
     if (player) playerContractType = (player as any).contractType || null;
   }
 
+  const displayId = await generateDisplayId("contracts");
+
   // Overlap check + creation in a transaction to prevent race conditions
   const contract = await sequelize.transaction(async (t) => {
     const overlap = await Contract.findOne({
@@ -194,6 +197,7 @@ export async function createContract(
 
     return await Contract.create(
       {
+        displayId,
         playerId: input.playerId,
         clubId: input.clubId,
         category: input.category,

@@ -15,6 +15,7 @@ import {
 } from "@modules/notifications/notification.service";
 import { logger } from "@config/logger";
 import { generateCriticalReferralTask } from "@modules/referrals/referralAutoTasks";
+import { generateDisplayId } from "@shared/utils/displayId";
 
 const PLAYER_ATTRS = [
   "id",
@@ -183,8 +184,11 @@ export async function createReferral(input: any, userId: string) {
     input.isRestricted = true;
   }
 
+  const displayId = await generateDisplayId("referrals");
+
   const referral = await Referral.create({
     ...input,
+    displayId,
     createdBy: userId,
     assignedAt: input.assignedTo ? new Date() : null,
   });

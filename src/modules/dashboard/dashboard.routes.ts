@@ -208,6 +208,7 @@ router.get(
     "Admin",
     "Manager",
     "Executive",
+    "Analyst",
     "Coach",
     "SkillCoach",
     "TacticalCoach",

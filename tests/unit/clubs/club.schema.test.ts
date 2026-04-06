@@ -8,23 +8,29 @@ import {
 
 describe('Club Schemas', () => {
   describe('createClubSchema', () => {
-    it('should accept valid club', () => {
-      expect(createClubSchema.safeParse({ name: 'Al-Hilal' }).success).toBe(true);
+    it('should accept valid club with country and league', () => {
+      expect(createClubSchema.safeParse({ name: 'Al-Hilal', country: 'Saudi Arabia', league: 'SPL' }).success).toBe(true);
+    });
+    it('should reject club without country', () => {
+      expect(createClubSchema.safeParse({ name: 'Al-Hilal', league: 'SPL' }).success).toBe(false);
+    });
+    it('should reject club without league', () => {
+      expect(createClubSchema.safeParse({ name: 'Al-Hilal', country: 'Saudi Arabia' }).success).toBe(false);
     });
     it('should reject empty name', () => {
-      expect(createClubSchema.safeParse({ name: '' }).success).toBe(false);
+      expect(createClubSchema.safeParse({ name: '', country: 'SA', league: 'SPL' }).success).toBe(false);
     });
     it('should default type to Club', () => {
-      expect(createClubSchema.parse({ name: 'Test' }).type).toBe('Club');
+      expect(createClubSchema.parse({ name: 'Test', country: 'SA', league: 'SPL' }).type).toBe('Club');
     });
-    it('should accept Sponsor type', () => {
+    it('should accept Sponsor type without country/league', () => {
       expect(createClubSchema.safeParse({ name: 'Nike', type: 'Sponsor' }).success).toBe(true);
     });
     it('should reject invalid type', () => {
       expect(createClubSchema.safeParse({ name: 'X', type: 'Team' }).success).toBe(false);
     });
     it('should reject invalid logoUrl', () => {
-      expect(createClubSchema.safeParse({ name: 'X', logoUrl: 'not-url' }).success).toBe(false);
+      expect(createClubSchema.safeParse({ name: 'X', country: 'SA', league: 'SPL', logoUrl: 'not-url' }).success).toBe(false);
     });
   });
 
