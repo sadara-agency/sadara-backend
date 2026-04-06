@@ -783,12 +783,12 @@ export async function getTaskTurnaround() {
         `SELECT
            u.role,
            COUNT(*)::INT AS tasks_completed,
-           ROUND(AVG(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600), 1) AS avg_hours,
-           ROUND(MIN(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600), 1) AS min_hours,
-           ROUND(MAX(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600), 1) AS max_hours,
-           ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (
+           ROUND((AVG(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600))::NUMERIC, 1) AS avg_hours,
+           ROUND((MIN(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600))::NUMERIC, 1) AS min_hours,
+           ROUND((MAX(EXTRACT(EPOCH FROM (t.completed_at - t.created_at)) / 3600))::NUMERIC, 1) AS max_hours,
+           ROUND(((PERCENTILE_CONT(0.5) WITHIN GROUP (
              ORDER BY EXTRACT(EPOCH FROM (t.completed_at - t.created_at))
-           )) / 3600, 1) AS median_hours
+           )) / 3600)::NUMERIC, 1) AS median_hours
          FROM tasks t
          JOIN users u ON t.assigned_to = u.id
          WHERE t.status = 'Completed'
@@ -881,23 +881,23 @@ export async function getLegalTurnaround() {
              CASE WHEN completed_log.logged_at IS NOT NULL
              THEN EXTRACT(EPOCH FROM (completed_log.logged_at - review_log.logged_at)) / 3600
              END
-           ), 1) AS avg_review_hours,
-           ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (
+           )::NUMERIC, 1) AS avg_review_hours,
+           ROUND(((PERCENTILE_CONT(0.5) WITHIN GROUP (
              ORDER BY CASE WHEN completed_log.logged_at IS NOT NULL
                THEN EXTRACT(EPOCH FROM (completed_log.logged_at - review_log.logged_at))
                ELSE NULL END
-           )) / 3600, 1) AS median_review_hours,
+           )) / 3600)::NUMERIC, 1) AS median_review_hours,
            COUNT(*) FILTER (WHERE c.status = 'Review')::INT AS currently_in_review
          FROM contracts c
          LEFT JOIN LATERAL (
            SELECT logged_at FROM audit_logs
-           WHERE entity = 'contracts' AND entity_id = c.id::TEXT
+           WHERE entity = 'contracts' AND entity_id = c.id
              AND action = 'UPDATE' AND detail ILIKE '%Review%'
            ORDER BY logged_at ASC LIMIT 1
          ) review_log ON true
          LEFT JOIN LATERAL (
            SELECT logged_at FROM audit_logs
-           WHERE entity = 'contracts' AND entity_id = c.id::TEXT
+           WHERE entity = 'contracts' AND entity_id = c.id
              AND action = 'UPDATE' AND detail ILIKE '%Signing%'
              AND logged_at > review_log.logged_at
            ORDER BY logged_at ASC LIMIT 1
@@ -915,7 +915,7 @@ export async function getLegalTurnaround() {
          FROM contracts c
          JOIN LATERAL (
            SELECT logged_at FROM audit_logs
-           WHERE entity = 'contracts' AND entity_id = c.id::TEXT
+           WHERE entity = 'contracts' AND entity_id = c.id
              AND action = 'UPDATE' AND detail ILIKE '%Review%'
            ORDER BY logged_at DESC LIMIT 1
          ) al ON true
@@ -945,10 +945,10 @@ export async function getApprovalBottleneck() {
         `SELECT
            ar.assigned_role AS role,
            COUNT(*)::INT AS pending_count,
-           ROUND(AVG(EXTRACT(EPOCH FROM (NOW() - ar.created_at)) / 3600), 1) AS avg_wait_hours,
+           ROUND((AVG(EXTRACT(EPOCH FROM (NOW() - ar.created_at)) / 3600))::NUMERIC, 1) AS avg_wait_hours,
            COUNT(*) FILTER (WHERE ar.priority IN ('high', 'critical'))::INT AS high_priority,
            MIN(ar.created_at) AS oldest_request,
-           ROUND(EXTRACT(EPOCH FROM (NOW() - MIN(ar.created_at))) / 86400, 1) AS oldest_days
+           ROUND((EXTRACT(EPOCH FROM (NOW() - MIN(ar.created_at))) / 86400)::NUMERIC, 1) AS oldest_days
          FROM approval_requests ar
          WHERE ar.status = 'Pending'
          GROUP BY ar.assigned_role
@@ -974,9 +974,9 @@ export async function getOperationalEfficiency() {
              COUNT(*) FILTER (WHERE status = 'Completed')::numeric /
              NULLIF(COUNT(*), 0) * 100, 1
            ) FROM tasks WHERE created_at >= NOW() - INTERVAL '30 days') AS completion_rate_30d,
-           (SELECT ROUND(AVG(
+           (SELECT ROUND((AVG(
              EXTRACT(EPOCH FROM (completed_at - created_at)) / 3600
-           ), 1) FROM tasks
+           ))::NUMERIC, 1) FROM tasks
             WHERE status = 'Completed'
             AND completed_at >= NOW() - INTERVAL '30 days') AS avg_completion_hours,
            (SELECT COUNT(*)::int FROM tasks
