@@ -31,6 +31,7 @@ export const CachePrefix = {
   SESSIONS: "sessions",
   JOURNEY: "journey",
   INJURIES: "injuries",
+  SIDEBAR_NAV: "sidebar-nav",
 } as const;
 
 // ── Core Operations ──

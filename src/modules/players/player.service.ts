@@ -3,6 +3,7 @@ import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
+import { generateDisplayId } from "@shared/utils/displayId";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { sequelize } from "@config/database";
 import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
@@ -385,7 +386,8 @@ export async function createPlayer(input: any, createdBy: string) {
       input.technicalAttributes = createEmptyTechnicalAttributes(group);
     }
   }
-  return await Player.create({ ...input, createdBy });
+  const displayId = await generateDisplayId("players");
+  return await Player.create({ ...input, createdBy, displayId });
 }
 
 export async function updatePlayer(id: string, input: any) {

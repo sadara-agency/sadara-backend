@@ -23,6 +23,7 @@ export interface MatchAttributes {
   homeTeamName?: string | null;
   awayTeamName?: string | null;
   providerSource?: string | null;
+  displayId?: string | null;
   // Cup/knockout fields
   round?: string | null;
   leg?: number | null;
@@ -36,7 +37,7 @@ export interface MatchAttributes {
 
 interface MatchCreationAttributes extends Optional<
   MatchAttributes,
-  "id" | "status" | "createdAt" | "updatedAt"
+  "id" | "status" | "displayId" | "createdAt" | "updatedAt"
 > {}
 
 // ── Model Class ──
@@ -64,6 +65,7 @@ export class Match
   declare homeTeamName: string | null;
   declare awayTeamName: string | null;
   declare providerSource: string | null;
+  declare displayId: string | null;
   // Cup/knockout fields
   declare round: string | null;
   declare leg: number | null;
@@ -159,6 +161,10 @@ Match.init(
     providerSource: {
       type: DataTypes.STRING(50),
       field: "provider_source",
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
     },
     // Cup/knockout fields
     round: { type: DataTypes.STRING(50) },

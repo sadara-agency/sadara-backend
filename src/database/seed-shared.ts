@@ -102,6 +102,13 @@ const RAW_PERMISSIONS: Perm[] = [
       "Coach",
       "SkillCoach",
       "TacticalCoach",
+      "FitnessCoach",
+      "NutritionSpecialist",
+      "GymCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+      "Finance",
+      "Legal",
       "Media",
       "Executive",
     ],
@@ -195,6 +202,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("scouting", ["Analyst"], {
     canRead: true,
+    canCreate: true,
   }),
 
   ...forRoles("referrals", ["Admin"], {

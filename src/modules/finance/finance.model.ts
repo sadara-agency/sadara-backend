@@ -36,6 +36,7 @@ export interface InvoiceAttributes {
   description?: string | null;
   lineItems?: object | null;
   documentUrl?: string | null;
+  displayId?: string | null;
   createdBy?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -48,6 +49,7 @@ interface InvoiceCreation extends Optional<
   | "taxAmount"
   | "currency"
   | "status"
+  | "displayId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -72,6 +74,7 @@ export class Invoice
   declare description: string | null;
   declare lineItems: object | null;
   declare documentUrl: string | null;
+  declare displayId: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -120,6 +123,11 @@ Invoice.init(
     description: { type: DataTypes.TEXT },
     lineItems: { type: DataTypes.JSONB, defaultValue: [], field: "line_items" },
     documentUrl: { type: DataTypes.TEXT, field: "document_url" },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
+      field: "display_id",
+    },
     createdBy: { type: DataTypes.UUID, field: "created_by" },
   },
   { sequelize, tableName: "invoices", underscored: true, timestamps: true },

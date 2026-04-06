@@ -55,6 +55,7 @@ export interface ReferralAttributes {
   resultingTicketId?: string | null;
   restrictedTo?: string[] | null;
   createdBy?: string | null;
+  displayId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -72,6 +73,7 @@ interface ReferralCreationAttributes extends Optional<
   | "referralTarget"
   | "closureNotes"
   | "closedAt"
+  | "displayId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -105,6 +107,7 @@ export class Referral
   declare resultingTicketId: string | null;
   declare restrictedTo: string[] | null;
   declare createdBy: string | null;
+  declare displayId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -209,6 +212,10 @@ Referral.init(
       type: DataTypes.ARRAY(DataTypes.UUID),
       defaultValue: [],
       field: "restricted_to",
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
     },
     createdBy: {
       type: DataTypes.UUID,

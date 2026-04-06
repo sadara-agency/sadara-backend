@@ -49,6 +49,7 @@ interface PlayerAttributes {
   overallGrade?: string | null;
   notes?: string | null;
   photoUrl?: string | null;
+  displayId?: string | null;
   createdBy: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -63,6 +64,7 @@ interface PlayerCreationAttributes extends Optional<
   | "contractType"
   | "marketValueCurrency"
   | "status"
+  | "displayId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -110,6 +112,7 @@ export class Player
   declare overallGrade: string | null;
   declare notes: string | null;
   declare photoUrl: string | null;
+  declare displayId: string | null;
   declare createdBy: string;
 
   get fullName(): string {
@@ -216,6 +219,7 @@ Player.init(
     },
     notes: { type: DataTypes.TEXT },
     photoUrl: { type: DataTypes.STRING },
+    displayId: { type: DataTypes.STRING(20), unique: true },
     createdBy: { type: DataTypes.UUID, allowNull: false },
   },
   {

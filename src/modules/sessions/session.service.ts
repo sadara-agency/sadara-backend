@@ -9,6 +9,7 @@ import { Journey } from "@modules/journey/journey.model";
 import { Ticket } from "@modules/tickets/ticket.model";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
+import { generateDisplayId } from "@shared/utils/displayId";
 import type {
   CreateSessionInput,
   UpdateSessionInput,
@@ -150,8 +151,11 @@ export async function createSession(body: CreateSessionInput, userId: string) {
     }
   }
 
+  const displayId = await generateDisplayId("sessions");
+
   const session = await Session.create({
     ...body,
+    displayId,
     createdBy: userId,
   });
 

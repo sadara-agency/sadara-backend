@@ -23,6 +23,7 @@ import {
   generateOfferCreationTask,
   generateOfferAcceptedTask,
 } from "@modules/offers/offerAutoTasks";
+import { generateDisplayId } from "@shared/utils/displayId";
 
 // ── List Offers ──
 
@@ -148,7 +149,8 @@ export async function createOffer(input: any, createdBy: string) {
     input.toClubId ? findOrThrow(Club, input.toClubId, "To-club") : null,
   ]);
 
-  const offer = await Offer.create({ ...input, createdBy });
+  const displayId = await generateDisplayId("offers");
+  const offer = await Offer.create({ ...input, displayId, createdBy });
 
   // Notify Admin/Manager about new offer
   const playerName =

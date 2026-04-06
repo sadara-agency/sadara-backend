@@ -72,6 +72,7 @@ interface ContractAttributes {
   // Meta
   notes: string | null;
   createdBy: string | null;
+  displayId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -118,6 +119,7 @@ interface ContractCreationAttributes extends Optional<
   | "parentContractId"
   | "notes"
   | "createdBy"
+  | "displayId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -187,8 +189,9 @@ export class Contract
   declare parentContractId: string | null;
   declare notes: string | null;
   declare createdBy: string | null;
-  declare createdAt: Date;
-  declare updatedAt: Date;
+  declare displayId: string | null;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
 }
 
 Contract.init(
@@ -407,6 +410,7 @@ Contract.init(
     notes: {
       type: DataTypes.TEXT,
     },
+    displayId: { type: DataTypes.STRING(20), unique: true },
     createdBy: {
       type: DataTypes.UUID,
       field: "created_by",

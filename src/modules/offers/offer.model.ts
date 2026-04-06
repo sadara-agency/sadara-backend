@@ -41,6 +41,7 @@ interface OfferAttributes {
 
   // Notes & meta
   notes?: string | null;
+  displayId?: string | null;
   createdBy?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -52,6 +53,7 @@ interface OfferCreationAttributes extends Optional<
   | "offerType"
   | "status"
   | "feeCurrency"
+  | "displayId"
   | "submittedAt"
   | "createdAt"
   | "updatedAt"
@@ -95,6 +97,7 @@ export class Offer
   declare convertedAt: Date | null;
 
   declare notes: string | null;
+  declare displayId: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -205,6 +208,10 @@ Offer.init(
     // Notes & meta
     notes: {
       type: DataTypes.TEXT,
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
     },
     createdBy: {
       type: DataTypes.UUID,

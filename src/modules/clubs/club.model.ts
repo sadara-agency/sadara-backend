@@ -25,6 +25,7 @@ interface ClubAttributes {
   primaryColor?: string | null;
   secondaryColor?: string | null;
   notes?: string | null;
+  code?: string | null;
   isActive?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -36,7 +37,7 @@ interface ClubAttributes {
 
 interface ClubCreationAttributes extends Optional<
   ClubAttributes,
-  "id" | "type" | "createdAt" | "updatedAt"
+  "id" | "type" | "code" | "createdAt" | "updatedAt"
 > {}
 
 export class Club
@@ -58,6 +59,7 @@ export class Club
   declare primaryColor: string | null;
   declare secondaryColor: string | null;
   declare notes: string | null;
+  declare code: string | null;
   declare isActive: boolean;
   declare squadType: string | null;
   declare splTeamId: number | null;
@@ -122,6 +124,10 @@ Club.init(
     },
     notes: {
       type: DataTypes.TEXT,
+    },
+    code: {
+      type: DataTypes.STRING(10),
+      unique: true,
     },
     squadType: {
       type: DataTypes.STRING(20),
