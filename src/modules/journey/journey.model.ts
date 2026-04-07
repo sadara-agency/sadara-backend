@@ -22,6 +22,7 @@ export type JourneyStageType =
 interface JourneyAttributes {
   id: string;
   playerId: string;
+  gateId: string | null;
   stageName: string;
   stageNameAr: string | null;
   stageOrder: number;
@@ -45,6 +46,7 @@ interface JourneyAttributes {
 interface JourneyCreationAttributes extends Optional<
   JourneyAttributes,
   | "id"
+  | "gateId"
   | "stageNameAr"
   | "status"
   | "health"
@@ -69,6 +71,7 @@ export class Journey
 {
   declare id: string;
   declare playerId: string;
+  declare gateId: string | null;
   declare stageName: string;
   declare stageNameAr: string | null;
   declare stageOrder: number;
@@ -101,6 +104,11 @@ Journey.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "player_id",
+    },
+    gateId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "gate_id",
     },
     stageName: {
       type: DataTypes.STRING(255),

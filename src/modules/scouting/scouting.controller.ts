@@ -74,6 +74,12 @@ export async function deleteWatchlist(req: AuthRequest, res: Response) {
   sendSuccess(res, result, "Prospect deleted");
 }
 
+export async function checkDuplicate(req: AuthRequest, res: Response) {
+  const { name, dob, club } = req.query as Record<string, string>;
+  const matches = await scoutingService.checkDuplicate(name, dob, club);
+  sendSuccess(res, matches);
+}
+
 // ══════════════════════════════════════════
 // SCREENING CASES
 // ══════════════════════════════════════════
@@ -146,4 +152,11 @@ export async function getDecision(req: AuthRequest, res: Response) {
 export async function pipelineSummary(req: AuthRequest, res: Response) {
   const summary = await scoutingService.getPipelineSummary();
   sendSuccess(res, summary);
+}
+
+// ── Prospect Timeline ──
+
+export async function prospectTimeline(req: AuthRequest, res: Response) {
+  const events = await scoutingService.getProspectTimeline(req.params.id);
+  sendSuccess(res, events);
 }

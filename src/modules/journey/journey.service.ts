@@ -2,6 +2,7 @@ import { Op, WhereOptions } from "sequelize";
 import { Journey } from "./journey.model";
 import { Ticket } from "@modules/tickets/ticket.model";
 import { Referral } from "@modules/referrals/referral.model";
+import { Gate } from "@modules/gates/gate.model";
 import { AppError } from "@middleware/errorHandler";
 import type {
   CreateJourneyInput,
@@ -16,6 +17,7 @@ export async function listJourneys(query: JourneyQuery) {
   const where: WhereOptions = {};
 
   if (query.playerId) where.playerId = query.playerId;
+  if ((query as any).gateId) where.gateId = (query as any).gateId;
   if (query.status) where.status = query.status;
   if (query.health) where.health = query.health;
   if (query.assignedTo) where.assignedTo = query.assignedTo;
@@ -33,6 +35,12 @@ export async function listJourneys(query: JourneyQuery) {
         model: Referral,
         as: "referral",
         attributes: ["id", "referralType", "status", "priority"],
+        required: false,
+      },
+      {
+        model: Gate,
+        as: "gate",
+        attributes: ["id", "gateNumber", "status"],
         required: false,
       },
     ],

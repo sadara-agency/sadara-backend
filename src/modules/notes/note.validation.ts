@@ -7,6 +7,7 @@ const OWNER_TYPES = [
   "Injury",
   "Club",
   "Offer",
+  "Watchlist",
 ] as const;
 
 export const createNoteSchema = z.object({

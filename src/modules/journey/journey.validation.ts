@@ -23,6 +23,7 @@ const STAGE_TYPES = [
 // ── Create Journey Stage ──
 export const createJourneySchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
+  gateId: z.string().uuid("Invalid gate ID").nullable().optional(),
   stageName: z.string().min(1, "Stage name is required"),
   stageNameAr: z.string().optional(),
   stageOrder: z.number().int().min(0).default(0),
@@ -47,6 +48,7 @@ export const createJourneySchema = z.object({
 
 // ── Update Journey Stage ──
 export const updateJourneySchema = z.object({
+  gateId: z.string().uuid("Invalid gate ID").nullable().optional(),
   stageName: z.string().min(1).optional(),
   stageNameAr: z.string().nullable().optional(),
   stageOrder: z.number().int().min(0).optional(),
@@ -81,6 +83,7 @@ export const journeyQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(100).default(50),
   playerId: z.string().uuid().optional(),
+  gateId: z.string().uuid().optional(),
   status: z.enum(STAGE_STATUSES).optional(),
   health: z.enum(STAGE_HEALTH).optional(),
   stageType: z.enum(STAGE_TYPES).optional(),

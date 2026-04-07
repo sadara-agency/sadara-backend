@@ -40,6 +40,12 @@ export const watchlistQuerySchema = z.object({
   nationality: z.string().optional(),
 });
 
+export const checkDuplicateSchema = z.object({
+  name: z.string().min(2).max(255),
+  dob: z.string().optional(),
+  club: z.string().optional(),
+});
+
 // ── Screening Case ──
 
 export const createScreeningSchema = z.object({

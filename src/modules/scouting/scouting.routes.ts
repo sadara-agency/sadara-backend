@@ -9,6 +9,7 @@ import {
   updateWatchlistSchema,
   updateWatchlistStatusSchema,
   watchlistQuerySchema,
+  checkDuplicateSchema,
   createScreeningSchema,
   updateScreeningSchema,
   markPackReadySchema,
@@ -35,9 +36,20 @@ router.get(
   asyncHandler(ctrl.listWatchlist),
 );
 router.get(
+  "/watchlist/check-duplicate",
+  authorizeModule("scouting", "read"),
+  validate(checkDuplicateSchema, "query"),
+  asyncHandler(ctrl.checkDuplicate),
+);
+router.get(
   "/watchlist/:id",
   authorizeModule("scouting", "read"),
   asyncHandler(ctrl.getWatchlistById),
+);
+router.get(
+  "/watchlist/:id/timeline",
+  authorizeModule("scouting", "read"),
+  asyncHandler(ctrl.prospectTimeline),
 );
 router.post(
   "/watchlist",

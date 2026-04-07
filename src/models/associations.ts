@@ -214,6 +214,10 @@ export function setupAssociations() {
   Journey.belongsTo(Referral, { foreignKey: "referralId", as: "referral" });
   Referral.hasMany(Journey, { foreignKey: "referralId", as: "journeyStages" });
 
+  // Journey ↔ Gate
+  Journey.belongsTo(Gate, { foreignKey: "gateId", as: "gate" });
+  Gate.hasMany(Journey, { foreignKey: "gateId", as: "journeyStages" });
+
   // Journey ↔ Player
   Journey.belongsTo(Player, { foreignKey: "playerId", as: "player" });
 

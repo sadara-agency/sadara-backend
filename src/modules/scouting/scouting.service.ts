@@ -122,6 +122,38 @@ export async function deleteWatchlist(id: string) {
   return { id };
 }
 
+export async function checkDuplicate(
+  name: string,
+  dob?: string,
+  club?: string,
+) {
+  const nameCondition = {
+    [Op.or]: [
+      { prospectName: { [Op.iLike]: `%${name}%` } },
+      { prospectNameAr: { [Op.iLike]: `%${name}%` } },
+    ],
+  };
+
+  const where: any = { ...nameCondition };
+  if (dob) where.dateOfBirth = dob;
+  if (club) where.currentClub = { [Op.iLike]: `%${club}%` };
+
+  return Watchlist.findAll({
+    where,
+    limit: 5,
+    attributes: [
+      "id",
+      "prospectName",
+      "prospectNameAr",
+      "dateOfBirth",
+      "currentClub",
+      "status",
+      "priority",
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+}
+
 // ══════════════════════════════════════════
 // SCREENING CASES
 // ══════════════════════════════════════════
@@ -322,4 +354,72 @@ export async function getPipelineSummary() {
     decisions,
     rejected,
   };
+}
+
+// ══════════════════════════════════════════
+// PROSPECT TIMELINE (audit-based)
+// ══════════════════════════════════════════
+
+export async function getProspectTimeline(watchlistId: string) {
+  // Verify prospect exists
+  await findOrThrow(Watchlist, watchlistId, "Watchlist entry");
+
+  // Gather related entity IDs
+  const screeningCases = await ScreeningCase.findAll({
+    where: { watchlistId },
+    attributes: ["id"],
+  });
+  const scIds = screeningCases.map((sc) => sc.id);
+
+  let decisionIds: string[] = [];
+  if (scIds.length > 0) {
+    const decisions = await SelectionDecision.findAll({
+      where: { screeningCaseId: { [Op.in]: scIds } },
+      attributes: ["id"],
+    });
+    decisionIds = decisions.map((d) => d.id);
+  }
+
+  // Build OR condition for audit logs
+  const { AuditLog } = await import("@modules/audit/AuditLog.model");
+  const orConditions: any[] = [{ entity: "watchlists", entityId: watchlistId }];
+  if (scIds.length > 0) {
+    orConditions.push({
+      entity: "screening_cases",
+      entityId: { [Op.in]: scIds },
+    });
+  }
+  if (decisionIds.length > 0) {
+    orConditions.push({
+      entity: "selection_decisions",
+      entityId: { [Op.in]: decisionIds },
+    });
+  }
+
+  const logs = await AuditLog.findAll({
+    where: { [Op.or]: orConditions },
+    order: [["loggedAt", "DESC"]],
+    limit: 100,
+    attributes: [
+      "id",
+      "action",
+      "entity",
+      "entityId",
+      "detail",
+      "userName",
+      "changes",
+      "loggedAt",
+    ],
+  });
+
+  return logs.map((log) => ({
+    id: log.id,
+    date: log.loggedAt?.toISOString() ?? "",
+    action: log.action,
+    entity: log.entity,
+    entityId: log.entityId,
+    detail: log.detail,
+    userName: log.userName,
+    changes: log.changes,
+  }));
 }

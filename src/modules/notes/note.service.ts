@@ -19,6 +19,7 @@ const OWNER_TYPE_TO_MODULE: Record<string, string> = {
   Injury: "injuries",
   Club: "clubs",
   Offer: "offers",
+  Watchlist: "scouting",
 };
 
 export async function listNotes(
