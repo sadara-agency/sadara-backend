@@ -10,6 +10,7 @@ import {
   TrainingMedia,
   TrainingModule,
   TrainingLesson,
+  LessonProgress,
   type LessonType,
 } from "@modules/training/training.model";
 import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
@@ -599,4 +600,134 @@ export async function getMediaSignedUrl(mediaId: string) {
   }
   const url = await resolveFileUrl(media.storagePath, 180); // 3-hour expiry for long videos
   return { url, mimeType: media.mimeType, durationSec: media.durationSec };
+}
+
+// ═══════════════════════════════════════════
+// LESSON PROGRESS (per-second tracking)
+// ═══════════════════════════════════════════
+
+const COMPLETION_THRESHOLD = 0.9; // 90% watched = complete
+
+/**
+ * Get all lesson progress for an enrollment (player sees their progress per lesson).
+ */
+export async function getLessonProgress(
+  enrollmentId: string,
+  playerId: string,
+) {
+  return LessonProgress.findAll({
+    where: { enrollmentId, playerId },
+    order: [["updatedAt", "DESC"]],
+  });
+}
+
+/**
+ * Update lesson watch position — called every ~30s by the video player.
+ * Handles: upsert progress, auto-complete at 90%, recalculate course %.
+ */
+export async function updateLessonProgress(
+  enrollmentId: string,
+  lessonId: string,
+  playerId: string,
+  input: { position: number; duration: number },
+) {
+  const { position, duration } = input;
+
+  // Upsert progress record
+  const [progress] = await LessonProgress.upsert(
+    {
+      enrollmentId,
+      lessonId,
+      playerId,
+      lastPosition: position,
+      totalSeconds: duration,
+      watchedSeconds: position, // Simple: position = furthest point watched
+    },
+    { returning: true },
+  );
+
+  // Auto-complete at 90%
+  if (
+    duration > 0 &&
+    position / duration >= COMPLETION_THRESHOLD &&
+    !progress.isCompleted
+  ) {
+    await progress.update({
+      isCompleted: true,
+      completedAt: new Date(),
+      watchedSeconds: duration,
+    });
+  }
+
+  // Recalculate course-level progress
+  await recalculateCourseProgress(enrollmentId);
+
+  return progress;
+}
+
+/**
+ * Mark a non-video lesson (PDF, link, quiz) as complete.
+ */
+export async function markLessonComplete(
+  enrollmentId: string,
+  lessonId: string,
+  playerId: string,
+) {
+  const [progress] = await LessonProgress.upsert(
+    {
+      enrollmentId,
+      lessonId,
+      playerId,
+      isCompleted: true,
+      completedAt: new Date(),
+      watchedSeconds: 1,
+      totalSeconds: 1,
+      lastPosition: 1,
+    },
+    { returning: true },
+  );
+
+  await recalculateCourseProgress(enrollmentId);
+  return progress;
+}
+
+/**
+ * Recalculate enrollment.progressPct based on completed lessons / total lessons.
+ */
+async function recalculateCourseProgress(enrollmentId: string) {
+  const enrollment = await TrainingEnrollment.findByPk(enrollmentId);
+  if (!enrollment) return;
+
+  // Count total lessons in the course
+  const totalLessons = await TrainingLesson.count({
+    include: [
+      {
+        model: TrainingModule,
+        as: "module",
+        where: { courseId: enrollment.courseId },
+        attributes: [],
+      },
+    ],
+  });
+
+  if (totalLessons === 0) return;
+
+  // Count completed lessons for this enrollment
+  const completedLessons = await LessonProgress.count({
+    where: { enrollmentId, isCompleted: true },
+  });
+
+  const pct = Math.round((completedLessons / totalLessons) * 100);
+
+  const updates: any = { progressPct: pct };
+  if (pct > 0 && enrollment.status === "NotStarted") {
+    updates.status = "InProgress";
+    updates.startedAt = new Date();
+  }
+  if (pct >= 100 && enrollment.status !== "Completed") {
+    updates.status = "Completed";
+    updates.completedAt = new Date();
+  }
+
+  await enrollment.update(updates);
 }
