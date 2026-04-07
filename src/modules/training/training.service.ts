@@ -10,6 +10,7 @@ import {
   TrainingMedia,
   TrainingModule,
   TrainingLesson,
+  type LessonType,
 } from "@modules/training/training.model";
 import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import { Player } from "@modules/players/player.model";
@@ -504,7 +505,7 @@ export async function createLesson(
   input: {
     title: string;
     titleAr?: string;
-    type?: string;
+    type?: LessonType;
     contentUrl?: string;
     durationSec?: number;
     isFree?: boolean;
@@ -517,7 +518,7 @@ export async function createLesson(
   return TrainingLesson.create({
     moduleId,
     ...input,
-    type: (input.type as any) ?? "video",
+    type: input.type ?? "video",
     sortOrder: ((maxOrder as number) ?? -1) + 1,
   });
 }
@@ -527,7 +528,7 @@ export async function updateLesson(
   input: {
     title?: string;
     titleAr?: string;
-    type?: string;
+    type?: LessonType;
     contentUrl?: string;
     durationSec?: number;
     isFree?: boolean;
