@@ -14,6 +14,7 @@ describe('Session Schemas', () => {
       sessionType: 'Physical',
       programOwner: 'FitnessCoach',
       sessionDate: '2026-04-10',
+      title: 'Morning fitness session',
     };
 
     it('should accept valid session', () => {
