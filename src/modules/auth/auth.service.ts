@@ -217,15 +217,26 @@ export async function login(input: LoginInput) {
       ...userWithoutPassword
     } = user.get({ plain: true });
 
+    // If the user is a Player, look up their playerId from player_accounts
+    let playerId: string | null = null;
+    if (user.role === "Player") {
+      const pa = await PlayerAccount.findOne({
+        where: { email: user.email },
+        attributes: ["playerId"],
+      });
+      playerId = pa?.playerId ?? null;
+    }
+
     const tokenPayload = {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
       role: user.role,
+      ...(playerId ? { playerId } : {}),
     };
 
     return {
-      user: userWithoutPassword,
+      user: { ...userWithoutPassword, ...(playerId ? { playerId } : {}) },
       token: generateAccessToken(tokenPayload),
       refreshToken: await createRefreshToken(user.id, "user"),
     };
