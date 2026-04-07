@@ -83,6 +83,17 @@ export const createLessonSchema = z.object({
 
 export const updateLessonSchema = createLessonSchema.partial();
 
+// ── Lesson Progress ──
+
+export const updateLessonProgressSchema = z.object({
+  position: z.number().int().min(0),
+  duration: z.number().int().min(1),
+});
+
+export const markLessonCompleteSchema = z.object({
+  lessonId: z.string().uuid(),
+});
+
 // ── Inferred types ──
 
 export type CreateCourseInput = z.infer<typeof createCourseSchema>;

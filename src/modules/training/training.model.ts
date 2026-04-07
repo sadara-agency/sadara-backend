@@ -546,3 +546,117 @@ TrainingLesson.belongsTo(TrainingMedia, {
   foreignKey: "mediaId",
   as: "media",
 });
+
+// ═══════════════════════════════════════════
+// Lesson Progress (per-lesson watch tracking)
+// ═══════════════════════════════════════════
+
+interface LessonProgressAttributes {
+  id: string;
+  enrollmentId: string;
+  lessonId: string;
+  playerId: string;
+  watchedSeconds: number;
+  totalSeconds: number;
+  lastPosition: number;
+  isCompleted: boolean;
+  completedAt?: Date | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface LessonProgressCreation extends Optional<
+  LessonProgressAttributes,
+  | "id"
+  | "watchedSeconds"
+  | "totalSeconds"
+  | "lastPosition"
+  | "isCompleted"
+  | "createdAt"
+  | "updatedAt"
+> {}
+
+export class LessonProgress
+  extends Model<LessonProgressAttributes, LessonProgressCreation>
+  implements LessonProgressAttributes
+{
+  declare id: string;
+  declare enrollmentId: string;
+  declare lessonId: string;
+  declare playerId: string;
+  declare watchedSeconds: number;
+  declare totalSeconds: number;
+  declare lastPosition: number;
+  declare isCompleted: boolean;
+  declare completedAt: Date | null;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+LessonProgress.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    enrollmentId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "enrollment_id",
+    },
+    lessonId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "lesson_id",
+    },
+    playerId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "player_id",
+    },
+    watchedSeconds: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: "watched_seconds",
+    },
+    totalSeconds: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: "total_seconds",
+    },
+    lastPosition: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: "last_position",
+    },
+    isCompleted: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_completed",
+    },
+    completedAt: {
+      type: DataTypes.DATE,
+      field: "completed_at",
+    },
+  },
+  {
+    sequelize,
+    tableName: "lesson_progress",
+    underscored: true,
+    timestamps: true,
+  },
+);
+
+TrainingEnrollment.hasMany(LessonProgress, {
+  foreignKey: "enrollmentId",
+  as: "lessonProgress",
+});
+LessonProgress.belongsTo(TrainingEnrollment, {
+  foreignKey: "enrollmentId",
+  as: "enrollment",
+});
+LessonProgress.belongsTo(TrainingLesson, {
+  foreignKey: "lessonId",
+  as: "lesson",
+});

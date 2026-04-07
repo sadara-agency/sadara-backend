@@ -255,3 +255,55 @@ export async function streamMedia(req: AuthRequest, res: Response) {
   const result = await svc.getMediaSignedUrl(req.params.mediaId);
   sendSuccess(res, result);
 }
+
+// ══════════════════════════════════════════
+// LESSON PROGRESS
+// ══════════════════════════════════════════
+
+export async function getLessonProgress(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    res
+      .status(400)
+      .json({ success: false, message: "Player account not linked" });
+    return;
+  }
+  const progress = await svc.getLessonProgress(
+    req.params.enrollmentId,
+    playerId,
+  );
+  sendSuccess(res, progress);
+}
+
+export async function updateLessonProgress(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    res
+      .status(400)
+      .json({ success: false, message: "Player account not linked" });
+    return;
+  }
+  const progress = await svc.updateLessonProgress(
+    req.params.enrollmentId,
+    req.params.lessonId,
+    playerId,
+    req.body,
+  );
+  sendSuccess(res, progress);
+}
+
+export async function markLessonComplete(req: AuthRequest, res: Response) {
+  const playerId = (req.user as any)?.playerId;
+  if (!playerId) {
+    res
+      .status(400)
+      .json({ success: false, message: "Player account not linked" });
+    return;
+  }
+  const progress = await svc.markLessonComplete(
+    req.params.enrollmentId,
+    req.body.lessonId,
+    playerId,
+  );
+  sendSuccess(res, progress);
+}

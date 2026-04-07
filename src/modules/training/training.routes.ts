@@ -20,6 +20,8 @@ import {
   reorderSchema,
   createLessonSchema,
   updateLessonSchema,
+  updateLessonProgressSchema,
+  markLessonCompleteSchema,
 } from "@modules/training/training.validation";
 import * as ctrl from "@modules/training/training.controller";
 
@@ -51,6 +53,29 @@ router.patch(
   authorizeModule("training", "update"),
   validate(selfUpdateProgressSchema),
   asyncHandler(ctrl.updateMyProgress),
+);
+
+// Player gets per-lesson progress for an enrollment
+router.get(
+  "/my/enrollments/:enrollmentId/lessons",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.getLessonProgress),
+);
+
+// Player updates video watch position (called every ~30s)
+router.patch(
+  "/my/enrollments/:enrollmentId/lessons/:lessonId/progress",
+  authorizeModule("training", "update"),
+  validate(updateLessonProgressSchema),
+  asyncHandler(ctrl.updateLessonProgress),
+);
+
+// Player marks a non-video lesson as complete
+router.post(
+  "/my/enrollments/:enrollmentId/lessons/complete",
+  authorizeModule("training", "update"),
+  validate(markLessonCompleteSchema),
+  asyncHandler(ctrl.markLessonComplete),
 );
 
 // ══════════════════════════════════════════
