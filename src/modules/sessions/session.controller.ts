@@ -6,6 +6,8 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple } from "@shared/utils/cache";
+import { CachePrefix } from "@shared/utils/cache";
 import * as sessionService from "./session.service";
 
 // ── List ──
@@ -24,13 +26,20 @@ export async function getById(req: AuthRequest, res: Response) {
 export async function create(req: AuthRequest, res: Response) {
   const session = await sessionService.createSession(req.body, req.user!.id);
 
-  await logAudit(
-    "CREATE",
-    "sessions",
-    session!.id,
-    buildAuditContext(req.user!, req.ip),
-    `Session created: ${session!.sessionType} for player ${session!.playerId}`,
-  );
+  Promise.all([
+    invalidateMultiple([
+      CachePrefix.SESSIONS,
+      CachePrefix.REFERRALS,
+      CachePrefix.DASHBOARD,
+    ]),
+    logAudit(
+      "CREATE",
+      "sessions",
+      session!.id,
+      buildAuditContext(req.user!, req.ip),
+      `Session created: ${session!.sessionType} for player ${session!.playerId}`,
+    ),
+  ]).catch(() => {});
 
   sendCreated(res, session, "Session created");
 }
@@ -39,13 +48,20 @@ export async function create(req: AuthRequest, res: Response) {
 export async function update(req: AuthRequest, res: Response) {
   const session = await sessionService.updateSession(req.params.id, req.body);
 
-  await logAudit(
-    "UPDATE",
-    "sessions",
-    req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    `Session updated`,
-  );
+  Promise.all([
+    invalidateMultiple([
+      CachePrefix.SESSIONS,
+      CachePrefix.REFERRALS,
+      CachePrefix.DASHBOARD,
+    ]),
+    logAudit(
+      "UPDATE",
+      "sessions",
+      req.params.id,
+      buildAuditContext(req.user!, req.ip),
+      `Session updated`,
+    ),
+  ]).catch(() => {});
 
   sendSuccess(res, session, "Session updated");
 }
@@ -54,13 +70,20 @@ export async function update(req: AuthRequest, res: Response) {
 export async function remove(req: AuthRequest, res: Response) {
   const result = await sessionService.deleteSession(req.params.id);
 
-  await logAudit(
-    "DELETE",
-    "sessions",
-    req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    "Session deleted",
-  );
+  Promise.all([
+    invalidateMultiple([
+      CachePrefix.SESSIONS,
+      CachePrefix.REFERRALS,
+      CachePrefix.DASHBOARD,
+    ]),
+    logAudit(
+      "DELETE",
+      "sessions",
+      req.params.id,
+      buildAuditContext(req.user!, req.ip),
+      "Session deleted",
+    ),
+  ]).catch(() => {});
 
   sendSuccess(res, result, "Session deleted");
 }
