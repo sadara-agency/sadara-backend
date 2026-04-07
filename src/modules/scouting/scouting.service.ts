@@ -67,9 +67,11 @@ export async function listWatchlist(queryParams: any, user?: AuthUser) {
         as: "screeningCases",
         attributes: ["id", "status", "caseNumber"],
         required: false,
+        separate: true,
+        order: [["createdAt", "DESC"]],
       },
     ],
-    subQuery: false,
+    distinct: true,
   });
 
   return { data: rows, meta: buildMeta(count, page, limit) };
@@ -581,34 +583,36 @@ export async function getScoutDashboard(userId: string) {
     avgDays = 0;
   }
 
-  // Conversion rates
-  const conversionRates = {
-    watchlistToScreening:
-      pipeline.total > 0
-        ? Math.round(
-            ((pipeline.shortlisted +
-              pipeline.screening +
-              pipeline.packReady +
-              pipeline.decided) /
-              pipeline.total) *
-              100,
-          )
-        : 0,
-    screeningToPackReady:
-      pipeline.screening + pipeline.packReady + pipeline.decided > 0
-        ? Math.round(
-            ((pipeline.packReady + pipeline.decided) /
-              (pipeline.screening + pipeline.packReady + pipeline.decided)) *
-              100,
-          )
-        : 0,
-    packReadyToDecided:
-      pipeline.packReady + pipeline.decided > 0
-        ? Math.round(
-            (pipeline.decided / (pipeline.packReady + pipeline.decided)) * 100,
-          )
-        : 0,
+  // Conversion rates — query historical totals (how many EVER entered each stage)
+  let conversionRates = {
+    watchlistToScreening: 0,
+    screeningToPackReady: 0,
+    packReadyToDecided: 0,
   };
+  try {
+    const everScreened = await ScreeningCase.count(); // every prospect that ever got a screening
+    const everPackReady = await ScreeningCase.count({
+      where: { isPackReady: true },
+    });
+    const everDecided = await SelectionDecision.count();
+
+    conversionRates = {
+      watchlistToScreening:
+        pipeline.total > 0
+          ? Math.min(100, Math.round((everScreened / pipeline.total) * 100))
+          : 0,
+      screeningToPackReady:
+        everScreened > 0
+          ? Math.min(100, Math.round((everPackReady / everScreened) * 100))
+          : 0,
+      packReadyToDecided:
+        everPackReady > 0
+          ? Math.min(100, Math.round((everDecided / everPackReady) * 100))
+          : 0,
+    };
+  } catch {
+    // keep defaults
+  }
 
   return {
     pipeline,
