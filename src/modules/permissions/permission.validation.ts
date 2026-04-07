@@ -46,6 +46,18 @@ const MODULES = [
   "saff-data",
   "spl-sync",
   "sessions",
+  "wellness",
+  "calendar",
+  "clearances",
+  "competitions",
+  "media_requests",
+  "press_releases",
+  "media_contacts",
+  "media_kits",
+  "social_media",
+  "journey",
+  "tickets",
+  "messaging",
 ] as const;
 
 export const updatePermissionsSchema = z.object({
