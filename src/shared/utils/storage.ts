@@ -59,6 +59,7 @@ export type UploadFolder =
 const PUBLIC_FOLDERS: ReadonlySet<UploadFolder> = new Set([
   "photos",
   "avatars",
+  "training-media",
 ]);
 
 /** Folders whose objects stay private — access via signed URLs only */
@@ -67,7 +68,6 @@ const PRIVATE_FOLDERS: ReadonlySet<UploadFolder> = new Set([
   "signed-contracts",
   "signed-documents",
   "voice-memos",
-  "training-media",
 ]);
 
 export interface UploadOptions {
@@ -292,6 +292,11 @@ export async function resolveFileUrl(
   // Private GCS key — generate signed URL
   if (USE_GCS && isPrivateKey(urlOrKey)) {
     return getSignedUrl(urlOrKey, expiresInMinutes);
+  }
+
+  // Public GCS key — return direct public URL
+  if (USE_GCS && env.gcs.bucket) {
+    return `https://storage.googleapis.com/${env.gcs.bucket}/${urlOrKey}`;
   }
 
   return urlOrKey;
