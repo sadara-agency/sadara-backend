@@ -32,6 +32,12 @@ const ALLOWED_MIMES = [
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "text/plain",
   "text/csv",
+  // Audio (voice memos)
+  "audio/webm",
+  "audio/ogg",
+  "audio/mpeg",
+  "audio/mp4",
+  "audio/wav",
 ];
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
