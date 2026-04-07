@@ -20,15 +20,15 @@ export const createMediaRequestSchema = z.object({
     .default("interview"),
   subject: z.string().min(1).max(500),
   subjectAr: z.string().max(500).optional(),
-  description: z.string().optional(),
-  descriptionAr: z.string().optional(),
+  description: z.string().max(2000).optional(),
+  descriptionAr: z.string().max(2000).optional(),
   playerId: z.string().uuid().optional(),
   clubId: z.string().uuid().optional(),
   matchId: z.string().uuid().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
   deadline: z.string().datetime({ offset: true }).optional(),
   scheduledAt: z.string().datetime({ offset: true }).optional(),
-  notes: z.string().optional(),
+  notes: z.string().max(2000).optional(),
   assignedTo: z.string().uuid().optional(),
 });
 
