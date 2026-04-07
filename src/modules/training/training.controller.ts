@@ -11,6 +11,7 @@ import {
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import * as svc from "@modules/training/training.service";
+import { logger } from "@config/logger";
 
 // ══════════════════════════════════════════
 // COURSES (Admin)
@@ -109,6 +110,11 @@ export async function completionMatrix(req: AuthRequest, res: Response) {
 export async function myEnrollments(req: AuthRequest, res: Response) {
   const playerId = (req.user as any)?.playerId;
   if (!playerId) {
+    logger.warn("[training] myEnrollments: playerId missing from JWT", {
+      userId: req.user?.id,
+      role: req.user?.role,
+      email: req.user?.email,
+    });
     sendSuccess(res, [], "Player account not linked");
     return;
   }

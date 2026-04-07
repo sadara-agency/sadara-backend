@@ -37,8 +37,8 @@ const envSchema = z.object({
         .string()
         .min(64, "JWT_SECRET must be ≥64 hex chars (256-bit) in production")
     : z.string().default(devJwtSecret),
-  JWT_EXPIRES_IN: z.string().default("7d"),
-  JWT_REFRESH_EXPIRES_IN: z.string().default("7d"),
+  JWT_EXPIRES_IN: z.string().default("1h"),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
 
   // CORS
   CORS_ORIGIN: z.string().default("http://localhost:3000"),

@@ -43,7 +43,7 @@ function parseExpiry(val: string): number {
   return n * multipliers[unit];
 }
 
-/** Generate short-lived access JWT (15 min). */
+/** Generate short-lived access JWT (uses JWT_EXPIRES_IN env, default 1h). */
 function generateAccessToken(payload: {
   id: string;
   email: string;
@@ -52,7 +52,7 @@ function generateAccessToken(payload: {
   playerId?: string | null;
 }): string {
   return jwt.sign(payload, env.jwt.secret as jwt.Secret, {
-    expiresIn: "15m",
+    expiresIn: env.jwt.expiresIn as unknown as number,
   });
 }
 
@@ -374,15 +374,30 @@ export async function refreshSession(rawToken: string) {
     throw new AppError("Invalid refresh token", 401);
   }
 
-  // If this token was already revoked, someone reused an old token.
-  // Revoke the entire family as a security measure.
+  // If this token was already revoked, check if it's a harmless race condition
+  // (browser retry, service worker, concurrent tabs) or actual reuse.
   if (record.revoked_at) {
-    await revokeFamily(record.family);
-    logger.warn("Refresh token reuse detected — entire family revoked", {
+    const revokedAgo = Date.now() - new Date(record.revoked_at).getTime();
+    const REUSE_GRACE_MS = 10_000; // 10-second grace window for network retries
+
+    if (revokedAgo > REUSE_GRACE_MS) {
+      // Genuine reuse — revoke entire family as a security measure
+      await revokeFamily(record.family);
+      logger.warn("Refresh token reuse detected — entire family revoked", {
+        userId: record.user_id,
+        family: record.family,
+        revokedAgoMs: revokedAgo,
+      });
+      throw new AppError("Token reuse detected. Please log in again.", 401);
+    }
+
+    // Within grace window — likely a race condition. Return 409 so the
+    // frontend can retry with the new cookie that was already set.
+    logger.info("Refresh token race condition (within grace window)", {
       userId: record.user_id,
-      family: record.family,
+      revokedAgoMs: revokedAgo,
     });
-    throw new AppError("Token reuse detected. Please log in again.", 401);
+    throw new AppError("Refresh already processed", 409);
   }
 
   // Check expiry
@@ -411,11 +426,23 @@ export async function refreshSession(rawToken: string) {
     if (!user || !user.isActive) {
       throw new AppError("Account not found or inactive", 401);
     }
+
+    // If user is a Player, preserve playerId in refreshed token
+    let playerId: string | null = null;
+    if (user.role === "Player") {
+      const pa = await PlayerAccount.findOne({
+        where: { email: user.email },
+        attributes: ["playerId"],
+      });
+      playerId = pa?.playerId ?? null;
+    }
+
     tokenPayload = {
       id: user.id,
       email: user.email,
       fullName: user.fullName,
       role: user.role,
+      ...(playerId ? { playerId } : {}),
     };
   } else {
     const account = await PlayerAccount.findByPk(record.user_id);
