@@ -40,7 +40,7 @@ export const createSessionSchema = z.object({
   sessionDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
-  title: z.string().max(255).optional(),
+  title: z.string().min(1, "Title is required").max(255),
   titleAr: z.string().max(255).optional(),
   summary: z.string().optional(),
   summaryAr: z.string().optional(),
