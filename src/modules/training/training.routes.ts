@@ -88,6 +88,12 @@ router.get(
   asyncHandler(ctrl.completionMatrix),
 );
 
+router.get(
+  "/admin/analytics",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.trainingAnalytics),
+);
+
 // ══════════════════════════════════════════
 // MODULES (under a course)
 // ══════════════════════════════════════════

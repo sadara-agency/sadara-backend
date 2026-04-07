@@ -307,3 +307,12 @@ export async function markLessonComplete(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, progress);
 }
+
+// ══════════════════════════════════════════
+// TRAINING ANALYTICS
+// ══════════════════════════════════════════
+
+export async function trainingAnalytics(req: AuthRequest, res: Response) {
+  const data = await svc.getTrainingAnalytics();
+  sendSuccess(res, data);
+}
