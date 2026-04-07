@@ -1009,6 +1009,7 @@ export async function getSportsManagerOverview() {
         referralsByResponsible,
         criticalReferrals,
         waitingReferrals,
+        overdueReferrals,
       ] = await Promise.all([
         // 1. Sessions grouped by program_owner
         sequelize.query(
@@ -1113,6 +1114,24 @@ export async function getSportsManagerOverview() {
            LIMIT 20`,
           { type: QueryTypes.SELECT },
         ),
+
+        // 9. Overdue referrals (past due date, still active)
+        sequelize.query(
+          `SELECT r.id, r.referral_type, r.referral_target, r.priority, r.status,
+                  r.created_at, r.due_date,
+                  p.first_name || ' ' || p.last_name AS player_name,
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, '') AS player_name_ar,
+                  u.full_name AS assignee_name,
+                  COALESCE(u.full_name_ar, u.full_name) AS assignee_name_ar
+           FROM referrals r
+           JOIN players p ON r.player_id = p.id
+           LEFT JOIN users u ON r.assigned_to = u.id
+           WHERE r.due_date < CURRENT_DATE
+             AND r.status IN ('Open', 'InProgress', 'Waiting')
+           ORDER BY r.due_date ASC
+           LIMIT 20`,
+          { type: QueryTypes.SELECT },
+        ),
       ]);
 
       return {
@@ -1124,6 +1143,7 @@ export async function getSportsManagerOverview() {
         referralsByResponsible,
         criticalReferrals,
         waitingReferrals,
+        overdueReferrals,
       };
     },
     CacheTTL.SHORT,
