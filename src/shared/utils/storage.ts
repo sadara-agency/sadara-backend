@@ -52,7 +52,8 @@ export type UploadFolder =
   | "avatars"
   | "signed-contracts"
   | "signed-documents"
-  | "voice-memos";
+  | "voice-memos"
+  | "training-media";
 
 /** Folders whose objects are made publicly readable on upload */
 const PUBLIC_FOLDERS: ReadonlySet<UploadFolder> = new Set([
@@ -66,6 +67,7 @@ const PRIVATE_FOLDERS: ReadonlySet<UploadFolder> = new Set([
   "signed-contracts",
   "signed-documents",
   "voice-memos",
+  "training-media",
 ]);
 
 export interface UploadOptions {

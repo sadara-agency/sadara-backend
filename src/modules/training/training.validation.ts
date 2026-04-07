@@ -56,6 +56,33 @@ export const selfUpdateProgressSchema = z.object({
   notes: z.string().optional(),
 });
 
+// ── Modules ──
+
+export const createModuleSchema = z.object({
+  title: z.string().min(1).max(500),
+  titleAr: z.string().max(500).optional(),
+  description: z.string().optional(),
+});
+
+export const updateModuleSchema = createModuleSchema.partial();
+
+export const reorderSchema = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1).max(100),
+});
+
+// ── Lessons ──
+
+export const createLessonSchema = z.object({
+  title: z.string().min(1).max(500),
+  titleAr: z.string().max(500).optional(),
+  type: z.enum(["video", "pdf", "link", "quiz"]).default("video"),
+  contentUrl: z.string().url().optional(),
+  durationSec: z.number().int().positive().optional(),
+  isFree: z.boolean().optional(),
+});
+
+export const updateLessonSchema = createLessonSchema.partial();
+
 // ── Inferred types ──
 
 export type CreateCourseInput = z.infer<typeof createCourseSchema>;

@@ -359,7 +359,162 @@ TrainingMedia.init(
   },
 );
 
+// ═══════════════════════════════════════════
+// Module (chapter within a course)
+// ═══════════════════════════════════════════
+
+interface ModuleAttributes {
+  id: string;
+  courseId: string;
+  title: string;
+  titleAr?: string | null;
+  description?: string | null;
+  sortOrder: number;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface ModuleCreation extends Optional<
+  ModuleAttributes,
+  "id" | "sortOrder" | "createdAt" | "updatedAt"
+> {}
+
+export class TrainingModule
+  extends Model<ModuleAttributes, ModuleCreation>
+  implements ModuleAttributes
+{
+  declare id: string;
+  declare courseId: string;
+  declare title: string;
+  declare titleAr: string | null;
+  declare description: string | null;
+  declare sortOrder: number;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+TrainingModule.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    courseId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "course_id",
+      references: { model: "training_courses", key: "id" },
+    },
+    title: { type: DataTypes.STRING(500), allowNull: false },
+    titleAr: { type: DataTypes.STRING(500), field: "title_ar" },
+    description: { type: DataTypes.TEXT },
+    sortOrder: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: "sort_order",
+    },
+  },
+  {
+    sequelize,
+    tableName: "training_modules",
+    underscored: true,
+    timestamps: true,
+  },
+);
+
+// ═══════════════════════════════════════════
+// Lesson (individual content unit within a module)
+// ═══════════════════════════════════════════
+
+export type LessonType = "video" | "pdf" | "link" | "quiz";
+
+interface LessonAttributes {
+  id: string;
+  moduleId: string;
+  title: string;
+  titleAr?: string | null;
+  type: LessonType;
+  sortOrder: number;
+  contentUrl?: string | null;
+  mediaId?: string | null;
+  durationSec?: number | null;
+  isFree: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface LessonCreation extends Optional<
+  LessonAttributes,
+  "id" | "sortOrder" | "isFree" | "createdAt" | "updatedAt"
+> {}
+
+export class TrainingLesson
+  extends Model<LessonAttributes, LessonCreation>
+  implements LessonAttributes
+{
+  declare id: string;
+  declare moduleId: string;
+  declare title: string;
+  declare titleAr: string | null;
+  declare type: LessonType;
+  declare sortOrder: number;
+  declare contentUrl: string | null;
+  declare mediaId: string | null;
+  declare durationSec: number | null;
+  declare isFree: boolean;
+  declare readonly createdAt: Date;
+  declare readonly updatedAt: Date;
+}
+
+TrainingLesson.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    moduleId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "module_id",
+      references: { model: "training_modules", key: "id" },
+    },
+    title: { type: DataTypes.STRING(500), allowNull: false },
+    titleAr: { type: DataTypes.STRING(500), field: "title_ar" },
+    type: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "video",
+    },
+    sortOrder: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0,
+      field: "sort_order",
+    },
+    contentUrl: { type: DataTypes.TEXT, field: "content_url" },
+    mediaId: {
+      type: DataTypes.UUID,
+      field: "media_id",
+      references: { model: "training_media", key: "id" },
+    },
+    durationSec: { type: DataTypes.INTEGER, field: "duration_sec" },
+    isFree: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      field: "is_free",
+    },
+  },
+  {
+    sequelize,
+    tableName: "training_lessons",
+    underscored: true,
+    timestamps: true,
+  },
+);
+
 // ── Associations ──
+
 TrainingCourse.hasMany(TrainingMedia, {
   foreignKey: "courseId",
   as: "media",
@@ -367,4 +522,27 @@ TrainingCourse.hasMany(TrainingMedia, {
 TrainingMedia.belongsTo(TrainingCourse, {
   foreignKey: "courseId",
   as: "course",
+});
+
+TrainingCourse.hasMany(TrainingModule, {
+  foreignKey: "courseId",
+  as: "modules",
+});
+TrainingModule.belongsTo(TrainingCourse, {
+  foreignKey: "courseId",
+  as: "course",
+});
+
+TrainingModule.hasMany(TrainingLesson, {
+  foreignKey: "moduleId",
+  as: "lessons",
+});
+TrainingLesson.belongsTo(TrainingModule, {
+  foreignKey: "moduleId",
+  as: "module",
+});
+
+TrainingLesson.belongsTo(TrainingMedia, {
+  foreignKey: "mediaId",
+  as: "media",
 });

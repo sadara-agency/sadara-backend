@@ -7,7 +7,12 @@ import {
   TrainingCourse,
   TrainingEnrollment,
   TrainingActivity,
+  TrainingMedia,
+  TrainingModule,
+  TrainingLesson,
+  type LessonType,
 } from "@modules/training/training.model";
+import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -432,4 +437,166 @@ export async function getCompletionMatrix(queryParams: any) {
   }));
 
   return { courses, players };
+}
+
+// ═══════════════════════════════════════════
+// MODULES
+// ═══════════════════════════════════════════
+
+export async function listModules(courseId: string) {
+  return TrainingModule.findAll({
+    where: { courseId },
+    order: [
+      ["sortOrder", "ASC"],
+      [{ model: TrainingLesson, as: "lessons" }, "sortOrder", "ASC"],
+    ],
+    include: [
+      {
+        model: TrainingLesson,
+        as: "lessons",
+        include: [{ model: TrainingMedia, as: "media", required: false }],
+      },
+    ],
+  });
+}
+
+export async function createModule(
+  courseId: string,
+  input: { title: string; titleAr?: string; description?: string },
+) {
+  await findOrThrow(TrainingCourse, courseId, "Course");
+  const maxOrder = await TrainingModule.max("sortOrder", {
+    where: { courseId },
+  });
+  return TrainingModule.create({
+    courseId,
+    ...input,
+    sortOrder: ((maxOrder as number) ?? -1) + 1,
+  });
+}
+
+export async function updateModule(
+  moduleId: string,
+  input: { title?: string; titleAr?: string; description?: string },
+) {
+  const mod = await findOrThrow(TrainingModule, moduleId, "Module");
+  return mod.update(input);
+}
+
+export async function deleteModule(moduleId: string) {
+  await destroyById(TrainingModule, moduleId, "Module");
+  return { id: moduleId };
+}
+
+export async function reorderModules(courseId: string, orderedIds: string[]) {
+  await Promise.all(
+    orderedIds.map((id, i) =>
+      TrainingModule.update({ sortOrder: i }, { where: { id, courseId } }),
+    ),
+  );
+}
+
+// ═══════════════════════════════════════════
+// LESSONS
+// ═══════════════════════════════════════════
+
+export async function createLesson(
+  moduleId: string,
+  input: {
+    title: string;
+    titleAr?: string;
+    type?: LessonType;
+    contentUrl?: string;
+    durationSec?: number;
+    isFree?: boolean;
+  },
+) {
+  await findOrThrow(TrainingModule, moduleId, "Module");
+  const maxOrder = await TrainingLesson.max("sortOrder", {
+    where: { moduleId },
+  });
+  return TrainingLesson.create({
+    moduleId,
+    ...input,
+    type: input.type ?? "video",
+    sortOrder: ((maxOrder as number) ?? -1) + 1,
+  });
+}
+
+export async function updateLesson(
+  lessonId: string,
+  input: {
+    title?: string;
+    titleAr?: string;
+    type?: LessonType;
+    contentUrl?: string;
+    durationSec?: number;
+    isFree?: boolean;
+  },
+) {
+  const lesson = await findOrThrow(TrainingLesson, lessonId, "Lesson");
+  return lesson.update(input);
+}
+
+export async function deleteLesson(lessonId: string) {
+  await destroyById(TrainingLesson, lessonId, "Lesson");
+  return { id: lessonId };
+}
+
+export async function reorderLessons(moduleId: string, orderedIds: string[]) {
+  await Promise.all(
+    orderedIds.map((id, i) =>
+      TrainingLesson.update({ sortOrder: i }, { where: { id, moduleId } }),
+    ),
+  );
+}
+
+// ═══════════════════════════════════════════
+// MEDIA UPLOAD + STREAM
+// ═══════════════════════════════════════════
+
+export async function uploadLessonMedia(
+  lessonId: string,
+  file: { buffer: Buffer; originalname: string; mimetype: string },
+  userId: string,
+) {
+  const lesson = await findOrThrow(TrainingLesson, lessonId, "Lesson");
+  const mod = await findOrThrow(TrainingModule, lesson.moduleId, "Module");
+
+  const result = await uploadFile({
+    folder: "training-media",
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    buffer: file.buffer,
+    generateThumbnail: false,
+  });
+
+  const media = await TrainingMedia.create({
+    courseId: mod.courseId,
+    lessonId,
+    type: file.mimetype.startsWith("video/") ? "video" : "document",
+    title: lesson.title,
+    titleAr: lesson.titleAr,
+    storageProvider: "gcs",
+    storagePath: result.key,
+    durationSec: null,
+    fileSizeMb: parseFloat((result.size / (1024 * 1024)).toFixed(2)),
+    mimeType: result.mimeType,
+    encodingStatus: "ready",
+    createdBy: userId,
+  } as any);
+
+  // Link media to lesson
+  await lesson.update({ mediaId: media.id });
+
+  return media;
+}
+
+export async function getMediaSignedUrl(mediaId: string) {
+  const media = await findOrThrow(TrainingMedia, mediaId, "Media");
+  if (!media.storagePath) {
+    throw new AppError("Media has no storage path", 400);
+  }
+  const url = await resolveFileUrl(media.storagePath, 180); // 3-hour expiry for long videos
+  return { url, mimeType: media.mimeType, durationSec: media.durationSec };
 }
