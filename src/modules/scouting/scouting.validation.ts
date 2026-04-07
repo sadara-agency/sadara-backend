@@ -46,6 +46,26 @@ export const checkDuplicateSchema = z.object({
   club: z.string().optional(),
 });
 
+// ── Bulk Operations ──
+
+export const bulkStatusSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+  status: z.enum(["Active", "Shortlisted", "Archived", "Rejected"]),
+});
+
+export const bulkPrioritySchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+  priority: z.enum(["High", "Medium", "Low"]),
+});
+
+export const bulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+});
+
+export const exportCsvSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+});
+
 // ── Screening Case ──
 
 export const createScreeningSchema = z.object({

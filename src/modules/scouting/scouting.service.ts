@@ -155,6 +155,101 @@ export async function checkDuplicate(
 }
 
 // ══════════════════════════════════════════
+// BULK OPERATIONS
+// ══════════════════════════════════════════
+
+export async function bulkUpdateStatus(ids: string[], status: string) {
+  const [updated] = await Watchlist.update({ status } as any, {
+    where: { id: { [Op.in]: ids } },
+  });
+  return { updated };
+}
+
+export async function bulkUpdatePriority(ids: string[], priority: string) {
+  const [updated] = await Watchlist.update({ priority } as any, {
+    where: { id: { [Op.in]: ids } },
+  });
+  return { updated };
+}
+
+export async function bulkDelete(ids: string[]) {
+  // Check for prospects with screening cases
+  const blocked = await ScreeningCase.findAll({
+    where: { watchlistId: { [Op.in]: ids } },
+    attributes: ["watchlistId"],
+    group: ["watchlistId"],
+  });
+  const blockedIds = blocked.map((b) => (b as any).watchlistId as string);
+
+  if (blockedIds.length > 0) {
+    throw new AppError(
+      `Cannot delete ${blockedIds.length} prospect(s) with screening cases. Remove screening cases first.`,
+      400,
+    );
+  }
+
+  const deleted = await Watchlist.destroy({
+    where: { id: { [Op.in]: ids } },
+  });
+  return { deleted };
+}
+
+export async function exportWatchlistCsv(ids: string[]) {
+  const items = await Watchlist.findAll({
+    where: { id: { [Op.in]: ids } },
+    include: [
+      { model: User, as: "scout", attributes: ["fullName", "fullNameAr"] },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  const headers = [
+    "Name",
+    "Name (Ar)",
+    "DOB",
+    "Nationality",
+    "Position",
+    "Club",
+    "League",
+    "Status",
+    "Priority",
+    "Technical",
+    "Physical",
+    "Mental",
+    "Potential",
+    "Source",
+    "Scout",
+    "Added",
+  ];
+
+  const rows = items.map((w) => {
+    const scout = (w as any).scout;
+    return [
+      w.prospectName,
+      w.prospectNameAr ?? "",
+      w.dateOfBirth ?? "",
+      w.nationality ?? "",
+      w.position ?? "",
+      w.currentClub ?? "",
+      w.currentLeague ?? "",
+      w.status,
+      w.priority,
+      w.technicalRating ?? "",
+      w.physicalRating ?? "",
+      w.mentalRating ?? "",
+      w.potentialRating ?? "",
+      w.source ?? "",
+      scout?.fullName ?? "",
+      w.createdAt ? new Date(w.createdAt).toISOString().split("T")[0] : "",
+    ]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(",");
+  });
+
+  return [headers.join(","), ...rows].join("\n");
+}
+
+// ══════════════════════════════════════════
 // SCREENING CASES
 // ══════════════════════════════════════════
 

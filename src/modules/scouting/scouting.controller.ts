@@ -81,6 +81,60 @@ export async function checkDuplicate(req: AuthRequest, res: Response) {
 }
 
 // ══════════════════════════════════════════
+// BULK OPERATIONS
+// ══════════════════════════════════════════
+
+export async function bulkStatus(req: AuthRequest, res: Response) {
+  const { ids, status } = req.body;
+  const result = await scoutingService.bulkUpdateStatus(ids, status);
+  await logAudit(
+    "UPDATE",
+    "watchlists",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Bulk status → ${status} (${ids.length} prospects)`,
+  );
+  sendSuccess(res, result, `${result.updated} prospects updated`);
+}
+
+export async function bulkPriority(req: AuthRequest, res: Response) {
+  const { ids, priority } = req.body;
+  const result = await scoutingService.bulkUpdatePriority(ids, priority);
+  await logAudit(
+    "UPDATE",
+    "watchlists",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Bulk priority → ${priority} (${ids.length} prospects)`,
+  );
+  sendSuccess(res, result, `${result.updated} prospects updated`);
+}
+
+export async function bulkDelete(req: AuthRequest, res: Response) {
+  const { ids } = req.body;
+  const result = await scoutingService.bulkDelete(ids);
+  await logAudit(
+    "DELETE",
+    "watchlists",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Bulk delete (${ids.length} prospects)`,
+  );
+  sendSuccess(res, result, `${result.deleted} prospects deleted`);
+}
+
+export async function exportCsv(req: AuthRequest, res: Response) {
+  const { ids } = req.body;
+  const csv = await scoutingService.exportWatchlistCsv(ids);
+  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  res.setHeader(
+    "Content-Disposition",
+    "attachment; filename=scouting-export.csv",
+  );
+  res.send("\uFEFF" + csv); // BOM for Excel Arabic support
+}
+
+// ══════════════════════════════════════════
 // SCREENING CASES
 // ══════════════════════════════════════════
 

@@ -10,6 +10,10 @@ import {
   updateWatchlistStatusSchema,
   watchlistQuerySchema,
   checkDuplicateSchema,
+  bulkStatusSchema,
+  bulkPrioritySchema,
+  bulkDeleteSchema,
+  exportCsvSchema,
   createScreeningSchema,
   updateScreeningSchema,
   markPackReadySchema,
@@ -41,6 +45,33 @@ router.get(
   validate(checkDuplicateSchema, "query"),
   asyncHandler(ctrl.checkDuplicate),
 );
+
+// ── Bulk Operations (must be before /:id) ──
+router.patch(
+  "/watchlist/bulk-status",
+  authorizeModule("scouting", "update"),
+  validate(bulkStatusSchema),
+  asyncHandler(ctrl.bulkStatus),
+);
+router.patch(
+  "/watchlist/bulk-priority",
+  authorizeModule("scouting", "update"),
+  validate(bulkPrioritySchema),
+  asyncHandler(ctrl.bulkPriority),
+);
+router.delete(
+  "/watchlist/bulk",
+  authorizeModule("scouting", "delete"),
+  validate(bulkDeleteSchema),
+  asyncHandler(ctrl.bulkDelete),
+);
+router.post(
+  "/watchlist/export-csv",
+  authorizeModule("scouting", "read"),
+  validate(exportCsvSchema),
+  asyncHandler(ctrl.exportCsv),
+);
+
 router.get(
   "/watchlist/:id",
   authorizeModule("scouting", "read"),
