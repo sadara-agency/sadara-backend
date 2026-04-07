@@ -7,6 +7,7 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
+import { uploadVideo } from "@middleware/upload";
 import {
   createCourseSchema,
   updateCourseSchema,
@@ -14,6 +15,11 @@ import {
   updateEnrollmentSchema,
   trackActivitySchema,
   selfUpdateProgressSchema,
+  createModuleSchema,
+  updateModuleSchema,
+  reorderSchema,
+  createLessonSchema,
+  updateLessonSchema,
 } from "@modules/training/training.validation";
 import * as ctrl from "@modules/training/training.controller";
 
@@ -55,6 +61,83 @@ router.get(
   "/admin/completion-matrix",
   authorizeModule("training", "read"),
   asyncHandler(ctrl.completionMatrix),
+);
+
+// ══════════════════════════════════════════
+// MODULES (under a course)
+// ══════════════════════════════════════════
+
+router.get(
+  "/courses/:courseId/modules",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.listModules),
+);
+router.post(
+  "/courses/:courseId/modules",
+  authorizeModule("training", "create"),
+  validate(createModuleSchema),
+  asyncHandler(ctrl.createModule),
+);
+router.patch(
+  "/courses/:courseId/modules/reorder",
+  authorizeModule("training", "update"),
+  validate(reorderSchema),
+  asyncHandler(ctrl.reorderModules),
+);
+router.patch(
+  "/modules/:moduleId",
+  authorizeModule("training", "update"),
+  validate(updateModuleSchema),
+  asyncHandler(ctrl.updateModule),
+);
+router.delete(
+  "/modules/:moduleId",
+  authorizeModule("training", "delete"),
+  asyncHandler(ctrl.deleteModule),
+);
+
+// ══════════════════════════════════════════
+// LESSONS (under a module)
+// ══════════════════════════════════════════
+
+router.post(
+  "/modules/:moduleId/lessons",
+  authorizeModule("training", "create"),
+  validate(createLessonSchema),
+  asyncHandler(ctrl.createLesson),
+);
+router.patch(
+  "/modules/:moduleId/lessons/reorder",
+  authorizeModule("training", "update"),
+  validate(reorderSchema),
+  asyncHandler(ctrl.reorderLessons),
+);
+router.patch(
+  "/lessons/:lessonId",
+  authorizeModule("training", "update"),
+  validate(updateLessonSchema),
+  asyncHandler(ctrl.updateLesson),
+);
+router.delete(
+  "/lessons/:lessonId",
+  authorizeModule("training", "delete"),
+  asyncHandler(ctrl.deleteLesson),
+);
+
+// ══════════════════════════════════════════
+// MEDIA (upload + stream)
+// ══════════════════════════════════════════
+
+router.post(
+  "/lessons/:lessonId/upload",
+  authorizeModule("training", "create"),
+  uploadVideo,
+  asyncHandler(ctrl.uploadLessonMedia),
+);
+router.get(
+  "/media/:mediaId/stream",
+  authorizeModule("training", "read"),
+  asyncHandler(ctrl.streamMedia),
 );
 
 // ══════════════════════════════════════════

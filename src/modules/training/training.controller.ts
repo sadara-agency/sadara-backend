@@ -159,3 +159,99 @@ export async function updateMyProgress(req: AuthRequest, res: Response) {
 
   sendSuccess(res, enrollment, "Progress updated");
 }
+
+// ══════════════════════════════════════════
+// MODULES
+// ══════════════════════════════════════════
+
+export async function listModules(req: AuthRequest, res: Response) {
+  const modules = await svc.listModules(req.params.courseId);
+  sendSuccess(res, modules);
+}
+
+export async function createModule(req: AuthRequest, res: Response) {
+  const mod = await svc.createModule(req.params.courseId, req.body);
+  await logAudit(
+    "CREATE",
+    "training_modules",
+    mod.id,
+    buildAuditContext(req.user!, req.ip),
+    `Module created: ${mod.title}`,
+  );
+  sendCreated(res, mod);
+}
+
+export async function updateModule(req: AuthRequest, res: Response) {
+  const mod = await svc.updateModule(req.params.moduleId, req.body);
+  sendSuccess(res, mod);
+}
+
+export async function deleteModule(req: AuthRequest, res: Response) {
+  const result = await svc.deleteModule(req.params.moduleId);
+  sendSuccess(res, result, "Module deleted");
+}
+
+export async function reorderModules(req: AuthRequest, res: Response) {
+  await svc.reorderModules(req.params.courseId, req.body.orderedIds);
+  sendSuccess(res, null, "Modules reordered");
+}
+
+// ══════════════════════════════════════════
+// LESSONS
+// ══════════════════════════════════════════
+
+export async function createLesson(req: AuthRequest, res: Response) {
+  const lesson = await svc.createLesson(req.params.moduleId, req.body);
+  await logAudit(
+    "CREATE",
+    "training_lessons",
+    lesson.id,
+    buildAuditContext(req.user!, req.ip),
+    `Lesson created: ${lesson.title}`,
+  );
+  sendCreated(res, lesson);
+}
+
+export async function updateLesson(req: AuthRequest, res: Response) {
+  const lesson = await svc.updateLesson(req.params.lessonId, req.body);
+  sendSuccess(res, lesson);
+}
+
+export async function deleteLesson(req: AuthRequest, res: Response) {
+  const result = await svc.deleteLesson(req.params.lessonId);
+  sendSuccess(res, result, "Lesson deleted");
+}
+
+export async function reorderLessons(req: AuthRequest, res: Response) {
+  await svc.reorderLessons(req.params.moduleId, req.body.orderedIds);
+  sendSuccess(res, null, "Lessons reordered");
+}
+
+// ══════════════════════════════════════════
+// MEDIA UPLOAD + STREAM
+// ══════════════════════════════════════════
+
+export async function uploadLessonMedia(req: AuthRequest, res: Response) {
+  if (!req.file) {
+    res.status(400).json({ success: false, message: "No file uploaded" });
+    return;
+  }
+  const media = await svc.uploadLessonMedia(
+    req.params.lessonId,
+    req.file,
+    req.user!.id,
+  );
+  await logAudit(
+    "CREATE",
+    "training_media",
+    media.id,
+    buildAuditContext(req.user!, req.ip),
+    `Media uploaded for lesson`,
+  );
+  sendCreated(res, media);
+}
+
+export async function streamMedia(req: AuthRequest, res: Response) {
+  const result = await svc.getMediaSignedUrl(req.params.mediaId);
+  sendSuccess(res, result);
+}

@@ -38,6 +38,10 @@ const ALLOWED_MIMES = [
   "audio/mpeg",
   "audio/mp4",
   "audio/wav",
+  // Video (training media)
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
 ];
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
@@ -68,6 +72,25 @@ export const uploadSingle = multer({
   storage,
   fileFilter,
   limits: { fileSize: MAX_FILE_SIZE },
+}).single("file");
+
+// ── Video upload (500MB limit for training media) ──
+
+const VIDEO_MAX_SIZE = 500 * 1024 * 1024; // 500MB
+
+const videoFileFilter: multer.Options["fileFilter"] = (_req, file, cb) => {
+  const mime = file.mimetype.toLowerCase();
+  if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+    cb(null, true);
+  } else {
+    cb(new Error(`Only video/audio files allowed. Got: ${file.mimetype}`));
+  }
+};
+
+export const uploadVideo = multer({
+  storage,
+  fileFilter: videoFileFilter,
+  limits: { fileSize: VIDEO_MAX_SIZE },
 }).single("file");
 
 // ── Magic byte verification middleware ──
