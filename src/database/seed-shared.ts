@@ -278,7 +278,11 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
   ...forRoles("training", ["Executive"], { canRead: true }),
-  ...forRoles("training", ["Player"], { canRead: true }),
+  ...forRoles("training", ["Player"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
 
   ...forRoles("finance", ["Admin"], {
     canCreate: true,
