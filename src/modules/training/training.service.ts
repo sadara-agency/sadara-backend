@@ -731,3 +731,195 @@ async function recalculateCourseProgress(enrollmentId: string) {
 
   await enrollment.update(updates);
 }
+
+// ═══════════════════════════════════════════
+// TRAINING ANALYTICS (Admin dashboard)
+// ═══════════════════════════════════════════
+
+export async function getTrainingAnalytics() {
+  const { sequelize: sq } = await import("@config/database");
+
+  // 1. Overall KPIs
+  const [totalCourses, totalEnrollments, totalCompleted, totalDropped] =
+    await Promise.all([
+      TrainingCourse.count({ where: { isActive: true } }),
+      TrainingEnrollment.count(),
+      TrainingEnrollment.count({ where: { status: "Completed" } }),
+      TrainingEnrollment.count({ where: { status: "Dropped" } }),
+    ]);
+
+  const overallCompletionRate =
+    totalEnrollments > 0
+      ? Math.round((totalCompleted / totalEnrollments) * 100)
+      : 0;
+
+  // 2. Avg completion time (days from enrolledAt to completedAt)
+  let avgCompletionDays = 0;
+  try {
+    const [result] = await sq.query<{ avg_days: string }>(
+      `SELECT COALESCE(
+        ROUND(AVG(EXTRACT(EPOCH FROM (completed_at - enrolled_at)) / 86400)),
+        0
+      )::text as avg_days
+      FROM training_enrollments
+      WHERE status = 'Completed' AND completed_at IS NOT NULL`,
+      { type: "SELECT" as any },
+    );
+    avgCompletionDays = parseInt((result as any)?.avg_days ?? "0", 10);
+  } catch {
+    avgCompletionDays = 0;
+  }
+
+  // 3. Total watch time (hours)
+  let totalWatchHours = 0;
+  try {
+    const [result] = await sq.query<{ total_hours: string }>(
+      `SELECT COALESCE(
+        ROUND(SUM(watched_seconds) / 3600.0, 1),
+        0
+      )::text as total_hours
+      FROM lesson_progress`,
+      { type: "SELECT" as any },
+    );
+    totalWatchHours = parseFloat((result as any)?.total_hours ?? "0");
+  } catch {
+    totalWatchHours = 0;
+  }
+
+  // 4. Per-course completion rates
+  const courseStatsRaw = await sq.query<{
+    course_id: string;
+    title: string;
+    title_ar: string | null;
+    enrolled: string;
+    completed: string;
+    in_progress: string;
+    dropped: string;
+    avg_progress: string;
+  }>(
+    `SELECT
+      tc.id as course_id,
+      tc.title,
+      tc.title_ar,
+      COUNT(te.id)::text as enrolled,
+      COUNT(CASE WHEN te.status = 'Completed' THEN 1 END)::text as completed,
+      COUNT(CASE WHEN te.status = 'InProgress' THEN 1 END)::text as in_progress,
+      COUNT(CASE WHEN te.status = 'Dropped' THEN 1 END)::text as dropped,
+      COALESCE(ROUND(AVG(te.progress_pct)), 0)::text as avg_progress
+    FROM training_courses tc
+    LEFT JOIN training_enrollments te ON te.course_id = tc.id
+    WHERE tc.is_active = true
+    GROUP BY tc.id, tc.title, tc.title_ar
+    ORDER BY enrolled DESC`,
+    { type: "SELECT" as any },
+  );
+
+  const courseStats = (courseStatsRaw as any[]).map((r) => ({
+    courseId: r.course_id,
+    title: r.title,
+    titleAr: r.title_ar,
+    enrolled: parseInt(r.enrolled, 10),
+    completed: parseInt(r.completed, 10),
+    inProgress: parseInt(r.in_progress, 10),
+    dropped: parseInt(r.dropped, 10),
+    avgProgress: parseInt(r.avg_progress, 10),
+    completionRate:
+      parseInt(r.enrolled, 10) > 0
+        ? Math.round(
+            (parseInt(r.completed, 10) / parseInt(r.enrolled, 10)) * 100,
+          )
+        : 0,
+  }));
+
+  // 5. Per-lesson watch rates (top lessons by watch time)
+  const lessonStatsRaw = await sq.query<{
+    lesson_id: string;
+    title: string;
+    title_ar: string | null;
+    total_watches: string;
+    completed_count: string;
+    avg_watched_pct: string;
+  }>(
+    `SELECT
+      tl.id as lesson_id,
+      tl.title,
+      tl.title_ar,
+      COUNT(lp.id)::text as total_watches,
+      COUNT(CASE WHEN lp.is_completed THEN 1 END)::text as completed_count,
+      CASE WHEN AVG(lp.total_seconds) > 0
+        THEN ROUND(AVG(lp.watched_seconds::decimal / NULLIF(lp.total_seconds, 0) * 100))::text
+        ELSE '0'
+      END as avg_watched_pct
+    FROM training_lessons tl
+    LEFT JOIN lesson_progress lp ON lp.lesson_id = tl.id
+    GROUP BY tl.id, tl.title, tl.title_ar
+    HAVING COUNT(lp.id) > 0
+    ORDER BY total_watches DESC
+    LIMIT 20`,
+    { type: "SELECT" as any },
+  );
+
+  const lessonStats = (lessonStatsRaw as any[]).map((r) => ({
+    lessonId: r.lesson_id,
+    title: r.title,
+    titleAr: r.title_ar,
+    totalWatches: parseInt(r.total_watches, 10),
+    completedCount: parseInt(r.completed_count, 10),
+    avgWatchedPct: parseInt(r.avg_watched_pct, 10),
+  }));
+
+  // 6. Player engagement — top players by watch time
+  const playerStatsRaw = await sq.query<{
+    player_id: string;
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+    total_watch_sec: string;
+    lessons_completed: string;
+    courses_completed: string;
+  }>(
+    `SELECT
+      p.id as player_id,
+      p.first_name,
+      p.last_name,
+      p.first_name_ar,
+      p.last_name_ar,
+      COALESCE(SUM(lp.watched_seconds), 0)::text as total_watch_sec,
+      COUNT(DISTINCT CASE WHEN lp.is_completed THEN lp.lesson_id END)::text as lessons_completed,
+      COUNT(DISTINCT CASE WHEN te.status = 'Completed' THEN te.id END)::text as courses_completed
+    FROM players p
+    JOIN training_enrollments te ON te.player_id = p.id
+    LEFT JOIN lesson_progress lp ON lp.player_id = p.id AND lp.enrollment_id = te.id
+    GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
+    ORDER BY total_watch_sec DESC
+    LIMIT 15`,
+    { type: "SELECT" as any },
+  );
+
+  const playerStats = (playerStatsRaw as any[]).map((r) => ({
+    playerId: r.player_id,
+    name: `${r.first_name} ${r.last_name}`.trim(),
+    nameAr: r.first_name_ar
+      ? `${r.first_name_ar} ${r.last_name_ar || ""}`.trim()
+      : null,
+    totalWatchMinutes: Math.round(parseInt(r.total_watch_sec, 10) / 60),
+    lessonsCompleted: parseInt(r.lessons_completed, 10),
+    coursesCompleted: parseInt(r.courses_completed, 10),
+  }));
+
+  return {
+    kpis: {
+      totalCourses,
+      totalEnrollments,
+      totalCompleted,
+      totalDropped,
+      overallCompletionRate,
+      avgCompletionDays,
+      totalWatchHours,
+    },
+    courseStats,
+    lessonStats,
+    playerStats,
+  };
+}
