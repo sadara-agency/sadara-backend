@@ -208,6 +208,11 @@ export async function pipelineSummary(req: AuthRequest, res: Response) {
   sendSuccess(res, summary);
 }
 
+export async function scoutDashboard(req: AuthRequest, res: Response) {
+  const data = await scoutingService.getScoutDashboard(req.user!.id);
+  sendSuccess(res, data);
+}
+
 // ── Prospect Timeline ──
 
 export async function prospectTimeline(req: AuthRequest, res: Response) {

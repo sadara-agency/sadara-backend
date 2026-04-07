@@ -32,6 +32,13 @@ router.get(
   asyncHandler(ctrl.pipelineSummary),
 );
 
+// ── Scout Dashboard ──
+router.get(
+  "/scout-dashboard",
+  authorizeModule("scouting", "read"),
+  asyncHandler(ctrl.scoutDashboard),
+);
+
 // ── Watchlist ──
 router.get(
   "/watchlist",

@@ -452,6 +452,179 @@ export async function getPipelineSummary() {
 }
 
 // ══════════════════════════════════════════
+// SCOUT DASHBOARD
+// ══════════════════════════════════════════
+
+export async function getScoutDashboard(userId: string) {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  const [
+    pipeline,
+    recentActivity,
+    expiringScreenings,
+    priorityAlerts,
+    addedThisMonth,
+    pendingDecisions,
+  ] = await Promise.all([
+    // Pipeline counts
+    Promise.all([
+      Watchlist.count({ where: { status: "Active" } }),
+      Watchlist.count({ where: { status: "Shortlisted" } }),
+      ScreeningCase.count({ where: { status: "InProgress" } }),
+      ScreeningCase.count({ where: { status: "PackReady" } }),
+      SelectionDecision.count(),
+      Watchlist.count({ where: { status: "Rejected" } }),
+      Watchlist.count(),
+    ]).then(
+      ([
+        active,
+        shortlisted,
+        screening,
+        packReady,
+        decided,
+        rejected,
+        total,
+      ]) => ({
+        total,
+        active,
+        shortlisted,
+        screening,
+        packReady,
+        decided,
+        rejected,
+      }),
+    ),
+
+    // Recent activity (last 5 updated by this scout)
+    Watchlist.findAll({
+      where: { scoutedBy: userId },
+      order: [["updatedAt", "DESC"]],
+      limit: 5,
+      attributes: [
+        "id",
+        "prospectName",
+        "prospectNameAr",
+        "status",
+        "priority",
+        "position",
+        "currentClub",
+        "updatedAt",
+      ],
+    }),
+
+    // Expiring screenings (InProgress > 14 days)
+    ScreeningCase.findAll({
+      where: {
+        status: "InProgress",
+        createdAt: { [Op.lt]: fourteenDaysAgo },
+      },
+      include: [
+        {
+          model: Watchlist,
+          as: "watchlist",
+          attributes: ["id", "prospectName", "prospectNameAr", "priority"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      limit: 10,
+      attributes: ["id", "caseNumber", "createdAt", "status"],
+    }),
+
+    // Priority alerts (High priority, Active/Shortlisted)
+    Watchlist.findAll({
+      where: {
+        priority: "High",
+        status: { [Op.in]: ["Active", "Shortlisted"] },
+      },
+      order: [["createdAt", "DESC"]],
+      limit: 8,
+      attributes: [
+        "id",
+        "prospectName",
+        "prospectNameAr",
+        "status",
+        "position",
+        "currentClub",
+        "createdAt",
+      ],
+    }),
+
+    // Added this month by this scout
+    Watchlist.count({
+      where: {
+        scoutedBy: userId,
+        createdAt: { [Op.gte]: startOfMonth },
+      },
+    }),
+
+    // Pending decisions (PackReady cases)
+    ScreeningCase.count({ where: { status: "PackReady" } }),
+  ]);
+
+  // Avg pipeline time (raw SQL for efficiency)
+  let avgDays = 0;
+  try {
+    const [result] = await sequelize.query<{ avg_days: number }>(
+      `SELECT COALESCE(
+        AVG(EXTRACT(EPOCH FROM (sd.created_at - w.created_at)) / 86400),
+        0
+      ) as avg_days
+      FROM watchlists w
+      JOIN screening_cases sc ON sc.watchlist_id = w.id
+      JOIN selection_decisions sd ON sd.screening_case_id = sc.id`,
+      { type: "SELECT" as any },
+    );
+    avgDays = Math.round((result as any)?.avg_days ?? 0);
+  } catch {
+    avgDays = 0;
+  }
+
+  // Conversion rates
+  const conversionRates = {
+    watchlistToScreening:
+      pipeline.total > 0
+        ? Math.round(
+            ((pipeline.shortlisted +
+              pipeline.screening +
+              pipeline.packReady +
+              pipeline.decided) /
+              pipeline.total) *
+              100,
+          )
+        : 0,
+    screeningToPackReady:
+      pipeline.screening + pipeline.packReady + pipeline.decided > 0
+        ? Math.round(
+            ((pipeline.packReady + pipeline.decided) /
+              (pipeline.screening + pipeline.packReady + pipeline.decided)) *
+              100,
+          )
+        : 0,
+    packReadyToDecided:
+      pipeline.packReady + pipeline.decided > 0
+        ? Math.round(
+            (pipeline.decided / (pipeline.packReady + pipeline.decided)) * 100,
+          )
+        : 0,
+  };
+
+  return {
+    pipeline,
+    conversionRates,
+    recentActivity,
+    expiringScreenings,
+    priorityAlerts,
+    kpis: {
+      addedThisMonth,
+      pendingDecisions,
+      avgDays,
+    },
+  };
+}
+
+// ══════════════════════════════════════════
 // PROSPECT TIMELINE (audit-based)
 // ══════════════════════════════════════════
 
