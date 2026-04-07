@@ -122,6 +122,133 @@ export async function deleteWatchlist(id: string) {
   return { id };
 }
 
+export async function checkDuplicate(
+  name: string,
+  dob?: string,
+  club?: string,
+) {
+  const nameCondition = {
+    [Op.or]: [
+      { prospectName: { [Op.iLike]: `%${name}%` } },
+      { prospectNameAr: { [Op.iLike]: `%${name}%` } },
+    ],
+  };
+
+  const where: any = { ...nameCondition };
+  if (dob) where.dateOfBirth = dob;
+  if (club) where.currentClub = { [Op.iLike]: `%${club}%` };
+
+  return Watchlist.findAll({
+    where,
+    limit: 5,
+    attributes: [
+      "id",
+      "prospectName",
+      "prospectNameAr",
+      "dateOfBirth",
+      "currentClub",
+      "status",
+      "priority",
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+}
+
+// ══════════════════════════════════════════
+// BULK OPERATIONS
+// ══════════════════════════════════════════
+
+export async function bulkUpdateStatus(ids: string[], status: string) {
+  const [updated] = await Watchlist.update({ status } as any, {
+    where: { id: { [Op.in]: ids } },
+  });
+  return { updated };
+}
+
+export async function bulkUpdatePriority(ids: string[], priority: string) {
+  const [updated] = await Watchlist.update({ priority } as any, {
+    where: { id: { [Op.in]: ids } },
+  });
+  return { updated };
+}
+
+export async function bulkDelete(ids: string[]) {
+  // Check for prospects with screening cases
+  const blocked = await ScreeningCase.findAll({
+    where: { watchlistId: { [Op.in]: ids } },
+    attributes: ["watchlistId"],
+    group: ["watchlistId"],
+  });
+  const blockedIds = blocked.map((b) => (b as any).watchlistId as string);
+
+  if (blockedIds.length > 0) {
+    throw new AppError(
+      `Cannot delete ${blockedIds.length} prospect(s) with screening cases. Remove screening cases first.`,
+      400,
+    );
+  }
+
+  const deleted = await Watchlist.destroy({
+    where: { id: { [Op.in]: ids } },
+  });
+  return { deleted };
+}
+
+export async function exportWatchlistCsv(ids: string[]) {
+  const items = await Watchlist.findAll({
+    where: { id: { [Op.in]: ids } },
+    include: [
+      { model: User, as: "scout", attributes: ["fullName", "fullNameAr"] },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  const headers = [
+    "Name",
+    "Name (Ar)",
+    "DOB",
+    "Nationality",
+    "Position",
+    "Club",
+    "League",
+    "Status",
+    "Priority",
+    "Technical",
+    "Physical",
+    "Mental",
+    "Potential",
+    "Source",
+    "Scout",
+    "Added",
+  ];
+
+  const rows = items.map((w) => {
+    const scout = (w as any).scout;
+    return [
+      w.prospectName,
+      w.prospectNameAr ?? "",
+      w.dateOfBirth ?? "",
+      w.nationality ?? "",
+      w.position ?? "",
+      w.currentClub ?? "",
+      w.currentLeague ?? "",
+      w.status,
+      w.priority,
+      w.technicalRating ?? "",
+      w.physicalRating ?? "",
+      w.mentalRating ?? "",
+      w.potentialRating ?? "",
+      w.source ?? "",
+      scout?.fullName ?? "",
+      w.createdAt ? new Date(w.createdAt).toISOString().split("T")[0] : "",
+    ]
+      .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+      .join(",");
+  });
+
+  return [headers.join(","), ...rows].join("\n");
+}
+
 // ══════════════════════════════════════════
 // SCREENING CASES
 // ══════════════════════════════════════════
@@ -322,4 +449,355 @@ export async function getPipelineSummary() {
     decisions,
     rejected,
   };
+}
+
+// ══════════════════════════════════════════
+// SCOUT DASHBOARD
+// ══════════════════════════════════════════
+
+export async function getScoutDashboard(userId: string) {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+  const [
+    pipeline,
+    recentActivity,
+    expiringScreenings,
+    priorityAlerts,
+    addedThisMonth,
+    pendingDecisions,
+  ] = await Promise.all([
+    // Pipeline counts
+    Promise.all([
+      Watchlist.count({ where: { status: "Active" } }),
+      Watchlist.count({ where: { status: "Shortlisted" } }),
+      ScreeningCase.count({ where: { status: "InProgress" } }),
+      ScreeningCase.count({ where: { status: "PackReady" } }),
+      SelectionDecision.count(),
+      Watchlist.count({ where: { status: "Rejected" } }),
+      Watchlist.count(),
+    ]).then(
+      ([
+        active,
+        shortlisted,
+        screening,
+        packReady,
+        decided,
+        rejected,
+        total,
+      ]) => ({
+        total,
+        active,
+        shortlisted,
+        screening,
+        packReady,
+        decided,
+        rejected,
+      }),
+    ),
+
+    // Recent activity (last 5 updated by this scout)
+    Watchlist.findAll({
+      where: { scoutedBy: userId },
+      order: [["updatedAt", "DESC"]],
+      limit: 5,
+      attributes: [
+        "id",
+        "prospectName",
+        "prospectNameAr",
+        "status",
+        "priority",
+        "position",
+        "currentClub",
+        "updatedAt",
+      ],
+    }),
+
+    // Expiring screenings (InProgress > 14 days)
+    ScreeningCase.findAll({
+      where: {
+        status: "InProgress",
+        createdAt: { [Op.lt]: fourteenDaysAgo },
+      },
+      include: [
+        {
+          model: Watchlist,
+          as: "watchlist",
+          attributes: ["id", "prospectName", "prospectNameAr", "priority"],
+        },
+      ],
+      order: [["createdAt", "ASC"]],
+      limit: 10,
+      attributes: ["id", "caseNumber", "createdAt", "status"],
+    }),
+
+    // Priority alerts (High priority, Active/Shortlisted)
+    Watchlist.findAll({
+      where: {
+        priority: "High",
+        status: { [Op.in]: ["Active", "Shortlisted"] },
+      },
+      order: [["createdAt", "DESC"]],
+      limit: 8,
+      attributes: [
+        "id",
+        "prospectName",
+        "prospectNameAr",
+        "status",
+        "position",
+        "currentClub",
+        "createdAt",
+      ],
+    }),
+
+    // Added this month by this scout
+    Watchlist.count({
+      where: {
+        scoutedBy: userId,
+        createdAt: { [Op.gte]: startOfMonth },
+      },
+    }),
+
+    // Pending decisions (PackReady cases)
+    ScreeningCase.count({ where: { status: "PackReady" } }),
+  ]);
+
+  // Avg pipeline time (raw SQL for efficiency)
+  let avgDays = 0;
+  try {
+    const [result] = await sequelize.query<{ avg_days: number }>(
+      `SELECT COALESCE(
+        AVG(EXTRACT(EPOCH FROM (sd.created_at - w.created_at)) / 86400),
+        0
+      ) as avg_days
+      FROM watchlists w
+      JOIN screening_cases sc ON sc.watchlist_id = w.id
+      JOIN selection_decisions sd ON sd.screening_case_id = sc.id`,
+      { type: "SELECT" as any },
+    );
+    avgDays = Math.round((result as any)?.avg_days ?? 0);
+  } catch {
+    avgDays = 0;
+  }
+
+  // Conversion rates
+  const conversionRates = {
+    watchlistToScreening:
+      pipeline.total > 0
+        ? Math.round(
+            ((pipeline.shortlisted +
+              pipeline.screening +
+              pipeline.packReady +
+              pipeline.decided) /
+              pipeline.total) *
+              100,
+          )
+        : 0,
+    screeningToPackReady:
+      pipeline.screening + pipeline.packReady + pipeline.decided > 0
+        ? Math.round(
+            ((pipeline.packReady + pipeline.decided) /
+              (pipeline.screening + pipeline.packReady + pipeline.decided)) *
+              100,
+          )
+        : 0,
+    packReadyToDecided:
+      pipeline.packReady + pipeline.decided > 0
+        ? Math.round(
+            (pipeline.decided / (pipeline.packReady + pipeline.decided)) * 100,
+          )
+        : 0,
+  };
+
+  return {
+    pipeline,
+    conversionRates,
+    recentActivity,
+    expiringScreenings,
+    priorityAlerts,
+    kpis: {
+      addedThisMonth,
+      pendingDecisions,
+      avgDays,
+    },
+  };
+}
+
+// ══════════════════════════════════════════
+// SCOUT PERFORMANCE ANALYTICS
+// ══════════════════════════════════════════
+
+export async function getScoutAnalytics(filters?: {
+  scoutId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const scoutFilter = filters?.scoutId
+    ? `AND w.scouted_by = '${filters.scoutId}'`
+    : "";
+  const dateFilter = filters?.dateFrom
+    ? `AND w.created_at >= '${filters.dateFrom}'`
+    : "";
+  const dateToFilter = filters?.dateTo
+    ? `AND w.created_at <= '${filters.dateTo}'`
+    : "";
+  const allFilters = `${scoutFilter} ${dateFilter} ${dateToFilter}`;
+
+  // 1. Prospects added per month per scout (last 12 months)
+  const monthlyRaw = await sequelize.query<{
+    month: string;
+    scout_id: string;
+    scout_name: string;
+    count: string;
+  }>(
+    `SELECT
+      TO_CHAR(DATE_TRUNC('month', w.created_at), 'YYYY-MM') as month,
+      w.scouted_by as scout_id,
+      COALESCE(u.full_name, 'Unknown') as scout_name,
+      COUNT(*)::text as count
+    FROM watchlists w
+    LEFT JOIN users u ON u.id = w.scouted_by
+    WHERE w.created_at >= NOW() - INTERVAL '12 months'
+      ${allFilters}
+    GROUP BY month, w.scouted_by, u.full_name
+    ORDER BY month`,
+    { type: "SELECT" as any },
+  );
+
+  // 2. Conversion rates per scout
+  const conversionRaw = await sequelize.query<{
+    scout_id: string;
+    scout_name: string;
+    total: string;
+    screened: string;
+    approved: string;
+    rejected: string;
+  }>(
+    `SELECT
+      w.scouted_by as scout_id,
+      COALESCE(u.full_name, 'Unknown') as scout_name,
+      COUNT(DISTINCT w.id)::text as total,
+      COUNT(DISTINCT sc.id)::text as screened,
+      COUNT(DISTINCT CASE WHEN sd.decision = 'Approved' THEN sd.id END)::text as approved,
+      COUNT(DISTINCT CASE WHEN sd.decision = 'Rejected' THEN sd.id END)::text as rejected
+    FROM watchlists w
+    LEFT JOIN users u ON u.id = w.scouted_by
+    LEFT JOIN screening_cases sc ON sc.watchlist_id = w.id
+    LEFT JOIN selection_decisions sd ON sd.screening_case_id = sc.id
+    WHERE 1=1 ${allFilters}
+    GROUP BY w.scouted_by, u.full_name
+    ORDER BY total DESC`,
+    { type: "SELECT" as any },
+  );
+
+  // 3. Average time-to-decision per scout
+  const avgTimeRaw = await sequelize.query<{
+    scout_id: string;
+    scout_name: string;
+    avg_days: string;
+  }>(
+    `SELECT
+      w.scouted_by as scout_id,
+      COALESCE(u.full_name, 'Unknown') as scout_name,
+      ROUND(AVG(EXTRACT(EPOCH FROM (sd.created_at - w.created_at)) / 86400))::text as avg_days
+    FROM watchlists w
+    JOIN screening_cases sc ON sc.watchlist_id = w.id
+    JOIN selection_decisions sd ON sd.screening_case_id = sc.id
+    LEFT JOIN users u ON u.id = w.scouted_by
+    WHERE 1=1 ${allFilters}
+    GROUP BY w.scouted_by, u.full_name
+    ORDER BY avg_days`,
+    { type: "SELECT" as any },
+  );
+
+  return {
+    monthlyAdditions: (monthlyRaw as any[]).map((r) => ({
+      month: r.month,
+      scoutId: r.scout_id,
+      scoutName: r.scout_name,
+      count: parseInt(r.count, 10),
+    })),
+    conversionRates: (conversionRaw as any[]).map((r) => ({
+      scoutId: r.scout_id,
+      scoutName: r.scout_name,
+      total: parseInt(r.total, 10),
+      screened: parseInt(r.screened, 10),
+      approved: parseInt(r.approved, 10),
+      rejected: parseInt(r.rejected, 10),
+    })),
+    avgTimeToDecision: (avgTimeRaw as any[]).map((r) => ({
+      scoutId: r.scout_id,
+      scoutName: r.scout_name,
+      avgDays: parseInt(r.avg_days, 10) || 0,
+    })),
+  };
+}
+
+// ══════════════════════════════════════════
+// PROSPECT TIMELINE (audit-based)
+// ══════════════════════════════════════════
+
+export async function getProspectTimeline(watchlistId: string) {
+  // Verify prospect exists
+  await findOrThrow(Watchlist, watchlistId, "Watchlist entry");
+
+  // Gather related entity IDs
+  const screeningCases = await ScreeningCase.findAll({
+    where: { watchlistId },
+    attributes: ["id"],
+  });
+  const scIds = screeningCases.map((sc) => sc.id);
+
+  let decisionIds: string[] = [];
+  if (scIds.length > 0) {
+    const decisions = await SelectionDecision.findAll({
+      where: { screeningCaseId: { [Op.in]: scIds } },
+      attributes: ["id"],
+    });
+    decisionIds = decisions.map((d) => d.id);
+  }
+
+  // Build OR condition for audit logs
+  const { AuditLog } = await import("@modules/audit/AuditLog.model");
+  const orConditions: any[] = [{ entity: "watchlists", entityId: watchlistId }];
+  if (scIds.length > 0) {
+    orConditions.push({
+      entity: "screening_cases",
+      entityId: { [Op.in]: scIds },
+    });
+  }
+  if (decisionIds.length > 0) {
+    orConditions.push({
+      entity: "selection_decisions",
+      entityId: { [Op.in]: decisionIds },
+    });
+  }
+
+  const logs = await AuditLog.findAll({
+    where: { [Op.or]: orConditions },
+    order: [["loggedAt", "DESC"]],
+    limit: 100,
+    attributes: [
+      "id",
+      "action",
+      "entity",
+      "entityId",
+      "detail",
+      "userName",
+      "changes",
+      "loggedAt",
+    ],
+  });
+
+  return logs.map((log) => ({
+    id: log.id,
+    date: log.loggedAt?.toISOString() ?? "",
+    action: log.action,
+    entity: log.entity,
+    entityId: log.entityId,
+    detail: log.detail,
+    userName: log.userName,
+    changes: log.changes,
+  }));
 }

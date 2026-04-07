@@ -7,7 +7,8 @@ export type NoteOwnerType =
   | "Match"
   | "Injury"
   | "Club"
-  | "Offer";
+  | "Offer"
+  | "Watchlist";
 
 interface NoteAttributes {
   id: string;

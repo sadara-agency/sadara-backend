@@ -40,6 +40,40 @@ export const watchlistQuerySchema = z.object({
   nationality: z.string().optional(),
 });
 
+export const checkDuplicateSchema = z.object({
+  name: z.string().min(2).max(255),
+  dob: z.string().optional(),
+  club: z.string().optional(),
+});
+
+// ── Bulk Operations ──
+
+export const bulkStatusSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+  status: z.enum(["Active", "Shortlisted", "Archived", "Rejected"]),
+});
+
+export const bulkPrioritySchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+  priority: z.enum(["High", "Medium", "Low"]),
+});
+
+export const bulkDeleteSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(50),
+});
+
+export const exportCsvSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(200),
+});
+
+// ── Analytics ──
+
+export const analyticsQuerySchema = z.object({
+  scoutId: z.string().uuid().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+});
+
 // ── Screening Case ──
 
 export const createScreeningSchema = z.object({

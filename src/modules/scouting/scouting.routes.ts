@@ -9,6 +9,12 @@ import {
   updateWatchlistSchema,
   updateWatchlistStatusSchema,
   watchlistQuerySchema,
+  checkDuplicateSchema,
+  bulkStatusSchema,
+  bulkPrioritySchema,
+  bulkDeleteSchema,
+  exportCsvSchema,
+  analyticsQuerySchema,
   createScreeningSchema,
   updateScreeningSchema,
   markPackReadySchema,
@@ -27,6 +33,21 @@ router.get(
   asyncHandler(ctrl.pipelineSummary),
 );
 
+// ── Scout Dashboard ──
+router.get(
+  "/scout-dashboard",
+  authorizeModule("scouting", "read"),
+  asyncHandler(ctrl.scoutDashboard),
+);
+
+// ── Analytics ──
+router.get(
+  "/analytics",
+  authorizeModule("scouting", "read"),
+  validate(analyticsQuerySchema, "query"),
+  asyncHandler(ctrl.scoutAnalytics),
+);
+
 // ── Watchlist ──
 router.get(
   "/watchlist",
@@ -35,9 +56,47 @@ router.get(
   asyncHandler(ctrl.listWatchlist),
 );
 router.get(
+  "/watchlist/check-duplicate",
+  authorizeModule("scouting", "read"),
+  validate(checkDuplicateSchema, "query"),
+  asyncHandler(ctrl.checkDuplicate),
+);
+
+// ── Bulk Operations (must be before /:id) ──
+router.patch(
+  "/watchlist/bulk-status",
+  authorizeModule("scouting", "update"),
+  validate(bulkStatusSchema),
+  asyncHandler(ctrl.bulkStatus),
+);
+router.patch(
+  "/watchlist/bulk-priority",
+  authorizeModule("scouting", "update"),
+  validate(bulkPrioritySchema),
+  asyncHandler(ctrl.bulkPriority),
+);
+router.delete(
+  "/watchlist/bulk",
+  authorizeModule("scouting", "delete"),
+  validate(bulkDeleteSchema),
+  asyncHandler(ctrl.bulkDelete),
+);
+router.post(
+  "/watchlist/export-csv",
+  authorizeModule("scouting", "read"),
+  validate(exportCsvSchema),
+  asyncHandler(ctrl.exportCsv),
+);
+
+router.get(
   "/watchlist/:id",
   authorizeModule("scouting", "read"),
   asyncHandler(ctrl.getWatchlistById),
+);
+router.get(
+  "/watchlist/:id/timeline",
+  authorizeModule("scouting", "read"),
+  asyncHandler(ctrl.prospectTimeline),
 );
 router.post(
   "/watchlist",
