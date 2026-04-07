@@ -54,7 +54,7 @@ router.put(
     const { permissions } = req.body;
 
     // Prevent modifying Admin & Player permissions via API
-    const LOCKED_ROLES = ["Admin", "Player"];
+    const LOCKED_ROLES = ["Admin"];
     const filtered = permissions.filter(
       (p: any) => !LOCKED_ROLES.includes(p.role),
     );
@@ -124,7 +124,7 @@ router.put(
     const { fieldPermissions } = req.body;
 
     // Prevent modifying Admin & Player field permissions via API
-    const LOCKED_ROLES = ["Admin", "Player"];
+    const LOCKED_ROLES = ["Admin"];
     const filtered = fieldPermissions.filter(
       (p: any) => !LOCKED_ROLES.includes(p.role),
     );
