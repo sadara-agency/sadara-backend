@@ -251,6 +251,7 @@ export type EncodingStatus = "pending" | "processing" | "ready" | "failed";
 interface MediaAttributes {
   id: string;
   courseId: string;
+  lessonId: string | null;
   type: MediaType;
   title: string | null;
   titleAr: string | null;
@@ -271,6 +272,7 @@ interface MediaAttributes {
 interface MediaCreation extends Optional<
   MediaAttributes,
   | "id"
+  | "lessonId"
   | "type"
   | "title"
   | "titleAr"
@@ -294,6 +296,7 @@ export class TrainingMedia
 {
   declare id: string;
   declare courseId: string;
+  declare lessonId: string | null;
   declare type: MediaType;
   declare title: string | null;
   declare titleAr: string | null;
@@ -321,6 +324,12 @@ TrainingMedia.init(
       allowNull: false,
       field: "course_id",
       references: { model: "training_courses", key: "id" },
+    },
+    lessonId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "lesson_id",
+      references: { model: "training_lessons", key: "id" },
     },
     type: {
       type: DataTypes.STRING(20),
