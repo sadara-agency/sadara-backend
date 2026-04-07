@@ -66,6 +66,14 @@ export const exportCsvSchema = z.object({
   ids: z.array(z.string().uuid()).min(1).max(200),
 });
 
+// ── Analytics ──
+
+export const analyticsQuerySchema = z.object({
+  scoutId: z.string().uuid().optional(),
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+});
+
 // ── Screening Case ──
 
 export const createScreeningSchema = z.object({

@@ -14,6 +14,7 @@ import {
   bulkPrioritySchema,
   bulkDeleteSchema,
   exportCsvSchema,
+  analyticsQuerySchema,
   createScreeningSchema,
   updateScreeningSchema,
   markPackReadySchema,
@@ -37,6 +38,14 @@ router.get(
   "/scout-dashboard",
   authorizeModule("scouting", "read"),
   asyncHandler(ctrl.scoutDashboard),
+);
+
+// ── Analytics ──
+router.get(
+  "/analytics",
+  authorizeModule("scouting", "read"),
+  validate(analyticsQuerySchema, "query"),
+  asyncHandler(ctrl.scoutAnalytics),
 );
 
 // ── Watchlist ──

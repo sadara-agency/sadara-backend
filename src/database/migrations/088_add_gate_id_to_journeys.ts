@@ -1,23 +1,23 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { sequelize } from "@config/database";
 
-export async function up(queryInterface: QueryInterface) {
-  await queryInterface.addColumn("player_journeys", "gate_id", {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: { model: "gates", key: "id" },
-    onUpdate: "CASCADE",
-    onDelete: "SET NULL",
-  });
+export async function up() {
+  await sequelize.query(`
+    ALTER TABLE player_journeys
+    ADD COLUMN IF NOT EXISTS gate_id UUID
+    REFERENCES gates(id) ON UPDATE CASCADE ON DELETE SET NULL;
+  `);
 
-  await queryInterface.addIndex("player_journeys", ["gate_id"], {
-    name: "player_journeys_gate_id_idx",
-  });
+  await sequelize.query(`
+    CREATE INDEX IF NOT EXISTS player_journeys_gate_id_idx
+    ON player_journeys (gate_id);
+  `);
 }
 
-export async function down(queryInterface: QueryInterface) {
-  await queryInterface.removeIndex(
-    "player_journeys",
-    "player_journeys_gate_id_idx",
-  );
-  await queryInterface.removeColumn("player_journeys", "gate_id");
+export async function down() {
+  await sequelize.query(`
+    DROP INDEX IF EXISTS player_journeys_gate_id_idx;
+  `);
+  await sequelize.query(`
+    ALTER TABLE player_journeys DROP COLUMN IF EXISTS gate_id;
+  `);
 }

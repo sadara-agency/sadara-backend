@@ -625,6 +625,116 @@ export async function getScoutDashboard(userId: string) {
 }
 
 // ══════════════════════════════════════════
+// SCOUT PERFORMANCE ANALYTICS
+// ══════════════════════════════════════════
+
+export async function getScoutAnalytics(filters?: {
+  scoutId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const scoutFilter = filters?.scoutId
+    ? `AND w.scouted_by = '${filters.scoutId}'`
+    : "";
+  const dateFilter = filters?.dateFrom
+    ? `AND w.created_at >= '${filters.dateFrom}'`
+    : "";
+  const dateToFilter = filters?.dateTo
+    ? `AND w.created_at <= '${filters.dateTo}'`
+    : "";
+  const allFilters = `${scoutFilter} ${dateFilter} ${dateToFilter}`;
+
+  // 1. Prospects added per month per scout (last 12 months)
+  const monthlyRaw = await sequelize.query<{
+    month: string;
+    scout_id: string;
+    scout_name: string;
+    count: string;
+  }>(
+    `SELECT
+      TO_CHAR(DATE_TRUNC('month', w.created_at), 'YYYY-MM') as month,
+      w.scouted_by as scout_id,
+      COALESCE(u.full_name, 'Unknown') as scout_name,
+      COUNT(*)::text as count
+    FROM watchlists w
+    LEFT JOIN users u ON u.id = w.scouted_by
+    WHERE w.created_at >= NOW() - INTERVAL '12 months'
+      ${allFilters}
+    GROUP BY month, w.scouted_by, u.full_name
+    ORDER BY month`,
+    { type: "SELECT" as any },
+  );
+
+  // 2. Conversion rates per scout
+  const conversionRaw = await sequelize.query<{
+    scout_id: string;
+    scout_name: string;
+    total: string;
+    screened: string;
+    approved: string;
+    rejected: string;
+  }>(
+    `SELECT
+      w.scouted_by as scout_id,
+      COALESCE(u.full_name, 'Unknown') as scout_name,
+      COUNT(DISTINCT w.id)::text as total,
+      COUNT(DISTINCT sc.id)::text as screened,
+      COUNT(DISTINCT CASE WHEN sd.decision = 'Approved' THEN sd.id END)::text as approved,
+      COUNT(DISTINCT CASE WHEN sd.decision = 'Rejected' THEN sd.id END)::text as rejected
+    FROM watchlists w
+    LEFT JOIN users u ON u.id = w.scouted_by
+    LEFT JOIN screening_cases sc ON sc.watchlist_id = w.id
+    LEFT JOIN selection_decisions sd ON sd.screening_case_id = sc.id
+    WHERE 1=1 ${allFilters}
+    GROUP BY w.scouted_by, u.full_name
+    ORDER BY total DESC`,
+    { type: "SELECT" as any },
+  );
+
+  // 3. Average time-to-decision per scout
+  const avgTimeRaw = await sequelize.query<{
+    scout_id: string;
+    scout_name: string;
+    avg_days: string;
+  }>(
+    `SELECT
+      w.scouted_by as scout_id,
+      COALESCE(u.full_name, 'Unknown') as scout_name,
+      ROUND(AVG(EXTRACT(EPOCH FROM (sd.created_at - w.created_at)) / 86400))::text as avg_days
+    FROM watchlists w
+    JOIN screening_cases sc ON sc.watchlist_id = w.id
+    JOIN selection_decisions sd ON sd.screening_case_id = sc.id
+    LEFT JOIN users u ON u.id = w.scouted_by
+    WHERE 1=1 ${allFilters}
+    GROUP BY w.scouted_by, u.full_name
+    ORDER BY avg_days`,
+    { type: "SELECT" as any },
+  );
+
+  return {
+    monthlyAdditions: (monthlyRaw as any[]).map((r) => ({
+      month: r.month,
+      scoutId: r.scout_id,
+      scoutName: r.scout_name,
+      count: parseInt(r.count, 10),
+    })),
+    conversionRates: (conversionRaw as any[]).map((r) => ({
+      scoutId: r.scout_id,
+      scoutName: r.scout_name,
+      total: parseInt(r.total, 10),
+      screened: parseInt(r.screened, 10),
+      approved: parseInt(r.approved, 10),
+      rejected: parseInt(r.rejected, 10),
+    })),
+    avgTimeToDecision: (avgTimeRaw as any[]).map((r) => ({
+      scoutId: r.scout_id,
+      scoutName: r.scout_name,
+      avgDays: parseInt(r.avg_days, 10) || 0,
+    })),
+  };
+}
+
+// ══════════════════════════════════════════
 // PROSPECT TIMELINE (audit-based)
 // ══════════════════════════════════════════
 
