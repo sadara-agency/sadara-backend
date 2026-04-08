@@ -16,6 +16,14 @@ import * as sessionController from "./session.controller";
 const router = Router();
 router.use(authenticate);
 
+// ── Manager Dashboard (before /:id routes) ──
+router.get(
+  "/manager/dashboard",
+  authorizeModule("sessions", "read"),
+  cacheRoute("sessions:manager:dashboard", CacheTTL.MEDIUM),
+  asyncHandler(sessionController.getManagerDashboard),
+);
+
 // ── Read ──
 router.get(
   "/",
