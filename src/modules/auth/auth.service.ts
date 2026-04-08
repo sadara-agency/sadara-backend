@@ -17,6 +17,7 @@ import {
   sendPasswordResetEmail,
   sendPasswordChangedEmail,
   sendWelcomeEmail,
+  sendInviteEmail,
 } from "@shared/utils/mail";
 
 /** Default role for self-registered users (no admin privileges). */
@@ -160,6 +161,21 @@ export async function invite(input: InviteInput) {
   }
 
   const { passwordHash: _, ...safe } = user.get({ plain: true });
+
+  // Send invite email (non-blocking)
+  const loginUrl = `${env.frontend.url}/login`;
+  sendInviteEmail(
+    user.email,
+    user.fullName || user.fullNameAr || "",
+    input.role,
+    loginUrl,
+  ).catch((err) =>
+    logger.warn("Failed to send invite email", {
+      email: user.email,
+      error: (err as Error).message,
+    }),
+  );
+
   return { user: safe };
 }
 

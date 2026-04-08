@@ -113,6 +113,11 @@ router.delete(
   asyncHandler(playerController.removeProvider),
 );
 router.post(
+  "/:id/providers/validate",
+  authorizeModule("players", "read"),
+  asyncHandler(playerController.validateProvider),
+);
+router.post(
   "/:id/refresh-stats",
   authorizeModule("players", "create"),
   asyncHandler(playerController.refreshStats),

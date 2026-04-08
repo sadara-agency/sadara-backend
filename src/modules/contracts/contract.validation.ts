@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const CONTRACT_CATEGORIES = ["Club", "Sponsorship"] as const;
+const CONTRACT_CATEGORIES = ["Club", "Sponsorship", "Agency"] as const;
 const CONTRACT_TYPES = [
   "Representation",
   "CareerManagement",
