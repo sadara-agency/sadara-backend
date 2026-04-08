@@ -40,25 +40,21 @@ export async function getPlayerTimeline(
     const sessions = await Referral.findAll({
       where: { playerId },
       order: [["createdAt", "DESC"]],
-      raw: true,
     });
 
-    for (const s of sessions as any[]) {
+    for (const s of sessions) {
       events.push({
         id: s.id,
-        date: s.created_at || s.createdAt,
+        date: (s.createdAt as any)?.toISOString?.() ?? String(s.createdAt),
         type: "session",
-        title:
-          s.trigger_desc ||
-          s.triggerDesc ||
-          `${s.referral_type || s.referralType} session`,
+        title: s.triggerDesc || `${s.referralType} session`,
         titleAr: null,
         status: s.status,
         priority: s.priority,
-        summary: s.trigger_desc || s.triggerDesc || null,
+        summary: s.triggerDesc || null,
         metadata: {
-          caseType: s.referral_type || s.referralType,
-          assignedTo: s.assigned_to || s.assignedTo,
+          caseType: s.referralType,
+          assignedTo: s.assignedTo,
           outcome: s.outcome,
         },
       });

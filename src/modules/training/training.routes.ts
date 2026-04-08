@@ -183,7 +183,6 @@ router.get(
 router.get(
   "/player/:playerId",
   authorizeModule("training", "read"),
-  authorizePlayerPackage("training", "read"),
   asyncHandler(ctrl.playerEnrollments),
 );
 router.get(
