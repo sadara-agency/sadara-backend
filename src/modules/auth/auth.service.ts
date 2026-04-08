@@ -394,7 +394,7 @@ export async function refreshSession(rawToken: string) {
   // (browser retry, service worker, concurrent tabs) or actual reuse.
   if (record.revoked_at) {
     const revokedAgo = Date.now() - new Date(record.revoked_at).getTime();
-    const REUSE_GRACE_MS = 10_000; // 10-second grace window for network retries
+    const REUSE_GRACE_MS = 30_000; // 30-second grace window for concurrent tabs / network retries
 
     if (revokedAgo > REUSE_GRACE_MS) {
       // Genuine reuse — revoke entire family as a security measure
