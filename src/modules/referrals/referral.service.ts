@@ -566,6 +566,7 @@ export async function getSpecialistPerformance(query: any = {}) {
       { model: Referral, as: "referral", attributes: ["id", "referralType"] },
     ],
     order: [["sessionDate", "DESC"]],
+    offset,
     limit: limit * 20, // Get more to analyze
   });
 

@@ -33,6 +33,12 @@ jest.mock('../../../src/modules/users/user.model', () => ({
 jest.mock('../../../src/modules/injuries/injury.model', () => ({
   Injury: { findByPk: jest.fn(), findAll: jest.fn(), name: 'Injury' },
 }));
+jest.mock('../../../src/modules/sessions/session.model', () => ({
+  Session: { findAll: jest.fn(), count: jest.fn(), name: 'Session' },
+}));
+jest.mock('../../../src/modules/tickets/ticket.model', () => ({
+  Ticket: { findByPk: jest.fn(), findAll: jest.fn(), name: 'Ticket' },
+}));
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
   notifyUser: jest.fn().mockResolvedValue(null),
@@ -40,6 +46,9 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
 jest.mock('../../../src/modules/referrals/referralAutoTasks', () => ({
   generateCriticalReferralTask: jest.fn().mockResolvedValue(null),
   checkReferralOverdue: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../src/shared/utils/audit', () => ({
+  logAudit: jest.fn().mockResolvedValue(undefined),
 }));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
