@@ -20,6 +20,7 @@ jest.mock('../../../src/shared/utils/mail', () => ({
   sendWelcomeEmail: jest.fn().mockResolvedValue(true),
   sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
   sendPasswordChangedEmail: jest.fn().mockResolvedValue(true),
+  sendInviteEmail: jest.fn().mockResolvedValue(true),
 }));
 
 const mockFindOne = jest.fn();
@@ -159,6 +160,97 @@ describe('Auth Service', () => {
           fullName: 'Test',
         }),
       ).rejects.toThrow('Email already registered');
+    });
+  });
+
+  // ════════════════════════════════════════════════════════
+  // INVITE (Admin creates user)
+  // ════════════════════════════════════════════════════════
+  describe('invite', () => {
+    it('should create an active user with the assigned role', async () => {
+      const createdUser = mockModelInstance({
+        ...mockUser({ role: 'Scout', isActive: true }),
+      });
+      mockCreate.mockResolvedValue(createdUser);
+
+      const result = await authService.invite({
+        email: 'scout@sadara.com',
+        password: 'StrongPass123!',
+        fullName: 'New Scout',
+        role: 'Scout',
+      });
+
+      expect(result).toHaveProperty('user');
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'scout@sadara.com',
+          role: 'Scout',
+          isActive: true,
+        }),
+      );
+    });
+
+    it('should send an invite email after creating the user', async () => {
+      const { sendInviteEmail } = await import('../../../src/shared/utils/mail');
+      const createdUser = mockModelInstance({
+        ...mockUser({ email: 'coach@sadara.com', fullName: 'New Coach', role: 'Coach' }),
+      });
+      mockCreate.mockResolvedValue(createdUser);
+
+      await authService.invite({
+        email: 'coach@sadara.com',
+        password: 'StrongPass123!',
+        fullName: 'New Coach',
+        role: 'Coach',
+      });
+
+      // Allow the fire-and-forget promise to settle
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(sendInviteEmail).toHaveBeenCalledWith(
+        'coach@sadara.com',
+        'New Coach',
+        'Coach',
+        expect.stringContaining('/login'),
+      );
+    });
+
+    it('should throw 409 if email already exists', async () => {
+      const uniqueError = new Error('Validation error') as any;
+      uniqueError.name = 'SequelizeUniqueConstraintError';
+      mockCreate.mockRejectedValue(uniqueError);
+
+      await expect(
+        authService.invite({
+          email: 'admin@sadara.com',
+          password: 'pass12345',
+          fullName: 'Duplicate',
+          role: 'Analyst',
+        }),
+      ).rejects.toThrow('Email already registered');
+    });
+
+    it('should not fail if invite email fails to send', async () => {
+      const { sendInviteEmail } = await import('../../../src/shared/utils/mail');
+      (sendInviteEmail as jest.Mock).mockRejectedValueOnce(new Error('SMTP down'));
+
+      const createdUser = mockModelInstance({
+        ...mockUser({ role: 'Finance', isActive: true }),
+      });
+      mockCreate.mockResolvedValue(createdUser);
+
+      const result = await authService.invite({
+        email: 'finance@sadara.com',
+        password: 'StrongPass123!',
+        fullName: 'Finance User',
+        role: 'Finance',
+      });
+
+      // User should still be created even if email fails
+      expect(result).toHaveProperty('user');
+
+      // Allow fire-and-forget to settle (error is caught by .catch())
+      await new Promise((r) => setTimeout(r, 10));
     });
   });
 

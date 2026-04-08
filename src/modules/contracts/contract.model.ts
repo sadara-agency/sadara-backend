@@ -8,7 +8,7 @@ interface ContractAttributes {
   id: string;
   playerId: string;
   clubId: string;
-  category: "Club" | "Sponsorship";
+  category: "Club" | "Sponsorship" | "Agency";
   contractType:
     | "Representation"
     | "CareerManagement"
@@ -131,7 +131,7 @@ export class Contract
   declare id: string;
   declare playerId: string;
   declare clubId: string;
-  declare category: "Club" | "Sponsorship";
+  declare category: "Club" | "Sponsorship" | "Agency";
   declare contractType:
     | "Representation"
     | "CareerManagement"
@@ -212,7 +212,7 @@ Contract.init(
       field: "club_id",
     },
     category: {
-      type: DataTypes.ENUM("Club", "Sponsorship"),
+      type: DataTypes.ENUM("Club", "Sponsorship", "Agency"),
       allowNull: false,
       defaultValue: "Club",
     },

@@ -649,3 +649,91 @@ export async function removePlayerProvider(
   await mapping.destroy();
   return { playerId, providerName };
 }
+
+/**
+ * Validate an external provider mapping by calling the provider API.
+ * Currently supports Sportmonks (player lookup by ID).
+ */
+export async function validateProviderMapping(
+  playerId: string,
+  body: { providerName: string; externalPlayerId: string },
+) {
+  const { providerName, externalPlayerId } = body;
+  if (!providerName || !externalPlayerId) {
+    throw new AppError("providerName and externalPlayerId are required", 400);
+  }
+
+  if (providerName === "Sportmonks") {
+    try {
+      const { testConnection } =
+        await import("@modules/sportmonks/sportmonks.provider");
+      const connected = await testConnection();
+      if (!connected) {
+        return {
+          valid: false,
+          providerName,
+          externalPlayerId,
+          error: "Sportmonks API is not configured or unreachable",
+        };
+      }
+
+      // Sportmonks v3: GET /football/players/{id}
+      const axios = (await import("axios")).default;
+      const { env } = await import("@config/env");
+      const res = await axios.get(
+        `https://api.sportmonks.com/v3/football/players/${encodeURIComponent(externalPlayerId)}`,
+        {
+          params: { api_token: env.sportmonks.apiToken },
+          timeout: 10_000,
+        },
+      );
+
+      const smPlayer = res.data?.data;
+      if (!smPlayer) {
+        return {
+          valid: false,
+          providerName,
+          externalPlayerId,
+          error: "Player not found",
+        };
+      }
+
+      return {
+        valid: true,
+        providerName,
+        externalPlayerId,
+        externalName:
+          smPlayer.display_name ||
+          smPlayer.common_name ||
+          smPlayer.name ||
+          null,
+        externalNationality: smPlayer.nationality || null,
+        externalPosition: smPlayer.position_id || null,
+      };
+    } catch (err: any) {
+      const status = err.response?.status;
+      if (status === 404) {
+        return {
+          valid: false,
+          providerName,
+          externalPlayerId,
+          error: "Player not found in Sportmonks",
+        };
+      }
+      return {
+        valid: false,
+        providerName,
+        externalPlayerId,
+        error: `Sportmonks API error: ${err.message}`,
+      };
+    }
+  }
+
+  // For unsupported providers, return unknown status
+  return {
+    valid: null,
+    providerName,
+    externalPlayerId,
+    error: `Validation not available for ${providerName}. Supported: Sportmonks.`,
+  };
+}

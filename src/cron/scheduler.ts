@@ -12,6 +12,7 @@ import {
   cleanupOldNotifications,
 } from "@modules/notifications/notification.service";
 import {
+  generateAutoTasks,
   generatePreMatchTasks,
   generateMatchLevelPreTasks,
 } from "@modules/matches/matchAutoTasks";
@@ -752,25 +753,43 @@ async function checkDocumentExpiry() {
 // ══════════════════════════════════════════════════════════════
 
 async function autoTransitionMatchStatuses() {
-  // Mark "upcoming" matches whose date has passed as "completed"
-  const [, updated] = await sequelize.query(
+  // Mark "upcoming" matches whose date has passed as "completed",
+  // returning their IDs so we can generate post-match auto-tasks.
+  const transitioned = await sequelize.query<{ id: string }>(
     `
     UPDATE matches
     SET status = 'completed', updated_at = NOW()
     WHERE status = 'upcoming'
       AND match_date::date < CURRENT_DATE
+    RETURNING id
     `,
-    { type: QueryTypes.RAW },
+    { type: QueryTypes.SELECT },
   );
 
-  const count = (updated as any)?.rowCount ?? 0;
-  if (count > 0) {
+  if (transitioned.length > 0) {
     logger.info(
-      `[Cron] Auto-transitioned ${count} past matches from "upcoming" → "completed"`,
+      `[Cron] Auto-transitioned ${transitioned.length} past matches from "upcoming" → "completed"`,
     );
+
+    // Fire-and-forget: generate post-match auto-tasks for each transitioned match
+    for (const { id } of transitioned) {
+      generateAutoTasks(id, "system")
+        .then((result) => {
+          if (result.created > 0) {
+            logger.info(
+              `[Cron] Post-match auto-tasks: created ${result.created} tasks for match ${id}`,
+            );
+          }
+        })
+        .catch((err) => {
+          logger.error(
+            `[Cron] Post-match auto-tasks failed for match ${id}: ${err.message}`,
+          );
+        });
+    }
   }
 
-  return { transitioned: count };
+  return { transitioned: transitioned.length };
 }
 
 // ══════════════════════════════════════════════════════════════

@@ -95,6 +95,18 @@ export async function removeProvider(req: AuthRequest, res: Response) {
   sendSuccess(res, result, "Provider mapping removed");
 }
 
+export async function validateProvider(req: AuthRequest, res: Response) {
+  const result = await playerService.validateProviderMapping(
+    req.params.id,
+    req.body,
+  );
+  sendSuccess(
+    res,
+    result,
+    result.valid ? "Provider ID validated" : "Validation failed",
+  );
+}
+
 export async function getTimeline(req: AuthRequest, res: Response) {
   const { getPlayerTimeline } = await import("./player.timeline");
   const { limit, offset, types } = req.query as any;
