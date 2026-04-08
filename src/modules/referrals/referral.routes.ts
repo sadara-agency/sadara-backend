@@ -36,7 +36,7 @@ router.get(
 router.get(
   "/manager/overdue",
   authorizeModule("referrals", "read"),
-  cacheRoute("referrals:manager:overdue", CacheTTL.LOW),
+  cacheRoute("referrals:manager:overdue", CacheTTL.SHORT),
   validate(referralQuerySchema, "query"),
   asyncHandler(referralController.getOverdueReferrals),
 );

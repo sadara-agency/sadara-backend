@@ -16,6 +16,7 @@ import {
   notifyUser,
 } from "@modules/notifications/notification.service";
 import { logger } from "@config/logger";
+import { logAudit } from "@shared/utils/audit";
 import { generateCriticalReferralTask } from "@modules/referrals/referralAutoTasks";
 import { generateDisplayId } from "@shared/utils/displayId";
 
@@ -691,9 +692,9 @@ export async function escalateReferral(
     referral.id,
     {
       userId,
-      userRole: "Manager",
-      userAgent: "sports-manager",
-      ipAddress: "",
+      userName: "",
+      userRole: "Manager" as any,
+      ip: "",
     },
     `Escalated referral: ${input.escalationType} - ${input.escalationNote}`,
   );
