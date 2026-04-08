@@ -1,6 +1,16 @@
 import { VoiceMemo } from "./voice-memo.model";
 import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import { AppError } from "@middleware/errorHandler";
+import { logger } from "@config/logger";
+
+async function safeResolveUrl(key: string): Promise<string> {
+  try {
+    return await resolveFileUrl(key, 60);
+  } catch (err) {
+    logger.warn(`[voice-memos] Failed to resolve signed URL for ${key}`, err);
+    return key;
+  }
+}
 
 export async function listVoiceMemos(ownerType: string, ownerId: string) {
   const memos = await VoiceMemo.findAll({
@@ -11,7 +21,7 @@ export async function listVoiceMemos(ownerType: string, ownerId: string) {
   // Resolve signed URLs for each memo
   const resolved = await Promise.all(
     memos.map(async (m) => {
-      const url = await resolveFileUrl(m.fileUrl, 60);
+      const url = await safeResolveUrl(m.fileUrl);
       return {
         id: m.id,
         ownerType: m.ownerType,
@@ -60,7 +70,7 @@ export async function createVoiceMemo(
 
   return {
     ...memo.toJSON(),
-    fileUrl: await resolveFileUrl(memo.fileUrl, 60),
+    fileUrl: await safeResolveUrl(memo.fileUrl),
   };
 }
 

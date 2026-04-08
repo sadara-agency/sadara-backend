@@ -23,6 +23,7 @@ router.post(
   "/",
   authorizeModule("scouting", "create"),
   uploadSingle,
+  validate(createVoiceMemoSchema),
   asyncHandler(ctrl.create),
 );
 
