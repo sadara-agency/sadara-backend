@@ -6,6 +6,8 @@ import {
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { Injury } from "@modules/injuries/injury.model";
+import { Session } from "@modules/sessions/session.model";
+import { Ticket } from "@modules/tickets/ticket.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
@@ -384,4 +386,317 @@ export async function deleteReferral(
 
   await referral.destroy();
   return { id };
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// ── SPORTS MANAGER OVERSIGHT & MONITORING ──
+// ════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Get manager dashboard overview:
+ * - Count of referrals by status
+ * - Critical/High priority referrals
+ * - Overdue referrals
+ * - Specialist performance summary
+ */
+export async function getManagerDashboard() {
+  const today = new Date().toISOString().split("T")[0];
+
+  // Aggregate by status
+  const statusCounts = await Referral.findAll({
+    attributes: [
+      "status",
+      [
+        require("sequelize").fn("COUNT", require("sequelize").col("*")),
+        "count",
+      ],
+    ],
+    group: ["status"],
+    raw: true,
+  });
+
+  // Critical/High priority open
+  const criticalReferrals = await Referral.findAll({
+    where: {
+      status: { [Op.in]: ["Open", "InProgress", "Waiting"] },
+      priority: { [Op.in]: ["Critical", "High"] },
+    },
+    include: referralIncludes(),
+    limit: 10,
+    order: [["createdAt", "DESC"]],
+  });
+
+  // Overdue (no session or no recent session past due date)
+  const overdueReferrals = await Referral.findAll({
+    where: {
+      status: { [Op.in]: ["Open", "InProgress", "Waiting"] },
+      dueDate: { [Op.lt]: today },
+    },
+    include: referralIncludes(),
+    limit: 10,
+    order: [["dueDate", "ASC"]],
+  });
+
+  // Specialist workload
+  const specialistCounts = await Referral.findAll({
+    where: { status: { [Op.in]: ["Open", "InProgress", "Waiting"] } },
+    attributes: [
+      "referralTarget",
+      [
+        require("sequelize").fn("COUNT", require("sequelize").col("*")),
+        "count",
+      ],
+    ],
+    group: ["referralTarget"],
+    raw: true,
+  });
+
+  return {
+    statusCounts: statusCounts.reduce((acc: any, row: any) => {
+      acc[row.status] = parseInt(row.count);
+      return acc;
+    }, {}),
+    criticalReferrals,
+    overdueCount: overdueReferrals.length,
+    overdue: overdueReferrals,
+    specialistWorkload: specialistCounts.map((row: any) => ({
+      specialist: row.referralTarget,
+      activeCount: parseInt(row.count),
+    })),
+  };
+}
+
+/**
+ * Get all open referrals grouped by specialist
+ */
+export async function getReferralsBySpecialist(query: any = {}) {
+  const { limit = 100, offset = 0, specialist } = query;
+
+  const where: any = { status: { [Op.in]: ["Open", "InProgress", "Waiting"] } };
+  if (specialist) where.referralTarget = specialist;
+
+  const { rows, count } = await Referral.findAndCountAll({
+    where,
+    include: referralIncludes(),
+    order: [
+      ["priority", "DESC"],
+      ["createdAt", "DESC"],
+    ],
+    limit,
+    offset,
+  });
+
+  // Group by specialist
+  const grouped = rows.reduce(
+    (acc: any, ref: any) => {
+      const specialist = ref.referralTarget || "Unassigned";
+      if (!acc[specialist]) acc[specialist] = [];
+      acc[specialist].push(ref);
+      return acc;
+    },
+    {} as Record<string, typeof rows>,
+  );
+
+  return { bySpecialist: grouped, total: count };
+}
+
+/**
+ * Get overdue referrals and tickets
+ */
+export async function getOverdueReferrals(query: any = {}) {
+  const { limit = 50, offset = 0, daysOverdue = 0 } = query;
+  const today = new Date().toISOString().split("T")[0];
+  const daysAgo = new Date(Date.now() - daysOverdue * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+
+  const overdueReferrals = await Referral.findAll({
+    where: {
+      status: { [Op.in]: ["Open", "InProgress", "Waiting"] },
+      dueDate: { [Op.between]: [daysAgo, today] },
+    },
+    include: referralIncludes(),
+    order: [["dueDate", "ASC"]],
+    limit,
+    offset,
+  });
+
+  // Get overdue tickets (if Ticket model exists)
+  let overdueTickets: any[] = [];
+  try {
+    overdueTickets = await Ticket.findAll({
+      where: {
+        status: { [Op.in]: ["Open", "InProgress"] },
+        dueDate: { [Op.lt]: today },
+      },
+      limit,
+      offset,
+      order: [["dueDate", "ASC"]],
+    });
+  } catch {
+    // Ticket model may not be available, continue without it
+  }
+
+  return {
+    referrals: overdueReferrals,
+    tickets: overdueTickets,
+    totalOverdue: overdueReferrals.length + overdueTickets.length,
+  };
+}
+
+/**
+ * Get specialist performance through sessions
+ * Shows: completed sessions, no-shows, cancellations
+ */
+export async function getSpecialistPerformance(query: any = {}) {
+  const { specialist, limit = 10, offset = 0 } = query;
+  const where: any = {};
+
+  if (specialist) {
+    where.programOwner = specialist;
+  }
+
+  // Get sessions grouped by specialist
+  const sessions = await Session.findAll({
+    where,
+    include: [
+      { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+      { model: User, as: "responsible", attributes: [...USER_ATTRS] },
+      { model: Referral, as: "referral", attributes: ["id", "referralType"] },
+    ],
+    order: [["sessionDate", "DESC"]],
+    limit: limit * 20, // Get more to analyze
+  });
+
+  // Aggregate performance metrics
+  const performance = sessions.reduce(
+    (acc: any, session: any) => {
+      const specialist = session.programOwner;
+      if (!acc[specialist]) {
+        acc[specialist] = {
+          specialist,
+          total: 0,
+          completed: 0,
+          scheduled: 0,
+          cancelled: 0,
+          noShow: 0,
+          completionRate: 0,
+        };
+      }
+
+      acc[specialist].total++;
+      acc[specialist][session.completionStatus.toLowerCase()]++;
+
+      return acc;
+    },
+    {} as Record<
+      string,
+      {
+        specialist: string;
+        total: number;
+        completed: number;
+        scheduled: number;
+        cancelled: number;
+        noShow: number;
+        completionRate: number;
+      }
+    >,
+  );
+
+  // Calculate completion rates
+  Object.values(performance).forEach((metric: any) => {
+    metric.completionRate =
+      metric.total > 0
+        ? Math.round((metric.completed / metric.total) * 100)
+        : 0;
+  });
+
+  return {
+    performance: Object.values(performance),
+    recentSessions: sessions.slice(0, limit),
+  };
+}
+
+/**
+ * Escalate a referral (manager intervention)
+ * Adds escalation note and optionally reassigns
+ */
+export async function escalateReferral(
+  id: string,
+  input: {
+    escalationType:
+      | "club_issue"
+      | "external_coach"
+      | "execution_delay"
+      | "responsibility_conflict"
+      | "redirection";
+    escalationNote: string;
+    reassignTo?: string | null;
+  },
+  userId: string,
+) {
+  const referral = await Referral.findByPk(id, { include: referralIncludes() });
+  if (!referral) throw new AppError("Referral not found", 404);
+
+  // Add escalation to notes
+  const escalationPrefix = `[ESCALATION - ${input.escalationType.toUpperCase()}] ${new Date().toISOString().split("T")[0]}: `;
+  const updatedNotes =
+    (referral.notes || "") + "\n" + escalationPrefix + input.escalationNote;
+
+  // Update referral
+  if (input.reassignTo) {
+    await findOrThrow(User, input.reassignTo, "Assigned user");
+    await referral.update({
+      assignedTo: input.reassignTo,
+      assignedAt: new Date(),
+      notes: updatedNotes,
+      status: "InProgress", // Changed to InProgress on escalation
+    });
+  } else {
+    await referral.update({
+      notes: updatedNotes,
+      status: "InProgress",
+    });
+  }
+
+  // Notify assignee about escalation
+  if (referral.assignedTo) {
+    const escalationTitle =
+      {
+        club_issue: "⚠️ Club Issue - Manager Escalation",
+        external_coach: "⚠️ External Coach Issue - Manager Escalation",
+        execution_delay: "⚠️ Execution Delay - Manager Intervention",
+        responsibility_conflict: "⚠️ Responsibility Conflict - Manager Review",
+        redirection: "🔄 Referral Redirection - Manager Action",
+      }[input.escalationType] || "Manager Escalation";
+
+    notifyUser(referral.assignedTo, {
+      type: "referral",
+      title: escalationTitle,
+      titleAr: escalationTitle, // TODO: Add Arabic versions
+      body: input.escalationNote,
+      link: `/dashboard/referrals/${referral.id}`,
+      sourceType: "referral",
+      sourceId: referral.id,
+      priority: "high",
+    }).catch((err) =>
+      logger.error("Failed to notify on escalation", err as Error),
+    );
+  }
+
+  // Log audit
+  await logAudit(
+    "ESCALATE",
+    "referrals",
+    referral.id,
+    {
+      userId,
+      userRole: "Manager",
+      userAgent: "sports-manager",
+      ipAddress: "",
+    },
+    `Escalated referral: ${input.escalationType} - ${input.escalationNote}`,
+  );
+
+  return refetchWithIncludes(id);
 }

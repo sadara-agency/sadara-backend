@@ -12,11 +12,47 @@ import {
   updateReferralStatusSchema,
   referralQuerySchema,
   checkDuplicateSchema,
+  escalateReferralSchema,
 } from "@modules/referrals/referral.validation";
 import * as referralController from "@modules/referrals/referral.controller";
 
 const router = Router();
 router.use(authenticate);
+
+// ── Manager Oversight (before /:id routes) ──
+router.get(
+  "/manager/dashboard",
+  authorizeModule("referrals", "read"),
+  cacheRoute("referrals:manager:dashboard", CacheTTL.MEDIUM),
+  asyncHandler(referralController.getManagerDashboard),
+);
+router.get(
+  "/manager/by-specialist",
+  authorizeModule("referrals", "read"),
+  cacheRoute("referrals:manager:specialists", CacheTTL.MEDIUM),
+  validate(referralQuerySchema, "query"),
+  asyncHandler(referralController.getReferralsBySpecialist),
+);
+router.get(
+  "/manager/overdue",
+  authorizeModule("referrals", "read"),
+  cacheRoute("referrals:manager:overdue", CacheTTL.LOW),
+  validate(referralQuerySchema, "query"),
+  asyncHandler(referralController.getOverdueReferrals),
+);
+router.get(
+  "/manager/specialist-performance",
+  authorizeModule("referrals", "read"),
+  cacheRoute("referrals:manager:performance", CacheTTL.MEDIUM),
+  validate(referralQuerySchema, "query"),
+  asyncHandler(referralController.getSpecialistPerformance),
+);
+router.patch(
+  "/manager/:id/escalate",
+  authorizeModule("referrals", "update"),
+  validate(escalateReferralSchema),
+  asyncHandler(referralController.escalateReferral),
+);
 
 // ── Read ──
 router.get(

@@ -121,6 +121,23 @@ export const referralQuerySchema = z.object({
   assignedTo: z.string().uuid().optional(),
 });
 
+// ── Escalate Referral ──
+
+export const escalateReferralSchema = z.object({
+  escalationType: z.enum([
+    "club_issue",
+    "external_coach",
+    "execution_delay",
+    "responsibility_conflict",
+    "redirection",
+  ]),
+  escalationNote: z
+    .string()
+    .min(10, "Escalation note must be at least 10 characters")
+    .max(1000),
+  reassignTo: z.string().uuid().optional().nullable(),
+});
+
 // ── Inferred Types ──
 
 export type CreateReferralInput = z.infer<typeof createReferralSchema>;
@@ -130,3 +147,4 @@ export type UpdateReferralStatusInput = z.infer<
 >;
 export type CheckDuplicateInput = z.infer<typeof checkDuplicateSchema>;
 export type ReferralQuery = z.infer<typeof referralQuerySchema>;
+export type EscalateReferralInput = z.infer<typeof escalateReferralSchema>;
