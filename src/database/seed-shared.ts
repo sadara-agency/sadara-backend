@@ -211,11 +211,28 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("referrals", ["Manager", "Analyst", "Scout"], {
-    canRead: true,
-    canCreate: true,
-    canUpdate: true,
-  }),
+  // Any team member can create a referral when they observe a need requiring another specialist
+  ...forRoles(
+    "referrals",
+    [
+      "Manager",
+      "Analyst",
+      "Scout",
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "NutritionSpecialist",
+      "GymCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+    ],
+    {
+      canRead: true,
+      canCreate: true,
+      canUpdate: true,
+    },
+  ),
 
   ...forRoles("injuries", ["Admin"], {
     canRead: true,

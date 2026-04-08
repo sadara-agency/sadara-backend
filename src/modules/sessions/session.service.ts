@@ -226,3 +226,130 @@ export async function getSessionStats() {
 
   return { byType, byStatus, byOwner };
 }
+
+// ── Manager Dashboard ──
+
+export async function getManagerDashboard() {
+  const today = new Date();
+  const todayStr = today.toISOString().split("T")[0];
+
+  // Calculate week boundaries (Monday to Sunday)
+  const dayOfWeek = today.getDay();
+  const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+  const monday = new Date(today.setDate(diff));
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+
+  const weekStart = monday.toISOString().split("T")[0];
+  const weekEnd = sunday.toISOString().split("T")[0];
+
+  const [
+    sessionsByOwner,
+    completionStats,
+    thisWeekSessions,
+    incompleteSessions,
+    lateSessions,
+  ] = await Promise.all([
+    // Sessions grouped by Program Owner
+    Session.findAll({
+      attributes: [
+        "programOwner",
+        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+        [
+          sequelize.fn(
+            "COUNT",
+            sequelize.fn(
+              "CASE",
+              sequelize.where(
+                sequelize.col("completion_status"),
+                Op.eq,
+                "Completed",
+              ),
+              1,
+            ),
+          ),
+          "completedCount",
+        ],
+      ],
+      group: ["programOwner"],
+      raw: true,
+    }),
+
+    // Completion status breakdown
+    Session.findAll({
+      attributes: [
+        "completionStatus",
+        [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+      ],
+      group: ["completionStatus"],
+      raw: true,
+    }),
+
+    // Sessions this week
+    Session.findAll({
+      where: {
+        sessionDate: { [Op.between]: [weekStart, weekEnd] },
+      },
+      include: sessionIncludes(),
+      order: [["sessionDate", "ASC"]],
+      limit: 20,
+    }),
+
+    // Incomplete sessions (Scheduled status)
+    Session.findAll({
+      where: {
+        completionStatus: { [Op.in]: ["Scheduled", "NoShow"] },
+        sessionDate: { [Op.lte]: todayStr },
+      },
+      include: sessionIncludes(),
+      order: [["sessionDate", "ASC"]],
+      limit: 15,
+    }),
+
+    // Late sessions (past session date but not completed)
+    Session.findAll({
+      where: {
+        completionStatus: { [Op.notIn]: ["Completed", "Cancelled"] },
+        sessionDate: { [Op.lt]: todayStr },
+      },
+      include: sessionIncludes(),
+      order: [["sessionDate", "ASC"]],
+      limit: 15,
+    }),
+  ]);
+
+  // Format sessionsByOwner response
+  const formattedSessionsByOwner = (sessionsByOwner as any[]).map(
+    (row: any) => ({
+      programOwner: row.programOwner,
+      totalSessions: parseInt(row.count) || 0,
+      completedSessions: parseInt(row.completedCount) || 0,
+      completionRate:
+        parseInt(row.count) > 0
+          ? Math.round(
+              (parseInt(row.completedCount) / parseInt(row.count)) * 100,
+            )
+          : 0,
+    }),
+  );
+
+  // Format completion status
+  const completionStatusCounts = (completionStats as any[]).reduce(
+    (acc: any, row: any) => {
+      acc[row.completionStatus] = parseInt(row.count) || 0;
+      return acc;
+    },
+    {},
+  );
+
+  return {
+    sessionsByOwner: formattedSessionsByOwner,
+    completionStatusCounts,
+    thisWeekSessionsCount: thisWeekSessions.length,
+    thisWeekSessions,
+    incompleteSessionsCount: incompleteSessions.length,
+    incompleteSessions,
+    lateSessionsCount: lateSessions.length,
+    lateSessions,
+  };
+}

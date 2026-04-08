@@ -107,3 +107,40 @@ export async function remove(req: AuthRequest, res: Response) {
 
   sendSuccess(res, result, "Referral deleted");
 }
+
+// ── MANAGER OVERSIGHT ──
+
+export async function getManagerDashboard(req: AuthRequest, res: Response) {
+  const dashboard = await referralService.getManagerDashboard();
+  sendSuccess(res, dashboard);
+}
+
+export async function getReferralsBySpecialist(
+  req: AuthRequest,
+  res: Response,
+) {
+  const result = await referralService.getReferralsBySpecialist(req.query);
+  sendSuccess(res, result);
+}
+
+export async function getOverdueReferrals(req: AuthRequest, res: Response) {
+  const result = await referralService.getOverdueReferrals(req.query);
+  sendSuccess(res, result);
+}
+
+export async function getSpecialistPerformance(
+  req: AuthRequest,
+  res: Response,
+) {
+  const result = await referralService.getSpecialistPerformance(req.query);
+  sendSuccess(res, result);
+}
+
+export async function escalateReferral(req: AuthRequest, res: Response) {
+  const referral = await referralService.escalateReferral(
+    req.params.id,
+    req.body,
+    req.user!.id,
+  );
+  sendSuccess(res, referral, "Referral escalated");
+}

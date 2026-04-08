@@ -111,3 +111,9 @@ export async function stats(req: AuthRequest, res: Response) {
   const data = await sessionService.getSessionStats();
   sendSuccess(res, data);
 }
+
+// ── Manager Dashboard ──
+export async function getManagerDashboard(req: AuthRequest, res: Response) {
+  const data = await sessionService.getManagerDashboard();
+  sendSuccess(res, data);
+}

@@ -36,7 +36,7 @@ export const createReferralSchema = z.object({
   referralTarget: z.enum(referralTargets).optional(),
   triggerDesc: z.string().optional(),
   priority: z.enum(referralPriorities).default("Medium"),
-  assignedTo: z.string().uuid().optional(),
+  assignedTo: z.string().uuid("Invalid assigned user ID"),
   dueDate: z.string().optional(),
   notes: z.string().optional(),
   isRestricted: z.boolean().default(false),
@@ -74,6 +74,14 @@ export const updateReferralStatusSchema = z
     {
       message: "closureNotes is required when closing a referral",
       path: ["closureNotes"],
+    },
+  )
+  .refine(
+    (data) =>
+      data.status !== "Closed" || (data.outcome && data.outcome.length > 0),
+    {
+      message: "outcome is required when closing a referral",
+      path: ["outcome"],
     },
   );
 
@@ -113,6 +121,23 @@ export const referralQuerySchema = z.object({
   assignedTo: z.string().uuid().optional(),
 });
 
+// ── Escalate Referral ──
+
+export const escalateReferralSchema = z.object({
+  escalationType: z.enum([
+    "club_issue",
+    "external_coach",
+    "execution_delay",
+    "responsibility_conflict",
+    "redirection",
+  ]),
+  escalationNote: z
+    .string()
+    .min(10, "Escalation note must be at least 10 characters")
+    .max(1000),
+  reassignTo: z.string().uuid().optional().nullable(),
+});
+
 // ── Inferred Types ──
 
 export type CreateReferralInput = z.infer<typeof createReferralSchema>;
@@ -122,3 +147,4 @@ export type UpdateReferralStatusInput = z.infer<
 >;
 export type CheckDuplicateInput = z.infer<typeof checkDuplicateSchema>;
 export type ReferralQuery = z.infer<typeof referralQuerySchema>;
+export type EscalateReferralInput = z.infer<typeof escalateReferralSchema>;

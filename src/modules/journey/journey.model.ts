@@ -19,6 +19,17 @@ export type JourneyStageType =
   | "MentalDevelopment"
   | "General";
 
+// ── Stage Owner (كل مرحلة لها متخصص مسؤول) ──
+export type JourneyStageOwner =
+  | "FitnessCoach" // المعد البدني
+  | "Coach" // المدرب الميداني
+  | "SkillCoach" // المدرب المهاري
+  | "TacticalCoach" // المدرب التكتيكي
+  | "Analyst" // محلل الأداء
+  | "NutritionSpecialist" // أخصائي التغذية
+  | "MentalCoach" // الأخصائي النفسي
+  | "Manager"; // المدير الرياضي
+
 interface JourneyAttributes {
   id: string;
   playerId: string;
@@ -29,6 +40,7 @@ interface JourneyAttributes {
   status: JourneyStageStatus;
   health: JourneyStageHealth;
   stageType: JourneyStageType;
+  stageOwner: JourneyStageOwner; // ✅ Who's responsible for this stage (specialist role)
   startDate: string | null;
   expectedEndDate: string | null;
   actualEndDate: string | null;
@@ -51,6 +63,7 @@ interface JourneyCreationAttributes extends Optional<
   | "status"
   | "health"
   | "stageType"
+  | "stageOwner"
   | "startDate"
   | "expectedEndDate"
   | "actualEndDate"
@@ -78,6 +91,7 @@ export class Journey
   declare status: JourneyStageStatus;
   declare health: JourneyStageHealth;
   declare stageType: JourneyStageType;
+  declare stageOwner: JourneyStageOwner;
   declare startDate: string | null;
   declare expectedEndDate: string | null;
   declare actualEndDate: string | null;
@@ -137,6 +151,11 @@ Journey.init(
       type: DataTypes.STRING(50),
       defaultValue: "General",
       field: "stage_type",
+    },
+    stageOwner: {
+      type: DataTypes.STRING(50),
+      allowNull: false,
+      field: "stage_owner",
     },
     startDate: {
       type: DataTypes.DATEONLY,
