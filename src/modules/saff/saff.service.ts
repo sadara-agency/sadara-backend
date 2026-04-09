@@ -14,6 +14,7 @@ import {
   Competition,
   ClubCompetition,
 } from "@modules/competitions/competition.model";
+import { findExistingLeagueEnrollment } from "@modules/competitions/competition.service";
 import { Watchlist } from "@modules/scouting/scouting.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
@@ -724,8 +725,34 @@ export async function importToSadara(input: ImportRequest) {
 
       // ── Import clubs ──
       if (importTypes.includes("clubs")) {
+        // Scope team maps to THIS tournament via standings + fixtures
+        const tournamentTeamIds = new Set<number>();
+
+        const standings = await SaffStanding.findAll({
+          where: { tournamentId: tournament.id, season },
+          attributes: ["saffTeamId"],
+          transaction: txn,
+        });
+        for (const s of standings) tournamentTeamIds.add(s.saffTeamId);
+
+        const fixtures = await SaffFixture.findAll({
+          where: { tournamentId: tournament.id, season },
+          attributes: ["saffHomeTeamId", "saffAwayTeamId"],
+          transaction: txn,
+        });
+        for (const f of fixtures) {
+          tournamentTeamIds.add(f.saffHomeTeamId);
+          tournamentTeamIds.add(f.saffAwayTeamId);
+        }
+
         const teamMaps = await SaffTeamMap.findAll({
-          where: { season, clubId: null },
+          where: {
+            season,
+            clubId: null,
+            ...(tournamentTeamIds.size > 0
+              ? { saffTeamId: { [Op.in]: [...tournamentTeamIds] } }
+              : {}),
+          },
           transaction: txn,
         });
 
@@ -754,6 +781,26 @@ export async function importToSadara(input: ImportRequest) {
           if (created) summary.clubs++;
 
           // ── Enroll club in competition for this season ──
+          // If this is a league, replace any existing league enrollment
+          if (competition.type === "league") {
+            const existing = await findExistingLeagueEnrollment(
+              club.id,
+              season,
+              competition.format,
+              competition.gender,
+              competition.ageGroup,
+              competition.id,
+              txn,
+            );
+            if (existing) {
+              await existing.destroy({ transaction: txn });
+              logger.info(
+                `[SAFF Import] Replacing league for ${club.name}: ` +
+                  `${((existing as any).competition as Competition)?.name} → ${competition.name}`,
+              );
+            }
+          }
+
           await ClubCompetition.findOrCreate({
             where: { clubId: club.id, competitionId: competition.id, season },
             defaults: {
@@ -935,6 +982,23 @@ export async function importToSadara(input: ImportRequest) {
             // Enroll both clubs in competition (skip if already enrolled)
             for (const clubId of clubIds) {
               if (enrolledClubs.has(clubId)) continue;
+
+              // If this is a league, replace any existing league enrollment
+              if (competition.type === "league") {
+                const existing = await findExistingLeagueEnrollment(
+                  clubId,
+                  season,
+                  competition.format,
+                  competition.gender,
+                  competition.ageGroup,
+                  competition.id,
+                  txn,
+                );
+                if (existing) {
+                  await existing.destroy({ transaction: txn });
+                }
+              }
+
               await ClubCompetition.findOrCreate({
                 where: { clubId, competitionId: competition.id, season },
                 defaults: { clubId, competitionId: competition.id, season },

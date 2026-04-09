@@ -11,6 +11,7 @@ import {
   Competition,
   ClubCompetition,
 } from "@modules/competitions/competition.model";
+import { findExistingLeagueEnrollment } from "@modules/competitions/competition.service";
 import {
   SPL_CLUB_REGISTRY,
   findByPulseLiveTeamId,
@@ -64,9 +65,21 @@ export async function seedClubExternalIds(): Promise<{
       // Auto-enroll in Roshn Saudi League competition
       const splComp = await Competition.findOne({
         where: { name: "Roshn Saudi League" },
-        attributes: ["id"],
       });
       if (splComp) {
+        // Replace any existing league enrollment (SPL is authoritative for tier 1)
+        const existing = await findExistingLeagueEnrollment(
+          club.id,
+          "2025-2026",
+          splComp.format,
+          splComp.gender,
+          splComp.ageGroup,
+          splComp.id,
+        );
+        if (existing) {
+          await existing.destroy();
+        }
+
         await ClubCompetition.findOrCreate({
           where: {
             clubId: club.id,
