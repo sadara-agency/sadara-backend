@@ -30,10 +30,18 @@ export type JourneyStageOwner =
   | "MentalCoach" // الأخصائي النفسي
   | "Manager"; // المدير الرياضي
 
+// ── Evolution Phase (career progression) ──
+export type JourneyPhase =
+  | "Diagnostic"
+  | "Foundation"
+  | "Integration"
+  | "Mastery";
+
 interface JourneyAttributes {
   id: string;
   playerId: string;
   gateId: string | null;
+  evolutionCycleId: string | null;
   stageName: string;
   stageNameAr: string | null;
   stageOrder: number;
@@ -41,6 +49,7 @@ interface JourneyAttributes {
   health: JourneyStageHealth;
   stageType: JourneyStageType;
   stageOwner: JourneyStageOwner; // ✅ Who's responsible for this stage (specialist role)
+  phase: JourneyPhase | null;
   startDate: string | null;
   expectedEndDate: string | null;
   actualEndDate: string | null;
@@ -48,6 +57,8 @@ interface JourneyAttributes {
   referralId: string | null;
   responsibleParty: string | null;
   responsiblePartyAr: string | null;
+  blockerDescription: string | null;
+  targetKpi: string | null;
   notes: string | null;
   notesAr: string | null;
   createdBy: string | null;
@@ -59,11 +70,13 @@ interface JourneyCreationAttributes extends Optional<
   JourneyAttributes,
   | "id"
   | "gateId"
+  | "evolutionCycleId"
   | "stageNameAr"
   | "status"
   | "health"
   | "stageType"
   | "stageOwner"
+  | "phase"
   | "startDate"
   | "expectedEndDate"
   | "actualEndDate"
@@ -71,6 +84,8 @@ interface JourneyCreationAttributes extends Optional<
   | "referralId"
   | "responsibleParty"
   | "responsiblePartyAr"
+  | "blockerDescription"
+  | "targetKpi"
   | "notes"
   | "notesAr"
   | "createdBy"
@@ -85,6 +100,7 @@ export class Journey
   declare id: string;
   declare playerId: string;
   declare gateId: string | null;
+  declare evolutionCycleId: string | null;
   declare stageName: string;
   declare stageNameAr: string | null;
   declare stageOrder: number;
@@ -92,6 +108,7 @@ export class Journey
   declare health: JourneyStageHealth;
   declare stageType: JourneyStageType;
   declare stageOwner: JourneyStageOwner;
+  declare phase: JourneyPhase | null;
   declare startDate: string | null;
   declare expectedEndDate: string | null;
   declare actualEndDate: string | null;
@@ -99,6 +116,8 @@ export class Journey
   declare referralId: string | null;
   declare responsibleParty: string | null;
   declare responsiblePartyAr: string | null;
+  declare blockerDescription: string | null;
+  declare targetKpi: string | null;
   declare notes: string | null;
   declare notesAr: string | null;
   declare createdBy: string | null;
@@ -123,6 +142,11 @@ Journey.init(
       type: DataTypes.UUID,
       allowNull: true,
       field: "gate_id",
+    },
+    evolutionCycleId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "evolution_cycle_id",
     },
     stageName: {
       type: DataTypes.STRING(255),
@@ -157,6 +181,10 @@ Journey.init(
       allowNull: false,
       field: "stage_owner",
     },
+    phase: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+    },
     startDate: {
       type: DataTypes.DATEONLY,
       field: "start_date",
@@ -185,6 +213,14 @@ Journey.init(
       type: DataTypes.STRING(255),
       field: "responsible_party_ar",
     },
+    blockerDescription: {
+      type: DataTypes.TEXT,
+      field: "blocker_description",
+    },
+    targetKpi: {
+      type: DataTypes.STRING(500),
+      field: "target_kpi",
+    },
     notes: { type: DataTypes.TEXT },
     notesAr: { type: DataTypes.TEXT, field: "notes_ar" },
     createdBy: { type: DataTypes.UUID, field: "created_by" },
@@ -199,6 +235,8 @@ Journey.init(
       { fields: ["assigned_to"] },
       { fields: ["status"] },
       { fields: ["player_id", "stage_order"] },
+      { fields: ["evolution_cycle_id"] },
+      { fields: ["phase"] },
     ],
   },
 );

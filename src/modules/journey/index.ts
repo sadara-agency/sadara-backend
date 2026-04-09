@@ -1,6 +1,12 @@
 // Model
 export { Journey } from "./journey.model";
-export type { JourneyStageStatus, JourneyStageHealth } from "./journey.model";
+export type {
+  JourneyStageStatus,
+  JourneyStageHealth,
+  JourneyStageType,
+  JourneyStageOwner,
+  JourneyPhase,
+} from "./journey.model";
 
 // Service
 export * as journeyService from "./journey.service";
