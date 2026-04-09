@@ -38,6 +38,7 @@ jest.mock("@modules/competitions/competition.model", () => ({
   },
   ClubCompetition: {
     findAll: jest.fn(),
+    findOne: jest.fn().mockResolvedValue(null),
     findOrCreate: jest.fn(),
     destroy: jest.fn(),
   },
@@ -46,6 +47,7 @@ jest.mock("@modules/competitions/competition.model", () => ({
 jest.mock("@modules/clubs/club.model", () => ({
   Club: {
     findByPk: jest.fn(),
+    update: jest.fn().mockResolvedValue([1]),
   },
 }));
 
@@ -118,7 +120,13 @@ const defaultQuery = {
 // ═══════════════════════════════════════════════
 
 describe("CompetitionService", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Default: no existing league enrollment (for addClubToCompetition checks)
+    (ClubCompetition.findOne as jest.Mock).mockResolvedValue(null);
+    // Default: syncClubLeagueField needs Club.update
+    (Club.update as jest.Mock).mockResolvedValue([1]);
+  });
 
   // ── listCompetitions ──
 
