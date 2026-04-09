@@ -256,17 +256,8 @@ export async function getManagerDashboard() {
         "programOwner",
         [sequelize.fn("COUNT", sequelize.col("id")), "count"],
         [
-          sequelize.fn(
-            "COUNT",
-            sequelize.fn(
-              "CASE",
-              sequelize.where(
-                sequelize.col("completion_status"),
-                Op.eq,
-                "Completed",
-              ),
-              1,
-            ),
+          sequelize.literal(
+            `COUNT(CASE WHEN "completion_status" = 'Completed' THEN 1 END)`,
           ),
           "completedCount",
         ],

@@ -1,7 +1,9 @@
-import { Op, WhereOptions } from "sequelize";
+import { Op, WhereOptions, Transaction } from "sequelize";
 import {
   Competition,
   ClubCompetition,
+  CompetitionFormat,
+  CompetitionGender,
 } from "@modules/competitions/competition.model";
 import { Club } from "@modules/clubs/club.model";
 import { AppError } from "@middleware/errorHandler";
@@ -115,8 +117,33 @@ export async function addClubToCompetition(
   competitionId: string,
   input: AddClubInput,
 ) {
-  await findOrThrow(Competition, competitionId, "Competition");
+  const competition = await findOrThrow(
+    Competition,
+    competitionId,
+    "Competition",
+  );
   await findOrThrow(Club, input.clubId, "Club");
+
+  // Prevent a club from being in two leagues of the same format/gender/ageGroup
+  if (competition.type === "league") {
+    const existing = await findExistingLeagueEnrollment(
+      input.clubId,
+      input.season,
+      competition.format,
+      competition.gender,
+      competition.ageGroup,
+      competitionId,
+    );
+
+    if (existing) {
+      const existingComp = (existing as any).competition as Competition;
+      throw new AppError(
+        `Club is already enrolled in league "${existingComp.name}" for season ${input.season}. ` +
+          `Remove it first before adding to a different league.`,
+        409,
+      );
+    }
+  }
 
   const [entry, created] = await ClubCompetition.findOrCreate({
     where: {
@@ -133,6 +160,10 @@ export async function addClubToCompetition(
 
   if (!created)
     throw new AppError("Club already in this competition/season", 409);
+
+  // Keep clubs.league in sync
+  syncClubLeagueField(input.clubId, input.season).catch(() => {});
+
   return entry;
 }
 
@@ -146,6 +177,12 @@ export async function removeClubFromCompetition(
 
   const deleted = await ClubCompetition.destroy({ where });
   if (!deleted) throw new AppError("Club-competition entry not found", 404);
+
+  // Keep clubs.league in sync
+  if (season) {
+    syncClubLeagueField(clubId, season).catch(() => {});
+  }
+
   return { competitionId, clubId };
 }
 
@@ -162,4 +199,84 @@ export async function getClubCompetitions(clubId: string, season?: string) {
   });
 
   return entries;
+}
+
+// ── League-uniqueness helpers ──
+
+/**
+ * Check if a club is already enrolled in a league-type competition
+ * of the same format/gender/ageGroup for a given season.
+ */
+export async function findExistingLeagueEnrollment(
+  clubId: string,
+  season: string,
+  format: CompetitionFormat,
+  gender: CompetitionGender,
+  ageGroup: string | null,
+  excludeCompetitionId?: string,
+  transaction?: Transaction,
+): Promise<ClubCompetition | null> {
+  const competitionWhere: WhereOptions = {
+    type: "league",
+    format,
+    gender,
+  };
+  if (ageGroup) {
+    competitionWhere.ageGroup = ageGroup;
+  } else {
+    competitionWhere[Op.or as any] = [{ ageGroup: null }, { ageGroup: "" }];
+  }
+
+  const ccWhere: WhereOptions = { clubId, season };
+  if (excludeCompetitionId) {
+    ccWhere.competitionId = { [Op.ne]: excludeCompetitionId };
+  }
+
+  return ClubCompetition.findOne({
+    where: ccWhere,
+    include: [
+      {
+        model: Competition,
+        as: "competition",
+        where: competitionWhere,
+      },
+    ],
+    transaction,
+  });
+}
+
+/**
+ * Sync the clubs.league field to match the club's actual
+ * men's outdoor senior league enrollment for a given season.
+ */
+export async function syncClubLeagueField(
+  clubId: string,
+  season: string,
+  transaction?: Transaction,
+): Promise<void> {
+  const leagueEntry = await ClubCompetition.findOne({
+    where: { clubId, season },
+    include: [
+      {
+        model: Competition,
+        as: "competition",
+        where: {
+          type: "league",
+          format: "outdoor",
+          gender: "men",
+          [Op.or as any]: [{ ageGroup: null }, { ageGroup: "" }],
+        },
+      },
+    ],
+    transaction,
+  });
+
+  const leagueName = leagueEntry
+    ? ((leagueEntry as any).competition as Competition).name
+    : null;
+
+  await Club.update(
+    { league: leagueName },
+    { where: { id: clubId }, transaction },
+  );
 }

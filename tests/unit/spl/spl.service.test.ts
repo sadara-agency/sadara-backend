@@ -15,11 +15,18 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
 
 jest.mock('../../../src/modules/competitions/competition.model', () => ({
   Competition: {
-    findOne: jest.fn().mockResolvedValue({ id: 'comp-001' }),
+    findOne: jest.fn().mockResolvedValue({
+      id: 'comp-001',
+      type: 'league',
+      format: 'outdoor',
+      gender: 'men',
+      ageGroup: null,
+    }),
     init: jest.fn(),
     name: 'Competition',
   },
   ClubCompetition: {
+    findOne: jest.fn().mockResolvedValue(null),
     findOrCreate: jest.fn().mockResolvedValue([{}, true]),
     init: jest.fn(),
     name: 'ClubCompetition',
@@ -48,7 +55,20 @@ jest.mock('../../../src/config/logger', () => ({
 import * as splService from '../../../src/modules/spl/spl.service';
 
 describe('SPL Service', () => {
-  beforeEach(() => { jest.clearAllMocks(); });
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // Re-set mocks cleared by clearAllMocks
+    const { Competition, ClubCompetition } = require('../../../src/modules/competitions/competition.model');
+    (Competition.findOne as jest.Mock).mockResolvedValue({
+      id: 'comp-001',
+      type: 'league',
+      format: 'outdoor',
+      gender: 'men',
+      ageGroup: null,
+    });
+    (ClubCompetition.findOne as jest.Mock).mockResolvedValue(null);
+    (ClubCompetition.findOrCreate as jest.Mock).mockResolvedValue([{}, true]);
+  });
 
   describe('seedClubExternalIds', () => {
     it('should update clubs with external IDs', async () => {

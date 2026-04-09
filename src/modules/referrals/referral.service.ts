@@ -587,7 +587,10 @@ export async function getSpecialistPerformance(query: any = {}) {
       }
 
       acc[specialist].total++;
-      acc[specialist][session.completionStatus.toLowerCase()]++;
+      const statusKey = (session.completionStatus || "scheduled").toLowerCase();
+      if (statusKey in acc[specialist]) {
+        (acc[specialist] as any)[statusKey]++;
+      }
 
       return acc;
     },
