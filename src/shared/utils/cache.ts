@@ -30,6 +30,7 @@ export const CachePrefix = {
   WELLNESS: "wellness",
   SESSIONS: "sessions",
   JOURNEY: "journey",
+  EVOLUTION_CYCLES: "evolution-cycles",
   INJURIES: "injuries",
   SIDEBAR_NAV: "sidebar-nav",
 } as const;

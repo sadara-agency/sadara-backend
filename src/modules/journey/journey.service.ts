@@ -1,5 +1,6 @@
 import { Op, WhereOptions } from "sequelize";
 import { Journey } from "./journey.model";
+import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
 import { Ticket } from "@modules/tickets/ticket.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Gate } from "@modules/gates/gate.model";
@@ -20,6 +21,9 @@ export async function listJourneys(query: JourneyQuery) {
   if ((query as any).gateId) where.gateId = (query as any).gateId;
   if (query.status) where.status = query.status;
   if (query.health) where.health = query.health;
+  if ((query as any).phase) (where as any).phase = (query as any).phase;
+  if ((query as any).evolutionCycleId)
+    (where as any).evolutionCycleId = (query as any).evolutionCycleId;
   if (query.assignedTo) where.assignedTo = query.assignedTo;
 
   const offset = (query.page - 1) * query.limit;
@@ -41,6 +45,12 @@ export async function listJourneys(query: JourneyQuery) {
         model: Gate,
         as: "gate",
         attributes: ["id", "gateNumber", "status"],
+        required: false,
+      },
+      {
+        model: EvolutionCycle,
+        as: "evolutionCycle",
+        attributes: ["id", "name", "nameAr", "tier", "currentPhase", "status"],
         required: false,
       },
     ],

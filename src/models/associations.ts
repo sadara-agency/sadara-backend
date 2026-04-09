@@ -11,6 +11,7 @@ import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { Journey } from "@modules/journey/journey.model";
+import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
 import {
   Watchlist,
   ScreeningCase,
@@ -220,6 +221,23 @@ export function setupAssociations() {
 
   // Journey ↔ Player
   Journey.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+
+  // Journey ↔ EvolutionCycle
+  Journey.belongsTo(EvolutionCycle, {
+    foreignKey: "evolutionCycleId",
+    as: "evolutionCycle",
+  });
+  EvolutionCycle.hasMany(Journey, {
+    foreignKey: "evolutionCycleId",
+    as: "stages",
+  });
+
+  // EvolutionCycle ↔ Player
+  EvolutionCycle.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Player.hasMany(EvolutionCycle, {
+    foreignKey: "playerId",
+    as: "evolutionCycles",
+  });
 
   // Scouting
   Watchlist.belongsTo(User, { foreignKey: "scoutedBy", as: "scout" });

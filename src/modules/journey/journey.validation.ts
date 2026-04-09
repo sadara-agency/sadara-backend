@@ -32,6 +32,14 @@ const STAGE_OWNERS = [
   "Manager", // المدير الرياضي (fallback)
 ] as const;
 
+// ── Evolution Phases (Career Progression) ──
+const EVOLUTION_PHASES = [
+  "Diagnostic",
+  "Foundation",
+  "Integration",
+  "Mastery",
+] as const;
+
 // ── Stage Type → Owner Mapping (enforces specialty separation) ──
 const STAGE_OWNER_MAP: Record<
   (typeof STAGE_TYPES)[number],
@@ -60,6 +68,12 @@ export const createJourneySchema = z
     stageOwner: z.enum(STAGE_OWNERS, {
       errorMap: () => ({ message: "Invalid specialist role for this stage" }),
     }),
+    phase: z.enum(EVOLUTION_PHASES).nullable().optional(),
+    evolutionCycleId: z
+      .string()
+      .uuid("Invalid evolution cycle ID")
+      .nullable()
+      .optional(),
     startDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
@@ -72,6 +86,8 @@ export const createJourneySchema = z
     referralId: z.string().uuid("Invalid referral ID").optional(),
     responsibleParty: z.string().optional(),
     responsiblePartyAr: z.string().optional(),
+    blockerDescription: z.string().optional(),
+    targetKpi: z.string().max(500).optional(),
     notes: z.string().optional(),
     notesAr: z.string().optional(),
   })
@@ -102,6 +118,12 @@ export const updateJourneySchema = z
         errorMap: () => ({ message: "Invalid specialist role for this stage" }),
       })
       .optional(),
+    phase: z.enum(EVOLUTION_PHASES).nullable().optional(),
+    evolutionCycleId: z
+      .string()
+      .uuid("Invalid evolution cycle ID")
+      .nullable()
+      .optional(),
     startDate: z
       .string()
       .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
@@ -121,6 +143,8 @@ export const updateJourneySchema = z
     referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
     responsibleParty: z.string().nullable().optional(),
     responsiblePartyAr: z.string().nullable().optional(),
+    blockerDescription: z.string().nullable().optional(),
+    targetKpi: z.string().max(500).nullable().optional(),
     notes: z.string().nullable().optional(),
     notesAr: z.string().nullable().optional(),
   })
@@ -149,6 +173,8 @@ export const journeyQuerySchema = z.object({
   status: z.enum(STAGE_STATUSES).optional(),
   health: z.enum(STAGE_HEALTH).optional(),
   stageType: z.enum(STAGE_TYPES).optional(),
+  phase: z.enum(EVOLUTION_PHASES).optional(),
+  evolutionCycleId: z.string().uuid().optional(),
   assignedTo: z.string().uuid().optional(),
   sort: z
     .enum([

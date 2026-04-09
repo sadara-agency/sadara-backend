@@ -454,13 +454,25 @@ export async function listAggregatedEvents(
     });
   }
 
+  // Session type → Arabic label map
+  const sessionTypeAr: Record<string, string> = {
+    Physical: "بدني",
+    Skill: "مهاري",
+    Tactical: "تكتيكي",
+    Mental: "نفسي",
+    Nutrition: "تغذية",
+    PerformanceAssessment: "تقييم أداء",
+    Goalkeeper: "حراسة مرمى",
+  };
+
   // Sessions → CalendarItem
   for (const s of sessions as any[]) {
     const pn = playerName(s.player);
+    const typeAr = sessionTypeAr[s.sessionType] || s.sessionType;
     items.push({
       id: `session-${s.id}`,
       title: `${s.sessionType}: ${pn.en}`,
-      titleAr: `${s.sessionType}: ${pn.ar}`,
+      titleAr: `${typeAr}: ${pn.ar}`,
       description: s.notes,
       descriptionAr: s.notesAr,
       eventType: "Session",
@@ -493,8 +505,8 @@ export async function listAggregatedEvents(
 
   // Matches → CalendarItem
   for (const m of matches as any[]) {
-    const home = m.homeTeamName || "Home";
-    const away = m.awayTeamName || "Away";
+    const home = m.homeTeamName || "";
+    const away = m.awayTeamName || "";
     const matchStart =
       m.matchDate instanceof Date
         ? m.matchDate.toISOString()
@@ -503,10 +515,15 @@ export async function listAggregatedEvents(
       new Date(matchStart).getTime() + 2 * 60 * 60 * 1000,
     ).toISOString();
 
+    const matchTitle =
+      home && away ? `${home} vs ${away}` : home || away || "Match";
+    const matchTitleAr =
+      home && away ? `${home} ضد ${away}` : home || away || "مباراة";
+
     items.push({
       id: `match-${m.id}`,
-      title: `${home} vs ${away}`,
-      titleAr: `${home} ضد ${away}`,
+      title: matchTitle,
+      titleAr: matchTitleAr,
       description: [m.competition, m.round].filter(Boolean).join(" · ") || null,
       descriptionAr: null,
       eventType: "Match",
