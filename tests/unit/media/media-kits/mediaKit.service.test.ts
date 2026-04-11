@@ -19,9 +19,12 @@ jest.mock('../../../../src/modules/media/media-kits/mediaKit.model', () => ({
   },
 }));
 
+const mockPlayerFindAll = jest.fn();
+
 jest.mock('../../../../src/modules/players/player.model', () => ({
   Player: {
     findByPk: (...a: unknown[]) => mockPlayerFindByPk(...a),
+    findAll: (...a: unknown[]) => mockPlayerFindAll(...a),
   },
 }));
 
@@ -32,6 +35,19 @@ jest.mock('../../../../src/modules/clubs/club.model', () => ({
 }));
 
 jest.mock('../../../../src/modules/users/user.model', () => ({ User: {} }));
+jest.mock('../../../../src/shared/utils/pdf', () => ({
+  escHtml: (v: unknown) => String(v ?? '-'),
+  fmtDate: () => '-',
+  calcAge: () => 25,
+  wrapHtml: (body: string, css: string) => `<html>${body}</html>`,
+  makeSadaraHeader: () => '<div class="hd"></div>',
+  renderPagesToBuffers: jest.fn().mockResolvedValue([Buffer.from('pdf')]),
+  mergeWithBrandPages: jest.fn().mockResolvedValue(Buffer.from('merged-pdf')),
+}));
+jest.mock('../../../../src/shared/utils/storage', () => ({
+  uploadFile: jest.fn().mockResolvedValue({ url: 'https://storage.example.com/doc.pdf', thumbnailUrl: null, key: 'documents/doc.pdf', size: 1024, mimeType: 'application/pdf' }),
+  resolveFileUrl: jest.fn().mockResolvedValue('https://storage.example.com/signed-url'),
+}));
 jest.mock('../../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
@@ -59,7 +75,7 @@ describe('Media Kit Service', () => {
       const result = await svc.generatePlayerKit('player-001', 'both', 'user-001');
       expect(result).toBeDefined();
       expect(mockGenCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ templateType: 'player_profile', playerId: 'player-001', generatedBy: 'user-001' }),
+        expect.objectContaining({ templateType: 'player_profile', playerId: 'player-001', generatedBy: 'user-001', fileUrl: expect.any(String), fileSize: expect.any(Number) }),
       );
     });
 
@@ -72,11 +88,12 @@ describe('Media Kit Service', () => {
   describe('generateSquadKit', () => {
     it('should create a squad roster generation record', async () => {
       mockClubFindByPk.mockResolvedValue(mockModelInstance(mockClub()));
+      mockPlayerFindAll.mockResolvedValue([]);
       mockGenCreate.mockResolvedValue(mockModelInstance(mockGeneration({ templateType: 'squad_roster', clubId: 'club-001' })));
       const result = await svc.generateSquadKit('club-001', 'en', 'user-001');
       expect(result).toBeDefined();
       expect(mockGenCreate).toHaveBeenCalledWith(
-        expect.objectContaining({ templateType: 'squad_roster', clubId: 'club-001', generatedBy: 'user-001' }),
+        expect.objectContaining({ templateType: 'squad_roster', clubId: 'club-001', generatedBy: 'user-001', fileUrl: expect.any(String), fileSize: expect.any(Number) }),
       );
     });
 
