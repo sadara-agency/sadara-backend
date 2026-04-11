@@ -18,7 +18,7 @@ export const createSocialPostSchema = z.object({
   platforms: z
     .array(z.enum(["twitter", "instagram", "linkedin", "facebook", "tiktok"]))
     .min(1),
-  scheduledAt: z.string().datetime().optional(),
+  scheduledAt: z.string().datetime({ offset: true }).optional(),
   playerId: z.string().uuid().optional(),
   clubId: z.string().uuid().optional(),
   matchId: z.string().uuid().optional(),
