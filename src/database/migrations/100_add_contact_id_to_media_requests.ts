@@ -1,6 +1,13 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 export async function up({ context: qi }: { context: QueryInterface }) {
+  // Guard: column may already exist from model sync
+  const table = (await qi.describeTable("media_requests")) as Record<
+    string,
+    unknown
+  >;
+  if (table.media_contact_id) return;
+
   await qi.addColumn("media_requests", "media_contact_id", {
     type: DataTypes.UUID,
     allowNull: true,
