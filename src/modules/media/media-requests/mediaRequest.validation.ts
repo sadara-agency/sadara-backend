@@ -30,6 +30,7 @@ export const createMediaRequestSchema = z.object({
   scheduledAt: z.string().datetime({ offset: true }).optional(),
   notes: z.string().max(2000).optional(),
   assignedTo: z.string().uuid().optional(),
+  mediaContactId: z.string().uuid().optional(),
 });
 
 // ── Update Media Request ──

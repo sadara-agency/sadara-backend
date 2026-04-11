@@ -33,6 +33,11 @@ export const CachePrefix = {
   EVOLUTION_CYCLES: "evolution-cycles",
   INJURIES: "injuries",
   SIDEBAR_NAV: "sidebar-nav",
+  MEDIA_REQUESTS: "media-requests",
+  MEDIA_CONTACTS: "media-contacts",
+  PRESS_RELEASES: "press-releases",
+  MEDIA_KITS: "media-kits",
+  SOCIAL_POSTS: "social-posts",
 } as const;
 
 // ── Core Operations ──

@@ -3,6 +3,9 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
 import {
   createPressReleaseSchema,
   updatePressReleaseSchema,
@@ -19,6 +22,7 @@ router.get(
   "/",
   authorizeModule("press_releases", "read"),
   dynamicFieldAccess("press_releases"),
+  cacheRoute("press-releases", CacheTTL.MEDIUM),
   validate(pressReleaseQuerySchema, "query"),
   asyncHandler(pressReleaseController.list),
 );
@@ -26,12 +30,14 @@ router.get(
   "/slug/:slug",
   authorizeModule("press_releases", "read"),
   dynamicFieldAccess("press_releases"),
+  cacheRoute("press-releases", CacheTTL.MEDIUM),
   asyncHandler(pressReleaseController.getBySlug),
 );
 router.get(
   "/:id",
   authorizeModule("press_releases", "read"),
   dynamicFieldAccess("press_releases"),
+  cacheRoute("press-releases", CacheTTL.MEDIUM),
   asyncHandler(pressReleaseController.getById),
 );
 
@@ -55,6 +61,15 @@ router.patch(
   authorizeModule("press_releases", "update"),
   validate(updatePressReleaseStatusSchema),
   asyncHandler(pressReleaseController.updateStatus),
+);
+
+// ── Cover Image Upload ──
+router.post(
+  "/:id/cover-image",
+  authorizeModule("press_releases", "update"),
+  uploadSingle,
+  verifyFileType,
+  asyncHandler(pressReleaseController.uploadCoverImage),
 );
 
 // ── Delete ──

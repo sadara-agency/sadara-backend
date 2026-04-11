@@ -3,6 +3,8 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 import {
   createMediaContactSchema,
   updateMediaContactSchema,
@@ -18,6 +20,7 @@ router.get(
   "/",
   authorizeModule("media_contacts", "read"),
   dynamicFieldAccess("media_contacts"),
+  cacheRoute("media-contacts", CacheTTL.MEDIUM),
   validate(mediaContactQuerySchema, "query"),
   asyncHandler(mediaContactController.list),
 );
@@ -25,6 +28,7 @@ router.get(
   "/:id",
   authorizeModule("media_contacts", "read"),
   dynamicFieldAccess("media_contacts"),
+  cacheRoute("media-contacts", CacheTTL.MEDIUM),
   asyncHandler(mediaContactController.getById),
 );
 

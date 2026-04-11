@@ -3,6 +3,9 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { CachePrefix, invalidateMultiple } from "@shared/utils/cache";
+import { uploadFile } from "@shared/utils/storage";
+import { AppError } from "@middleware/errorHandler";
 import * as pressReleaseService from "./pressRelease.service";
 
 const crud = createCrudController({
@@ -15,7 +18,7 @@ const crud = createCrudController({
     delete: (id) => pressReleaseService.deletePressRelease(id),
   },
   entity: "press_releases",
-  cachePrefixes: [],
+  cachePrefixes: [CachePrefix.PRESS_RELEASES],
   label: (r) => r.title,
 });
 
@@ -48,4 +51,42 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   );
 
   sendSuccess(res, release, `Status updated to ${release.status}`);
+}
+
+// ── Custom: Upload Cover Image ──
+
+export async function uploadCoverImage(req: AuthRequest, res: Response) {
+  if (!req.file) throw new AppError("No file uploaded", 400);
+
+  const result = await uploadFile({
+    folder: "photos",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: true,
+  });
+
+  const coverImageUrl = result.url.startsWith("http")
+    ? result.url
+    : `${req.protocol}://${req.get("host")}${result.url}`;
+
+  const release = await pressReleaseService.updatePressRelease(req.params.id, {
+    coverImageUrl,
+  });
+
+  logAudit(
+    "UPDATE",
+    "press_releases",
+    release.id,
+    buildAuditContext(req.user!, req.ip),
+    "Updated press release cover image",
+  ).catch(() => {});
+
+  invalidateMultiple([CachePrefix.PRESS_RELEASES]).catch(() => {});
+
+  sendSuccess(
+    res,
+    { coverImageUrl, thumbnailUrl: result.thumbnailUrl },
+    "Cover image uploaded",
+  );
 }

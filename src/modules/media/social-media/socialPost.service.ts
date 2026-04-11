@@ -6,6 +6,9 @@ import { Match } from "@modules/matches/match.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { createNotification } from "@modules/notifications/notification.service";
+import { createEvent } from "@modules/calendar/event.service";
+import { logger } from "@config/logger";
 import {
   CreateSocialPostInput,
   UpdateSocialPostInput,
@@ -142,6 +145,78 @@ export async function updateSocialPostStatus(
   if (data.status === "published") updates.publishedAt = new Date();
 
   await post.update(updates);
+
+  // Auto-create calendar event when scheduled
+  if (data.status === "scheduled" && post.scheduledAt) {
+    const scheduledDate = new Date(post.scheduledAt);
+    const endDate = new Date(scheduledDate.getTime() + 30 * 60 * 1000); // +30 min
+    createEvent(
+      {
+        title: `Social Post: ${post.title}`,
+        titleAr: post.titleAr || `منشور: ${post.title}`,
+        eventType: "Custom",
+        startDate: scheduledDate.toISOString(),
+        endDate: endDate.toISOString(),
+        allDay: false,
+        color: "#3C3CFA",
+      },
+      post.createdBy,
+    )
+      .then((event) => {
+        post.update({ calendarEventId: event.id }).catch(() => {});
+      })
+      .catch((err) => logger.warn("Social post calendar sync failed", err));
+  }
+
+  // Fire-and-forget notification when published
+  if (data.status === "published") {
+    createNotification({
+      userId: post.createdBy,
+      type: "system",
+      title: `Social post published: ${post.title}`,
+      titleAr: `تم نشر المنشور: ${post.titleAr || post.title}`,
+      link: "/dashboard/media/social",
+      sourceType: "social_post",
+      sourceId: post.id,
+      priority: "normal",
+    }).catch((err) => logger.warn("Social post notification failed", err));
+  }
+
+  return getSocialPostById(id);
+}
+
+// ── Add Image URL ──
+
+export async function addImageUrl(id: string, imageUrl: string) {
+  const post = await getSocialPostById(id);
+  if (post.status === "published" || post.status === "archived") {
+    throw new AppError(
+      "Cannot modify images on a published or archived post",
+      400,
+    );
+  }
+  const currentUrls = (post.imageUrls as string[]) || [];
+  await post.update({ imageUrls: [...currentUrls, imageUrl] });
+  return getSocialPostById(id);
+}
+
+// ── Remove Image URL ──
+
+export async function removeImageUrl(id: string, index: number) {
+  const post = await getSocialPostById(id);
+  if (post.status === "published" || post.status === "archived") {
+    throw new AppError(
+      "Cannot modify images on a published or archived post",
+      400,
+    );
+  }
+  const currentUrls = (post.imageUrls as string[]) || [];
+  if (index < 0 || index >= currentUrls.length) {
+    throw new AppError("Image index out of range", 400);
+  }
+  const updated = [...currentUrls];
+  updated.splice(index, 1);
+  await post.update({ imageUrls: updated });
   return getSocialPostById(id);
 }
 
