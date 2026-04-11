@@ -38,6 +38,21 @@ export const CachePrefix = {
   PRESS_RELEASES: "press-releases",
   MEDIA_KITS: "media-kits",
   SOCIAL_POSTS: "social-posts",
+  SESSION_FEEDBACK: "session-feedback",
+  MEAL_PLANS: "meal-plans",
+  RTP: "rtp",
+  INJURY_FINANCIALS: "injury-financials",
+  MATCH_ANALYTICS: "match-analytics",
+  POSITIONAL_BENCHMARKS: "positional-benchmarks",
+  TACTICAL: "tactical",
+  SET_PIECES: "set-pieces",
+  TACTICAL_REPORTS: "tactical-reports",
+  TRAINING_PLANS: "training-plans",
+  DEV_REVIEWS: "dev-reviews",
+  MENTAL: "mental",
+  MENTAL_TEMPLATES: "mental-templates",
+  VIDEO_CLIPS: "video-clips",
+  VIDEO_TAGS: "video-tags",
 } as const;
 
 // ── Core Operations ──

@@ -24,9 +24,17 @@ import {
   markLessonCompleteSchema,
 } from "@modules/training/training.validation";
 import * as ctrl from "@modules/training/training.controller";
+import planRoutes from "@modules/training/plans/trainingPlan.routes";
+import reviewRoutes from "@modules/training/reviews/devReview.routes";
 
 const router = Router();
 router.use(authenticate);
+
+// ── Sub-modules ──
+// /api/v1/training/plans
+router.use("/plans", planRoutes);
+// /api/v1/training/reviews
+router.use("/reviews", reviewRoutes);
 
 // ══════════════════════════════════════════
 // PLAYER SELF-SERVICE (must come before :id catch-all)

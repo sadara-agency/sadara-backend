@@ -10,6 +10,8 @@ import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
+import { SessionFeedback } from "@modules/sessions/feedback/sessionFeedback.model";
+import { MealPlan, MealPlanItem } from "@modules/wellness/mealPlan.model";
 import { Journey } from "@modules/journey/journey.model";
 import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
 import {
@@ -210,6 +212,19 @@ export function setupAssociations() {
     as: "journeyStage",
   });
   Journey.hasMany(Session, { foreignKey: "journeyStageId", as: "sessions" });
+
+  // Session Feedback
+  SessionFeedback.belongsTo(Session, {
+    foreignKey: "sessionId",
+    as: "session",
+  });
+  Session.hasMany(SessionFeedback, { foreignKey: "sessionId", as: "feedback" });
+  SessionFeedback.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Player.hasMany(SessionFeedback, {
+    foreignKey: "playerId",
+    as: "sessionFeedback",
+  });
+  SessionFeedback.belongsTo(User, { foreignKey: "coachId", as: "coach" });
 
   // Journey ↔ Referral
   Journey.belongsTo(Referral, { foreignKey: "referralId", as: "referral" });
@@ -525,4 +540,9 @@ export function setupAssociations() {
     foreignKey: "userId",
     as: "trackedPlayers",
   });
+
+  // Meal Plans
+  MealPlan.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Player.hasMany(MealPlan, { foreignKey: "playerId", as: "mealPlans" });
+  MealPlan.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 }

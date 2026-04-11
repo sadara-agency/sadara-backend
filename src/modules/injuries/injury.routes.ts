@@ -11,9 +11,15 @@ import {
   injuryQuerySchema,
 } from "@modules/injuries/injury.validation";
 import * as ctrl from "@modules/injuries/injury.controller";
+import rtpRoutes from "@modules/injuries/rtp/rtp.routes";
+import financialsRoutes from "@modules/injuries/financials/injuryFinancials.routes";
 
 const router = Router();
 router.use(authenticate);
+
+// ── Sub-module routes ──
+router.use("/rtp", rtpRoutes);
+router.use("/financials", financialsRoutes);
 
 router.get(
   "/",

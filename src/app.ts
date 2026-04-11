@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import fs from "fs";
 import { env } from "@config/env";
+import { logger } from "@config/logger";
 import { errorHandler } from "@middleware/errorHandler";
 import { apiLimiter, authLimiter } from "@middleware/rateLimiter";
 import { csrfProtection } from "@middleware/csrf";
@@ -55,6 +56,7 @@ import calendarRoutes from "@modules/calendar/event.routes";
 import esignatureRoutes from "@modules/esignatures/esignature.routes";
 import wellnessRoutes from "@modules/wellness/wellness.routes";
 import fitnessRoutes from "@modules/wellness/fitness.routes";
+import mealPlanRoutes from "@modules/wellness/mealPlan.routes";
 import mediaRoutes from "@modules/media/media.routes";
 import journeyRoutes from "@modules/journey/journey.routes";
 import evolutionCycleRoutes from "@modules/evolution-cycles/evolution-cycle.routes";
@@ -63,6 +65,9 @@ import ticketRoutes from "@modules/tickets/ticket.routes";
 import sessionRoutes from "@modules/sessions/session.routes";
 import messagingRoutes from "@modules/messaging/messaging.routes";
 import packageRoutes from "@modules/packages/package.routes";
+import tacticalRoutes from "@modules/tactical/tactical.routes";
+import mentalRoutes from "@modules/mental/mental.routes";
+import videoRoutes from "@modules/video/video.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -99,6 +104,11 @@ app.use(
         return callback(null, true);
       }
 
+      // Allow Cloud Run API's own origin (for Swagger UI)
+      if (/^https:\/\/api-sadara-\d+\.europe-west1\.run\.app$/.test(origin)) {
+        return callback(null, true);
+      }
+
       // Allow localhost in development
       if (
         env.nodeEnv !== "production" &&
@@ -107,7 +117,9 @@ app.use(
         return callback(null, true);
       }
 
-      callback(new Error(`CORS: origin ${origin} not allowed`));
+      // Reject with false (returns 403) instead of Error (which causes 500)
+      logger.warn(`CORS rejected: ${origin}`);
+      callback(null, false);
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -286,6 +298,7 @@ app.use("/api/v1/calendar", calendarRoutes);
 app.use("/api/v1/esignatures", esignatureRoutes);
 app.use("/api/v1/wellness", wellnessRoutes);
 app.use("/api/v1/wellness", fitnessRoutes);
+app.use("/api/v1/wellness", mealPlanRoutes);
 app.use("/api/v1/media", mediaRoutes);
 
 // ── Public press release portal (no auth) ──
@@ -308,6 +321,9 @@ app.use("/api/v1/tickets", ticketRoutes);
 app.use("/api/v1/sessions", sessionRoutes);
 app.use("/api/v1/messaging", messagingRoutes);
 app.use("/api/v1/packages", packageRoutes);
+app.use("/api/v1/tactical", tacticalRoutes);
+app.use("/api/v1/mental", mentalRoutes);
+app.use("/api/v1/video", videoRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(

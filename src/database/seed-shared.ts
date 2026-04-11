@@ -366,6 +366,32 @@ const RAW_PERMISSIONS: Perm[] = [
   ...allRoles("sessions", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("sessions", ["Admin", "Manager"], { canDelete: true }),
 
+  ...forRoles(
+    "session-feedback",
+    [
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+      "Analyst",
+    ],
+    { canRead: true, canCreate: true, canUpdate: true },
+  ),
+  ...forRoles("session-feedback", ["Admin", "Manager"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("session-feedback", ["NutritionSpecialist", "GymCoach"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("session-feedback", ["Player", "Executive"], { canRead: true }),
+
   ...allRoles("notifications", {
     canRead: true,
     canUpdate: true,
@@ -498,6 +524,100 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
 
+  ...forRoles("meal-plans", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("meal-plans", ["NutritionSpecialist"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("meal-plans", ["Coach", "FitnessCoach", "GymCoach"], {
+    canRead: true,
+  }),
+  ...forRoles("meal-plans", ["Player"], { canRead: true }),
+  ...forRoles("meal-plans", ["Executive"], { canRead: true }),
+
+  // ── RTP Protocols ──
+  ...forRoles("rtp", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("rtp", ["Coach", "FitnessCoach", "GoalkeeperCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("rtp", ["SkillCoach", "TacticalCoach", "MentalCoach"], {
+    canRead: true,
+  }),
+  ...forRoles("rtp", ["Analyst", "NutritionSpecialist", "Executive"], {
+    canRead: true,
+  }),
+  ...forRoles("rtp", ["Player"], { canRead: true }),
+
+  // ── Tactical Intelligence ──
+  ...forRoles("tactical", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("tactical", ["Analyst", "TacticalCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("tactical", ["Coach", "SkillCoach", "GoalkeeperCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("tactical", ["FitnessCoach", "Executive", "Scout"], {
+    canRead: true,
+  }),
+  ...forRoles("tactical", ["Player"], { canRead: true }),
+
+  // ── Match Analytics ──
+  ...forRoles("match-analytics", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("match-analytics", ["Analyst"], {
+    canCreate: true,
+    canRead: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "match-analytics",
+    ["Coach", "TacticalCoach", "SkillCoach", "FitnessCoach", "GoalkeeperCoach"],
+    { canRead: true },
+  ),
+  ...forRoles("match-analytics", ["Executive", "Scout", "Player"], {
+    canRead: true,
+  }),
+
+  // ── Injury Financials ──
+  ...forRoles("injury-financials", ["Admin", "Manager", "Finance"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("injury-financials", ["Coach", "FitnessCoach"], {
+    canRead: true,
+  }),
+  ...forRoles("injury-financials", ["Executive"], { canRead: true }),
+
   ...forRoles("media_requests", ["Admin", "Manager", "Media"], {
     canCreate: true,
     canRead: true,
@@ -546,6 +666,100 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
   ...forRoles("social_media", ["Executive"], { canRead: true }),
+
+  // ── Training Plans ──
+  ...forRoles("training-plans", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "training-plans",
+    ["Coach", "SkillCoach", "TacticalCoach", "FitnessCoach", "GoalkeeperCoach"],
+    {
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+      canDelete: false,
+    },
+  ),
+  ...forRoles("training-plans", ["Analyst"], { canRead: true }),
+  ...forRoles("training-plans", ["Player"], { canRead: true }),
+
+  // ── Development Reviews ──
+  ...forRoles("dev-reviews", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "dev-reviews",
+    [
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+    ],
+    {
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+      canDelete: false,
+    },
+  ),
+  ...forRoles("dev-reviews", ["Analyst"], { canRead: true }),
+  ...forRoles("dev-reviews", ["Player"], { canRead: true, canUpdate: true }), // Player can acknowledge
+
+  // ── Mental Health Assessments ──
+  // MentalCoach has full CRUD + sees confidential records
+  ...forRoles("mental", ["MentalCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  // Admin can read everything (including confidential); full management
+  ...forRoles("mental", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  // Manager can read non-confidential only (enforced in service layer)
+  ...forRoles("mental", ["Manager"], { canRead: true }),
+  // Player can read their own assessments (enforced in service layer)
+  ...forRoles("mental", ["Player"], { canRead: true }),
+
+  // ── Video Library ──
+  ...forRoles("video", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("video", ["Analyst"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "video",
+    ["Coach", "TacticalCoach", "SkillCoach", "GoalkeeperCoach"],
+    {
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+    },
+  ),
+  ...forRoles("video", ["FitnessCoach", "Scout", "Executive"], {
+    canRead: true,
+  }),
+  ...forRoles("video", ["Player"], { canRead: true }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

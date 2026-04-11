@@ -19,9 +19,13 @@ import {
   updateMatchAnalysisSchema,
 } from "@modules/matches/match.validation";
 import * as ctrl from "@modules/matches/match.controller";
+import analyticsRoutes from "@modules/matches/analytics/matchAnalytics.routes";
 
 const router = Router();
 router.use(authenticate);
+
+// ── Analytics sub-module ──
+router.use("/analytics", analyticsRoutes);
 
 // ── Calendar (must be before /:id to avoid route conflict) ──
 router.get(
