@@ -20,6 +20,16 @@ jest.mock('../../../../src/modules/media/media-requests/mediaRequest.model', () 
 jest.mock('../../../../src/modules/players/player.model', () => ({ Player: {} }));
 jest.mock('../../../../src/modules/clubs/club.model', () => ({ Club: {} }));
 jest.mock('../../../../src/modules/users/user.model', () => ({ User: {} }));
+jest.mock('../../../../src/modules/media/media-contacts/mediaContact.model', () => ({
+  MediaContact: { findByPk: jest.fn() },
+}));
+jest.mock('../../../../src/modules/notifications/notification.service', () => ({
+  createNotification: jest.fn().mockResolvedValue({}),
+  notifyByRole: jest.fn().mockResolvedValue(0),
+}));
+jest.mock('../../../../src/modules/calendar/event.service', () => ({
+  createEvent: jest.fn().mockResolvedValue({ id: 'evt-001' }),
+}));
 jest.mock('../../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));

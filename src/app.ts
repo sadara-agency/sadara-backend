@@ -287,6 +287,21 @@ app.use("/api/v1/esignatures", esignatureRoutes);
 app.use("/api/v1/wellness", wellnessRoutes);
 app.use("/api/v1/wellness", fitnessRoutes);
 app.use("/api/v1/media", mediaRoutes);
+
+// ── Public press release portal (no auth) ──
+app.get("/api/v1/public/press-releases/:slug", async (req, res, next) => {
+  try {
+    const { getPressReleaseBySlug } =
+      await import("@modules/media/press-releases/pressRelease.service");
+    const release = await getPressReleaseBySlug(req.params.slug);
+    if (release.status !== "published") {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+    res.json({ success: true, data: release });
+  } catch (err) {
+    next(err);
+  }
+});
 app.use("/api/v1/journey", journeyRoutes);
 app.use("/api/v1/evolution-cycles", evolutionCycleRoutes);
 app.use("/api/v1/tickets", ticketRoutes);

@@ -6,6 +6,11 @@ import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
+  createNotification,
+  notifyByRole,
+} from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
+import {
   CreatePressReleaseInput,
   UpdatePressReleaseInput,
   UpdatePressReleaseStatusInput,
@@ -179,7 +184,64 @@ export async function updatePressReleaseStatus(
     updatePayload.publishedAt = new Date();
   }
 
-  return release.update(updatePayload);
+  await release.update(updatePayload);
+
+  // Fire-and-forget notifications
+  const statusLabelAr: Record<string, string> = {
+    review: "قيد المراجعة",
+    approved: "تمت الموافقة",
+    published: "منشور",
+    archived: "مؤرشف",
+    draft: "مسودة",
+  };
+
+  const titlePreview =
+    release.title.length > 50
+      ? release.title.slice(0, 50) + "..."
+      : release.title;
+
+  if (data.status === "review") {
+    // Notify Managers & Admins that a press release needs review
+    notifyByRole(["Admin", "Manager"], {
+      type: "system",
+      title: `Press release submitted for review: ${titlePreview}`,
+      titleAr: `بيان صحفي للمراجعة: ${release.titleAr || titlePreview}`,
+      link: "/dashboard/media/press-releases",
+      sourceType: "press_release",
+      sourceId: release.id,
+      priority: "normal",
+    }).catch((err) =>
+      logger.warn("Press release review notification failed", err),
+    );
+  } else if (data.status === "approved") {
+    createNotification({
+      userId: release.createdBy,
+      type: "system",
+      title: `Your press release was approved: ${titlePreview}`,
+      titleAr: `تمت الموافقة على بيانك الصحفي: ${release.titleAr || titlePreview}`,
+      link: "/dashboard/media/press-releases",
+      sourceType: "press_release",
+      sourceId: release.id,
+      priority: "normal",
+    }).catch((err) =>
+      logger.warn("Press release approval notification failed", err),
+    );
+  } else if (data.status === "published") {
+    createNotification({
+      userId: release.createdBy,
+      type: "system",
+      title: `Press release published: ${titlePreview}`,
+      titleAr: `تم نشر البيان الصحفي: ${release.titleAr || titlePreview}`,
+      link: "/dashboard/media/press-releases",
+      sourceType: "press_release",
+      sourceId: release.id,
+      priority: "normal",
+    }).catch((err) =>
+      logger.warn("Press release publish notification failed", err),
+    );
+  }
+
+  return release;
 }
 
 // ── Delete ──

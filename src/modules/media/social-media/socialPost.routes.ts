@@ -2,6 +2,9 @@ import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
 import {
   createSocialPostSchema,
   updateSocialPostSchema,
@@ -17,6 +20,7 @@ router.use(authenticate);
 router.get(
   "/",
   authorizeModule("social_media", "read"),
+  cacheRoute("social-posts", CacheTTL.MEDIUM),
   validate(socialPostQuerySchema, "query"),
   asyncHandler(socialPostController.list),
 );
@@ -25,6 +29,7 @@ router.get(
 router.get(
   "/:id",
   authorizeModule("social_media", "read"),
+  cacheRoute("social-posts", CacheTTL.MEDIUM),
   asyncHandler(socialPostController.getById),
 );
 
@@ -50,6 +55,20 @@ router.patch(
   authorizeModule("social_media", "update"),
   validate(updateSocialPostStatusSchema),
   asyncHandler(socialPostController.updateStatus),
+);
+
+// ── Image Upload ──
+router.post(
+  "/:id/images",
+  authorizeModule("social_media", "update"),
+  uploadSingle,
+  verifyFileType,
+  asyncHandler(socialPostController.uploadImage),
+);
+router.delete(
+  "/:id/images/:index",
+  authorizeModule("social_media", "update"),
+  asyncHandler(socialPostController.removeImage),
 );
 
 // ── Delete ──

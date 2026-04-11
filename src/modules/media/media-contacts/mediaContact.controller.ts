@@ -1,4 +1,5 @@
 import { createCrudController } from "@shared/utils/crudController";
+import { CachePrefix } from "@shared/utils/cache";
 import * as mediaContactService from "./mediaContact.service";
 
 const crud = createCrudController({
@@ -11,7 +12,7 @@ const crud = createCrudController({
     delete: (id) => mediaContactService.deleteMediaContact(id),
   },
   entity: "media_contacts",
-  cachePrefixes: [],
+  cachePrefixes: [CachePrefix.MEDIA_CONTACTS],
   label: (c) => `${c.name} (${c.outlet})`,
 });
 

@@ -3,6 +3,8 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 import {
   createMediaRequestSchema,
   updateMediaRequestSchema,
@@ -19,6 +21,7 @@ router.get(
   "/",
   authorizeModule("media_requests", "read"),
   dynamicFieldAccess("media_requests"),
+  cacheRoute("media-requests", CacheTTL.MEDIUM),
   validate(mediaRequestQuerySchema, "query"),
   asyncHandler(mediaRequestController.list),
 );
@@ -26,6 +29,7 @@ router.get(
   "/:id",
   authorizeModule("media_requests", "read"),
   dynamicFieldAccess("media_requests"),
+  cacheRoute("media-requests", CacheTTL.MEDIUM),
   asyncHandler(mediaRequestController.getById),
 );
 

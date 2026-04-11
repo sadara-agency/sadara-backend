@@ -32,6 +32,7 @@ export interface MediaRequestAttributes {
   declineReason?: string | null;
   notes?: string | null;
   assignedTo?: string | null;
+  mediaContactId?: string | null;
   createdBy: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -81,6 +82,7 @@ export class MediaRequest
   declare declineReason: string | null;
   declare notes: string | null;
   declare assignedTo: string | null;
+  declare mediaContactId: string | null;
   declare createdBy: string;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -196,6 +198,10 @@ MediaRequest.init(
     assignedTo: {
       type: DataTypes.UUID,
       field: "assigned_to",
+    },
+    mediaContactId: {
+      type: DataTypes.UUID,
+      field: "media_contact_id",
     },
     createdBy: {
       type: DataTypes.UUID,

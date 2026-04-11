@@ -17,13 +17,13 @@ export async function generatePlayerKit(req: AuthRequest, res: Response) {
     req.user!.id,
   );
 
-  await logAudit(
+  logAudit(
     "CREATE",
     "media_kits",
     generation.id,
     buildAuditContext(req.user!, req.ip),
     `Generated player profile kit for ${req.params.playerId}`,
-  );
+  ).catch(() => {});
 
   sendCreated(res, generation, "Player profile kit generated");
 }
@@ -37,15 +37,22 @@ export async function generateSquadKit(req: AuthRequest, res: Response) {
     req.user!.id,
   );
 
-  await logAudit(
+  logAudit(
     "CREATE",
     "media_kits",
     generation.id,
     buildAuditContext(req.user!, req.ip),
     `Generated squad roster kit for ${req.params.clubId}`,
-  );
+  ).catch(() => {});
 
   sendCreated(res, generation, "Squad roster kit generated");
+}
+
+// ── Download ──
+
+export async function download(req: AuthRequest, res: Response) {
+  const url = await mediaKitService.getDownloadUrl(req.params.id);
+  sendSuccess(res, { downloadUrl: url });
 }
 
 // ── History ──

@@ -1,10 +1,14 @@
 import { Op } from "sequelize";
 import { MediaRequest } from "./mediaRequest.model";
+import { MediaContact } from "@modules/media/media-contacts/mediaContact.model";
 import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { createNotification } from "@modules/notifications/notification.service";
+import { createEvent } from "@modules/calendar/event.service";
+import { logger } from "@config/logger";
 import {
   CreateMediaRequestInput,
   UpdateMediaRequestInput,
@@ -75,6 +79,20 @@ export async function listMediaRequests(queryParams: Record<string, unknown>) {
         attributes: ["id", "fullName"],
         required: false,
       },
+      {
+        model: MediaContact,
+        as: "mediaContact",
+        attributes: [
+          "id",
+          "name",
+          "nameAr",
+          "outlet",
+          "outletAr",
+          "email",
+          "phone",
+        ],
+        required: false,
+      },
     ],
     subQuery: false,
   });
@@ -111,6 +129,20 @@ export async function getMediaRequestById(id: string) {
         attributes: ["id", "fullName"],
         required: false,
       },
+      {
+        model: MediaContact,
+        as: "mediaContact",
+        attributes: [
+          "id",
+          "name",
+          "nameAr",
+          "outlet",
+          "outletAr",
+          "email",
+          "phone",
+        ],
+        required: false,
+      },
     ],
   });
   if (!request) throw new AppError("Media request not found", 404);
@@ -123,10 +155,29 @@ export async function createMediaRequest(
   data: CreateMediaRequestInput,
   userId: string,
 ) {
+  // Auto-fill journalist fields from media contact if provided
+  let fillData = { ...data };
+  if (data.mediaContactId) {
+    const contact = await MediaContact.findByPk(data.mediaContactId);
+    if (contact) {
+      fillData = {
+        ...fillData,
+        journalistName: data.journalistName || contact.name,
+        journalistNameAr: data.journalistNameAr || contact.nameAr || undefined,
+        outlet: data.outlet || contact.outlet,
+        outletAr: data.outletAr || contact.outletAr || undefined,
+        journalistEmail: data.journalistEmail || contact.email || undefined,
+        journalistPhone: data.journalistPhone || contact.phone || undefined,
+      };
+    }
+  }
+
   return MediaRequest.create({
-    ...data,
-    deadline: data.deadline ? new Date(data.deadline) : undefined,
-    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
+    ...fillData,
+    deadline: fillData.deadline ? new Date(fillData.deadline) : undefined,
+    scheduledAt: fillData.scheduledAt
+      ? new Date(fillData.scheduledAt)
+      : undefined,
     createdBy: userId,
   });
 }
@@ -167,7 +218,66 @@ export async function updateMediaRequestStatus(
   if (data.declineReason) updatePayload.declineReason = data.declineReason;
   if (data.scheduledAt) updatePayload.scheduledAt = data.scheduledAt;
 
-  return request.update(updatePayload);
+  await request.update(updatePayload);
+
+  // Fire-and-forget notifications
+  const statusLabelAr: Record<string, string> = {
+    approved: "تمت الموافقة",
+    declined: "مرفوض",
+    scheduled: "مجدول",
+    completed: "مكتمل",
+    pending: "قيد الانتظار",
+  };
+
+  const notifyUser = (userId: string) =>
+    createNotification({
+      userId,
+      type: "system",
+      title: `Media request ${data.status}: ${request.subject}`,
+      titleAr: `طلب إعلامي ${statusLabelAr[data.status] || data.status}: ${request.subjectAr || request.subject}`,
+      link: "/dashboard/media/requests",
+      sourceType: "media_request",
+      sourceId: request.id,
+      priority: "normal",
+    }).catch((err) => logger.warn("Media request notification failed", err));
+
+  // Auto-create calendar event when scheduled
+  if (data.status === "scheduled" && request.scheduledAt) {
+    const scheduledDate = new Date(request.scheduledAt);
+    const endDate = new Date(scheduledDate.getTime() + 60 * 60 * 1000); // +1 hour
+    createEvent(
+      {
+        title: `Media: ${request.subject}`,
+        titleAr: request.subjectAr || `إعلامي: ${request.subject}`,
+        eventType: "Meeting",
+        startDate: scheduledDate.toISOString(),
+        endDate: endDate.toISOString(),
+        allDay: false,
+        description: request.description || undefined,
+        descriptionAr: request.descriptionAr || undefined,
+      },
+      request.createdBy,
+    )
+      .then((event) => {
+        request.update({ calendarEventId: event.id }).catch(() => {});
+      })
+      .catch((err) => logger.warn("Media request calendar sync failed", err));
+  }
+
+  if (data.status === "approved" && request.assignedTo) {
+    notifyUser(request.assignedTo);
+  } else if (data.status === "declined") {
+    notifyUser(request.createdBy);
+  } else if (data.status === "scheduled") {
+    notifyUser(request.createdBy);
+    if (request.assignedTo && request.assignedTo !== request.createdBy) {
+      notifyUser(request.assignedTo);
+    }
+  } else if (data.status === "completed") {
+    notifyUser(request.createdBy);
+  }
+
+  return request;
 }
 
 // ── Delete ──

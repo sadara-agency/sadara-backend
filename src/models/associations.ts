@@ -467,6 +467,10 @@ export function setupAssociations() {
   MediaRequest.belongsTo(Match, { foreignKey: "matchId", as: "match" });
   MediaRequest.belongsTo(User, { foreignKey: "assignedTo", as: "assignee" });
   MediaRequest.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  MediaRequest.belongsTo(MediaContact, {
+    foreignKey: "mediaContactId",
+    as: "mediaContact",
+  });
 
   // ── Media Contacts ──
   MediaContact.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
