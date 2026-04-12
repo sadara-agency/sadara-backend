@@ -1,5 +1,6 @@
 import { Response, NextFunction } from "express";
 import type { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
 import {
   sendSuccess,
   sendCreated,
@@ -73,6 +74,31 @@ export async function deleteClip(
     const data = await videoService.deleteClip(req.params.id);
     await invalidateByPrefix(CachePrefix.VIDEO_CLIPS);
     return sendSuccess(res, data, "Video clip deleted");
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function uploadClip(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    if (!req.file) throw new AppError("No file uploaded", 400);
+    const { title, playerId, matchId } = req.body as {
+      title?: string;
+      playerId?: string;
+      matchId?: string;
+    };
+    if (!title) throw new AppError("title is required", 422);
+    const data = await videoService.uploadVideoFile(
+      req.file,
+      { title, playerId, matchId },
+      req.user!.id,
+    );
+    await invalidateByPrefix(CachePrefix.VIDEO_CLIPS);
+    return sendCreated(res, data, "Video clip uploaded");
   } catch (err) {
     next(err);
   }

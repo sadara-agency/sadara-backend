@@ -3,6 +3,7 @@ import { VideoClip, VideoTag } from "./video.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
+import { uploadFile } from "@shared/utils/storage";
 import type {
   CreateClipDTO,
   UpdateClipDTO,
@@ -96,6 +97,40 @@ export async function deleteClip(id: string) {
   const clip = await getClipById(id);
   await clip.destroy();
   return { id };
+}
+
+// ── Upload video file to GCS/local storage ──
+
+export async function uploadVideoFile(
+  file: {
+    buffer: Buffer;
+    originalname: string;
+    mimetype: string;
+    size: number;
+  },
+  meta: { title: string; playerId?: string; matchId?: string },
+  userId: string,
+) {
+  const result = await uploadFile({
+    folder: "video-clips",
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    buffer: file.buffer,
+    generateThumbnail: false,
+  });
+
+  return VideoClip.create({
+    title: meta.title,
+    playerId: meta.playerId ?? null,
+    matchId: meta.matchId ?? null,
+    storageProvider: "gcs",
+    storagePath: result.key,
+    externalUrl: result.url,
+    mimeType: result.mimeType,
+    fileSizeMb: parseFloat((file.size / (1024 * 1024)).toFixed(2)),
+    status: "ready",
+    uploadedBy: userId,
+  });
 }
 
 // ── Tags ──

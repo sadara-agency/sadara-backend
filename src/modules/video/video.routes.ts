@@ -3,6 +3,7 @@ import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
+import { uploadVideo } from "@middleware/upload";
 import * as videoController from "./video.controller";
 import {
   createClipSchema,
@@ -54,6 +55,14 @@ router.get(
   "/clips/:id",
   authorizeModule("video", "read"),
   videoController.getClip,
+);
+
+// Upload a video file (multipart/form-data) — must be before POST /clips (JSON)
+router.post(
+  "/clips/upload",
+  authorizeModule("video", "create"),
+  uploadVideo,
+  videoController.uploadClip,
 );
 
 router.post(
