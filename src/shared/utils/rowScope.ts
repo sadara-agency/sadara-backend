@@ -75,6 +75,23 @@ const analystPlayers: ScopeBuilder = (u) => ({
   },
 });
 
+/**
+ * Restricted-referral scope: a referral is visible if any of
+ *   - isRestricted = false (unrestricted, the default case)
+ *   - user id is in the restrictedTo UUID array
+ *   - user is the assignee
+ *   - user is the creator
+ * Expressed as a WHERE clause via the PG array-contains operator.
+ */
+const restrictedReferral: ScopeBuilder = (u) => ({
+  [Op.or]: [
+    { isRestricted: false },
+    { restrictedTo: { [Op.contains]: [u.id] } },
+    { assignedTo: u.id },
+    { createdBy: u.id },
+  ],
+});
+
 // ── Scope Rules Config ──
 // Module → Role → scope builder function
 // Roles not listed default to "all" (no filtering)
@@ -202,6 +219,23 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     GoalkeeperCoach: coachPlayers,
     MentalCoach: coachPlayers,
     Analyst: analystPlayers,
+  },
+
+  referrals: {
+    Player: restrictedReferral,
+    Scout: restrictedReferral,
+    Coach: restrictedReferral,
+    SkillCoach: restrictedReferral,
+    TacticalCoach: restrictedReferral,
+    FitnessCoach: restrictedReferral,
+    NutritionSpecialist: restrictedReferral,
+    GymCoach: restrictedReferral,
+    GoalkeeperCoach: restrictedReferral,
+    MentalCoach: restrictedReferral,
+    Analyst: restrictedReferral,
+    Finance: restrictedReferral,
+    Legal: restrictedReferral,
+    Media: restrictedReferral,
   },
 };
 
@@ -347,6 +381,13 @@ export async function checkRowAccess(
       if (COACH_ROLES.includes(role) || role === "Analyst")
         return isPlayerOwnedBy(record.playerId, user);
       return true;
+
+    case "referrals":
+      if (!record.isRestricted) return true;
+      if ((record.restrictedTo || []).includes(user.id)) return true;
+      if (record.assignedTo === user.id) return true;
+      if (record.createdBy === user.id) return true;
+      return false;
   }
 
   return true;

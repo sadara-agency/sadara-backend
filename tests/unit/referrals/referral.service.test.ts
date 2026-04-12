@@ -53,8 +53,14 @@ jest.mock('../../../src/shared/utils/audit', () => ({
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
+jest.mock('../../../src/shared/utils/verifyRole', () => ({
+  verifyUserRole: jest.fn().mockResolvedValue(undefined),
+}));
 
 import * as referralService from '../../../src/modules/referrals/referral.service';
+
+const adminUser = { id: 'user-001', email: 'a@s.io', fullName: 'Admin', role: 'Admin' as const };
+const analystUser = { id: 'user-002', email: 'b@s.io', fullName: 'Analyst', role: 'Analyst' as const };
 
 describe('Referral Service', () => {
   beforeEach(() => { jest.clearAllMocks(); });
@@ -62,25 +68,25 @@ describe('Referral Service', () => {
   describe('listReferrals', () => {
     it('should return paginated referrals for Admin', async () => {
       mockReferralFindAndCountAll.mockResolvedValue({ count: 1, rows: [mockModelInstance(mockReferral())] });
-      const result = await referralService.listReferrals({ page: 1, limit: 10 }, 'user-001', 'Admin');
+      const result = await referralService.listReferrals({ page: 1, limit: 10 }, adminUser);
       expect(result.data).toHaveLength(1);
     });
 
     it('should apply access filter for non-Admin', async () => {
       mockReferralFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await referralService.listReferrals({ page: 1, limit: 10 }, 'user-002', 'Analyst');
+      await referralService.listReferrals({ page: 1, limit: 10 }, analystUser);
       expect(mockReferralFindAndCountAll).toHaveBeenCalled();
     });
 
     it('should filter by status', async () => {
       mockReferralFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await referralService.listReferrals({ status: 'Open', page: 1, limit: 10 }, 'user-001', 'Admin');
+      await referralService.listReferrals({ status: 'Open', page: 1, limit: 10 }, adminUser);
       expect(mockReferralFindAndCountAll).toHaveBeenCalled();
     });
 
     it('should apply search', async () => {
       mockReferralFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await referralService.listReferrals({ search: 'injury', page: 1, limit: 10 }, 'user-001', 'Admin');
+      await referralService.listReferrals({ search: 'injury', page: 1, limit: 10 }, adminUser);
       expect(mockReferralFindAndCountAll).toHaveBeenCalled();
     });
   });
@@ -88,25 +94,25 @@ describe('Referral Service', () => {
   describe('getReferralById', () => {
     it('should return referral for Admin', async () => {
       mockReferralFindByPk.mockResolvedValue(mockModelInstance(mockReferral({ isRestricted: false })));
-      const result = await referralService.getReferralById('ref-001', 'user-001', 'Admin');
+      const result = await referralService.getReferralById('ref-001', adminUser);
       expect(result).toBeDefined();
     });
 
     it('should throw 404 if not found', async () => {
       mockReferralFindByPk.mockResolvedValue(null);
-      await expect(referralService.getReferralById('bad', 'user-001', 'Admin')).rejects.toThrow('Referral not found');
+      await expect(referralService.getReferralById('bad', adminUser)).rejects.toThrow('Referral not found');
     });
 
-    it('should throw 403 for restricted referral if non-admin not allowed', async () => {
+    it('should throw 404 for restricted referral if non-admin not allowed', async () => {
       const ref = mockModelInstance(mockReferral({ isRestricted: true, restrictedTo: ['user-003'], assignedTo: 'user-003', createdBy: 'user-003' }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await expect(referralService.getReferralById('ref-001', 'user-002', 'Analyst')).rejects.toThrow('Access denied');
+      await expect(referralService.getReferralById('ref-001', analystUser)).rejects.toThrow('Referral not found');
     });
 
     it('should allow restricted access for assigned user', async () => {
       const ref = mockModelInstance(mockReferral({ isRestricted: true, restrictedTo: [], assignedTo: 'user-002', createdBy: 'user-003' }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      const result = await referralService.getReferralById('ref-001', 'user-002', 'Analyst');
+      const result = await referralService.getReferralById('ref-001', analystUser);
       expect(result).toBeDefined();
     });
   });
@@ -145,14 +151,14 @@ describe('Referral Service', () => {
     it('should update referral', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'Open', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await referralService.updateReferral('ref-001', { notes: 'Updated' }, 'user-001', 'Admin');
+      await referralService.updateReferral('ref-001', { notes: 'Updated' }, adminUser);
       expect(ref.update).toHaveBeenCalled();
     });
 
     it('should allow updating any status (no block on Closed)', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'Closed', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await referralService.updateReferral('ref-001', { notes: 'Reopened' }, 'user-001', 'Admin');
+      await referralService.updateReferral('ref-001', { notes: 'Reopened' }, adminUser);
       expect(ref.update).toHaveBeenCalled();
     });
   });
@@ -161,14 +167,14 @@ describe('Referral Service', () => {
     it('should update status', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'Open', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await referralService.updateReferralStatus('ref-001', { status: 'InProgress' }, 'user-001', 'Admin');
+      await referralService.updateReferralStatus('ref-001', { status: 'InProgress' }, adminUser);
       expect(ref.update).toHaveBeenCalled();
     });
 
     it('should set closedAt when Closed', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'InProgress', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await referralService.updateReferralStatus('ref-001', { status: 'Closed', closureNotes: 'Done' }, 'user-001', 'Admin');
+      await referralService.updateReferralStatus('ref-001', { status: 'Closed', closureNotes: 'Done' }, adminUser);
       expect(ref.update).toHaveBeenCalledWith(expect.objectContaining({ closedAt: expect.any(Date) }));
     });
   });
@@ -177,7 +183,7 @@ describe('Referral Service', () => {
     it('should delete referral', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'Open', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      const result = await referralService.deleteReferral('ref-001', 'user-001', 'Admin');
+      const result = await referralService.deleteReferral('ref-001', adminUser);
       expect(ref.destroy).toHaveBeenCalled();
       expect(result).toEqual({ id: 'ref-001' });
     });
@@ -185,7 +191,7 @@ describe('Referral Service', () => {
     it('should throw 400 if closed', async () => {
       const ref = mockModelInstance(mockReferral({ status: 'Closed', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
-      await expect(referralService.deleteReferral('ref-001', 'user-001', 'Admin')).rejects.toThrow('Cannot delete a closed referral');
+      await expect(referralService.deleteReferral('ref-001', adminUser)).rejects.toThrow('Cannot delete a closed referral');
     });
   });
 });

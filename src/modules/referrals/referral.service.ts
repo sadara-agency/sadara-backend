@@ -12,6 +12,12 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
+import type { AuthUser } from "@shared/types";
+import {
   notifyByRole,
   notifyUser,
 } from "@modules/notifications/notification.service";
@@ -43,37 +49,9 @@ async function refetchWithIncludes(id: string) {
   return Referral.findByPk(id, { include: referralIncludes() });
 }
 
-// ── Access Control ──
-
-function applyAccessFilter(where: any, userId: string, userRole: string) {
-  if (["Admin", "Manager", "Executive"].includes(userRole)) return;
-
-  const accessConditions = [
-    { isRestricted: false },
-    { restrictedTo: { [Op.contains]: [userId] } },
-    { assignedTo: userId },
-    { createdBy: userId },
-  ];
-
-  if (where[Op.or]) {
-    const searchConditions = where[Op.or];
-    delete where[Op.or];
-    where[Op.and] = [
-      { [Op.or]: searchConditions },
-      { [Op.or]: accessConditions },
-    ];
-  } else {
-    where[Op.or] = accessConditions;
-  }
-}
-
 // ── List ──
 
-export async function listReferrals(
-  queryParams: any,
-  userId: string,
-  userRole: string,
-) {
+export async function listReferrals(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",
@@ -102,7 +80,8 @@ export async function listReferrals(
     ];
   }
 
-  applyAccessFilter(where, userId, userRole);
+  const scope = await buildRowScope("referrals", user);
+  if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Referral.findAndCountAll({
     where,
@@ -118,27 +97,12 @@ export async function listReferrals(
 
 // ── Get by ID ──
 
-export async function getReferralById(
-  id: string,
-  userId: string,
-  userRole: string,
-) {
+export async function getReferralById(id: string, user?: AuthUser) {
   const referral = await Referral.findByPk(id, { include: referralIncludes() });
   if (!referral) throw new AppError("Referral not found", 404);
 
-  if (
-    referral.isRestricted &&
-    !["Admin", "Manager", "Executive"].includes(userRole)
-  ) {
-    const allowed = referral.restrictedTo || [];
-    if (
-      !allowed.includes(userId) &&
-      referral.assignedTo !== userId &&
-      referral.createdBy !== userId
-    ) {
-      throw new AppError("Access denied: this referral is restricted", 403);
-    }
-  }
+  const allowed = await checkRowAccess("referrals", referral, user);
+  if (!allowed) throw new AppError("Referral not found", 404);
 
   return referral;
 }
@@ -250,13 +214,8 @@ export async function createReferral(input: any, userId: string) {
 
 // ── Update ──
 
-export async function updateReferral(
-  id: string,
-  input: any,
-  userId: string,
-  userRole: string,
-) {
-  const referral = await getReferralById(id, userId, userRole);
+export async function updateReferral(id: string, input: any, user?: AuthUser) {
+  const referral = await getReferralById(id, user);
 
   // Track assignment change
   if (input.assignedTo && input.assignedTo !== referral.assignedTo) {
@@ -290,10 +249,9 @@ export async function updateReferral(
 export async function updateReferralStatus(
   id: string,
   input: any,
-  userId: string,
-  userRole: string,
+  user?: AuthUser,
 ) {
-  const referral = await getReferralById(id, userId, userRole);
+  const referral = await getReferralById(id, user);
 
   const updateData: Partial<ReferralAttributes> = {
     status: input.status as ReferralAttributes["status"],
@@ -374,12 +332,8 @@ async function syncInjuryFromCase(
 
 // ── Delete ──
 
-export async function deleteReferral(
-  id: string,
-  userId: string,
-  userRole: string,
-) {
-  const referral = await getReferralById(id, userId, userRole);
+export async function deleteReferral(id: string, user?: AuthUser) {
+  const referral = await getReferralById(id, user);
 
   if (referral.status === "Closed") {
     throw new AppError("Cannot delete a closed referral", 400);

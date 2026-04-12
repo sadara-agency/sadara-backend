@@ -8,6 +8,12 @@ import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { buildMeta } from "@shared/utils/pagination";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
+import type { AuthUser } from "@shared/types";
 import type {
   PlayerCareQuery,
   CreateCaseInput,
@@ -28,7 +34,7 @@ const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 
 // ── List Cases (single JOIN query) ──
 
-export async function listCases(query: PlayerCareQuery) {
+export async function listCases(query: PlayerCareQuery, user?: AuthUser) {
   const { page, limit, category, status, playerId, search, sort, order } =
     query;
   const offset = (page - 1) * limit;
@@ -47,6 +53,9 @@ export async function listCases(query: PlayerCareQuery) {
       { notes: { [Op.iLike]: `%${search}%` } },
     ];
   }
+
+  const scope = await buildRowScope("referrals", user);
+  if (scope) mergeScope(where, scope);
 
   const { count, rows } = await Referral.findAndCountAll({
     where,
@@ -99,7 +108,7 @@ export async function listCases(query: PlayerCareQuery) {
 
 // ── Get Case by ID ──
 
-export async function getCaseById(id: string) {
+export async function getCaseById(id: string, user?: AuthUser) {
   const caseRecord = await Referral.findByPk(id, {
     include: [
       { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
@@ -135,6 +144,10 @@ export async function getCaseById(id: string) {
   });
 
   if (!caseRecord) throw new AppError("Case not found", 404);
+
+  const allowed = await checkRowAccess("referrals", caseRecord, user);
+  if (!allowed) throw new AppError("Case not found", 404);
+
   return caseRecord;
 }
 
@@ -234,12 +247,19 @@ export async function createMedicalCase(
 
 // ── Update Case ──
 
-export async function updateCase(id: string, input: Record<string, unknown>) {
+export async function updateCase(
+  id: string,
+  input: Record<string, unknown>,
+  user?: AuthUser,
+) {
   const caseRecord = await Referral.findByPk(id);
   if (!caseRecord) throw new AppError("Case not found", 404);
 
+  const allowed = await checkRowAccess("referrals", caseRecord, user);
+  if (!allowed) throw new AppError("Case not found", 404);
+
   await caseRecord.update(input);
-  return getCaseById(id);
+  return getCaseById(id, user);
 }
 
 // ── Update Case Status (with bidirectional sync) ──
@@ -250,9 +270,13 @@ export async function updateCaseStatus(
   outcome?: string,
   notes?: string,
   closureNotes?: string,
+  user?: AuthUser,
 ) {
   const caseRecord = await Referral.findByPk(id);
   if (!caseRecord) throw new AppError("Case not found", 404);
+
+  const allowed = await checkRowAccess("referrals", caseRecord, user);
+  if (!allowed) throw new AppError("Case not found", 404);
 
   const updateData: Record<string, unknown> = { status };
   if (outcome) updateData.outcome = outcome;
@@ -295,14 +319,17 @@ export async function updateCaseStatus(
     }
   }
 
-  return getCaseById(id);
+  return getCaseById(id, user);
 }
 
 // ── Delete Case ──
 
-export async function deleteCase(id: string) {
+export async function deleteCase(id: string, user?: AuthUser) {
   const caseRecord = await Referral.findByPk(id);
   if (!caseRecord) throw new AppError("Case not found", 404);
+
+  const allowed = await checkRowAccess("referrals", caseRecord, user);
+  if (!allowed) throw new AppError("Case not found", 404);
 
   if (caseRecord.status === "Closed") {
     throw new AppError("Cannot delete a closed case", 400);
@@ -318,9 +345,13 @@ export async function deleteCase(id: string) {
 
 // ── Player Timeline ──
 
-export async function getPlayerTimeline(playerId: string) {
+export async function getPlayerTimeline(playerId: string, user?: AuthUser) {
+  const where: any = { playerId };
+  const scope = await buildRowScope("referrals", user);
+  if (scope) mergeScope(where, scope);
+
   const cases = await Referral.findAll({
-    where: { playerId },
+    where,
     include: [
       {
         model: Injury,
