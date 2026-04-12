@@ -2,6 +2,30 @@
 // tests/unit/auth/auth.middleware.test.ts
 // Unit tests for authentication and authorization middleware.
 // ─────────────────────────────────────────────────────────────
+jest.mock('@config/database', () => ({
+  sequelize: {
+    query: jest.fn().mockResolvedValue([{ is_active: true }]),
+    authenticate: jest.fn(),
+    transaction: jest.fn((fn: Function) => fn({})),
+  },
+}));
+
+jest.mock('@shared/utils/cache', () => ({
+  cacheGet: jest.fn().mockResolvedValue(null),
+  cacheSet: jest.fn().mockResolvedValue(null),
+  cacheDel: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('@modules/permissions/permission.service', () => ({
+  hasPermission: jest.fn().mockResolvedValue(true),
+  loadPermissions: jest.fn().mockResolvedValue({}),
+  getPermissions: jest.fn().mockResolvedValue({}),
+  invalidatePermissionCache: jest.fn().mockResolvedValue(undefined),
+  loadFieldPermissions: jest.fn().mockResolvedValue({}),
+  getFieldPermissions: jest.fn().mockResolvedValue({}),
+  getHiddenFields: jest.fn().mockResolvedValue([]),
+}));
+
 import { Request, Response, NextFunction } from 'express';
 import { authenticate, authorize } from '../../../src/middleware/auth';
 import { generateTestToken, mockUser } from '../../setup/test-helpers';
@@ -24,34 +48,34 @@ function createMockReqRes(headers: Record<string, string> = {}) {
 }
 
 describe('authenticate middleware', () => {
-  it('should pass through with valid token', () => {
+  it('should pass through with valid token', async () => {
     const token = generateTestToken();
     const { req, res, next } = createMockReqRes({
       authorization: `Bearer ${token}`,
     });
 
-    authenticate(req as any, res, next);
+    await authenticate(req as any, res, next);
 
     expect(next).toHaveBeenCalled();
     expect((req as any).user).toBeDefined();
     expect((req as any).user.email).toBe('admin@sadara.com');
   });
 
-  it('should return 401 when no token provided', () => {
+  it('should return 401 when no token provided', async () => {
     const { req, res, next } = createMockReqRes();
 
-    authenticate(req as any, res, next);
+    await authenticate(req as any, res, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(next).not.toHaveBeenCalled();
   });
 
-  it('should return 401 when token is malformed', () => {
+  it('should return 401 when token is malformed', async () => {
     const { req, res, next } = createMockReqRes({
       authorization: 'Bearer invalid.token.here',
     });
 
-    authenticate(req as any, res, next);
+    await authenticate(req as any, res, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
@@ -59,7 +83,7 @@ describe('authenticate middleware', () => {
     );
   });
 
-  it('should return 401 for expired tokens', () => {
+  it('should return 401 for expired tokens', async () => {
     // Create a token that expired 1 hour ago
     const jwt = require('jsonwebtoken');
     const { env } = require('../../../src/config/env');
@@ -73,7 +97,7 @@ describe('authenticate middleware', () => {
       authorization: `Bearer ${token}`,
     });
 
-    authenticate(req as any, res, next);
+    await authenticate(req as any, res, next);
 
     expect(res.status).toHaveBeenCalledWith(401);
     expect(res.json).toHaveBeenCalledWith(
@@ -83,14 +107,14 @@ describe('authenticate middleware', () => {
 });
 
 describe('authorize middleware', () => {
-  it('should allow access for permitted roles', () => {
+  it('should allow access for permitted roles', async () => {
     const token = generateTestToken(mockUser({ role: 'Admin' }) as any);
     const { req, res, next } = createMockReqRes({
       authorization: `Bearer ${token}`,
     });
 
     // First authenticate
-    authenticate(req as any, res, next);
+    await authenticate(req as any, res, next);
 
     // Then authorize
     const authorizeMw = authorize('Admin', 'Manager');
