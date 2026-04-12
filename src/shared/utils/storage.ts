@@ -53,13 +53,15 @@ export type UploadFolder =
   | "signed-contracts"
   | "signed-documents"
   | "voice-memos"
-  | "training-media";
+  | "training-media"
+  | "video-clips";
 
 /** Folders whose objects are made publicly readable on upload */
 const PUBLIC_FOLDERS: ReadonlySet<UploadFolder> = new Set([
   "photos",
   "avatars",
   "training-media",
+  "video-clips",
 ]);
 
 /** Folders whose objects stay private — access via signed URLs only */
