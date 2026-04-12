@@ -32,14 +32,14 @@ router.get(
 router.post(
   "/insights/:id/dismiss",
   authorizeModule("spl-sync", "update"),
-  validate(insightIdSchema),
+  validate(insightIdSchema, "params"),
   asyncHandler(ctrl.dismiss),
 );
 
 router.post(
   "/insights/:id/add-to-watchlist",
   authorizeModule("spl-sync", "create"),
-  validate(insightIdSchema),
+  validate(insightIdSchema, "params"),
   asyncHandler(ctrl.addToWatchlist),
 );
 
@@ -61,13 +61,14 @@ router.post(
 router.get(
   "/tracked/:id",
   authorizeModule("spl-sync", "read"),
-  validate(trackedPlayerIdSchema),
+  validate(trackedPlayerIdSchema, "params"),
   asyncHandler(ctrl.getTrackedDetail),
 );
 
 router.patch(
   "/tracked/:id/alerts",
   authorizeModule("spl-sync", "update"),
+  validate(trackedPlayerIdSchema, "params"),
   validate(updateAlertConfigSchema),
   asyncHandler(ctrl.updateAlerts),
 );
@@ -75,7 +76,7 @@ router.patch(
 router.delete(
   "/tracked/:id",
   authorizeModule("spl-sync", "delete"),
-  validate(trackedPlayerIdSchema),
+  validate(trackedPlayerIdSchema, "params"),
   asyncHandler(ctrl.untrack),
 );
 
@@ -90,6 +91,7 @@ router.get(
 router.patch(
   "/competitions/:id",
   authorizeModule("spl-sync", "update"),
+  validate(insightIdSchema, "params"),
   validate(toggleCompetitionSchema),
   asyncHandler(ctrl.toggleComp),
 );
