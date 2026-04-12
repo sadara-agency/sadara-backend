@@ -1,6 +1,10 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
-export async function up(queryInterface: QueryInterface) {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}) {
   // ── mental_assessment_templates ──
   await queryInterface.createTable("mental_assessment_templates", {
     id: {
@@ -155,7 +159,11 @@ export async function up(queryInterface: QueryInterface) {
   });
 }
 
-export async function down(queryInterface: QueryInterface) {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}) {
   await queryInterface.dropTable("mental_assessments");
   await queryInterface.dropTable("mental_assessment_templates");
 }
