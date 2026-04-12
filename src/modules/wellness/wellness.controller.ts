@@ -23,7 +23,7 @@ const WELLNESS_CACHES = [CachePrefix.WELLNESS, CachePrefix.DASHBOARD];
 // ══════════════════════════════════════════
 
 export async function getProfile(req: AuthRequest, res: Response) {
-  const profile = await svc.getProfile(req.params.playerId);
+  const profile = await svc.getProfile(req.params.playerId, req.user);
   sendSuccess(res, profile);
 }
 
@@ -83,7 +83,11 @@ export async function recalculateTargets(req: AuthRequest, res: Response) {
 // ══════════════════════════════════════════
 
 export async function listWeightLogs(req: AuthRequest, res: Response) {
-  const result = await svc.listWeightLogs(req.params.playerId, req.query);
+  const result = await svc.listWeightLogs(
+    req.params.playerId,
+    req.query,
+    req.user,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 
@@ -94,7 +98,7 @@ export async function createWeightLog(req: AuthRequest, res: Response) {
 }
 
 export async function getWeightTrend(req: AuthRequest, res: Response) {
-  const trend = await svc.getWeightTrend(req.params.playerId);
+  const trend = await svc.getWeightTrend(req.params.playerId, req.user);
   sendSuccess(res, trend);
 }
 
@@ -190,7 +194,11 @@ export async function createFoodItem(req: AuthRequest, res: Response) {
 // ══════════════════════════════════════════
 
 export async function listMealLogs(req: AuthRequest, res: Response) {
-  const result = await svc.listMealLogs(req.params.playerId, req.query);
+  const result = await svc.listMealLogs(
+    req.params.playerId,
+    req.query,
+    req.user,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 
@@ -221,7 +229,7 @@ export async function copyDay(req: AuthRequest, res: Response) {
 export async function getDailyTotals(req: AuthRequest, res: Response) {
   const date =
     (req.query.date as string) || new Date().toISOString().slice(0, 10);
-  const totals = await svc.getDailyTotals(req.params.playerId, date);
+  const totals = await svc.getDailyTotals(req.params.playerId, date, req.user);
   sendSuccess(res, totals);
 }
 
@@ -283,18 +291,22 @@ export async function myDailyTotals(req: AuthRequest, res: Response) {
 
 export async function playerDashboard(req: AuthRequest, res: Response) {
   const days = Number(req.query.days) || 7;
-  const data = await svc.getPlayerDashboard(req.params.playerId, days);
+  const data = await svc.getPlayerDashboard(
+    req.params.playerId,
+    days,
+    req.user,
+  );
   sendSuccess(res, data);
 }
 
 export async function coachOverview(req: AuthRequest, res: Response) {
-  const data = await svc.getCoachOverview();
+  const data = await svc.getCoachOverview(req.user);
   sendSuccess(res, data);
 }
 
 export async function coachHeatmap(req: AuthRequest, res: Response) {
   const days = Number(req.query.days) || 14;
-  const data = await svc.getHeatmapData(days);
+  const data = await svc.getHeatmapData(days, req.user);
   sendSuccess(res, data);
 }
 
@@ -338,13 +350,13 @@ export async function myCheckinToday(req: AuthRequest, res: Response) {
     return;
   }
   const today = new Date().toISOString().split("T")[0];
-  const data = await svc.getCheckinByDate(playerId, today);
+  const data = await svc.getCheckinByDate(playerId, today, req.user);
   sendSuccess(res, data);
 }
 
 export async function listCheckins(req: AuthRequest, res: Response) {
   const { playerId } = req.params;
-  const result = await svc.listCheckins(playerId, req.query as any);
+  const result = await svc.listCheckins(playerId, req.query as any, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 
@@ -361,7 +373,7 @@ export async function myCheckins(req: AuthRequest, res: Response) {
 export async function checkinTrend(req: AuthRequest, res: Response) {
   const { playerId } = req.params;
   const days = Number(req.query.days) || 28;
-  const data = await svc.getCheckinTrend(playerId, days);
+  const data = await svc.getCheckinTrend(playerId, days, req.user);
   sendSuccess(res, data);
 }
 

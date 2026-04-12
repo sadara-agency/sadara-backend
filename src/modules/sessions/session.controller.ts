@@ -12,13 +12,13 @@ import * as sessionService from "./session.service";
 
 // ── List ──
 export async function list(req: AuthRequest, res: Response) {
-  const result = await sessionService.listSessions(req.query as any);
+  const result = await sessionService.listSessions(req.query as any, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 
 // ── Get by ID ──
 export async function getById(req: AuthRequest, res: Response) {
-  const session = await sessionService.getSessionById(req.params.id);
+  const session = await sessionService.getSessionById(req.params.id, req.user);
   sendSuccess(res, session);
 }
 

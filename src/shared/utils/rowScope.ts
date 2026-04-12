@@ -23,6 +23,8 @@ const COACH_ROLES = [
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
+  "GoalkeeperCoach",
+  "MentalCoach",
 ];
 
 const UUID_RE =
@@ -115,6 +117,13 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Player: ownAssigned,
     Scout: ownAssigned,
     Coach: ownAssigned,
+    SkillCoach: ownAssigned,
+    TacticalCoach: ownAssigned,
+    FitnessCoach: ownAssigned,
+    NutritionSpecialist: ownAssigned,
+    GymCoach: ownAssigned,
+    GoalkeeperCoach: ownAssigned,
+    MentalCoach: ownAssigned,
     Analyst: ownAssigned,
     Finance: ownAssigned,
     Legal: ownAssigned,
@@ -125,6 +134,13 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Player: (u) => ({ requestedBy: u.id }),
     Scout: (u) => ({ requestedBy: u.id }),
     Coach: (u) => ({ requestedBy: u.id }),
+    SkillCoach: (u) => ({ requestedBy: u.id }),
+    TacticalCoach: (u) => ({ requestedBy: u.id }),
+    FitnessCoach: (u) => ({ requestedBy: u.id }),
+    NutritionSpecialist: (u) => ({ requestedBy: u.id }),
+    GymCoach: (u) => ({ requestedBy: u.id }),
+    GoalkeeperCoach: (u) => ({ requestedBy: u.id }),
+    MentalCoach: (u) => ({ requestedBy: u.id }),
     Analyst: (u) => ({
       [Op.or]: [{ requestedBy: u.id }, { assignedTo: u.id }],
     }),
@@ -135,6 +151,13 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Player: ownUploaded,
     Scout: ownUploaded,
     Coach: ownUploaded,
+    SkillCoach: ownUploaded,
+    TacticalCoach: ownUploaded,
+    FitnessCoach: ownUploaded,
+    NutritionSpecialist: ownUploaded,
+    GymCoach: ownUploaded,
+    GoalkeeperCoach: ownUploaded,
+    MentalCoach: ownUploaded,
     Analyst: ownUploaded,
     Media: ownUploaded,
   },
@@ -143,8 +166,42 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Player: ownCreated,
     Scout: ownCreated,
     Coach: ownCreated,
+    SkillCoach: ownCreated,
+    TacticalCoach: ownCreated,
+    FitnessCoach: ownCreated,
+    NutritionSpecialist: ownCreated,
+    GymCoach: ownCreated,
+    GoalkeeperCoach: ownCreated,
+    MentalCoach: ownCreated,
     Analyst: ownCreated,
     Media: ownCreated,
+  },
+
+  sessions: {
+    Player: ownPlayer,
+    Scout: ownCreated,
+    Coach: coachPlayers,
+    SkillCoach: coachPlayers,
+    TacticalCoach: coachPlayers,
+    FitnessCoach: coachPlayers,
+    NutritionSpecialist: coachPlayers,
+    GymCoach: coachPlayers,
+    GoalkeeperCoach: coachPlayers,
+    MentalCoach: coachPlayers,
+    Analyst: analystPlayers,
+  },
+
+  wellness: {
+    Player: ownPlayer,
+    Coach: coachPlayers,
+    SkillCoach: coachPlayers,
+    TacticalCoach: coachPlayers,
+    FitnessCoach: coachPlayers,
+    NutritionSpecialist: coachPlayers,
+    GymCoach: coachPlayers,
+    GoalkeeperCoach: coachPlayers,
+    MentalCoach: coachPlayers,
+    Analyst: analystPlayers,
   },
 };
 
@@ -277,6 +334,19 @@ export async function checkRowAccess(
 
     case "notes":
       return record.createdBy === user.id;
+
+    case "sessions":
+      if (role === "Player") return record.playerId === user.playerId;
+      if (role === "Scout") return record.createdBy === user.id;
+      if (COACH_ROLES.includes(role) || role === "Analyst")
+        return isPlayerOwnedBy(record.playerId, user);
+      return true;
+
+    case "wellness":
+      if (role === "Player") return record.playerId === user.playerId;
+      if (COACH_ROLES.includes(role) || role === "Analyst")
+        return isPlayerOwnedBy(record.playerId, user);
+      return true;
   }
 
   return true;

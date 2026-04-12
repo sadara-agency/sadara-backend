@@ -553,44 +553,84 @@ export async function createValuation(input: CreateValuationInput) {
 // FINANCIAL DASHBOARD (PRD enhanced)
 // ══════════════════════════════════════════
 
+// Roles that see company-wide financial data; all others are scoped to their own player record
+const FINANCE_BYPASS_ROLES = [
+  "Admin",
+  "Manager",
+  "Executive",
+  "Finance",
+  "Legal",
+];
+
 export async function getFinancialDashboard(
   playerContractType?: string,
   comparisonPeriod: "MoM" | "QoQ" | "YoY" = "MoM",
+  user?: AuthUser,
 ) {
+  const playerIdFilter =
+    user && !FINANCE_BYPASS_ROLES.includes(user.role)
+      ? (user.playerId ?? null)
+      : null;
+
   const cacheKey = buildCacheKey(`${CachePrefix.FINANCE}:dashboard`, {
     playerContractType,
     comparisonPeriod,
+    // Non-bypass users get a user-specific cache entry to prevent cross-user poisoning
+    ...(playerIdFilter ? { uid: user!.id } : {}),
   });
 
   return cacheOrFetch(
     cacheKey,
     async () => {
-      // Build optional contract-type filter for player queries
-      const typeFilter = playerContractType ? "AND contract_type = $1" : "";
-      const typeBind = playerContractType ? { bind: [playerContractType] } : {};
+      // Build named replacements (converted from positional $1 to avoid mixing bind/replacements)
+      const replacements: Record<string, unknown> = {};
+      let typeFilter = "";
+      let typeFilterP = "";
+      let commissionTypeJoin = "";
+      let commissionPayJoin = "";
+      let trendTypeJoin = "";
+      let playerTypeJoin = "";
+
+      if (playerContractType) {
+        typeFilter = "AND contract_type = :contractType";
+        typeFilterP = "AND p.contract_type = :contractType";
+        commissionTypeJoin =
+          "JOIN players p ON c.player_id = p.id AND p.contract_type = :contractType";
+        commissionPayJoin =
+          "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = :contractType";
+        trendTypeJoin =
+          "JOIN players p ON v.player_id = p.id AND p.contract_type = :contractType";
+        playerTypeJoin = "AND p.contract_type = :contractType";
+        replacements.contractType = playerContractType;
+      }
+
+      let playerClause = "";
+      let playerClauseNoAlias = "";
+      if (playerIdFilter) {
+        playerClause = "AND p.id = :playerId";
+        playerClauseNoAlias = "AND id = :playerId";
+        replacements.playerId = playerIdFilter;
+      }
 
       // Total portfolio market value
       const [marketValue] = await sequelize.query<MarketValueRow>(
         `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
             COUNT(*)::INT AS total_players
-     FROM players WHERE status = 'active' ${typeFilter}`,
-        { type: QueryTypes.SELECT, ...typeBind },
+     FROM players WHERE status = 'active' ${typeFilter} ${playerClauseNoAlias}`,
+        { type: QueryTypes.SELECT, replacements },
       );
 
       // Player distribution by contract type
       const distribution = await sequelize.query<DistributionRow>(
         `SELECT contract_type, COUNT(*)::INT AS count
-     FROM players WHERE status = 'active' ${typeFilter}
+     FROM players WHERE status = 'active' ${typeFilter} ${playerClauseNoAlias}
      GROUP BY contract_type ORDER BY count DESC`,
-        { type: QueryTypes.SELECT, ...typeBind },
+        { type: QueryTypes.SELECT, replacements },
       );
 
       // Expected vs collected commissions
-      const commissionTypeJoin = playerContractType
-        ? "JOIN players p ON c.player_id = p.id AND p.contract_type = $1"
-        : "";
-      const commissionPayJoin = playerContractType
-        ? "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = $1"
+      const playerCommissionClause = playerIdFilter
+        ? "AND c.player_id = :playerId"
         : "";
       const [commissions] = await sequelize.query<CommissionsRow>(
         `SELECT
@@ -602,8 +642,8 @@ export async function getFinancialDashboard(
         ${commissionPayJoin}
         WHERE pay.status IN ('Expected', 'Overdue') AND pay.payment_type = 'Commission') AS outstanding_commissions
      FROM contracts c ${commissionTypeJoin}
-     WHERE c.status IN ('Active', 'Expiring Soon')`,
-        { type: QueryTypes.SELECT, ...typeBind },
+     WHERE c.status IN ('Active', 'Expiring Soon') ${playerCommissionClause}`,
+        { type: QueryTypes.SELECT, replacements },
       );
 
       // Top 10 valued players
@@ -613,14 +653,14 @@ export async function getFinancialDashboard(
             c.name AS club_name, c.name_ar AS club_name_ar
      FROM players p
      LEFT JOIN clubs c ON p.current_club_id = c.id
-     WHERE p.status = 'active' AND p.market_value IS NOT NULL ${typeFilter}
+     WHERE p.status = 'active' AND p.market_value IS NOT NULL ${typeFilterP} ${playerClause}
      ORDER BY p.market_value DESC LIMIT 10`,
-        { type: QueryTypes.SELECT, ...typeBind },
+        { type: QueryTypes.SELECT, replacements },
       );
 
       // Market value trend (monthly for last 12 months from valuations)
-      const trendTypeJoin = playerContractType
-        ? "JOIN players p ON v.player_id = p.id AND p.contract_type = $1"
+      const playerValuationClause = playerIdFilter
+        ? "AND v.player_id = :playerId"
         : "";
       const marketValueTrend = await sequelize.query<MarketValueTrendRow>(
         `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
@@ -629,14 +669,17 @@ export async function getFinancialDashboard(
      FROM valuations v
      ${trendTypeJoin}
      WHERE v.valued_at >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+       ${playerValuationClause}
      GROUP BY DATE_TRUNC('month', v.valued_at)
      ORDER BY month`,
-        { type: QueryTypes.SELECT, ...typeBind },
+        { type: QueryTypes.SELECT, replacements },
       );
 
-      // Revenue by club (top 10 clubs by paid invoice revenue)
-      const revenueByClub = await sequelize.query<RevenueByClubRow>(
-        `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
+      // Revenue by club — agency-level view, not meaningful per-player
+      const revenueByClub = playerIdFilter
+        ? ([] as RevenueByClubRow[])
+        : await sequelize.query<RevenueByClubRow>(
+            `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
             COALESCE(SUM(i.total_amount), 0)::NUMERIC AS total_revenue,
             COUNT(*)::INT AS invoice_count
      FROM invoices i
@@ -645,13 +688,10 @@ export async function getFinancialDashboard(
      GROUP BY c.id, c.name, c.name_ar, c.logo_url
      ORDER BY total_revenue DESC
      LIMIT 10`,
-        { type: QueryTypes.SELECT },
-      );
+            { type: QueryTypes.SELECT },
+          );
 
       // Per-player revenue breakdown (top 20 by paid payments)
-      const playerTypeJoin = playerContractType
-        ? "AND p.contract_type = $1"
-        : "";
       const playerRevenueBreakdown = await sequelize.query<PlayerRevenueRow>(
         `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
             c.name AS club_name, c.name_ar AS club_name_ar,
@@ -660,18 +700,20 @@ export async function getFinancialDashboard(
             COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Bonus'), 0)::NUMERIC AS bonus,
             COALESCE(SUM(pay.amount), 0)::NUMERIC AS total_revenue
      FROM payments pay
-     JOIN players p ON pay.player_id = p.id ${playerTypeJoin}
+     JOIN players p ON pay.player_id = p.id ${playerTypeJoin} ${playerClause}
      LEFT JOIN clubs c ON p.current_club_id = c.id
      WHERE pay.status = 'Paid'
      GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url, c.name, c.name_ar
      ORDER BY total_revenue DESC
      LIMIT 20`,
-        { type: QueryTypes.SELECT, ...typeBind },
+        { type: QueryTypes.SELECT, replacements },
       );
 
-      // Cash flow timeline (-12 months to +6 months)
-      const cashFlowTimeline = await sequelize.query<CashFlowRow>(
-        `WITH months AS (
+      // Cash flow timeline — agency-level view, not meaningful per-player
+      const cashFlowTimeline = playerIdFilter
+        ? ([] as CashFlowRow[])
+        : await sequelize.query<CashFlowRow>(
+            `WITH months AS (
        SELECT TO_CHAR(d, 'YYYY-MM') AS month
        FROM generate_series(
          DATE_TRUNC('month', NOW()) - INTERVAL '12 months',
@@ -702,27 +744,37 @@ export async function getFinancialDashboard(
      LEFT JOIN expected e ON m.month = e.month
      LEFT JOIN received r ON m.month = r.month
      ORDER BY m.month`,
-        { type: QueryTypes.SELECT },
-      );
+            { type: QueryTypes.SELECT },
+          );
 
-      // Period comparison
-      const periodComparison = await computePeriodComparison(comparisonPeriod);
+      // Period comparison — agency-level, skip for scoped users
+      const periodComparison = playerIdFilter
+        ? {}
+        : await computePeriodComparison(comparisonPeriod);
 
-      // Profitability
+      // Profitability — scoped to player payments if playerIdFilter is set
+      const playerPaymentClause = playerIdFilter
+        ? "AND player_id = :playerId"
+        : "";
       const [revRow] = await sequelize.query<RevenueRow>(
         `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
      FROM payments WHERE status = 'Paid'
-       AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
-        { type: QueryTypes.SELECT },
+       AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+       ${playerPaymentClause}`,
+        { type: QueryTypes.SELECT, replacements },
       );
-      const [expRow] = await sequelize.query<ExpenseTotalRow>(
-        `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
+      // Expenses are agency-level; Player role sees 0
+      let totalExpenses = 0;
+      if (!playerIdFilter) {
+        const [expRow] = await sequelize.query<ExpenseTotalRow>(
+          `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
      FROM expenses
      WHERE date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
-        { type: QueryTypes.SELECT },
-      );
+          { type: QueryTypes.SELECT },
+        );
+        totalExpenses = Number(expRow?.total_expenses || 0);
+      }
       const totalRevenue = Number(revRow?.total_revenue || 0);
-      const totalExpenses = Number(expRow?.total_expenses || 0);
       const netProfit = totalRevenue - totalExpenses;
 
       return {
@@ -749,10 +801,24 @@ export async function getFinancialDashboard(
   );
 }
 
-export async function getFinanceSummary(months = 12) {
+export async function getFinanceSummary(months = 12, user?: AuthUser) {
+  const playerIdFilter =
+    user && !FINANCE_BYPASS_ROLES.includes(user.role)
+      ? (user.playerId ?? null)
+      : null;
+
+  const cacheKey = buildCacheKey(`${CachePrefix.FINANCE}:summary`, {
+    months,
+    ...(playerIdFilter ? { uid: user!.id } : {}),
+  });
+
   return cacheOrFetch(
-    buildCacheKey(`${CachePrefix.FINANCE}:summary`, { months }),
+    cacheKey,
     async () => {
+      const replacements: Record<string, unknown> = { months };
+      const playerClause = playerIdFilter ? "AND player_id = :playerId" : "";
+      if (playerIdFilter) replacements.playerId = playerIdFilter;
+
       const [invoiceStats] = await sequelize.query<InvoiceStatsRow>(
         `
         SELECT
@@ -762,31 +828,37 @@ export async function getFinanceSummary(months = 12) {
           COUNT(*) FILTER (WHERE status = 'Overdue')::INT AS overdue_count,
           COUNT(*)::INT AS total_invoices
         FROM invoices
+        WHERE 1=1 ${playerClause}
       `,
-        { type: QueryTypes.SELECT },
+        { type: QueryTypes.SELECT, replacements },
       );
 
       const upcomingPayments = await Payment.count({
-        where: { status: "Expected" },
+        where: {
+          status: "Expected",
+          ...(playerIdFilter ? { playerId: playerIdFilter } : {}),
+        },
       });
 
       const revenueByMonth = await sequelize.query<RevenueByMonthRow>(
         `
         SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
           SUM(amount)::NUMERIC AS paid
-        FROM payments WHERE status = 'Paid' AND paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => $1)
+        FROM payments WHERE status = 'Paid'
+          AND paid_date >= DATE_TRUNC('month', NOW()) - make_interval(months => :months)
+          ${playerClause}
         GROUP BY DATE_TRUNC('month', paid_date) ORDER BY month
       `,
-        { bind: [months], type: QueryTypes.SELECT },
+        { type: QueryTypes.SELECT, replacements },
       );
 
       const revenueByType = await sequelize.query<RevenueByTypeRow>(
         `
         SELECT payment_type, SUM(amount)::NUMERIC AS total
-        FROM payments WHERE status = 'Paid'
+        FROM payments WHERE status = 'Paid' ${playerClause}
         GROUP BY payment_type ORDER BY total DESC
       `,
-        { type: QueryTypes.SELECT },
+        { type: QueryTypes.SELECT, replacements },
       );
 
       return {

@@ -215,11 +215,10 @@ export async function scoutDashboard(req: AuthRequest, res: Response) {
 
 export async function scoutAnalytics(req: AuthRequest, res: Response) {
   const { scoutId, dateFrom, dateTo } = req.query as Record<string, string>;
-  const data = await scoutingService.getScoutAnalytics({
-    scoutId,
-    dateFrom,
-    dateTo,
-  });
+  const data = await scoutingService.getScoutAnalytics(
+    { scoutId, dateFrom, dateTo },
+    req.user,
+  );
   sendSuccess(res, data);
 }
 

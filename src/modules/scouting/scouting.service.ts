@@ -632,20 +632,34 @@ export async function getScoutDashboard(userId: string) {
 // SCOUT PERFORMANCE ANALYTICS
 // ══════════════════════════════════════════
 
-export async function getScoutAnalytics(filters?: {
-  scoutId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-}) {
-  const scoutFilter = filters?.scoutId
-    ? `AND w.scouted_by = '${filters.scoutId}'`
-    : "";
-  const dateFilter = filters?.dateFrom
-    ? `AND w.created_at >= '${filters.dateFrom}'`
-    : "";
-  const dateToFilter = filters?.dateTo
-    ? `AND w.created_at <= '${filters.dateTo}'`
-    : "";
+export async function getScoutAnalytics(
+  filters?: { scoutId?: string; dateFrom?: string; dateTo?: string },
+  user?: AuthUser,
+) {
+  const ANALYTICS_BYPASS = ["Admin", "Manager", "Executive"];
+
+  // Scout role can only see their own analytics — force scoutId to their own id
+  const resolvedScoutId =
+    user && !ANALYTICS_BYPASS.includes(user.role) ? user.id : filters?.scoutId;
+
+  // Build parameterized filter clauses — no string interpolation
+  const replacements: Record<string, unknown> = {};
+  let scoutFilter = "";
+  let dateFilter = "";
+  let dateToFilter = "";
+
+  if (resolvedScoutId) {
+    scoutFilter = "AND w.scouted_by = :scoutId";
+    replacements.scoutId = resolvedScoutId;
+  }
+  if (filters?.dateFrom) {
+    dateFilter = "AND w.created_at >= :dateFrom";
+    replacements.dateFrom = filters.dateFrom;
+  }
+  if (filters?.dateTo) {
+    dateToFilter = "AND w.created_at <= :dateTo";
+    replacements.dateTo = filters.dateTo;
+  }
   const allFilters = `${scoutFilter} ${dateFilter} ${dateToFilter}`;
 
   // 1. Prospects added per month per scout (last 12 months)
@@ -666,7 +680,7 @@ export async function getScoutAnalytics(filters?: {
       ${allFilters}
     GROUP BY month, w.scouted_by, u.full_name
     ORDER BY month`,
-    { type: "SELECT" as any },
+    { type: "SELECT" as any, replacements },
   );
 
   // 2. Conversion rates per scout
@@ -692,7 +706,7 @@ export async function getScoutAnalytics(filters?: {
     WHERE 1=1 ${allFilters}
     GROUP BY w.scouted_by, u.full_name
     ORDER BY total DESC`,
-    { type: "SELECT" as any },
+    { type: "SELECT" as any, replacements },
   );
 
   // 3. Average time-to-decision per scout
@@ -712,7 +726,7 @@ export async function getScoutAnalytics(filters?: {
     WHERE 1=1 ${allFilters}
     GROUP BY w.scouted_by, u.full_name
     ORDER BY avg_days`,
-    { type: "SELECT" as any },
+    { type: "SELECT" as any, replacements },
   );
 
   return {

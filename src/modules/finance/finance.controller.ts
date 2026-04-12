@@ -167,7 +167,7 @@ export async function createValuation(req: AuthRequest, res: Response) {
 
 // ── Summary ──
 export async function summary(req: AuthRequest, res: Response) {
-  sendSuccess(res, await svc.getFinanceSummary());
+  sendSuccess(res, await svc.getFinanceSummary(12, req.user));
 }
 
 // ── Financial Dashboard (PRD enhanced) ──
@@ -177,6 +177,7 @@ export async function dashboard(req: AuthRequest, res: Response) {
     await svc.getFinancialDashboard(
       req.query.playerContractType as string | undefined,
       (req.query.comparisonPeriod as "MoM" | "QoQ" | "YoY") || "MoM",
+      req.user,
     ),
   );
 }
