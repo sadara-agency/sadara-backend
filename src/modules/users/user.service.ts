@@ -24,6 +24,8 @@ import {
   CreateUserInput,
   UpdateUserInput,
 } from "@modules/users/user.validation";
+import { cacheDel } from "@shared/utils/cache";
+import { USER_ACTIVE_CACHE_KEY } from "@middleware/auth";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {
@@ -187,6 +189,12 @@ export async function updateUser(id: string, input: UpdateUserInput) {
   }
 
   await user.update(input);
+
+  // If isActive changed, immediately invalidate the auth cache so the
+  // new status takes effect on the user's next request (< 1 second).
+  if (input.isActive !== undefined) {
+    cacheDel(USER_ACTIVE_CACHE_KEY(id)).catch(() => {});
+  }
 
   // Return without passwordHash
   const { passwordHash: _, ...safeUser } = user.get({ plain: true });

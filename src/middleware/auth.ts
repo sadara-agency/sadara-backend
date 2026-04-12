@@ -1,5 +1,6 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { QueryTypes } from "sequelize";
 import { env } from "@config/env";
 import { sequelize } from "@config/database";
 import { AuthRequest, AuthUser, UserRole } from "@shared/types";
@@ -10,8 +11,30 @@ import {
   CrudAction,
 } from "@modules/permissions/permission.service";
 import { logger } from "@config/logger";
+import { cacheGet, cacheSet, cacheDel } from "@shared/utils/cache";
 
-// Throttle activity updates — at most once per 5 minutes per user
+// ── Active-status cache ──
+// Key: `user_active:{userId}` → boolean. TTL: 60 s.
+// On deactivation, set to false immediately. On re-activation, delete so it re-fetches.
+export const USER_ACTIVE_CACHE_KEY = (id: string) => `user_active:${id}`;
+const USER_ACTIVE_TTL = 60; // seconds
+
+async function isUserActive(userId: string): Promise<boolean> {
+  const key = USER_ACTIVE_CACHE_KEY(userId);
+  const cached = await cacheGet<boolean>(key);
+  if (cached !== null) return cached;
+
+  type Row = { is_active: boolean };
+  const [row] = await sequelize.query<Row>(
+    "SELECT is_active FROM users WHERE id = :id LIMIT 1",
+    { replacements: { id: userId }, type: QueryTypes.SELECT },
+  );
+  const active = row?.is_active ?? false;
+  await cacheSet(key, active, USER_ACTIVE_TTL).catch(() => {});
+  return active;
+}
+
+// ── Throttle activity updates — at most once per 5 minutes per user
 const activityCache = new Map<string, number>();
 const ACTIVITY_THROTTLE_MS = 5 * 60 * 1000;
 const MAX_ACTIVITY_CACHE_SIZE = 1000;
@@ -57,11 +80,11 @@ function extractToken(req: AuthRequest): string | undefined {
 }
 
 // ── Verify JWT Token ──
-export function authenticate(
+export async function authenticate(
   req: AuthRequest,
   res: Response,
   next: NextFunction,
-): void {
+): Promise<void> {
   const token = extractToken(req);
 
   if (!token) {
@@ -69,18 +92,36 @@ export function authenticate(
     return;
   }
 
+  let decoded: AuthUser;
   try {
-    const decoded = jwt.verify(token, env.jwt.secret) as AuthUser;
-    req.user = decoded;
-    trackActivity(decoded.id);
-    next();
+    decoded = jwt.verify(token, env.jwt.secret) as AuthUser;
   } catch (err) {
     if (err instanceof jwt.TokenExpiredError) {
       sendUnauthorized(res, "Token expired");
     } else {
       sendUnauthorized(res, "Invalid token");
     }
+    return;
   }
+
+  // Check if the account is still active (Redis-cached, 60-second TTL).
+  // Fail-open if Redis/DB is unavailable — don't block all requests.
+  try {
+    const active = await isUserActive(decoded.id);
+    if (!active) {
+      sendUnauthorized(res, "Account deactivated");
+      return;
+    }
+  } catch (err) {
+    logger.warn("isUserActive check failed — allowing request through", {
+      userId: decoded.id,
+      error: (err as Error).message,
+    });
+  }
+
+  req.user = decoded;
+  trackActivity(decoded.id);
+  next();
 }
 
 // ── Role-based Authorization ──
