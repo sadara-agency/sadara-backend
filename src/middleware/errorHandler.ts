@@ -32,6 +32,16 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
+  // Guard against double-sends: if a response was already committed, log and abort.
+  if (res.headersSent) {
+    logger.error("Error after response already sent", {
+      message: err.message,
+      path: req.path,
+      method: req.method,
+    });
+    return;
+  }
+
   if (err instanceof AppError) {
     // Operational errors — expected, log at warn level
     logger.warn("Operational error", {

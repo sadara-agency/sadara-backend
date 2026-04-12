@@ -64,18 +64,17 @@ export function cacheRoute(
     }
 
     // Try to get from cache
+    let cached: { body: any; statusCode: number } | null = null;
     try {
-      const cached = await cacheGet<{ body: any; statusCode: number }>(
-        cacheKey,
-      );
-
-      if (cached) {
-        res.setHeader("X-Cache", "HIT");
-        res.status(cached.statusCode).json(cached.body);
-        return;
-      }
+      cached = await cacheGet<{ body: any; statusCode: number }>(cacheKey);
     } catch {
       // Cache read failed — continue to handler
+    }
+
+    if (cached) {
+      res.setHeader("X-Cache", "HIT");
+      res.status(cached.statusCode).json(cached.body);
+      return;
     }
 
     // Cache miss — intercept the response to cache it
