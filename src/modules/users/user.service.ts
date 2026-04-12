@@ -6,7 +6,12 @@
 // login/register/profile for the authenticated user.
 // This module lets Admins manage ALL users in the system.
 // ─────────────────────────────────────────────────────────────
-import { Op, Sequelize, QueryTypes } from "sequelize";
+import {
+  Op,
+  Sequelize,
+  QueryTypes,
+  ForeignKeyConstraintError,
+} from "sequelize";
 import bcrypt from "bcryptjs";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
@@ -211,7 +216,18 @@ export async function deleteUser(id: string, requesterId: string) {
 
   const user = await findOrThrow(User, id, "User");
 
-  await user.destroy();
+  try {
+    await user.destroy();
+  } catch (err) {
+    if (err instanceof ForeignKeyConstraintError) {
+      throw new AppError(
+        "Cannot delete user: this account has linked records (content, notes, or audit history). Deactivate the user instead.",
+        409,
+      );
+    }
+    throw err;
+  }
+
   return { id };
 }
 
