@@ -45,7 +45,7 @@ describe('Wellness Dashboard Controller', () => {
       const res = mockRes();
       await controller.playerDashboard(mockReq({ params: { playerId: 'p1' } }), res);
       expect(res.status).toHaveBeenCalledWith(200);
-      expect(svc.getPlayerDashboard).toHaveBeenCalledWith('p1', 7);
+      expect(svc.getPlayerDashboard).toHaveBeenCalledWith('p1', 7, expect.anything());
     });
   });
 

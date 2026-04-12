@@ -14,6 +14,48 @@ import {
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { checkRowAccess } from "@shared/utils/rowScope";
+import { AuthUser } from "@shared/types";
+
+const WELLNESS_BYPASS = ["Admin", "Manager", "Executive"];
+const COACH_ROLE_LIST = [
+  "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
+  "GoalkeeperCoach",
+  "MentalCoach",
+];
+
+/**
+ * Builds a raw SQL WHERE addition + replacements to restrict the players list
+ * to only rows visible to the given user. Used in bulk queries like getCoachOverview.
+ */
+function buildPlayerScopeSQL(user?: AuthUser): {
+  clause: string;
+  replacements: Record<string, unknown>;
+} {
+  if (!user || WELLNESS_BYPASS.includes(user.role))
+    return { clause: "", replacements: {} };
+  if (user.role === "Player")
+    return {
+      clause: "AND p.id = :scopePlayerId",
+      replacements: { scopePlayerId: user.playerId },
+    };
+  if (COACH_ROLE_LIST.includes(user.role))
+    return {
+      clause: "AND p.coach_id = :scopeCoachId",
+      replacements: { scopeCoachId: user.id },
+    };
+  if (user.role === "Analyst")
+    return {
+      clause: "AND p.analyst_id = :scopeAnalystId",
+      replacements: { scopeAnalystId: user.id },
+    };
+  return { clause: "", replacements: {} };
+}
 import {
   calculateBMR,
   calculateTDEE,
@@ -50,7 +92,9 @@ import { calculateRingScore } from "./wellness.helpers";
 // PROFILES
 // ══════════════════════════════════════════
 
-export async function getProfile(playerId: string) {
+export async function getProfile(playerId: string, user?: AuthUser) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Wellness profile not found", 404);
   const profile = await WellnessProfile.findOne({ where: { playerId } });
   if (!profile) throw new AppError("Wellness profile not found", 404);
   return profile;
@@ -179,7 +223,13 @@ export async function recalculateTargets(playerId: string) {
 // WEIGHT LOGS
 // ══════════════════════════════════════════
 
-export async function listWeightLogs(playerId: string, queryParams: any) {
+export async function listWeightLogs(
+  playerId: string,
+  queryParams: any,
+  user?: AuthUser,
+) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const { limit, offset, page } = parsePagination(queryParams, "logged_at");
   const where: any = { playerId };
 
@@ -218,7 +268,10 @@ export async function createWeightLog(body: CreateWeightLogInput) {
 
 export async function getWeightTrend(
   playerId: string,
+  user?: AuthUser,
 ): Promise<WeightTrendResponse> {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const fourWeeksAgo = new Date();
   fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
   const fromDate = fourWeeksAgo.toISOString().slice(0, 10);
@@ -337,7 +390,13 @@ export async function getFoodItem(id: string) {
 // MEAL LOGS
 // ══════════════════════════════════════════
 
-export async function listMealLogs(playerId: string, queryParams: any) {
+export async function listMealLogs(
+  playerId: string,
+  queryParams: any,
+  user?: AuthUser,
+) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const where: any = { playerId };
 
   if (queryParams.date) {
@@ -426,7 +485,10 @@ export async function copyDay(body: CopyDayInput & { playerId: string }) {
 export async function getDailyTotals(
   playerId: string,
   date: string,
+  user?: AuthUser,
 ): Promise<DailyTotalsResponse> {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const meals = await WellnessMealLog.findAll({
     where: { playerId, loggedDate: date },
     include: [
@@ -495,7 +557,10 @@ function todayLocal(): string {
 export async function getPlayerDashboard(
   playerId: string,
   days = 7,
+  user?: AuthUser,
 ): Promise<PlayerDashboardResponse> {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const today = todayLocal();
 
   // Get profile targets
@@ -573,16 +638,21 @@ export async function getPlayerDashboard(
 /**
  * Coach traffic light overview for all players with wellness profiles.
  */
-export async function getCoachOverview(): Promise<CoachOverviewResponse> {
-  // Get all active players, LEFT JOIN profiles so players without profiles also appear
+export async function getCoachOverview(
+  user?: AuthUser,
+): Promise<CoachOverviewResponse> {
+  const { clause: playerScope, replacements: scopeReplacements } =
+    buildPlayerScopeSQL(user);
+
+  // Get all active players visible to this user, LEFT JOIN profiles so players without profiles also appear
   const players: any[] = await sequelize.query(
     `SELECT p.id AS player_id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
             CASE WHEN wp.id IS NOT NULL THEN true ELSE false END AS has_profile
      FROM players p
      LEFT JOIN wellness_profiles wp ON wp.player_id = p.id
-     WHERE p.status = 'active'
+     WHERE p.status = 'active' ${playerScope}
      ORDER BY p.first_name, p.last_name`,
-    { type: QueryTypes.SELECT },
+    { type: QueryTypes.SELECT, replacements: scopeReplacements },
   );
 
   const threeDaysAgo = new Date();
@@ -720,7 +790,9 @@ export async function getCoachOverview(): Promise<CoachOverviewResponse> {
 
 // ── Heatmap Data (per-player daily ring scores) ──
 
-export async function getHeatmapData(days = 14) {
+export async function getHeatmapData(days = 14, user?: AuthUser) {
+  const { clause: playerScope, replacements: scopeReplacements } =
+    buildPlayerScopeSQL(user);
   const today = todayLocal();
   const startDate = new Date(today);
   startDate.setDate(startDate.getDate() - days + 1);
@@ -740,10 +812,10 @@ export async function getHeatmapData(days = 14) {
        ON ds.player_id = p.id
        AND ds.summary_date >= :startDate
        AND ds.summary_date <= :today
-     WHERE p.status = 'active'
+     WHERE p.status = 'active' ${playerScope}
      ORDER BY p.first_name, p.last_name, ds.summary_date`,
     {
-      replacements: { startDate: startStr, today },
+      replacements: { startDate: startStr, today, ...scopeReplacements },
       type: QueryTypes.SELECT,
     },
   );
@@ -854,7 +926,10 @@ export async function createCheckin(
 export async function listCheckins(
   playerId: string,
   query: { page?: number; limit?: number; from?: string; to?: string },
+  user?: AuthUser,
 ) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const { limit, offset, page } = parsePagination(query);
   const where: any = { playerId };
 
@@ -877,7 +952,13 @@ export async function listCheckins(
 /**
  * Get a single checkin for a player on a specific date.
  */
-export async function getCheckinByDate(playerId: string, date: string) {
+export async function getCheckinByDate(
+  playerId: string,
+  date: string,
+  user?: AuthUser,
+) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   return WellnessCheckin.findOne({
     where: { playerId, checkinDate: date },
   });
@@ -886,7 +967,13 @@ export async function getCheckinByDate(playerId: string, date: string) {
 /**
  * Get readiness trend for a player over the last N days.
  */
-export async function getCheckinTrend(playerId: string, days = 28) {
+export async function getCheckinTrend(
+  playerId: string,
+  days = 28,
+  user?: AuthUser,
+) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
   const fromDate = new Date();
   fromDate.setDate(fromDate.getDate() - days);
   const fromStr = fromDate.toISOString().split("T")[0];

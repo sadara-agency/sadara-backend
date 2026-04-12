@@ -6,12 +6,22 @@ const mockFindByPk = jest.fn();
 const mockFindOne = jest.fn();
 const mockUserCreate = jest.fn();
 
-jest.mock('../../../src/config/database', () => ({
+jest.mock('@config/database', () => ({
   sequelize: {
     query: jest.fn(),
     authenticate: jest.fn(),
     transaction: jest.fn((fn: Function) => fn({})),
   },
+}));
+
+jest.mock('@modules/permissions/permission.service', () => ({
+  hasPermission: jest.fn().mockResolvedValue(true),
+  loadPermissions: jest.fn().mockResolvedValue({}),
+  getPermissions: jest.fn().mockResolvedValue({}),
+  invalidatePermissionCache: jest.fn().mockResolvedValue(undefined),
+  loadFieldPermissions: jest.fn().mockResolvedValue({}),
+  getFieldPermissions: jest.fn().mockResolvedValue({}),
+  getHiddenFields: jest.fn().mockResolvedValue([]),
 }));
 
 jest.mock('../../../src/modules/players/player.model', () => ({

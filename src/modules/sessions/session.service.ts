@@ -10,6 +10,12 @@ import { Ticket } from "@modules/tickets/ticket.model";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { generateDisplayId } from "@shared/utils/displayId";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
+import { AuthUser } from "@shared/types";
 import type {
   CreateSessionInput,
   UpdateSessionInput,
@@ -90,12 +96,15 @@ function buildWhere(query: SessionQuery): WhereOptions {
 
 // ── List ──
 
-export async function listSessions(query: SessionQuery) {
-  const where = buildWhere(query);
+export async function listSessions(query: SessionQuery, user?: AuthUser) {
+  const where = buildWhere(query) as any;
   const sortField = query.sort.replace(/_([a-z])/g, (_, c: string) =>
     c.toUpperCase(),
   );
   const offset = (query.page - 1) * query.limit;
+
+  const scope = await buildRowScope("sessions", user);
+  if (scope) mergeScope(where, scope);
 
   const { rows: data, count: total } = await Session.findAndCountAll({
     where,
@@ -119,9 +128,11 @@ export async function listSessions(query: SessionQuery) {
 
 // ── Get by ID ──
 
-export async function getSessionById(id: string) {
+export async function getSessionById(id: string, user?: AuthUser) {
   const session = await Session.findByPk(id, { include: sessionIncludes() });
   if (!session) throw new AppError("Session not found", 404);
+  const ok = await checkRowAccess("sessions", session, user);
+  if (!ok) throw new AppError("Session not found", 404);
   return session;
 }
 

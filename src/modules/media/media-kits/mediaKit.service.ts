@@ -438,20 +438,7 @@ export async function listGenerationHistory(
     include: INCLUDES,
   });
 
-  const resolved = await Promise.all(
-    rows.map(async (row) => {
-      const plain = row.get({ plain: true }) as unknown as {
-        fileUrl?: string | null;
-        [k: string]: unknown;
-      };
-      if (plain.fileUrl) {
-        plain.fileUrl = await resolveFileUrl(plain.fileUrl, 60);
-      }
-      return plain;
-    }),
-  );
-
-  return { data: resolved, meta: buildMeta(count, page, limit) };
+  return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
 // ── Get by ID ──
@@ -461,12 +448,5 @@ export async function getGenerationById(id: string) {
     include: INCLUDES,
   });
   if (!generation) throw new AppError("Media kit generation not found", 404);
-  const plain = generation.get({ plain: true }) as unknown as {
-    fileUrl?: string | null;
-    [k: string]: unknown;
-  };
-  if (plain.fileUrl) {
-    plain.fileUrl = await resolveFileUrl(plain.fileUrl, 60);
-  }
-  return plain;
+  return generation;
 }

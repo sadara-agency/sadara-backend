@@ -304,6 +304,21 @@ export async function resolveFileUrl(
   return urlOrKey;
 }
 
+/**
+ * Download a private file as a Buffer.
+ * Uses the service account's read access — no URL signing required.
+ * Works in both GCS (Cloud Run) and local-disk mode.
+ */
+export async function streamFileBuffer(key: string): Promise<Buffer> {
+  if (!USE_GCS) {
+    const { readFile } = await import("fs/promises");
+    const { join } = await import("path");
+    return readFile(join(process.cwd(), "uploads", key));
+  }
+  const [buffer] = await getGCS().bucket(env.gcs.bucket).file(key).download();
+  return buffer as Buffer;
+}
+
 // ── Startup log ──
 
 if (USE_GCS) {
