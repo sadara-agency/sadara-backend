@@ -12,6 +12,8 @@ import {
   sessionQuerySchema,
 } from "./session.validation";
 import * as sessionController from "./session.controller";
+import feedbackRoutes from "./feedback/sessionFeedback.routes";
+import * as feedbackController from "./feedback/sessionFeedback.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -86,6 +88,17 @@ router.delete(
   "/:id",
   authorizeModule("sessions", "delete"),
   asyncHandler(sessionController.remove),
+);
+
+// ── Feedback sub-routes ──
+router.use("/:sessionId/feedback", feedbackRoutes);
+
+// ── Player Feedback Summary ──
+router.get(
+  "/player/:playerId/feedback-summary",
+  authorizeModule("session-feedback", "read"),
+  cacheRoute("session-feedback", CacheTTL.MEDIUM),
+  asyncHandler(feedbackController.playerSummary),
 );
 
 export default router;
