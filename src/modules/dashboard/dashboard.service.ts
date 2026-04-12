@@ -673,13 +673,13 @@ export async function getEmployeePerformance(limit = 20) {
     async () => {
       const rows = await sequelize.query<Record<string, unknown>>(
         `WITH action_counts AS (
-           SELECT user_id, COUNT(*)::int AS actions_30d
+           SELECT user_id, COUNT(*)::int AS actions30d
            FROM audit_logs
            WHERE logged_at >= NOW() - INTERVAL '30 days'
            GROUP BY user_id
          ),
          completed_counts AS (
-           SELECT assigned_to, COUNT(*)::int AS tasks_completed_30d
+           SELECT assigned_to, COUNT(*)::int AS tasksCompleted30d
            FROM tasks
            WHERE status = 'Completed'
              AND completed_at >= NOW() - INTERVAL '30 days'
@@ -695,15 +695,15 @@ export async function getEmployeePerformance(limit = 20) {
          SELECT
            u.id, u.full_name, u.full_name_ar, u.role, u.avatar_url,
            u.last_login,
-           COALESCE(a.actions_30d, 0) AS actions_30d,
-           COALESCE(c.tasks_completed_30d, 0) AS tasks_completed_30d,
+           COALESCE(a.actions30d, 0) AS actions30d,
+           COALESCE(c.tasksCompleted30d, 0) AS tasksCompleted30d,
            COALESCE(o.overdue_tasks, 0) AS overdue_tasks
          FROM users u
          LEFT JOIN action_counts a ON a.user_id = u.id
          LEFT JOIN completed_counts c ON c.assigned_to = u.id
          LEFT JOIN overdue_counts o ON o.assigned_to = u.id
          WHERE u.is_active = true AND u.role != 'Player'
-         ORDER BY actions_30d DESC
+         ORDER BY actions30d DESC
          LIMIT $1`,
         { bind: [limit], type: QueryTypes.SELECT },
       );
