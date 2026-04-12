@@ -11,8 +11,12 @@ import {
 
 const P = CachePrefix.DASHBOARD;
 
-/** Roles that see ALL data (no player-level filtering). */
-const UNFILTERED_ROLES: UserRole[] = [
+/**
+ * Roles that see ALL upcoming matches on the dashboard. Matches are not
+ * privacy-sensitive — finance/legal/media need full visibility for their
+ * cross-functional oversight.
+ */
+const MATCH_VIEW_ALL_ROLES: UserRole[] = [
   "Admin",
   "Manager",
   "Executive",
@@ -20,6 +24,15 @@ const UNFILTERED_ROLES: UserRole[] = [
   "Legal",
   "Media",
 ];
+
+/**
+ * Roles that bypass task scoping on the dashboard widget.
+ * Matches the central `BYPASS_ROLES` in `@shared/utils/rowScope` so that
+ * the dashboard urgent-tasks widget stays consistent with the raw /tasks
+ * endpoint. Finance/Legal/Media fall through to the role-scoped branch
+ * and see only their own assigned tasks.
+ */
+const TASK_BYPASS_ROLES: UserRole[] = ["Admin", "Manager", "Executive"];
 
 /** Main KPI counters from the dashboard view. */
 export async function getKpis() {
@@ -260,8 +273,8 @@ export async function getUpcomingMatches(
   return cacheOrFetch(
     cacheKey,
     async () => {
-      // Unfiltered roles — see all matches
-      if (!userId || !userRole || UNFILTERED_ROLES.includes(userRole)) {
+      // Match-view-all roles — see all matches
+      if (!userId || !userRole || MATCH_VIEW_ALL_ROLES.includes(userRole)) {
         return sequelize.query(
           `SELECT
              m.id, m.match_date, m.venue, m.competition, m.status,
@@ -342,8 +355,8 @@ export async function getUrgentTasks(
   return cacheOrFetch(
     cacheKey,
     async () => {
-      // Unfiltered roles — see all tasks
-      if (!userId || !userRole || UNFILTERED_ROLES.includes(userRole)) {
+      // Task-bypass roles (Admin/Manager/Executive) — see all tasks
+      if (!userId || !userRole || TASK_BYPASS_ROLES.includes(userRole)) {
         return sequelize.query(
           `SELECT
              t.id, t.title, t.title_ar, t.type, t.priority, t.status, t.due_date,

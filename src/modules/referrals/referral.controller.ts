@@ -5,38 +5,32 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import * as referralService from "@modules/referrals/referral.service";
 
-// Referrals pass userId/role to most service methods, so we adapt via
-// the service wrapper. list and getById need custom handlers since they
-// require req.user context beyond what the factory provides.
+// list / getById / update / remove are custom because they need req.user
+// for row-level scoping via buildRowScope. Create goes through the factory
+// for its audit + cache-invalidation wiring.
 
 const crud = createCrudController({
   service: {
-    list: (query) => referralService.listReferrals(query, "", ""),
-    getById: (id) => referralService.getReferralById(id, "", ""),
+    list: (query) => referralService.listReferrals(query),
+    getById: (id) => referralService.getReferralById(id),
     create: (body, userId) => referralService.createReferral(body, userId),
-    update: (id, body) => referralService.updateReferral(id, body, "", ""),
-    delete: (id) => referralService.deleteReferral(id, "", ""),
+    update: (id, body) => referralService.updateReferral(id, body),
+    delete: (id) => referralService.deleteReferral(id),
   },
   entity: "referrals",
   cachePrefixes: [],
   label: (r) => `${r.referralType} referral for player ${r.playerId}`,
 });
 
-// Override list/getById to pass user context
 export async function list(req: AuthRequest, res: Response) {
-  const result = await referralService.listReferrals(
-    req.query,
-    req.user!.id,
-    req.user!.role,
-  );
+  const result = await referralService.listReferrals(req.query, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 
 export async function getById(req: AuthRequest, res: Response) {
   const referral = await referralService.getReferralById(
     req.params.id,
-    req.user!.id,
-    req.user!.role,
+    req.user,
   );
   sendSuccess(res, referral);
 }
@@ -51,13 +45,11 @@ export async function checkDuplicate(req: AuthRequest, res: Response) {
   sendSuccess(res, result);
 }
 
-// Override update/remove to pass user context
 export async function update(req: AuthRequest, res: Response) {
   const referral = await referralService.updateReferral(
     req.params.id,
     req.body,
-    req.user!.id,
-    req.user!.role,
+    req.user,
   );
 
   await logAudit(
@@ -75,8 +67,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   const referral = await referralService.updateReferralStatus(
     req.params.id,
     req.body,
-    req.user!.id,
-    req.user!.role,
+    req.user,
   );
 
   await logAudit(
@@ -91,11 +82,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
 }
 
 export async function remove(req: AuthRequest, res: Response) {
-  const result = await referralService.deleteReferral(
-    req.params.id,
-    req.user!.id,
-    req.user!.role,
-  );
+  const result = await referralService.deleteReferral(req.params.id, req.user);
 
   await logAudit(
     "DELETE",

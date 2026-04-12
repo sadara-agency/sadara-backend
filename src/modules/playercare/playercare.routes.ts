@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
 import { playerCareController } from "./playercare.controller";
 
 const router = Router();
@@ -15,9 +15,11 @@ router.get(
   playerCareController.list,
 );
 
+// Stats aggregates across all referrals org-wide. Restricted to bypass
+// roles because scoped aggregates would be misleading for coaches/analysts.
 router.get(
   "/stats",
-  authorizeModule("referrals", "read"),
+  authorize("Admin", "Manager", "Executive"),
   playerCareController.stats,
 );
 

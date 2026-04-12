@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
+import type { AuthRequest } from "@shared/types";
 import * as caseService from "./playercare.service";
 import {
   sendSuccess,
@@ -17,15 +18,15 @@ import {
 
 export const playerCareController = {
   /** GET /api/v1/playercare — list all cases */
-  list: asyncHandler(async (req: Request, res: Response) => {
+  list: asyncHandler(async (req: AuthRequest, res: Response) => {
     const query = playerCareQuerySchema.parse(req.query);
-    const result = await caseService.listCases(query);
+    const result = await caseService.listCases(query, req.user);
     sendPaginated(res, result.data, result.meta);
   }),
 
   /** GET /api/v1/playercare/:id — get case detail with injury */
-  getById: asyncHandler(async (req: Request, res: Response) => {
-    const caseRecord = await caseService.getCaseById(req.params.id);
+  getById: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const caseRecord = await caseService.getCaseById(req.params.id, req.user);
     sendSuccess(res, caseRecord);
   }),
 
@@ -50,14 +51,18 @@ export const playerCareController = {
   }),
 
   /** PATCH /api/v1/playercare/:id — update case */
-  update: asyncHandler(async (req: Request, res: Response) => {
+  update: asyncHandler(async (req: AuthRequest, res: Response) => {
     const input = updateCaseSchema.parse(req.body);
-    const caseRecord = await caseService.updateCase(req.params.id, input);
+    const caseRecord = await caseService.updateCase(
+      req.params.id,
+      input,
+      req.user,
+    );
     sendSuccess(res, caseRecord);
   }),
 
   /** PATCH /api/v1/playercare/:id/status — update status with sync */
-  updateStatus: asyncHandler(async (req: Request, res: Response) => {
+  updateStatus: asyncHandler(async (req: AuthRequest, res: Response) => {
     const { status, outcome, notes, closureNotes } =
       updateCaseStatusSchema.parse(req.body);
     const caseRecord = await caseService.updateCaseStatus(
@@ -66,20 +71,21 @@ export const playerCareController = {
       outcome,
       notes,
       closureNotes,
+      req.user,
     );
     sendSuccess(res, caseRecord);
   }),
 
   /** DELETE /api/v1/playercare/:id — delete case */
-  delete: asyncHandler(async (req: Request, res: Response) => {
-    await caseService.deleteCase(req.params.id);
+  delete: asyncHandler(async (req: AuthRequest, res: Response) => {
+    await caseService.deleteCase(req.params.id, req.user);
     sendSuccess(res, null, "Case deleted");
   }),
 
   /** GET /api/v1/playercare/player/:playerId/timeline */
-  timeline: asyncHandler(async (req: Request, res: Response) => {
+  timeline: asyncHandler(async (req: AuthRequest, res: Response) => {
     const { playerId } = playerIdSchema.parse(req.params);
-    const timeline = await caseService.getPlayerTimeline(playerId);
+    const timeline = await caseService.getPlayerTimeline(playerId, req.user);
     sendSuccess(res, timeline);
   }),
 
