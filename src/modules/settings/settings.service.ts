@@ -8,6 +8,7 @@ import { Session } from "@modules/sessions/session.model";
 import { Gate } from "@modules/gates/gate.model";
 import { AppError } from "@middleware/errorHandler";
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
+import { resolveSmtpSecurity, resetTransporter } from "@shared/utils/mail";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { parseCsvBuffer } from "../../database/csv-import/parse-csv";
 import {
@@ -231,7 +232,6 @@ export async function getSmtpSettings() {
       password: "",
       fromEmail: "",
       fromName: "",
-      secure: true,
     }
   );
 }
@@ -243,6 +243,8 @@ export async function updateSmtpSettings(data: SmtpSettingsInput) {
     updated.password = current.password;
   }
   await setAppSetting("smtp_config", updated);
+  // Reset the cached nodemailer transporter so the next email uses the new config.
+  resetTransporter();
   return {
     ...updated,
     password: updated.password ? "••••••••" : "",
@@ -256,14 +258,22 @@ export async function testSmtpConnection() {
   }
   try {
     const nodemailer = require("nodemailer");
+    const port = Number(settings.port) || 587;
+    const { secure, requireTLS } = resolveSmtpSecurity(port);
     const transporter = nodemailer.createTransport({
       host: settings.host,
-      port: settings.port || 587,
-      secure: settings.secure ?? true,
+      port,
+      secure,
+      requireTLS,
       auth: { user: settings.username, pass: settings.password },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
     });
     await transporter.verify();
-    return { success: true, message: "SMTP connection successful" };
+    return {
+      success: true,
+      message: `SMTP connection successful (${secure ? "SSL" : "STARTTLS"} on port ${port})`,
+    };
   } catch (err: any) {
     return { success: false, message: err.message || "Connection failed" };
   }

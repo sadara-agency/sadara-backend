@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { getAppSetting } from "@shared/utils/appSettings";
 
 function escapeHtml(str: string): string {
   return str
@@ -12,45 +13,131 @@ function escapeHtml(str: string): string {
 }
 
 // ═══════════════════════════════════════════════════════════
-// Transporter (lazy-initialized singleton)
+// Port → Encryption mapping (shared with settings.service)
 // ═══════════════════════════════════════════════════════════
 
-let _transporter: nodemailer.Transporter | null = null;
+/**
+ * Port 465 uses implicit TLS (`secure: true`). Every other common SMTP port
+ * (587, 25, 2525) starts plaintext and upgrades via STARTTLS. Passing
+ * `secure: true` to port 587 is the cause of the classic
+ * "ssl3_get_record:wrong version number" error.
+ */
+export function resolveSmtpSecurity(port: number): {
+  secure: boolean;
+  requireTLS: boolean;
+} {
+  if (port === 465) return { secure: true, requireTLS: false };
+  return { secure: false, requireTLS: true };
+}
 
-function getTransporter(): nodemailer.Transporter | null {
+// ═══════════════════════════════════════════════════════════
+// Transporter (lazy-initialized singleton — DB config first, env fallback)
+// ═══════════════════════════════════════════════════════════
+
+interface ResolvedSmtp {
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  from: string;
+  fromName: string;
+}
+
+let _transporter: nodemailer.Transporter | null = null;
+let _resolvedFrom: { email: string; name: string } | null = null;
+
+/**
+ * Invalidate the cached transporter so the next send rebuilds it.
+ * Called by settings.service.updateSmtpSettings() after an admin saves new SMTP config.
+ */
+export function resetTransporter(): void {
+  if (_transporter) {
+    try {
+      _transporter.close();
+    } catch {
+      /* ignore */
+    }
+  }
+  _transporter = null;
+  _resolvedFrom = null;
+}
+
+async function resolveSmtpConfig(): Promise<ResolvedSmtp | null> {
+  // 1. DB config (admin-saved via Settings → SMTP)
+  try {
+    const dbCfg = await getAppSetting("smtp_config");
+    if (dbCfg?.host && dbCfg?.username && dbCfg?.password) {
+      return {
+        host: dbCfg.host,
+        port: Number(dbCfg.port) || 587,
+        user: dbCfg.username,
+        password: dbCfg.password,
+        from: dbCfg.fromEmail || dbCfg.username,
+        fromName: dbCfg.fromName || "صدارة | Sadara",
+      };
+    }
+  } catch (err: any) {
+    logger.warn("Failed to load SMTP config from DB — falling back to env", {
+      error: err?.message,
+    });
+  }
+
+  // 2. Env fallback
+  if (env.smtp.host && env.smtp.user) {
+    return {
+      host: env.smtp.host,
+      port: env.smtp.port,
+      user: env.smtp.user,
+      password: env.smtp.password,
+      from: env.smtp.from,
+      fromName: "صدارة | Sadara",
+    };
+  }
+
+  return null;
+}
+
+async function getTransporter(): Promise<nodemailer.Transporter | null> {
   if (_transporter) return _transporter;
 
-  // If SMTP is not configured, return null (will fall back to console)
-  if (!env.smtp.host || !env.smtp.user) {
+  const cfg = await resolveSmtpConfig();
+  if (!cfg) {
     logger.warn("SMTP not configured — emails will be logged to console");
     return null;
   }
 
+  const { secure, requireTLS } = resolveSmtpSecurity(cfg.port);
+
   _transporter = nodemailer.createTransport({
-    host: env.smtp.host,
-    port: env.smtp.port,
-    secure: env.smtp.secure, // true for 465, false for 587
+    host: cfg.host,
+    port: cfg.port,
+    secure,
+    requireTLS,
     auth: {
-      user: env.smtp.user,
-      pass: env.smtp.password,
+      user: cfg.user,
+      pass: cfg.password,
     },
-    // Pool connections for better performance
     pool: true,
     maxConnections: 5,
     maxMessages: 100,
-    // Timeouts
     connectionTimeout: 10_000,
     greetingTimeout: 10_000,
     socketTimeout: 30_000,
   });
 
-  // Verify connection on first use
+  _resolvedFrom = { email: cfg.from, name: cfg.fromName };
+
   _transporter
     .verify()
-    .then(() => logger.info("SMTP connection verified"))
+    .then(() =>
+      logger.info("SMTP connection verified", {
+        host: cfg.host,
+        port: cfg.port,
+      }),
+    )
     .catch((err) => {
       logger.error("SMTP connection failed", { error: err.message });
-      _transporter = null;
+      resetTransporter();
     });
 
   return _transporter;
@@ -68,10 +155,9 @@ interface MailOptions {
 }
 
 export async function sendMail(options: MailOptions): Promise<boolean> {
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
 
   if (!transporter) {
-    // Fallback: log via logger in dev mode
     logger.info("Email (SMTP not configured)", {
       to: options.to,
       subject: options.subject,
@@ -80,9 +166,12 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
     return false;
   }
 
+  const fromName = _resolvedFrom?.name || "صدارة | Sadara";
+  const fromEmail = _resolvedFrom?.email || env.smtp.from;
+
   try {
     const info = await transporter.sendMail({
-      from: `"صدارة | Sadara" <${env.smtp.from}>`,
+      from: `"${fromName}" <${fromEmail}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,

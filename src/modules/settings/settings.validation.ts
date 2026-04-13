@@ -68,6 +68,9 @@ export const notificationPrefsSchema = z.object({
 });
 
 // ── SMTP ──
+// Note: `secure` is accepted for backward compatibility but ignored by the
+// server. The encryption mode is auto-derived from the port (465 → implicit
+// SSL, otherwise STARTTLS) — see `resolveSmtpSecurity` in mail.ts.
 
 export const smtpSettingsSchema = z.object({
   host: z.string().min(1).optional(),
