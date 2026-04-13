@@ -21,6 +21,7 @@ jest.mock('../../../src/shared/utils/mail', () => ({
   sendPasswordResetEmail: jest.fn().mockResolvedValue(true),
   sendPasswordChangedEmail: jest.fn().mockResolvedValue(true),
   sendInviteEmail: jest.fn().mockResolvedValue(true),
+  sendEmailVerificationEmail: jest.fn().mockResolvedValue(true),
 }));
 
 const mockFindOne = jest.fn();
@@ -108,6 +109,8 @@ describe('Auth Service', () => {
     it('should throw 403 for inactive user', async () => {
       const password = 'SecurePass123!';
       const hash = await bcrypt.hash(password, 10);
+      // emailVerifiedAt is set by default in mockUser(), so this falls through
+      // the EMAIL_NOT_VERIFIED gate and hits PENDING_APPROVAL.
       const user = mockModelInstance({
         ...mockUser(),
         passwordHash: hash,
@@ -117,7 +120,23 @@ describe('Auth Service', () => {
 
       await expect(
         authService.login({ email: 'admin@sadara.com', password }),
-      ).rejects.toThrow('Account is not yet activated');
+      ).rejects.toThrow('waiting for admin approval');
+    });
+
+    it('should throw 403 for unverified email', async () => {
+      const password = 'SecurePass123!';
+      const hash = await bcrypt.hash(password, 10);
+      const user = mockModelInstance({
+        ...mockUser(),
+        passwordHash: hash,
+        isActive: true,
+        emailVerifiedAt: null,
+      });
+      mockFindOne.mockResolvedValue(user);
+
+      await expect(
+        authService.login({ email: 'admin@sadara.com', password }),
+      ).rejects.toThrow('verify your email');
     });
   });
 

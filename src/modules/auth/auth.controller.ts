@@ -167,6 +167,32 @@ export async function resetPassword(req: Request, res: Response) {
   sendSuccess(res, result);
 }
 
+// ── Verify Email (public — validate verification link) ──
+export async function verifyEmail(req: Request, res: Response) {
+  const result = await authService.verifyEmail(req.body.token);
+
+  await logAudit("VERIFY_EMAIL", "users", result.user.id, {
+    userId: result.user.id,
+    userName: result.user.fullName,
+    userRole: "" as any,
+    ip: req.ip,
+  });
+
+  sendSuccess(
+    res,
+    result,
+    result.alreadyVerified
+      ? "Email already verified"
+      : "Email verified successfully",
+  );
+}
+
+// ── Resend Verification Email (public — idempotent, enumeration-safe) ──
+export async function resendVerification(req: Request, res: Response) {
+  const result = await authService.resendVerificationEmail(req.body.email);
+  sendSuccess(res, result);
+}
+
 // ── Logout (clears httpOnly cookies + revokes refresh tokens) ──
 export async function logout(req: AuthRequest, res: Response) {
   // Revoke the refresh token if present

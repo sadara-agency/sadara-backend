@@ -40,6 +40,9 @@ interface UserAttributes {
   inviteToken: string | null;
   inviteTokenExpiry: Date | null;
   lastActivity: Date | null;
+  emailVerifiedAt: Date | null;
+  emailVerificationToken: string | null;
+  emailVerificationTokenExpiry: Date | null;
 }
 
 interface UserCreationAttributes extends Optional<
@@ -58,6 +61,9 @@ interface UserCreationAttributes extends Optional<
   | "inviteToken"
   | "inviteTokenExpiry"
   | "lastActivity"
+  | "emailVerifiedAt"
+  | "emailVerificationToken"
+  | "emailVerificationTokenExpiry"
 > {}
 
 export class User
@@ -82,6 +88,9 @@ export class User
   declare inviteToken: string | null;
   declare inviteTokenExpiry: Date | null;
   declare lastActivity: Date | null;
+  declare emailVerifiedAt: Date | null;
+  declare emailVerificationToken: string | null;
+  declare emailVerificationTokenExpiry: Date | null;
 }
 
 User.init(
@@ -159,6 +168,24 @@ User.init(
       allowNull: true,
       defaultValue: null,
       field: "last_activity",
+    },
+    emailVerifiedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      field: "email_verified_at",
+    },
+    emailVerificationToken: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      defaultValue: null,
+      field: "email_verification_token",
+    },
+    emailVerificationTokenExpiry: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      field: "email_verification_token_expiry",
     },
   },
   {
