@@ -158,6 +158,7 @@ export async function updateSocialPostStatus(
         startDate: scheduledDate.toISOString(),
         endDate: endDate.toISOString(),
         allDay: false,
+        timezone: "UTC",
         color: "#3C3CFA",
       },
       post.createdBy,
