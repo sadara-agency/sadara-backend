@@ -142,6 +142,7 @@ export async function createEvent(input: CreateEventInput, createdBy: string) {
         color: input.color,
         recurrenceRule: input.recurrenceRule,
         reminderMinutes: input.reminderMinutes,
+        timezone: input.timezone ?? "Asia/Riyadh",
         createdBy,
       },
       { transaction },
@@ -233,6 +234,8 @@ interface CalendarItem {
   isReadOnly: boolean;
   isVirtual: boolean;
   reminderMinutes: number | null;
+  /** IANA timezone identifier for rrule expansion and reminder scheduling. */
+  timezone: string;
   createdBy: string | null;
   meta: Record<string, unknown> | null;
   creator: { id: string; fullName: string; fullNameAr?: string } | null;
@@ -440,6 +443,7 @@ export async function listAggregatedEvents(
       isReadOnly: ev.isAutoCreated,
       isVirtual: false,
       reminderMinutes: ev.reminderMinutes,
+      timezone: ev.timezone ?? "Asia/Riyadh",
       createdBy: ev.createdBy,
       meta: null,
       creator: ev.creator
@@ -488,6 +492,7 @@ export async function listAggregatedEvents(
       isReadOnly: false,
       isVirtual: true,
       reminderMinutes: null,
+      timezone: "Asia/Riyadh",
       createdBy: s.createdBy,
       meta: {
         sessionType: s.sessionType,
@@ -539,6 +544,7 @@ export async function listAggregatedEvents(
       isReadOnly: true,
       isVirtual: true,
       reminderMinutes: null,
+      timezone: "Asia/Riyadh",
       createdBy: null,
       meta: {
         status: m.status,
@@ -577,6 +583,7 @@ export async function listAggregatedEvents(
       isReadOnly: false,
       isVirtual: true,
       reminderMinutes: null,
+      timezone: "Asia/Riyadh",
       createdBy: t.assignedBy,
       meta: {
         type: t.type,
@@ -612,6 +619,7 @@ export async function listAggregatedEvents(
       isReadOnly: true,
       isVirtual: true,
       reminderMinutes: null,
+      timezone: "Asia/Riyadh",
       createdBy: r.createdBy,
       meta: {
         referralType: r.referralType,
@@ -665,6 +673,7 @@ export async function listAggregatedEvents(
           isReadOnly: true,
           isVirtual: true,
           reminderMinutes: null,
+          timezone: "Asia/Riyadh",
           createdBy: mr.createdBy,
           meta: { requestType: mr.requestType, status: mr.status },
           creator: null,
@@ -718,6 +727,7 @@ export async function listAggregatedEvents(
           isReadOnly: true,
           isVirtual: true,
           reminderMinutes: null,
+          timezone: "Asia/Riyadh",
           createdBy: sp.createdBy,
           meta: {
             postType: sp.postType,

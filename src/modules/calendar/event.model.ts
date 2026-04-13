@@ -40,6 +40,7 @@ interface CalendarEventAttributes {
   sourceId: string | null;
   isAutoCreated: boolean;
   reminderMinutes: number | null;
+  timezone: string;
   createdBy: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -63,6 +64,7 @@ interface CalendarEventCreationAttributes extends Optional<
   | "sourceId"
   | "isAutoCreated"
   | "reminderMinutes"
+  | "timezone"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -90,6 +92,7 @@ export class CalendarEvent
   declare sourceId: string | null;
   declare isAutoCreated: boolean;
   declare reminderMinutes: number | null;
+  declare timezone: string;
   declare createdBy: string;
 }
 
@@ -174,6 +177,10 @@ CalendarEvent.init(
     reminderMinutes: {
       type: DataTypes.INTEGER,
       field: "reminder_minutes",
+    },
+    timezone: {
+      type: DataTypes.STRING(64),
+      defaultValue: "Asia/Riyadh",
     },
     createdBy: {
       type: DataTypes.UUID,

@@ -54,6 +54,7 @@ export const createEventSchema = z
       .optional(),
     recurrenceRule: z.string().optional(),
     reminderMinutes: z.number().int().positive().optional(),
+    timezone: z.string().default("Asia/Riyadh"),
     attendees: z.array(attendeeSchema).optional(),
   })
   .refine((d) => new Date(d.endDate) >= new Date(d.startDate), {
@@ -80,6 +81,7 @@ export const updateEventSchema = z.object({
     .optional(),
   recurrenceRule: z.string().nullable().optional(),
   reminderMinutes: z.number().int().positive().nullable().optional(),
+  timezone: z.string().optional(),
   attendees: z.array(attendeeSchema).optional(),
 });
 
