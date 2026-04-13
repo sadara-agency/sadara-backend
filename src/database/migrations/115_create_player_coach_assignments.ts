@@ -11,7 +11,11 @@ import { QueryInterface, DataTypes } from "sequelize";
  * The coach_id column on players is retained for backward compatibility (used
  * by the player profile UI) but is no longer authoritative for row-scope.
  */
-export async function up(queryInterface: QueryInterface): Promise<void> {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.createTable("player_coach_assignments", {
     id: {
       type: DataTypes.UUID,
@@ -78,6 +82,10 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   `);
 }
 
-export async function down(queryInterface: QueryInterface): Promise<void> {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.dropTable("player_coach_assignments");
 }
