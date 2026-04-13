@@ -18,6 +18,11 @@ export const mockUser = (overrides: Record<string, any> = {}) => ({
   isActive: true,
   passwordHash: '$2a$12$dummyhashfortest',
   lastLogin: null,
+  // Default to verified so login tests don't hit the EMAIL_NOT_VERIFIED gate.
+  // Tests that exercise the unverified state should override with `emailVerifiedAt: null`.
+  emailVerifiedAt: new Date(),
+  emailVerificationToken: null,
+  emailVerificationTokenExpiry: null,
   notificationPreferences: {
     contracts: true, offers: true, matches: true, tasks: true,
     email: true, push: false, sms: false,
