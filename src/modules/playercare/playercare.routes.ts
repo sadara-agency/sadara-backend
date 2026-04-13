@@ -1,6 +1,16 @@
 import { Router } from "express";
 import { authenticate, authorize, authorizeModule } from "@middleware/auth";
+import { validate } from "@middleware/validate";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { playerCareController } from "./playercare.controller";
+import {
+  createCaseSchema,
+  createMedicalCaseSchema,
+  updateCaseSchema,
+  updateCaseStatusSchema,
+  caseIdSchema,
+  playerIdSchema,
+} from "./playercare.validation";
 
 const router = Router();
 
@@ -11,7 +21,8 @@ router.use(authenticate);
 
 router.get(
   "/",
-  authorizeModule("referrals", "read"),
+  authorizeModule("playercare", "read"),
+  dynamicFieldAccess("playercare"),
   playerCareController.list,
 );
 
@@ -25,13 +36,17 @@ router.get(
 
 router.get(
   "/player/:playerId/timeline",
-  authorizeModule("referrals", "read"),
+  authorizeModule("playercare", "read"),
+  validate(playerIdSchema, "params"),
+  dynamicFieldAccess("playercare"),
   playerCareController.timeline,
 );
 
 router.get(
   "/:id",
-  authorizeModule("referrals", "read"),
+  authorizeModule("playercare", "read"),
+  validate(caseIdSchema, "params"),
+  dynamicFieldAccess("playercare"),
   playerCareController.getById,
 );
 
@@ -39,25 +54,29 @@ router.get(
 
 router.post(
   "/",
-  authorizeModule("referrals", "create"),
+  authorizeModule("playercare", "create"),
+  validate(createCaseSchema),
   playerCareController.create,
 );
 
 router.post(
   "/medical",
-  authorizeModule("injuries", "create"),
+  authorizeModule("playercare", "create"),
+  validate(createMedicalCaseSchema),
   playerCareController.createMedical,
 );
 
 router.patch(
   "/:id",
-  authorizeModule("referrals", "update"),
+  authorizeModule("playercare", "update"),
+  validate(updateCaseSchema),
   playerCareController.update,
 );
 
 router.patch(
   "/:id/status",
-  authorizeModule("referrals", "update"),
+  authorizeModule("playercare", "update"),
+  validate(updateCaseStatusSchema),
   playerCareController.updateStatus,
 );
 
@@ -65,7 +84,7 @@ router.patch(
 
 router.delete(
   "/:id",
-  authorizeModule("referrals", "delete"),
+  authorizeModule("playercare", "delete"),
   playerCareController.delete,
 );
 

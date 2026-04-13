@@ -33,6 +33,8 @@ const safeErrors = winston.format((info) => {
 // JSON format for production (structured, parseable by log aggregators)
 const prodFormat = combine(timestamp(), safeErrors, json());
 
+// logger.ts is imported by config/env.ts so we cannot import env here
+// (circular dependency). Reading NODE_ENV directly is intentional bootstrap code.
 const isProduction = process.env.NODE_ENV === "production";
 
 export const logger = winston.createLogger({

@@ -166,13 +166,23 @@ export async function createContract(
       ? (input.baseSalary * input.commissionPct) / 100
       : 0;
 
+  // Validate FKs early to return clean 404/422 instead of a DB constraint 500 (A-H8)
+  const [playerRow] = await Promise.all([
+    Player.findByPk(input.playerId, { attributes: ["id", "contractType"] }),
+    ...(input.clubId
+      ? [
+          Club.findByPk(input.clubId, { attributes: ["id"] }).then((c) => {
+            if (!c) throw new AppError("Club not found", 404);
+          }),
+        ]
+      : []),
+  ]);
+  if (!playerRow) throw new AppError("Player not found", 404);
+
   // Auto-fill playerContractType from player profile if not provided
   let playerContractType = (input as any).playerContractType || null;
   if (!playerContractType) {
-    const player = await Player.findByPk(input.playerId, {
-      attributes: ["contractType"],
-    });
-    if (player) playerContractType = (player as any).contractType || null;
+    playerContractType = (playerRow as any).contractType || null;
   }
 
   const displayId = await generateDisplayId("contracts");

@@ -33,7 +33,19 @@ export async function list(req: AuthRequest, res: Response) {
   sendPaginated(res, r.data, r.meta);
 }
 
-export const { getById, create, update, remove } = crud;
+// Override create/update to forward full req.user so validateEntity can
+// check the caller's read permission on the linked module (A-C2)
+export async function create(req: AuthRequest, res: Response) {
+  const doc = await svc.createDocument(req.body, req.user!.id, req.user);
+  sendCreated(res, doc);
+}
+
+export async function update(req: AuthRequest, res: Response) {
+  const doc = await svc.updateDocument(req.params.id, req.body, req.user);
+  sendSuccess(res, doc, "Document updated");
+}
+
+export const { getById, remove } = crud;
 
 // ── Upload (multipart/form-data — real file) ──
 
@@ -78,7 +90,7 @@ export async function upload(req: AuthRequest, res: Response) {
     notes: body.notes || null,
   };
 
-  const doc = await svc.createDocument(input, req.user!.id);
+  const doc = await svc.createDocument(input, req.user!.id, req.user);
 
   await logAudit(
     "CREATE",

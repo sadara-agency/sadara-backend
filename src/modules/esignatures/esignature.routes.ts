@@ -2,6 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
+import { authLimiter } from "@middleware/rateLimiter";
 import {
   createSignatureRequestSchema,
   submitSignatureSchema,
@@ -13,15 +14,18 @@ import * as ctrl from "./esignature.controller";
 const router = Router();
 
 // ── Public routes (token-based, no auth) ──
+// Rate-limited: prevents token enumeration on this unauthenticated surface (A-H12)
 
-router.get("/sign/:token", asyncHandler(ctrl.viewByToken));
+router.get("/sign/:token", authLimiter, asyncHandler(ctrl.viewByToken));
 router.post(
   "/sign/:token",
+  authLimiter,
   validate(submitSignatureSchema),
   asyncHandler(ctrl.submitByToken),
 );
 router.post(
   "/sign/:token/decline",
+  authLimiter,
   validate(declineSignatureSchema),
   asyncHandler(ctrl.declineByToken),
 );

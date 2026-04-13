@@ -106,16 +106,29 @@ export async function resolveEntityLabel(
   }
 }
 
-/** Validate that the entity exists. Throws 404 if not found. */
+/**
+ * Validate that the entity exists and the requesting user has read permission
+ * on the linked module. Throws 404 (not 403) to avoid leaking existence.
+ */
 async function validateEntity(
   entityType: DocumentEntityType,
   entityId: string,
+  user?: AuthUser,
 ) {
   const Model = ENTITY_MODELS[entityType];
   const exists = await (Model as any).findByPk(entityId, {
     attributes: ["id"],
   });
   if (!exists) throw new AppError(`${entityType} not found`, 404);
+
+  // Ensure the caller can read the linked module (A-C2)
+  if (user?.role && user.role !== "Admin") {
+    const mod = ENTITY_TYPE_TO_MODULE[entityType];
+    if (mod) {
+      const canRead = await hasPermission(user.role, mod, "read");
+      if (!canRead) throw new AppError(`${entityType} not found`, 404);
+    }
+  }
 }
 
 // ── Entity type → permission module mapping ──
@@ -220,15 +233,44 @@ export async function getDocumentById(id: string, user?: AuthUser) {
   const hasAccess = await checkRowAccess("documents", doc, user);
   if (!hasAccess) throw new AppError("Document not found", 404);
 
+  // A-C1: Apply the same role-based type filter as listDocuments.
+  // A Scout blocked from listing Medical docs can't bypass it by fetching by ID.
+  if (user?.role && user.role !== "Admin") {
+    const blockedTypes = SENSITIVE_DOC_TYPES_BY_ROLE[user.role];
+    if (
+      blockedTypes?.length &&
+      blockedTypes.includes(doc.getDataValue("type") as string)
+    ) {
+      throw new AppError("Document not found", 404);
+    }
+
+    // Also check entity-linked module permission
+    const entityType = doc.getDataValue(
+      "entityType",
+    ) as DocumentEntityType | null;
+    const entityId = doc.getDataValue("entityId") as string | null;
+    if (entityType && entityId) {
+      const mod = ENTITY_TYPE_TO_MODULE[entityType];
+      if (mod) {
+        const canRead = await hasPermission(user.role, mod, "read");
+        if (!canRead) throw new AppError("Document not found", 404);
+      }
+    }
+  }
+
   return doc;
 }
 
 // ── Create (with real file data) ──
 
-export async function createDocument(input: any, userId: string) {
-  // Validate linked entity if provided
+export async function createDocument(
+  input: any,
+  userId: string,
+  user?: AuthUser,
+) {
+  // Validate linked entity if provided — also checks caller's read permission (A-C2)
   if (input.entityType && input.entityId) {
-    await validateEntity(input.entityType, input.entityId);
+    await validateEntity(input.entityType, input.entityId, user);
     // Resolve and denormalize the entity label
     if (!input.entityLabel) {
       input.entityLabel = await resolveEntityLabel(
@@ -244,12 +286,12 @@ export async function createDocument(input: any, userId: string) {
 
 // ── Update ──
 
-export async function updateDocument(id: string, input: any) {
+export async function updateDocument(id: string, input: any, user?: AuthUser) {
   const doc = await findOrThrow(Document, id, "Document");
 
-  // If entity link is being changed, validate and resolve label
+  // If entity link is being changed, validate and resolve label — checks permission (A-C2)
   if (input.entityType && input.entityId) {
-    await validateEntity(input.entityType, input.entityId);
+    await validateEntity(input.entityType, input.entityId, user);
     if (!input.entityLabel) {
       input.entityLabel = await resolveEntityLabel(
         input.entityType,

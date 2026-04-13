@@ -194,6 +194,16 @@ export async function updateOffer(id: string, input: any) {
   return await offer.update(input);
 }
 
+// Allowed status transitions — prevents arbitrary state jumps (A-H4)
+const OFFER_STATUS_TRANSITIONS: Record<string, string[]> = {
+  New: ["Under Review", "Rejected", "Closed"],
+  "Under Review": ["Negotiation", "Accepted", "Rejected", "Closed"],
+  Negotiation: ["Accepted", "Rejected", "Closed"],
+  Accepted: ["Closed"],
+  Rejected: ["Closed"],
+  Closed: [],
+};
+
 // ── Update Offer Status ──
 
 export async function updateOfferStatus(
@@ -201,6 +211,15 @@ export async function updateOfferStatus(
   input: { status: string; counterOffer?: object; notes?: string },
 ) {
   const offer = await findOrThrow(Offer, id, "Offer");
+
+  const currentStatus = offer.getDataValue("status") as string;
+  const allowed = OFFER_STATUS_TRANSITIONS[currentStatus] ?? [];
+  if (!allowed.includes(input.status)) {
+    throw new AppError(
+      `Cannot transition offer from "${currentStatus}" to "${input.status}"`,
+      422,
+    );
+  }
 
   const updateData: any = { status: input.status };
 
