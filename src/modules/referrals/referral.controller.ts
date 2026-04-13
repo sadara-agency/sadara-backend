@@ -1,13 +1,15 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
-import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import * as referralService from "@modules/referrals/referral.service";
 
-// list / getById / update / remove are custom because they need req.user
-// for row-level scoping via buildRowScope. Create goes through the factory
-// for its audit + cache-invalidation wiring.
+// All handlers are custom because they need req.user for row-level scoping.
 
 const crud = createCrudController({
   service: {
@@ -35,7 +37,23 @@ export async function getById(req: AuthRequest, res: Response) {
   sendSuccess(res, referral);
 }
 
-export const { create } = crud;
+export async function create(req: AuthRequest, res: Response) {
+  const referral = await referralService.createReferral(
+    req.body,
+    req.user!.id,
+    req.user,
+  );
+
+  await logAudit(
+    "CREATE",
+    "referrals",
+    referral!.id,
+    buildAuditContext(req.user!, req.ip),
+    `Created referral ${referral!.id}`,
+  );
+
+  sendCreated(res, referral, "Referral created");
+}
 
 export async function checkDuplicate(req: AuthRequest, res: Response) {
   const result = await referralService.checkDuplicate(
