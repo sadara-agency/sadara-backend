@@ -13,11 +13,16 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  await queryInterface.addColumn("calendar_events", "timezone", {
-    type: DataTypes.STRING(64),
-    allowNull: false,
-    defaultValue: "Asia/Riyadh",
-  });
+  const table = (await queryInterface.describeTable(
+    "calendar_events",
+  )) as Record<string, unknown>;
+  if (!table.timezone) {
+    await queryInterface.addColumn("calendar_events", "timezone", {
+      type: DataTypes.STRING(64),
+      allowNull: false,
+      defaultValue: "Asia/Riyadh",
+    });
+  }
 }
 
 export async function down({
@@ -25,5 +30,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  await queryInterface.removeColumn("calendar_events", "timezone");
+  const table = (await queryInterface.describeTable(
+    "calendar_events",
+  )) as Record<string, unknown>;
+  if (table.timezone) {
+    await queryInterface.removeColumn("calendar_events", "timezone");
+  }
 }

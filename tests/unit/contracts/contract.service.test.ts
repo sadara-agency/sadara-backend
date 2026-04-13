@@ -71,13 +71,26 @@ jest.mock('../../../src/modules/approvals/approval.service', () => ({
   resolveApprovalByEntity: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock('../../../src/shared/utils/rowScope', () => ({
+  buildRowScope: jest.fn().mockResolvedValue(null),
+  checkRowAccess: jest.fn().mockResolvedValue(true),
+  mergeScope: jest.fn(),
+}));
+
+jest.mock('../../../src/config/logger', () => ({
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+}));
+
 import * as contractService from '../../../src/modules/contracts/contract.service';
+import * as rowScope from '../../../src/shared/utils/rowScope';
 
 describe('Contract Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFindOne.mockResolvedValue(null); // default: no overlap
     mockClubFindByPk.mockResolvedValue({ id: 'club-001' }); // default: club exists
+    (rowScope.checkRowAccess as jest.Mock).mockResolvedValue(true);
+    (rowScope.buildRowScope as jest.Mock).mockResolvedValue(null);
   });
 
   // ════════════════════════════════════════════════════════
@@ -186,6 +199,16 @@ describe('Contract Service', () => {
         contractService.getContractById('nonexistent'),
       ).rejects.toThrow('Contract not found');
     });
+
+    it('should throw 404 (not 403) when row access denied — prevents existence leak', async () => {
+      mockFindByPk.mockResolvedValue(mockModelInstance(mockContract()));
+      (rowScope.checkRowAccess as jest.Mock).mockResolvedValue(false);
+
+      const scout = { id: 'scout-001', role: 'Scout' } as any;
+      await expect(
+        contractService.getContractById('contract-001', scout),
+      ).rejects.toThrow('Contract not found');
+    });
   });
 
   // ════════════════════════════════════════════════════════
@@ -220,6 +243,127 @@ describe('Contract Service', () => {
         expect.objectContaining({ transaction: expect.anything() }),
       );
     });
+
+    it('should throw 404 when player does not exist', async () => {
+      mockPlayerFindByPk.mockResolvedValue(null);
+
+      await expect(
+        contractService.createContract(
+          { playerId: 'bad', clubId: 'club-001', startDate: '2025-01-01', endDate: '2028-01-01' } as any,
+          'user-001',
+        ),
+      ).rejects.toThrow('Player not found');
+    });
+
+    it('should throw 404 when club does not exist', async () => {
+      mockPlayerFindByPk.mockResolvedValue({ id: 'player-001', contractType: 'Professional' });
+      mockClubFindByPk.mockResolvedValue(null);
+
+      await expect(
+        contractService.createContract(
+          { playerId: 'player-001', clubId: 'bad', startDate: '2025-01-01', endDate: '2028-01-01' } as any,
+          'user-001',
+        ),
+      ).rejects.toThrow('Club not found');
+    });
+
+    it('should throw 409 when an overlapping active contract exists', async () => {
+      mockPlayerFindByPk.mockResolvedValue({ id: 'player-001', contractType: 'Professional' });
+      mockFindOne.mockResolvedValue(mockModelInstance(mockContract({ status: 'Active' })));
+
+      await expect(
+        contractService.createContract(
+          { playerId: 'player-001', clubId: 'club-001', startDate: '2025-01-01', endDate: '2028-01-01' } as any,
+          'user-001',
+        ),
+      ).rejects.toThrow('overlapping dates');
+    });
+  });
+
+  // ════════════════════════════════════════════════════════
+  // UPDATE CONTRACT
+  // ════════════════════════════════════════════════════════
+  describe('updateContract', () => {
+    it('should update allowed fields', async () => {
+      const contract = mockModelInstance(mockContract({ commissionLocked: false }));
+      mockFindByPk.mockResolvedValue(contract);
+
+      await contractService.updateContract('contract-001', { baseSalary: 600_000 });
+
+      expect(contract.update).toHaveBeenCalledWith(
+        expect.objectContaining({ baseSalary: 600_000 }),
+      );
+    });
+
+    it('should throw 404 when contract does not exist', async () => {
+      mockFindByPk.mockResolvedValue(null);
+
+      await expect(
+        contractService.updateContract('nonexistent', { baseSalary: 100 }),
+      ).rejects.toThrow('Contract not found');
+    });
+
+    it('should throw 400 when commission fields changed on a locked contract', async () => {
+      const contract = mockModelInstance(mockContract({ commissionLocked: true }));
+      mockFindByPk.mockResolvedValue(contract);
+
+      await expect(
+        contractService.updateContract('contract-001', { commissionPct: 15 }),
+      ).rejects.toThrow('Commission fields cannot be modified');
+    });
+  });
+
+  // ════════════════════════════════════════════════════════
+  // TERMINATE CONTRACT
+  // ════════════════════════════════════════════════════════
+  describe('terminateContract', () => {
+    it('should terminate an Active contract and lock commission', async () => {
+      const contract = mockModelInstance(
+        mockContract({ status: 'Active', startDate: '2024-01-01', endDate: '2028-01-01', notes: null }),
+      );
+      // findOrThrow call then getContractById at end
+      mockFindByPk
+        .mockResolvedValueOnce(contract)
+        .mockResolvedValue(mockModelInstance(mockContract({ status: 'Terminated' })));
+
+      await contractService.terminateContract(
+        'contract-001',
+        { reason: 'Mutual agreement', terminationDate: '2025-06-01' },
+        'user-001',
+      );
+
+      expect(contract.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'Terminated',
+          terminationReason: 'Mutual agreement',
+          commissionLocked: true,
+        }),
+      );
+    });
+
+    it('should throw 400 when contract status is not terminatable', async () => {
+      const contract = mockModelInstance(mockContract({ status: 'Draft' }));
+      mockFindByPk.mockResolvedValue(contract);
+
+      await expect(
+        contractService.terminateContract('contract-001', { reason: 'test' }, 'user-001'),
+      ).rejects.toThrow("Cannot terminate a contract in 'Draft' status");
+    });
+
+    it('should throw 400 when termination date is before contract start date', async () => {
+      const contract = mockModelInstance(
+        mockContract({ status: 'Active', startDate: '2025-06-01', endDate: '2028-01-01' }),
+      );
+      mockFindByPk.mockResolvedValue(contract);
+
+      await expect(
+        contractService.terminateContract(
+          'contract-001',
+          { reason: 'test', terminationDate: '2025-01-01' },
+          'user-001',
+        ),
+      ).rejects.toThrow('before contract start date');
+    });
   });
 
   // ════════════════════════════════════════════════════════
@@ -242,6 +386,14 @@ describe('Contract Service', () => {
       await expect(
         contractService.deleteContract('nonexistent'),
       ).rejects.toThrow('Contract not found');
+    });
+
+    it('should throw 400 when trying to delete an Active contract', async () => {
+      mockFindByPk.mockResolvedValue(mockModelInstance(mockContract({ status: 'Active' })));
+
+      await expect(
+        contractService.deleteContract('contract-001'),
+      ).rejects.toThrow('Cannot delete an active contract');
     });
   });
 });
