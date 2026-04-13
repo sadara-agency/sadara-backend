@@ -2,6 +2,14 @@
 // src/database/seed.ts
 // Consolidated seed — seeds ALL data needed to test the full
 // platform in a single idempotent run.
+//
+// ⚠️  DEVELOPMENT-ONLY FIXTURES ⚠️
+// The user accounts seeded below use placeholder @sadara.com email
+// addresses (admin@sadara.com, agent@sadara.com, etc.). They are NOT
+// real accounts and must never exist in production. Production boots
+// are protected by src/database/validate-production.ts which rejects
+// any @sadara.com address, and seedDatabase() refuses to run when
+// NODE_ENV === "production".
 // ─────────────────────────────────────────────────────────────
 import bcrypt from "bcryptjs";
 import { sequelize } from "@config/database";
@@ -2295,6 +2303,14 @@ async function seedAllData(tx: Transaction): Promise<void> {
 // ═════════════════════════════════════════════════════════════
 
 export async function seedDatabase(): Promise<void> {
+  // Hard-block in production: this seed creates fake @sadara.com users.
+  if (env.nodeEnv === "production") {
+    logger.warn(
+      "seedDatabase() called in production — refusing to run (dev-only fixtures)",
+    );
+    return;
+  }
+
   // 1. Permissions — idempotent, outside transaction
   try {
     await seedPermissions();
