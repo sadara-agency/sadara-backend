@@ -82,11 +82,15 @@ export async function upload(req: AuthRequest, res: Response) {
     entityId: body.entityId || null,
     issueDate: body.issueDate || null,
     expiryDate: body.expiryDate || null,
-    tags: body.tags
-      ? typeof body.tags === "string"
-        ? JSON.parse(body.tags)
-        : body.tags
-      : [],
+    tags: (() => {
+      if (!body.tags) return [];
+      if (typeof body.tags !== "string") return body.tags;
+      try {
+        return JSON.parse(body.tags);
+      } catch {
+        throw new AppError("Invalid tags format — must be a JSON array", 400);
+      }
+    })(),
     notes: body.notes || null,
   };
 
