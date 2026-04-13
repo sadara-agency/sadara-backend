@@ -47,6 +47,7 @@ export const CachePrefix = {
   TACTICAL: "tactical",
   SET_PIECES: "set-pieces",
   TACTICAL_REPORTS: "tactical-reports",
+  TRAINING: "training",
   TRAINING_PLANS: "training-plans",
   DEV_REVIEWS: "dev-reviews",
   MENTAL: "mental",

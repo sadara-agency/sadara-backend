@@ -8,6 +8,8 @@ import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CachePrefix, CacheTTL } from "@shared/utils/cache";
 import { uploadVideo } from "@middleware/upload";
 import {
   createCourseSchema,
@@ -46,6 +48,7 @@ router.use("/reviews", reviewRoutes);
 router.get(
   "/my",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(ctrl.myEnrollments),
 );
 
@@ -69,6 +72,7 @@ router.patch(
 router.get(
   "/my/enrollments/:enrollmentId/lessons",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(ctrl.getLessonProgress),
 );
 
@@ -95,12 +99,14 @@ router.post(
 router.get(
   "/admin/completion-matrix",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.SHORT),
   asyncHandler(ctrl.completionMatrix),
 );
 
 router.get(
   "/admin/analytics",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.SHORT),
   asyncHandler(ctrl.trainingAnalytics),
 );
 
@@ -111,6 +117,7 @@ router.get(
 router.get(
   "/courses/:courseId/modules",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.MEDIUM),
   asyncHandler(ctrl.listModules),
 );
 router.post(
@@ -188,16 +195,19 @@ router.get(
 router.get(
   "/",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.MEDIUM),
   asyncHandler(ctrl.listCourses),
 );
 router.get(
   "/player/:playerId",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.MEDIUM),
   asyncHandler(ctrl.playerEnrollments),
 );
 router.get(
   "/:id",
   authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.MEDIUM),
   asyncHandler(ctrl.getCourse),
 );
 router.post(

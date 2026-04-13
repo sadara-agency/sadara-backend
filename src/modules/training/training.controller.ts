@@ -10,8 +10,11 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/training/training.service";
 import { logger } from "@config/logger";
+
+const TRAINING_CACHES = [CachePrefix.TRAINING];
 
 // ══════════════════════════════════════════
 // COURSES (Admin)
@@ -29,30 +32,37 @@ export async function getCourse(req: AuthRequest, res: Response) {
 
 export async function createCourse(req: AuthRequest, res: Response) {
   const course = await svc.createCourse(req.body, req.user!.id);
-  await logAudit(
-    "CREATE",
-    "training",
-    course.id,
-    buildAuditContext(req.user!, req.ip),
-    `Created course: ${course.title}`,
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "CREATE",
+      "training",
+      course.id,
+      buildAuditContext(req.user!, req.ip),
+      `Created course: ${course.title}`,
+    ),
+  ]).catch(() => {});
   sendCreated(res, course);
 }
 
 export async function updateCourse(req: AuthRequest, res: Response) {
   const course = await svc.updateCourse(req.params.id, req.body);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, course, "Course updated");
 }
 
 export async function deleteCourse(req: AuthRequest, res: Response) {
   const result = await svc.deleteCourse(req.params.id);
-  await logAudit(
-    "DELETE",
-    "training",
-    result.id,
-    buildAuditContext(req.user!, req.ip),
-    "Course deleted",
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "DELETE",
+      "training",
+      result.id,
+      buildAuditContext(req.user!, req.ip),
+      "Course deleted",
+    ),
+  ]).catch(() => {});
   sendSuccess(res, result, "Course deleted");
 }
 
@@ -66,13 +76,16 @@ export async function enrollPlayers(req: AuthRequest, res: Response) {
     req.body.playerIds,
     req.user!.id,
   );
-  await logAudit(
-    "UPDATE",
-    "training",
-    req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    `Enrolled ${req.body.playerIds.length} players`,
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "UPDATE",
+      "training",
+      req.params.id,
+      buildAuditContext(req.user!, req.ip),
+      `Enrolled ${req.body.playerIds.length} players`,
+    ),
+  ]).catch(() => {});
   sendSuccess(res, course, "Players enrolled");
 }
 
@@ -81,11 +94,13 @@ export async function updateEnrollment(req: AuthRequest, res: Response) {
     req.params.enrollmentId,
     req.body,
   );
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, enrollment, "Enrollment updated");
 }
 
 export async function removeEnrollment(req: AuthRequest, res: Response) {
   const result = await svc.removeEnrollment(req.params.enrollmentId);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, result, "Enrollment removed");
 }
 
@@ -137,13 +152,16 @@ export async function trackMyActivity(req: AuthRequest, res: Response) {
     req.body,
   );
 
-  await logAudit(
-    "UPDATE",
-    "training",
-    req.params.enrollmentId,
-    buildAuditContext(req.user!, req.ip),
-    `Player tracked: ${req.body.action} on enrollment ${req.params.enrollmentId}`,
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "UPDATE",
+      "training",
+      req.params.enrollmentId,
+      buildAuditContext(req.user!, req.ip),
+      `Player tracked: ${req.body.action} on enrollment ${req.params.enrollmentId}`,
+    ),
+  ]).catch(() => {});
 
   sendSuccess(res, result, "Activity tracked");
 }
@@ -177,28 +195,34 @@ export async function listModules(req: AuthRequest, res: Response) {
 
 export async function createModule(req: AuthRequest, res: Response) {
   const mod = await svc.createModule(req.params.courseId, req.body);
-  await logAudit(
-    "CREATE",
-    "training_modules",
-    mod.id,
-    buildAuditContext(req.user!, req.ip),
-    `Module created: ${mod.title}`,
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "CREATE",
+      "training_modules",
+      mod.id,
+      buildAuditContext(req.user!, req.ip),
+      `Module created: ${mod.title}`,
+    ),
+  ]).catch(() => {});
   sendCreated(res, mod);
 }
 
 export async function updateModule(req: AuthRequest, res: Response) {
   const mod = await svc.updateModule(req.params.moduleId, req.body);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, mod);
 }
 
 export async function deleteModule(req: AuthRequest, res: Response) {
   const result = await svc.deleteModule(req.params.moduleId);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, result, "Module deleted");
 }
 
 export async function reorderModules(req: AuthRequest, res: Response) {
   await svc.reorderModules(req.params.courseId, req.body.orderedIds);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, null, "Modules reordered");
 }
 
@@ -208,28 +232,34 @@ export async function reorderModules(req: AuthRequest, res: Response) {
 
 export async function createLesson(req: AuthRequest, res: Response) {
   const lesson = await svc.createLesson(req.params.moduleId, req.body);
-  await logAudit(
-    "CREATE",
-    "training_lessons",
-    lesson.id,
-    buildAuditContext(req.user!, req.ip),
-    `Lesson created: ${lesson.title}`,
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "CREATE",
+      "training_lessons",
+      lesson.id,
+      buildAuditContext(req.user!, req.ip),
+      `Lesson created: ${lesson.title}`,
+    ),
+  ]).catch(() => {});
   sendCreated(res, lesson);
 }
 
 export async function updateLesson(req: AuthRequest, res: Response) {
   const lesson = await svc.updateLesson(req.params.lessonId, req.body);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, lesson);
 }
 
 export async function deleteLesson(req: AuthRequest, res: Response) {
   const result = await svc.deleteLesson(req.params.lessonId);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, result, "Lesson deleted");
 }
 
 export async function reorderLessons(req: AuthRequest, res: Response) {
   await svc.reorderLessons(req.params.moduleId, req.body.orderedIds);
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, null, "Lessons reordered");
 }
 
@@ -247,13 +277,16 @@ export async function uploadLessonMedia(req: AuthRequest, res: Response) {
     req.file,
     req.user!.id,
   );
-  await logAudit(
-    "CREATE",
-    "training_media",
-    media.id,
-    buildAuditContext(req.user!, req.ip),
-    `Media uploaded for lesson`,
-  );
+  Promise.all([
+    invalidateMultiple(TRAINING_CACHES),
+    logAudit(
+      "CREATE",
+      "training_media",
+      media.id,
+      buildAuditContext(req.user!, req.ip),
+      `Media uploaded for lesson`,
+    ),
+  ]).catch(() => {});
   sendCreated(res, media);
 }
 
@@ -311,6 +344,7 @@ export async function markLessonComplete(req: AuthRequest, res: Response) {
     req.body.lessonId,
     playerId,
   );
+  invalidateMultiple(TRAINING_CACHES).catch(() => {});
   sendSuccess(res, progress);
 }
 
