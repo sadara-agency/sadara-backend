@@ -402,6 +402,7 @@ export function mockModelInstance(data: Record<string, any>) {
   return {
     ...data,
     get: jest.fn((_opts?: { plain?: boolean }) => ({ ...data })),
+    getDataValue: jest.fn((key: string) => data[key]),
     update: jest.fn(async (updates: Record<string, any>) => {
       Object.assign(data, updates);
       return { ...data, get: jest.fn(() => data) };

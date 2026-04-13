@@ -86,6 +86,7 @@ const envSchema = z.object({
   GCS_PROJECT_ID: z.string().default(""),
   GOOGLE_APPLICATION_CREDENTIALS: z.string().default(""),
   GCS_CREDENTIALS_JSON: z.string().default(""), // For PaaS: JSON string of service account key
+  GCS_TRAINING_BUCKET: z.string().default("sadara-training-media"),
 
   // Nutritionix Food API (optional)
   NUTRITIONIX_APP_ID: z.string().default(""),
@@ -210,6 +211,7 @@ export const env = {
     projectId: validated.GCS_PROJECT_ID,
     credentials: validated.GOOGLE_APPLICATION_CREDENTIALS,
     credentialsJson: validated.GCS_CREDENTIALS_JSON,
+    trainingBucket: validated.GCS_TRAINING_BUCKET,
   },
 
   nutritionix: {

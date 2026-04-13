@@ -6,11 +6,11 @@
  */
 
 import { Storage } from "@google-cloud/storage";
-import "@config/env";
+import { env } from "@config/env";
 import { logger } from "@config/logger";
 
 const storage = new Storage();
-const BUCKET = process.env.GCS_TRAINING_BUCKET || "sadara-training-media";
+const BUCKET = env.gcs.trainingBucket;
 
 /**
  * Generate a resumable upload URL for the client to upload directly to GCS.

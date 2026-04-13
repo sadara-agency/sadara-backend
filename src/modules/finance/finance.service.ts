@@ -527,12 +527,15 @@ export async function createValuation(input: CreateValuationInput) {
   });
   if (prev && !input.trend) {
     const prevVal = Number(prev.value);
+    const rawPct = ((input.value - prevVal) / prevVal) * 100;
+    // Keep as number (2 dp) — avoids the string produced by .toFixed() (A-H15)
+    const roundedPct = Math.round(rawPct * 100) / 100;
     if (input.value > prevVal) {
       input.trend = "up";
-      input.changePct = (((input.value - prevVal) / prevVal) * 100).toFixed(2);
+      input.changePct = roundedPct;
     } else if (input.value < prevVal) {
       input.trend = "down";
-      input.changePct = (((input.value - prevVal) / prevVal) * 100).toFixed(2);
+      input.changePct = roundedPct;
     } else {
       input.trend = "stable";
       input.changePct = 0;

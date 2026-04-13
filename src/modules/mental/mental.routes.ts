@@ -1,6 +1,8 @@
 import { Router } from "express";
+import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
 import * as mentalController from "./mental.controller";
@@ -37,35 +39,37 @@ router.use(authenticate);
 router.get(
   "/templates",
   authorizeModule("mental", "read"),
+  dynamicFieldAccess("mental"),
   cacheRoute("mental-templates", CacheTTL.LONG),
-  mentalController.listTemplates,
+  asyncHandler(mentalController.listTemplates),
 );
 
 router.get(
   "/templates/:id",
   authorizeModule("mental", "read"),
+  dynamicFieldAccess("mental"),
   cacheRoute("mental-template", CacheTTL.LONG),
-  mentalController.getTemplate,
+  asyncHandler(mentalController.getTemplate),
 );
 
 router.post(
   "/templates",
   authorizeModule("mental", "create"),
   validate(createTemplateSchema),
-  mentalController.createTemplate,
+  asyncHandler(mentalController.createTemplate),
 );
 
 router.patch(
   "/templates/:id",
   authorizeModule("mental", "update"),
   validate(updateTemplateSchema),
-  mentalController.updateTemplate,
+  asyncHandler(mentalController.updateTemplate),
 );
 
 router.delete(
   "/templates/:id",
   authorizeModule("mental", "delete"),
-  mentalController.deleteTemplate,
+  asyncHandler(mentalController.deleteTemplate),
 );
 
 // ── Assessments ──
@@ -85,46 +89,50 @@ router.delete(
 router.get(
   "/assessments",
   authorizeModule("mental", "read"),
+  dynamicFieldAccess("mental"),
   validate(listAssessmentsSchema, "query"),
-  mentalController.listAssessments,
+  asyncHandler(mentalController.listAssessments),
 );
 
 router.get(
   "/assessments/alerts",
   authorizeModule("mental", "read"),
-  mentalController.getAlerts,
+  dynamicFieldAccess("mental"),
+  asyncHandler(mentalController.getAlerts),
 );
 
 router.get(
   "/assessments/player/:playerId/trend",
   authorizeModule("mental", "read"),
-  mentalController.getTrend,
+  dynamicFieldAccess("mental"),
+  asyncHandler(mentalController.getTrend),
 );
 
 router.get(
   "/assessments/:id",
   authorizeModule("mental", "read"),
-  mentalController.getAssessment,
+  dynamicFieldAccess("mental"),
+  asyncHandler(mentalController.getAssessment),
 );
 
 router.post(
   "/assessments",
   authorizeModule("mental", "create"),
   validate(createAssessmentSchema),
-  mentalController.createAssessment,
+  asyncHandler(mentalController.createAssessment),
 );
 
 router.patch(
   "/assessments/:id",
   authorizeModule("mental", "update"),
   validate(updateAssessmentSchema),
-  mentalController.updateAssessment,
+  asyncHandler(mentalController.updateAssessment),
 );
 
 router.delete(
   "/assessments/:id",
   authorizeModule("mental", "delete"),
-  mentalController.deleteAssessment,
+  asyncHandler(mentalController.deleteAssessment),
 );
 
 export default router;

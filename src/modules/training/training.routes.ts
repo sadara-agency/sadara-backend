@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import { uploadVideo } from "@middleware/upload";
@@ -29,6 +30,7 @@ import reviewRoutes from "@modules/training/reviews/devReview.routes";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("training"));
 
 // ── Sub-modules ──
 // /api/v1/training/plans

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createReportSchema,
@@ -10,6 +11,7 @@ import * as ctrl from "@modules/reports/report.controller";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("reports"));
 
 // Predefined reports (must be before /:id to avoid route conflicts)
 router.get(

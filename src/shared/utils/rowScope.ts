@@ -57,11 +57,15 @@ const ownPlayer: ScopeBuilder = (u) => ({ playerId: u.playerId });
 /** Player's own record (players table, id = user.playerId) */
 const ownPlayerSelf: ScopeBuilder = (u) => ({ id: u.playerId });
 
-/** Coach's players: playerId IN (SELECT id FROM players WHERE coach_id = ?) */
+/**
+ * Coach's players: playerId IN (SELECT player_id FROM player_coach_assignments WHERE coach_user_id = ?)
+ * Uses the join table so all 8 specialty roles can be independently assigned to players,
+ * replacing the old single-column players.coach_id approach.
+ */
 const coachPlayers: ScopeBuilder = (u) => ({
   playerId: {
     [Op.in]: literal(
-      `(SELECT id FROM players WHERE coach_id = '${safeId(u.id)}')`,
+      `(SELECT player_id FROM player_coach_assignments WHERE coach_user_id = '${safeId(u.id)}')`,
     ),
   },
 });
@@ -394,7 +398,9 @@ export async function checkRowAccess(
 }
 
 /**
- * Check if a player belongs to the given coach/analyst via DB query.
+ * Check if a player is assigned to the given user.
+ * Coach roles: checked via player_coach_assignments join table (multi-specialty).
+ * Analyst: checked via players.analyst_id column.
  */
 async function isPlayerOwnedBy(
   playerId: string | undefined | null,
@@ -402,14 +408,21 @@ async function isPlayerOwnedBy(
 ): Promise<boolean> {
   if (!playerId) return false;
 
-  const column = COACH_ROLES.includes(user.role) ? "coach_id" : "analyst_id";
-  const [result] = await sequelize.query<{ exists: boolean }>(
-    `SELECT EXISTS(SELECT 1 FROM players WHERE id = :playerId AND ${column} = :userId) AS "exists"`,
-    {
-      replacements: { playerId, userId: user.id },
-      type: QueryTypes.SELECT,
-    },
-  );
+  if (COACH_ROLES.includes(user.role)) {
+    const [result] = await sequelize.query<{ exists: boolean }>(
+      `SELECT EXISTS(
+        SELECT 1 FROM player_coach_assignments
+        WHERE player_id = :playerId AND coach_user_id = :userId
+      ) AS "exists"`,
+      { replacements: { playerId, userId: user.id }, type: QueryTypes.SELECT },
+    );
+    return result?.exists ?? false;
+  }
 
+  // Analyst: single-column FK on players table
+  const [result] = await sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS(SELECT 1 FROM players WHERE id = :playerId AND analyst_id = :userId) AS "exists"`,
+    { replacements: { playerId, userId: user.id }, type: QueryTypes.SELECT },
+  );
   return result?.exists ?? false;
 }

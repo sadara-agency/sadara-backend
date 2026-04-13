@@ -143,6 +143,14 @@ export async function getTaskById(id: string, user?: AuthUser) {
 // Create Task
 // ────────────────────────────────────────────────────────────
 export async function createTask(input: CreateTaskInput, assignedBy: string) {
+  // FK checks — catch invalid references before hitting the DB constraint
+  await Promise.all([
+    input.assignedTo
+      ? findOrThrow(User, input.assignedTo, "Assigned user")
+      : null,
+    input.playerId ? findOrThrow(Player, input.playerId, "Player") : null,
+  ]);
+
   const task = await Task.create({
     title: input.title,
     titleAr: input.titleAr,
@@ -221,6 +229,11 @@ export async function createSubTask(
   assignedBy: string,
 ) {
   const parent = await findOrThrow(Task, parentTaskId, "Parent task");
+
+  // FK check for assignee
+  if (input.assignedTo) {
+    await findOrThrow(User, input.assignedTo, "Assigned user");
+  }
 
   // Enforce max depth = 1 (sub-tasks cannot have their own sub-tasks)
   if (parent.parentTaskId) {

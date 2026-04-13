@@ -253,6 +253,7 @@ export async function updateMediaRequestStatus(
         startDate: scheduledDate.toISOString(),
         endDate: endDate.toISOString(),
         allDay: false,
+        timezone: "UTC",
         description: request.description || undefined,
         descriptionAr: request.descriptionAr || undefined,
       },

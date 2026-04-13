@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
 import {
@@ -14,6 +15,7 @@ import * as clubController from "@modules/clubs/club.controller";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("clubs"));
 
 router.get(
   "/",

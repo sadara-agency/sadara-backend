@@ -128,8 +128,19 @@ export async function checkDuplicate(playerId: string, referralType: string) {
 
 // ── Create ──
 
-export async function createReferral(input: any, userId: string) {
+export async function createReferral(
+  input: any,
+  userId: string,
+  user?: AuthUser,
+) {
   const player = await findOrThrow(Player, input.playerId, "Player");
+
+  // Row-scope guard: users with a restricted scope (e.g. Coach) can only
+  // create referrals for players they are allowed to see.
+  if (user) {
+    const hasAccess = await checkRowAccess("players", player, user);
+    if (!hasAccess) throw new AppError("Player not found", 404);
+  }
 
   if (input.assignedTo) {
     await findOrThrow(User, input.assignedTo, "Assigned user");
