@@ -41,8 +41,12 @@ jest.mock('../../../src/modules/players/player.model', () => ({
   },
 }));
 
+const mockClubFindByPk = jest.fn();
 jest.mock('../../../src/modules/clubs/club.model', () => ({
-  Club: { name: 'Club' },
+  Club: {
+    name: 'Club',
+    findByPk: (...args: unknown[]) => mockClubFindByPk(...args),
+  },
 }));
 
 jest.mock('../../../src/modules/users/user.model', () => ({
@@ -73,6 +77,7 @@ describe('Contract Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockFindOne.mockResolvedValue(null); // default: no overlap
+    mockClubFindByPk.mockResolvedValue({ id: 'club-001' }); // default: club exists
   });
 
   // ════════════════════════════════════════════════════════

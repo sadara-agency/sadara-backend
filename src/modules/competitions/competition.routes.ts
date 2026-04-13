@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createCompetitionSchema,
@@ -13,6 +14,7 @@ import * as ctrl from "@modules/competitions/competition.controller";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("competitions"));
 
 // ── Competition CRUD ──
 router.get(

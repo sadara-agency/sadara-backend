@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorize } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
 import * as portalController from "@modules/portal/portal.controller";
@@ -43,6 +44,7 @@ router.post(
 
 // ── All other portal routes require authentication ──
 router.use(authenticate);
+router.use(dynamicFieldAccess("portal"));
 
 // ── Player-only routes (role: Player) ──
 router.get(

@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import {
@@ -26,6 +27,7 @@ import * as ctrl from "./wellness.controller";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("wellness"));
 
 // ══════════════════════════════════════════
 // PLAYER SELF-SERVICE (must come before :id / :playerId catch-all)
