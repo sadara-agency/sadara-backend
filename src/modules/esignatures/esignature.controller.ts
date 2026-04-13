@@ -23,7 +23,7 @@ async function resolveDocUrl(obj: any): Promise<void> {
 
 // ── Create signature request ──
 export async function create(req: AuthRequest, res: Response) {
-  const result = await svc.createSignatureRequest(req.body, req.user!.id);
+  const result = await svc.createSignatureRequest(req.body, req.user!);
   sendCreated(res, result);
 }
 

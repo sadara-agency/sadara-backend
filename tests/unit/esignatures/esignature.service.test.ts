@@ -99,6 +99,13 @@ jest.mock('../../../src/middleware/errorHandler', () => ({
   },
 }));
 
+// ── Mock rowScope ──
+jest.mock('../../../src/shared/utils/rowScope', () => ({
+  buildRowScope: jest.fn().mockResolvedValue(null),
+  checkRowAccess: jest.fn().mockResolvedValue(true),
+  mergeScope: jest.fn(),
+}));
+
 import * as svc from '../../../src/modules/esignatures/esignature.service';
 import { mockModelInstance } from '../../setup/test-helpers';
 
@@ -148,6 +155,8 @@ describe('E-Signature Service', () => {
   // ══════════════════════════════════════════
 
   describe('createSignatureRequest', () => {
+    const testUser = { id: 'user-1', role: 'Admin', email: 'admin@test.com', fullName: 'Admin' } as any;
+
     const input = {
       documentId: 'doc-1',
       title: 'Sign NDA',
@@ -166,7 +175,7 @@ describe('E-Signature Service', () => {
       mockSSFindAll.mockResolvedValue([]);
       mockSRFindByPk.mockResolvedValue(mockRequest());
 
-      const result = await svc.createSignatureRequest(input, 'user-1');
+      const result = await svc.createSignatureRequest(input, testUser);
       expect(mockSRCreate).toHaveBeenCalled();
       expect(mockSSCreate).toHaveBeenCalled();
       expect(result).toBeDefined();
@@ -174,13 +183,13 @@ describe('E-Signature Service', () => {
 
     it('should throw 404 if document not found', async () => {
       mockDocFindByPk.mockResolvedValue(null);
-      await expect(svc.createSignatureRequest(input, 'user-1')).rejects.toThrow('Document not found');
+      await expect(svc.createSignatureRequest(input, testUser)).rejects.toThrow('Document not found');
     });
 
     it('should throw 404 if user not found', async () => {
       mockDocFindByPk.mockResolvedValue(mockDoc);
       mockUserFindByPk.mockResolvedValue(null);
-      await expect(svc.createSignatureRequest(input, 'user-1')).rejects.toThrow('User not found');
+      await expect(svc.createSignatureRequest(input, testUser)).rejects.toThrow('User not found');
     });
 
     it('should set first signer as Active for sequential order', async () => {
@@ -192,7 +201,7 @@ describe('E-Signature Service', () => {
       mockSSFindAll.mockResolvedValue([]);
       mockSRFindByPk.mockResolvedValue(mockRequest());
 
-      await svc.createSignatureRequest(input, 'user-1');
+      await svc.createSignatureRequest(input, testUser);
 
       const createCall = mockSSCreate.mock.calls[0][0];
       expect(createCall.status).toBe('Active');
@@ -216,7 +225,7 @@ describe('E-Signature Service', () => {
         ],
       };
 
-      await svc.createSignatureRequest(parallelInput as any, 'user-1');
+      await svc.createSignatureRequest(parallelInput as any, testUser);
 
       expect(mockSSCreate).toHaveBeenCalledTimes(2);
       expect(mockSSCreate.mock.calls[0][0].status).toBe('Active');
@@ -244,7 +253,7 @@ describe('E-Signature Service', () => {
         ],
       };
 
-      await svc.createSignatureRequest(extInput, 'user-1');
+      await svc.createSignatureRequest(extInput, testUser);
 
       const createCall = mockSSCreate.mock.calls[0][0];
       expect(createCall.token).toBeTruthy();
@@ -260,7 +269,7 @@ describe('E-Signature Service', () => {
       mockSSFindAll.mockResolvedValue([]);
       mockSRFindByPk.mockResolvedValue(mockRequest());
 
-      await svc.createSignatureRequest(input, 'user-1');
+      await svc.createSignatureRequest(input, testUser);
       expect(mockSACreate).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'created', signatureRequestId: 'req-1' }),
       );
