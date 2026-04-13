@@ -8,7 +8,11 @@ import { QueryInterface, DataTypes } from "sequelize";
  * Default is 'Asia/Riyadh' (the platform's primary timezone for MENA users).
  * Values must be valid IANA timezone identifiers (e.g. 'Asia/Dubai', 'Europe/London').
  */
-export async function up(queryInterface: QueryInterface): Promise<void> {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.addColumn("calendar_events", "timezone", {
     type: DataTypes.STRING(64),
     allowNull: false,
@@ -16,6 +20,10 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   });
 }
 
-export async function down(queryInterface: QueryInterface): Promise<void> {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.removeColumn("calendar_events", "timezone");
 }
