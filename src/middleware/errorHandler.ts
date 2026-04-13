@@ -8,11 +8,19 @@ export class AppError extends Error {
   isOperational: boolean;
   /** Optional structured error detail (e.g. field-level validation errors) */
   errorDetail?: string | { field: string; message: string }[];
+  /** Optional stable error code clients can branch on (e.g. "EMAIL_NOT_VERIFIED") */
+  code?: string;
 
-  constructor(message: string, statusCode = 400, isOperational = true) {
+  constructor(
+    message: string,
+    statusCode = 400,
+    isOperational = true,
+    code?: string,
+  ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
+    this.code = code;
     Object.setPrototypeOf(this, AppError.prototype);
   }
 
@@ -54,6 +62,7 @@ export function errorHandler(
     res.status(err.statusCode).json({
       success: false,
       message: err.message,
+      ...(err.code && { code: err.code }),
       ...(err.errorDetail && { error: err.errorDetail }),
     });
     return;

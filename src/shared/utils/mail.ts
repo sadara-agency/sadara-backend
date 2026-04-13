@@ -314,6 +314,59 @@ export async function sendPasswordResetEmail(
 }
 
 /**
+ * Send an email-verification link to a newly registered user.
+ * Link expires after 24 hours (see auth.service.register).
+ */
+export async function sendEmailVerificationEmail(
+  to: string,
+  userName: string,
+  verifyUrl: string,
+): Promise<boolean> {
+  const content = `
+    <div style="text-align:center; margin-bottom:24px;">
+      <div style="display:inline-block; width:56px; height:56px; border-radius:16px; background-color:rgba(60,60,250,0.1); line-height:56px; text-align:center;">
+        <span style="font-size:28px;">✉️</span>
+      </div>
+    </div>
+
+    <h1 style="color:#ffffff; font-size:22px; font-weight:bold; text-align:center; margin:0 0 8px;">
+      تأكيد البريد الإلكتروني
+    </h1>
+    <p style="color:rgba(255,255,255,0.5); font-size:14px; text-align:center; margin:0 0 28px; line-height:1.6;">
+      مرحباً ${escapeHtml(userName || "")}، اضغط الزر أدناه لتأكيد عنوان بريدك الإلكتروني وتفعيل حسابك في صدارة.
+    </p>
+
+    <div style="text-align:center; margin-bottom:28px;">
+      <a href="${verifyUrl}" target="_blank"
+         style="display:inline-block; background-color:#3C3CFA; color:#ffffff; font-size:14px; font-weight:600; text-decoration:none; padding:14px 40px; border-radius:12px; letter-spacing:0.3px;">
+        تأكيد البريد / Verify Email
+      </a>
+    </div>
+
+    <div style="background-color:rgba(255,255,255,0.03); border-radius:10px; padding:16px; margin-bottom:20px; border:1px solid rgba(228,229,243,0.05);">
+      <p style="color:rgba(255,255,255,0.4); font-size:12px; margin:0 0 8px; line-height:1.6;">
+        ⏱️ هذا الرابط صالح لمدة <strong style="color:rgba(255,255,255,0.6);">24 ساعة</strong>.
+      </p>
+      <p style="color:rgba(255,255,255,0.4); font-size:12px; margin:0; line-height:1.6;">
+        🔒 إذا لم تقم بإنشاء حساب في صدارة، يمكنك تجاهل هذا البريد بأمان.
+      </p>
+    </div>
+
+    <p style="color:rgba(255,255,255,0.25); font-size:10px; text-align:center; margin:0; word-break:break-all; direction:ltr;">
+      إذا لم يعمل الزر، انسخ هذا الرابط في المتصفح:<br/>
+      <a href="${verifyUrl}" style="color:#3C3CFA; text-decoration:none;">${verifyUrl}</a>
+    </p>
+  `;
+
+  return sendMail({
+    to,
+    subject: "✉️ تأكيد البريد الإلكتروني — صدارة",
+    html: wrapInTemplate(content),
+    text: `مرحباً ${userName}، يرجى تأكيد بريدك الإلكتروني من خلال هذا الرابط: ${verifyUrl} — صالح لمدة 24 ساعة.`,
+  });
+}
+
+/**
  * Send a welcome/activation email to newly registered users.
  */
 export async function sendWelcomeEmail(

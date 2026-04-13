@@ -16,9 +16,22 @@ import {
 import {
   sendPasswordResetEmail,
   sendPasswordChangedEmail,
-  sendWelcomeEmail,
   sendInviteEmail,
+  sendEmailVerificationEmail,
 } from "@shared/utils/mail";
+
+/** Email verification token validity — 24 hours. */
+const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Generate a raw verification token and its SHA-256 hash, mirroring the
+ * forgot-password pattern. The raw token is emailed; only the hash is stored.
+ */
+function createVerificationToken(): { rawToken: string; tokenHash: string } {
+  const rawToken = crypto.randomBytes(32).toString("hex");
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+  return { rawToken, tokenHash };
+}
 
 /** Default role for self-registered users (no admin privileges). */
 const DEFAULT_ROLE = "Analyst";
@@ -108,6 +121,10 @@ export async function revokeAllUserTokens(
 export async function register(input: RegisterInput) {
   const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
 
+  // Generate email verification token up-front so it's persisted atomically with the user row.
+  const { rawToken, tokenHash } = createVerificationToken();
+  const expiry = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+
   let user: User;
   try {
     user = await User.create({
@@ -117,6 +134,9 @@ export async function register(input: RegisterInput) {
       fullNameAr: input.fullNameAr,
       role: DEFAULT_ROLE,
       isActive: false,
+      emailVerifiedAt: null,
+      emailVerificationToken: tokenHash,
+      emailVerificationTokenExpiry: expiry,
     });
   } catch (err: any) {
     if (err.name === "SequelizeUniqueConstraintError") {
@@ -125,15 +145,24 @@ export async function register(input: RegisterInput) {
     throw err;
   }
 
-  const { passwordHash: _, ...safe } = user.get({ plain: true });
+  const {
+    passwordHash: _,
+    emailVerificationToken: _evt,
+    emailVerificationTokenExpiry: _evte,
+    ...safe
+  } = user.get({ plain: true });
 
-  // Send welcome email (non-blocking — don't fail registration if email fails)
-  sendWelcomeEmail(user.email, user.fullName || user.fullNameAr || "").catch(
-    (err) =>
-      logger.warn("Failed to send welcome email", {
-        email: user.email,
-        error: (err as Error).message,
-      }),
+  // Send verification email (non-blocking — don't fail registration if email fails)
+  const verifyUrl = `${env.frontend.url}/verify-email?token=${rawToken}`;
+  sendEmailVerificationEmail(
+    user.email,
+    user.fullName || user.fullNameAr || "",
+    verifyUrl,
+  ).catch((err) =>
+    logger.warn("Failed to send verification email", {
+      email: user.email,
+      error: (err as Error).message,
+    }),
   );
 
   return { user: safe };
@@ -152,6 +181,9 @@ export async function invite(input: InviteInput) {
       fullNameAr: input.fullNameAr,
       role: input.role as any,
       isActive: true,
+      // Admin-invited users are trusted — auto-verified so they skip the
+      // email confirmation step and can log in as soon as they get the invite.
+      emailVerifiedAt: new Date(),
     });
   } catch (err: any) {
     if (err.name === "SequelizeUniqueConstraintError") {
@@ -213,10 +245,24 @@ export async function login(input: LoginInput) {
       throw new AppError("Invalid email or password", 401);
     }
 
+    // Gate 1: email verification (self-service) — must be checked before
+    // the admin-approval gate so the user gets the actionable message first.
+    if (!user.emailVerifiedAt) {
+      throw new AppError(
+        "Please verify your email address before signing in.",
+        403,
+        true,
+        "EMAIL_NOT_VERIFIED",
+      );
+    }
+
+    // Gate 2: admin activation
     if (!user.isActive) {
       throw new AppError(
-        "Account is not yet activated. Please wait for admin approval or verify your email.",
+        "Your account is waiting for admin approval.",
         403,
+        true,
+        "PENDING_APPROVAL",
       );
     }
 
@@ -697,4 +743,98 @@ export async function resetPassword(token: string, newPassword: string) {
   );
 
   return { message: "Password reset successfully. You can now log in." };
+}
+
+// ════════════════════════════════════════════════════════════
+// Verify Email — validates token, marks account verified
+// ════════════════════════════════════════════════════════════
+export async function verifyEmail(rawToken: string) {
+  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+  const user = await User.findOne({
+    where: {
+      emailVerificationToken: tokenHash,
+      emailVerificationTokenExpiry: { [Op.gt]: new Date() },
+    },
+  });
+
+  if (!user) {
+    throw new AppError(
+      "Invalid or expired verification link",
+      400,
+      true,
+      "INVALID_VERIFICATION_TOKEN",
+    );
+  }
+
+  if (user.emailVerifiedAt) {
+    // Idempotent — clear any stale token and return success.
+    await user.update({
+      emailVerificationToken: null,
+      emailVerificationTokenExpiry: null,
+    } as any);
+    return {
+      user: { id: user.id, email: user.email, fullName: user.fullName },
+      alreadyVerified: true,
+    };
+  }
+
+  await user.update({
+    emailVerifiedAt: new Date(),
+    emailVerificationToken: null,
+    emailVerificationTokenExpiry: null,
+  } as any);
+
+  return {
+    user: { id: user.id, email: user.email, fullName: user.fullName },
+    alreadyVerified: false,
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+// Resend Verification Email — regenerates token and re-sends
+// ════════════════════════════════════════════════════════════
+export async function resendVerificationEmail(email: string) {
+  const user = await User.findOne({ where: { email } });
+
+  // Always return success to prevent email enumeration (mirrors forgotPassword).
+  if (!user) {
+    return {
+      message:
+        "If an account exists for that email, a verification link has been sent.",
+    };
+  }
+
+  // Idempotent: if already verified, do nothing but return success.
+  if (user.emailVerifiedAt) {
+    return {
+      message:
+        "If an account exists for that email, a verification link has been sent.",
+    };
+  }
+
+  const { rawToken, tokenHash } = createVerificationToken();
+  const expiry = new Date(Date.now() + VERIFICATION_TOKEN_TTL_MS);
+
+  await user.update({
+    emailVerificationToken: tokenHash,
+    emailVerificationTokenExpiry: expiry,
+  } as any);
+
+  const verifyUrl = `${env.frontend.url}/verify-email?token=${rawToken}`;
+  sendEmailVerificationEmail(
+    user.email,
+    user.fullName || user.fullNameAr || "",
+    verifyUrl,
+  ).catch((err) =>
+    logger.warn("Failed to send verification email", {
+      email: user.email,
+      error: (err as Error).message,
+    }),
+  );
+
+  return {
+    message:
+      "If an account exists for that email, a verification link has been sent.",
+  };
 }

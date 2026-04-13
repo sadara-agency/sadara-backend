@@ -11,6 +11,8 @@ import {
   changePasswordSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  verifyEmailSchema,
+  resendVerificationSchema,
 } from "@modules/auth/auth.validation";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
 import * as authController from "@modules/auth/auth.controller";
@@ -41,6 +43,62 @@ router.post(
   passwordResetLimiter,
   validate(resetPasswordSchema),
   asyncHandler(authController.resetPassword),
+);
+
+/**
+ * @swagger
+ * /auth/verify-email:
+ *   post:
+ *     summary: Verify a user's email address using a token from the verification link
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [token]
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Email verified
+ *       400:
+ *         description: Invalid or expired token
+ */
+router.post(
+  "/verify-email",
+  validate(verifyEmailSchema),
+  asyncHandler(authController.verifyEmail),
+);
+
+/**
+ * @swagger
+ * /auth/resend-verification:
+ *   post:
+ *     summary: Resend the email verification link (rate-limited, enumeration-safe)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [email]
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *     responses:
+ *       200:
+ *         description: Always returns success (prevents email enumeration)
+ */
+router.post(
+  "/resend-verification",
+  passwordResetLimiter,
+  validate(resendVerificationSchema),
+  asyncHandler(authController.resendVerification),
 );
 
 // ── Refresh Token ──
