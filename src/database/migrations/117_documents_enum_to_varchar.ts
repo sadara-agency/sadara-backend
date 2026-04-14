@@ -18,19 +18,13 @@ export async function up({
       ALTER COLUMN status      TYPE VARCHAR(50) USING status::text;
   `);
 
-  // Drop the now-orphaned PostgreSQL ENUM types created by Sequelize
+  // Drop the now-orphaned PostgreSQL ENUM types created by Sequelize.
+  // CASCADE handles any array-type dependents (e.g. _enum_documents_type) that
+  // PostgreSQL creates automatically alongside ENUM definitions.
   await queryInterface.sequelize.query(`
-    DO $$ BEGIN
-      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_entity_type') THEN
-        DROP TYPE "enum_documents_entity_type";
-      END IF;
-      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_type') THEN
-        DROP TYPE "enum_documents_type";
-      END IF;
-      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_status') THEN
-        DROP TYPE "enum_documents_status";
-      END IF;
-    END $$;
+    DROP TYPE IF EXISTS "enum_documents_entity_type" CASCADE;
+    DROP TYPE IF EXISTS "enum_documents_type"        CASCADE;
+    DROP TYPE IF EXISTS "enum_documents_status"      CASCADE;
   `);
 }
 
