@@ -179,7 +179,7 @@ export async function invite(input: InviteInput) {
       passwordHash,
       fullName: input.fullName,
       fullNameAr: input.fullNameAr,
-      role: input.role as any,
+      role: input.role,
       isActive: true,
       // Admin-invited users are trusted — auto-verified so they skip the
       // email confirmation step and can log in as soon as they get the invite.
@@ -229,6 +229,7 @@ export async function login(input: LoginInput) {
 
     if (!(await bcrypt.compare(input.password, user.passwordHash))) {
       // Atomic increment to prevent race condition on concurrent failed logins
+
       await User.update(
         {
           failedLoginAttempts: sequelize.literal(
@@ -329,6 +330,7 @@ export async function login(input: LoginInput) {
 
   if (!(await bcrypt.compare(input.password, playerAccount.passwordHash))) {
     // Atomic increment to prevent race condition on concurrent failed logins
+
     await PlayerAccount.update(
       {
         failedLoginAttempts: sequelize.literal(
@@ -687,7 +689,7 @@ export async function forgotPassword(email: string) {
   await user.update({
     resetToken: tokenHash,
     resetTokenExpiry: expiry,
-  } as any);
+  });
 
   // Build the reset URL
   const resetUrl = `${env.frontend.url}/reset-password?token=${rawToken}`;
@@ -729,7 +731,7 @@ export async function resetPassword(token: string, newPassword: string) {
     passwordHash,
     resetToken: null,
     resetTokenExpiry: null,
-  } as any);
+  });
 
   // Revoke all refresh tokens on password reset
   await revokeAllUserTokens(user.id, "user");
@@ -772,7 +774,7 @@ export async function verifyEmail(rawToken: string) {
     await user.update({
       emailVerificationToken: null,
       emailVerificationTokenExpiry: null,
-    } as any);
+    });
     return {
       user: { id: user.id, email: user.email, fullName: user.fullName },
       alreadyVerified: true,
@@ -783,7 +785,7 @@ export async function verifyEmail(rawToken: string) {
     emailVerifiedAt: new Date(),
     emailVerificationToken: null,
     emailVerificationTokenExpiry: null,
-  } as any);
+  });
 
   return {
     user: { id: user.id, email: user.email, fullName: user.fullName },
@@ -819,7 +821,7 @@ export async function resendVerificationEmail(email: string) {
   await user.update({
     emailVerificationToken: tokenHash,
     emailVerificationTokenExpiry: expiry,
-  } as any);
+  });
 
   const verifyUrl = `${env.frontend.url}/verify-email?token=${rawToken}`;
   sendEmailVerificationEmail(

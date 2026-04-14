@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import { mockDocument, mockModelInstance } from '../../setup/test-helpers';
+import type { DocumentQuery } from '../../../src/modules/documents/document.validation';
 
 const mockDocFindAndCountAll = jest.fn();
 const mockDocFindByPk = jest.fn();
@@ -64,26 +65,26 @@ describe('Document Service', () => {
   describe('listDocuments', () => {
     it('should return paginated documents', async () => {
       mockDocFindAndCountAll.mockResolvedValue({ count: 1, rows: [mockModelInstance(mockDocument())] });
-      const result = await docService.listDocuments({ page: 1, limit: 10 });
+      const result = await docService.listDocuments({ page: 1, limit: 10 } as unknown as DocumentQuery);
       expect(result.data).toHaveLength(1);
       expect(result.meta.total).toBe(1);
     });
 
     it('should filter by type', async () => {
       mockDocFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await docService.listDocuments({ type: 'Contract', page: 1, limit: 10 });
+      await docService.listDocuments({ type: 'Contract', page: 1, limit: 10 } as unknown as DocumentQuery);
       expect(mockDocFindAndCountAll).toHaveBeenCalled();
     });
 
     it('should filter by entityType and entityId', async () => {
       mockDocFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await docService.listDocuments({ entityType: 'Player', entityId: 'player-001', page: 1, limit: 10 });
+      await docService.listDocuments({ entityType: 'Player', entityId: 'player-001', page: 1, limit: 10 } as unknown as DocumentQuery);
       expect(mockDocFindAndCountAll).toHaveBeenCalled();
     });
 
     it('should apply search', async () => {
       mockDocFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await docService.listDocuments({ search: 'passport', page: 1, limit: 10 });
+      await docService.listDocuments({ search: 'passport', page: 1, limit: 10 } as unknown as DocumentQuery);
       expect(mockDocFindAndCountAll).toHaveBeenCalled();
     });
   });

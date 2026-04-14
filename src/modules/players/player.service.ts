@@ -26,6 +26,7 @@ import {
   mergeScope,
   checkRowAccess,
 } from "@shared/utils/rowScope";
+import { PlayerQuery } from "@modules/players/utils/player.validation";
 
 // ── Lightweight computed attributes (same-row, no joins needed) ──
 const COMPUTED_ATTRIBUTES: [any, string][] = [
@@ -174,7 +175,8 @@ async function getPlayerCounts(playerId: string): Promise<PlayerCounts> {
 // Step 1: Fetch base player data with lightweight attributes (no heavy subqueries)
 // Step 2: Batch-load stats for all returned player IDs in a single query
 // Step 3: Merge stats into player objects
-export async function listPlayers(queryParams: any, user?: AuthUser) {
+
+export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",

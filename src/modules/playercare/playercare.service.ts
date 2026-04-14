@@ -154,6 +154,14 @@ export async function getCaseById(id: string, user?: AuthUser) {
 // ── Create Performance/Mental Case ──
 
 export async function createCase(input: CreateCaseInput, createdBy: string) {
+  // Validate FKs before inserting to return clean 404 instead of DB 500
+  const player = await Player.findByPk(input.playerId);
+  if (!player) throw new AppError("Player not found", 404);
+  if (input.assignedTo) {
+    const assignee = await User.findByPk(input.assignedTo);
+    if (!assignee) throw new AppError("Assigned user not found", 404);
+  }
+
   const caseRecord = await Referral.create({
     referralType: input.caseType,
     playerId: input.playerId,
@@ -178,6 +186,10 @@ export async function createMedicalCase(
   input: CreateMedicalCaseInput,
   createdBy: string,
 ) {
+  // Validate player exists before opening a transaction
+  const player = await Player.findByPk(input.playerId);
+  if (!player) throw new AppError("Player not found", 404);
+
   return transaction(async (t) => {
     // 1. Create the injury record
     const injury = await Injury.create(

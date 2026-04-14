@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import { mockPlayer, mockClub, mockModelInstance } from '../../setup/test-helpers';
+import type { PlayerQuery } from '../../../src/modules/players/utils/player.validation';
 
 // ── Mock dependencies ──
 const mockFindAndCountAll = jest.fn();
@@ -82,7 +83,7 @@ describe('Player Service', () => {
       const { sequelize } = require('../../../src/config/database');
       sequelize.query.mockResolvedValue([]);
 
-      const result = await playerService.listPlayers({ page: 1, limit: 10 });
+      const result = await playerService.listPlayers({ page: 1, limit: 10 } as unknown as PlayerQuery);
 
       expect(result.data).toBeDefined();
       expect(result.meta).toBeDefined();
@@ -94,7 +95,7 @@ describe('Player Service', () => {
       const { sequelize } = require('../../../src/config/database');
       sequelize.query.mockResolvedValue([]);
 
-      await playerService.listPlayers({ status: 'Active', page: 1, limit: 10 });
+      await playerService.listPlayers({ status: 'active', page: 1, limit: 10 } as unknown as PlayerQuery);
 
       const call = mockFindAndCountAll.mock.calls[0][0];
       expect(call.where).toBeDefined();
@@ -105,7 +106,7 @@ describe('Player Service', () => {
       const { sequelize } = require('../../../src/config/database');
       sequelize.query.mockResolvedValue([]);
 
-      await playerService.listPlayers({ search: 'Salem', page: 1, limit: 10 });
+      await playerService.listPlayers({ search: 'Salem', page: 1, limit: 10 } as unknown as PlayerQuery);
 
       expect(mockFindAndCountAll).toHaveBeenCalled();
     });
@@ -115,7 +116,7 @@ describe('Player Service', () => {
       const { sequelize } = require('../../../src/config/database');
       sequelize.query.mockResolvedValue([]);
 
-      await playerService.listPlayers({ position: 'Forward', page: 1, limit: 10 });
+      await playerService.listPlayers({ position: 'Forward', page: 1, limit: 10 } as unknown as PlayerQuery);
 
       const call = mockFindAndCountAll.mock.calls[0][0];
       expect(call.where).toBeDefined();

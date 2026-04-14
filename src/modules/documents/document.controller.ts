@@ -10,6 +10,7 @@ import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
 import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import * as svc from "@modules/documents/document.service";
+import type { DocumentQuery } from "@modules/documents/document.validation";
 
 // Documents list takes req.user?.role for RBAC, so we override list.
 // Upload is custom (multipart/form-data).
@@ -28,8 +29,13 @@ const crud = createCrudController({
 });
 
 // Override list to pass user role for RBAC filtering + row-level scoping
+// req.query validated by documentQuerySchema middleware before reaching here
 export async function list(req: AuthRequest, res: Response) {
-  const r = await svc.listDocuments(req.query, req.user?.role, req.user);
+  const r = await svc.listDocuments(
+    req.query as unknown as DocumentQuery,
+    req.user?.role,
+    req.user,
+  );
   sendPaginated(res, r.data, r.meta);
 }
 
@@ -82,11 +88,15 @@ export async function upload(req: AuthRequest, res: Response) {
     entityId: body.entityId || null,
     issueDate: body.issueDate || null,
     expiryDate: body.expiryDate || null,
-    tags: body.tags
-      ? typeof body.tags === "string"
-        ? JSON.parse(body.tags)
-        : body.tags
-      : [],
+    tags: (() => {
+      if (!body.tags) return [];
+      if (typeof body.tags !== "string") return body.tags;
+      try {
+        return JSON.parse(body.tags);
+      } catch {
+        throw new AppError("Invalid tags format — must be a JSON array", 400);
+      }
+    })(),
     notes: body.notes || null,
   };
 

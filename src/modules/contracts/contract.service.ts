@@ -18,6 +18,7 @@ import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
   CreateContractInput,
   UpdateContractInput,
+  ContractQuery,
 } from "@modules/contracts/contract.validation";
 import { generateContractCreationTask } from "@modules/contracts/contractAutoTasks";
 import { isApprovalChainResolved } from "@modules/approvals/approval.service";
@@ -72,7 +73,10 @@ function enrichContract(contract: any) {
 // ────────────────────────────────────────────────────────────
 // List Contracts
 // ────────────────────────────────────────────────────────────
-export async function listContracts(queryParams: any, user?: AuthUser) {
+export async function listContracts(
+  queryParams: ContractQuery,
+  user?: AuthUser,
+) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",

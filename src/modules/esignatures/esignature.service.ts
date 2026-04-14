@@ -11,6 +11,8 @@ import { Document } from "@modules/documents/document.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
+import { checkRowAccess } from "@shared/utils/rowScope";
+import type { AuthUser } from "@shared/types";
 import { notifyUser } from "@modules/notifications/notification.service";
 import {
   sendSignatureRequestEmail,
@@ -89,10 +91,16 @@ function generateToken(): { raw: string; hash: string; expiresAt: Date } {
 
 export async function createSignatureRequest(
   input: CreateSignatureRequestInput,
-  userId: string,
+  user: AuthUser,
 ) {
+  const userId = user.id;
+
   const doc = await Document.findByPk(input.documentId);
   if (!doc) throw new AppError("Document not found", 404);
+
+  // Prevent users from creating signature requests on documents they cannot access
+  const allowed = await checkRowAccess("documents", doc, user);
+  if (!allowed) throw new AppError("Document not found", 404);
 
   const creator = await User.findByPk(userId, { attributes: [...USER_ATTRS] });
   if (!creator) throw new AppError("User not found", 404);

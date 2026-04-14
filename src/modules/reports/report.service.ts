@@ -5,7 +5,10 @@ import { Club } from "@modules/clubs/club.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
-import { CreateReportInput } from "@modules/reports/report.validation";
+import {
+  CreateReportInput,
+  ReportQuery,
+} from "@modules/reports/report.validation";
 import { generateReportPdf } from "@modules/reports/report.pdf";
 import { logger } from "@config/logger";
 import { generateReportFailedTask } from "@modules/reports/reportAutoTasks";
@@ -29,7 +32,8 @@ const REPORT_INCLUDES = [
 // ────────────────────────────────────────────────────────────
 // List Reports
 // ────────────────────────────────────────────────────────────
-export async function listReports(queryParams: any) {
+
+export async function listReports(queryParams: ReportQuery) {
   try {
     const { limit, offset, page } = parsePagination(queryParams, "createdAt");
 

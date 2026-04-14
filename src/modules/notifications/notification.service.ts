@@ -157,7 +157,21 @@ export async function notifyUser(
 
 // ── List notifications for a user ──
 
-export async function listNotifications(userId: string, queryParams: any) {
+export interface NotificationQuery {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: "asc" | "desc";
+  search?: string;
+  unreadOnly?: string;
+  type?: string;
+  priority?: string;
+}
+
+export async function listNotifications(
+  userId: string,
+  queryParams: NotificationQuery,
+) {
   const { limit, offset, page } = parsePagination(queryParams, "createdAt");
   const where: any = { userId, isDismissed: false };
 

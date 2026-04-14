@@ -176,6 +176,14 @@ export async function createTask(input: CreateTaskInput, assignedBy: string) {
 export async function updateTask(id: string, input: UpdateTaskInput) {
   const task = await findOrThrow(Task, id, "Task");
 
+  // FK checks on reassign/relink — catch invalid references before hitting the DB constraint
+  await Promise.all([
+    input.assignedTo
+      ? findOrThrow(User, input.assignedTo, "Assigned user")
+      : null,
+    input.playerId ? findOrThrow(Player, input.playerId, "Player") : null,
+  ]);
+
   await task.update(input);
 
   // Re-fetch with associations

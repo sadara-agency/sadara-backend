@@ -26,7 +26,7 @@ import {
   CacheTTL,
   CachePrefix,
 } from "@shared/utils/cache";
-import { AuthUser } from "@shared/types";
+import { AuthUser, ROLES, UserRole } from "@shared/types";
 import {
   buildRowScope,
   mergeScope,
@@ -557,12 +557,12 @@ export async function createValuation(input: CreateValuationInput) {
 // ══════════════════════════════════════════
 
 // Roles that see company-wide financial data; all others are scoped to their own player record
-const FINANCE_BYPASS_ROLES = [
-  "Admin",
-  "Manager",
-  "Executive",
-  "Finance",
-  "Legal",
+const FINANCE_BYPASS_ROLES: UserRole[] = [
+  ROLES.ADMIN,
+  ROLES.MANAGER,
+  ROLES.EXECUTIVE,
+  ROLES.FINANCE,
+  ROLES.LEGAL,
 ];
 
 export async function getFinancialDashboard(
@@ -615,169 +615,180 @@ export async function getFinancialDashboard(
         replacements.playerId = playerIdFilter;
       }
 
-      // Total portfolio market value
-      const [marketValue] = await sequelize.query<MarketValueRow>(
-        `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
-            COUNT(*)::INT AS total_players
-     FROM players WHERE status = 'active' ${typeFilter} ${playerClauseNoAlias}`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-
-      // Player distribution by contract type
-      const distribution = await sequelize.query<DistributionRow>(
-        `SELECT contract_type, COUNT(*)::INT AS count
-     FROM players WHERE status = 'active' ${typeFilter} ${playerClauseNoAlias}
-     GROUP BY contract_type ORDER BY count DESC`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-
-      // Expected vs collected commissions
+      // Hoist per-query clause strings before parallelizing
       const playerCommissionClause = playerIdFilter
         ? "AND c.player_id = :playerId"
         : "";
-      const [commissions] = await sequelize.query<CommissionsRow>(
-        `SELECT
-       COALESCE(SUM(CASE WHEN c.total_commission ~ '^[0-9.]+$' THEN c.total_commission::NUMERIC ELSE 0 END), 0) AS expected_commissions,
-       (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
-        ${commissionPayJoin}
-        WHERE pay.status = 'Paid' AND pay.payment_type = 'Commission') AS collected_commissions,
-       (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
-        ${commissionPayJoin}
-        WHERE pay.status IN ('Expected', 'Overdue') AND pay.payment_type = 'Commission') AS outstanding_commissions
-     FROM contracts c ${commissionTypeJoin}
-     WHERE c.status IN ('Active', 'Expiring Soon') ${playerCommissionClause}`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-
-      // Top 10 valued players
-      const topPlayers = await sequelize.query<TopPlayerRow>(
-        `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
-            p.market_value, p.market_value_currency, p.position, p.photo_url,
-            c.name AS club_name, c.name_ar AS club_name_ar
-     FROM players p
-     LEFT JOIN clubs c ON p.current_club_id = c.id
-     WHERE p.status = 'active' AND p.market_value IS NOT NULL ${typeFilterP} ${playerClause}
-     ORDER BY p.market_value DESC LIMIT 10`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-
-      // Market value trend (monthly for last 12 months from valuations)
       const playerValuationClause = playerIdFilter
         ? "AND v.player_id = :playerId"
         : "";
-      const marketValueTrend = await sequelize.query<MarketValueTrendRow>(
-        `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
-            SUM(v.value)::NUMERIC AS total_value,
-            COUNT(DISTINCT v.player_id)::INT AS players_valued
-     FROM valuations v
-     ${trendTypeJoin}
-     WHERE v.valued_at >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
-       ${playerValuationClause}
-     GROUP BY DATE_TRUNC('month', v.valued_at)
-     ORDER BY month`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-
-      // Revenue by club — agency-level view, not meaningful per-player
-      const revenueByClub = playerIdFilter
-        ? ([] as RevenueByClubRow[])
-        : await sequelize.query<RevenueByClubRow>(
-            `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
-            COALESCE(SUM(i.total_amount), 0)::NUMERIC AS total_revenue,
-            COUNT(*)::INT AS invoice_count
-     FROM invoices i
-     JOIN clubs c ON i.club_id = c.id
-     WHERE i.status = 'Paid'
-     GROUP BY c.id, c.name, c.name_ar, c.logo_url
-     ORDER BY total_revenue DESC
-     LIMIT 10`,
-            { type: QueryTypes.SELECT },
-          );
-
-      // Per-player revenue breakdown (top 20 by paid payments)
-      const playerRevenueBreakdown = await sequelize.query<PlayerRevenueRow>(
-        `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
-            c.name AS club_name, c.name_ar AS club_name_ar,
-            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Commission'), 0)::NUMERIC AS commissions,
-            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Sponsorship'), 0)::NUMERIC AS sponsorship,
-            COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Bonus'), 0)::NUMERIC AS bonus,
-            COALESCE(SUM(pay.amount), 0)::NUMERIC AS total_revenue
-     FROM payments pay
-     JOIN players p ON pay.player_id = p.id ${playerTypeJoin} ${playerClause}
-     LEFT JOIN clubs c ON p.current_club_id = c.id
-     WHERE pay.status = 'Paid'
-     GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url, c.name, c.name_ar
-     ORDER BY total_revenue DESC
-     LIMIT 20`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-
-      // Cash flow timeline — agency-level view, not meaningful per-player
-      const cashFlowTimeline = playerIdFilter
-        ? ([] as CashFlowRow[])
-        : await sequelize.query<CashFlowRow>(
-            `WITH months AS (
-       SELECT TO_CHAR(d, 'YYYY-MM') AS month
-       FROM generate_series(
-         DATE_TRUNC('month', NOW()) - INTERVAL '12 months',
-         DATE_TRUNC('month', NOW()) + INTERVAL '6 months',
-         '1 month'
-       ) d
-     ),
-     expected AS (
-       SELECT TO_CHAR(DATE_TRUNC('month', due_date), 'YYYY-MM') AS month,
-              SUM(amount)::NUMERIC AS amount
-       FROM payments
-       WHERE due_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
-         AND due_date <= DATE_TRUNC('month', NOW()) + INTERVAL '6 months'
-       GROUP BY DATE_TRUNC('month', due_date)
-     ),
-     received AS (
-       SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
-              SUM(amount)::NUMERIC AS amount
-       FROM payments
-       WHERE status = 'Paid'
-         AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
-       GROUP BY DATE_TRUNC('month', paid_date)
-     )
-     SELECT m.month,
-            COALESCE(e.amount, 0) AS expected,
-            COALESCE(r.amount, 0) AS received
-     FROM months m
-     LEFT JOIN expected e ON m.month = e.month
-     LEFT JOIN received r ON m.month = r.month
-     ORDER BY m.month`,
-            { type: QueryTypes.SELECT },
-          );
-
-      // Period comparison — agency-level, skip for scoped users
-      const periodComparison = playerIdFilter
-        ? {}
-        : await computePeriodComparison(comparisonPeriod);
-
-      // Profitability — scoped to player payments if playerIdFilter is set
       const playerPaymentClause = playerIdFilter
         ? "AND player_id = :playerId"
         : "";
-      const [revRow] = await sequelize.query<RevenueRow>(
-        `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
-     FROM payments WHERE status = 'Paid'
-       AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
-       ${playerPaymentClause}`,
-        { type: QueryTypes.SELECT, replacements },
-      );
-      // Expenses are agency-level; Player role sees 0
-      let totalExpenses = 0;
-      if (!playerIdFilter) {
-        const [expRow] = await sequelize.query<ExpenseTotalRow>(
-          `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
-     FROM expenses
-     WHERE date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
-          { type: QueryTypes.SELECT },
-        );
-        totalExpenses = Number(expRow?.total_expenses || 0);
-      }
+
+      // Run all queries in parallel — none share row results
+      const [
+        marketValueRows,
+        distribution,
+        commissionsRows,
+        topPlayers,
+        marketValueTrend,
+        revenueByClub,
+        playerRevenueBreakdown,
+        cashFlowTimeline,
+        periodComparison,
+        revRows,
+        expRows,
+      ] = await Promise.all([
+        // Total portfolio market value
+        sequelize.query<MarketValueRow>(
+          `SELECT COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value,
+              COUNT(*)::INT AS total_players
+       FROM players WHERE status = 'active' ${typeFilter} ${playerClauseNoAlias}`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Player distribution by contract type
+        sequelize.query<DistributionRow>(
+          `SELECT contract_type, COUNT(*)::INT AS count
+       FROM players WHERE status = 'active' ${typeFilter} ${playerClauseNoAlias}
+       GROUP BY contract_type ORDER BY count DESC`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Expected vs collected commissions
+        sequelize.query<CommissionsRow>(
+          `SELECT
+         COALESCE(SUM(CASE WHEN c.total_commission ~ '^[0-9.]+$' THEN c.total_commission::NUMERIC ELSE 0 END), 0) AS expected_commissions,
+         (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
+          ${commissionPayJoin}
+          WHERE pay.status = 'Paid' AND pay.payment_type = 'Commission') AS collected_commissions,
+         (SELECT COALESCE(SUM(pay.amount), 0)::NUMERIC FROM payments pay
+          ${commissionPayJoin}
+          WHERE pay.status IN ('Expected', 'Overdue') AND pay.payment_type = 'Commission') AS outstanding_commissions
+       FROM contracts c ${commissionTypeJoin}
+       WHERE c.status IN ('Active', 'Expiring Soon') ${playerCommissionClause}`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Top 10 valued players
+        sequelize.query<TopPlayerRow>(
+          `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+              p.market_value, p.market_value_currency, p.position, p.photo_url,
+              c.name AS club_name, c.name_ar AS club_name_ar
+       FROM players p
+       LEFT JOIN clubs c ON p.current_club_id = c.id
+       WHERE p.status = 'active' AND p.market_value IS NOT NULL ${typeFilterP} ${playerClause}
+       ORDER BY p.market_value DESC LIMIT 10`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Market value trend (monthly for last 12 months from valuations)
+        sequelize.query<MarketValueTrendRow>(
+          `SELECT TO_CHAR(DATE_TRUNC('month', v.valued_at), 'YYYY-MM') AS month,
+              SUM(v.value)::NUMERIC AS total_value,
+              COUNT(DISTINCT v.player_id)::INT AS players_valued
+       FROM valuations v
+       ${trendTypeJoin}
+       WHERE v.valued_at >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+         ${playerValuationClause}
+       GROUP BY DATE_TRUNC('month', v.valued_at)
+       ORDER BY month`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Revenue by club — agency-level, skip for scoped users
+        playerIdFilter
+          ? Promise.resolve([] as RevenueByClubRow[])
+          : sequelize.query<RevenueByClubRow>(
+              `SELECT c.id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url,
+              COALESCE(SUM(i.total_amount), 0)::NUMERIC AS total_revenue,
+              COUNT(*)::INT AS invoice_count
+       FROM invoices i
+       JOIN clubs c ON i.club_id = c.id
+       WHERE i.status = 'Paid'
+       GROUP BY c.id, c.name, c.name_ar, c.logo_url
+       ORDER BY total_revenue DESC
+       LIMIT 10`,
+              { type: QueryTypes.SELECT },
+            ),
+        // Per-player revenue breakdown (top 20 by paid payments)
+        sequelize.query<PlayerRevenueRow>(
+          `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
+              c.name AS club_name, c.name_ar AS club_name_ar,
+              COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Commission'), 0)::NUMERIC AS commissions,
+              COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Sponsorship'), 0)::NUMERIC AS sponsorship,
+              COALESCE(SUM(pay.amount) FILTER (WHERE pay.payment_type = 'Bonus'), 0)::NUMERIC AS bonus,
+              COALESCE(SUM(pay.amount), 0)::NUMERIC AS total_revenue
+       FROM payments pay
+       JOIN players p ON pay.player_id = p.id ${playerTypeJoin} ${playerClause}
+       LEFT JOIN clubs c ON p.current_club_id = c.id
+       WHERE pay.status = 'Paid'
+       GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url, c.name, c.name_ar
+       ORDER BY total_revenue DESC
+       LIMIT 20`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Cash flow timeline — agency-level, skip for scoped users
+        playerIdFilter
+          ? Promise.resolve([] as CashFlowRow[])
+          : sequelize.query<CashFlowRow>(
+              `WITH months AS (
+         SELECT TO_CHAR(d, 'YYYY-MM') AS month
+         FROM generate_series(
+           DATE_TRUNC('month', NOW()) - INTERVAL '12 months',
+           DATE_TRUNC('month', NOW()) + INTERVAL '6 months',
+           '1 month'
+         ) d
+       ),
+       expected AS (
+         SELECT TO_CHAR(DATE_TRUNC('month', due_date), 'YYYY-MM') AS month,
+                SUM(amount)::NUMERIC AS amount
+         FROM payments
+         WHERE due_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+           AND due_date <= DATE_TRUNC('month', NOW()) + INTERVAL '6 months'
+         GROUP BY DATE_TRUNC('month', due_date)
+       ),
+       received AS (
+         SELECT TO_CHAR(DATE_TRUNC('month', paid_date), 'YYYY-MM') AS month,
+                SUM(amount)::NUMERIC AS amount
+         FROM payments
+         WHERE status = 'Paid'
+           AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+         GROUP BY DATE_TRUNC('month', paid_date)
+       )
+       SELECT m.month,
+              COALESCE(e.amount, 0) AS expected,
+              COALESCE(r.amount, 0) AS received
+       FROM months m
+       LEFT JOIN expected e ON m.month = e.month
+       LEFT JOIN received r ON m.month = r.month
+       ORDER BY m.month`,
+              { type: QueryTypes.SELECT },
+            ),
+        // Period comparison — agency-level, skip for scoped users
+        playerIdFilter
+          ? Promise.resolve({} as Record<string, unknown>)
+          : computePeriodComparison(comparisonPeriod),
+        // Revenue for profitability — scoped to player if applicable
+        sequelize.query<RevenueRow>(
+          `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_revenue
+       FROM payments WHERE status = 'Paid'
+         AND paid_date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'
+         ${playerPaymentClause}`,
+          { type: QueryTypes.SELECT, replacements },
+        ),
+        // Expenses — agency-level only
+        playerIdFilter
+          ? Promise.resolve([] as ExpenseTotalRow[])
+          : sequelize.query<ExpenseTotalRow>(
+              `SELECT COALESCE(SUM(amount), 0)::NUMERIC AS total_expenses
+       FROM expenses
+       WHERE date >= DATE_TRUNC('month', NOW()) - INTERVAL '12 months'`,
+              { type: QueryTypes.SELECT },
+            ),
+      ]);
+
+      const [marketValue] = marketValueRows;
+      const [commissions] = commissionsRows;
+      const [revRow] = revRows;
       const totalRevenue = Number(revRow?.total_revenue || 0);
+      const totalExpenses = Number(expRows[0]?.total_expenses || 0);
       const netProfit = totalRevenue - totalExpenses;
 
       return {

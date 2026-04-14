@@ -94,7 +94,7 @@ describe('Notification Service', () => {
 
     it('should filter by unread only', async () => {
       mockNotifFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
-      await notifService.listNotifications('user-001', { unreadOnly: true, page: 1, limit: 10 });
+      await notifService.listNotifications('user-001', { unreadOnly: 'true', page: 1, limit: 10 });
       expect(mockNotifFindAndCountAll).toHaveBeenCalled();
     });
 

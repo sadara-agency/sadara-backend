@@ -11,6 +11,10 @@ import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/finance/finance.service";
 import { createApprovalRequest } from "@modules/approvals/approval.service";
 
+// Approval thresholds for high-value invoices
+const APPROVAL_THRESHOLD_HIGH = 50_000;
+const APPROVAL_THRESHOLD_CRITICAL = 100_000;
+
 // Fire-and-forget cache invalidation helper
 function bustFinanceCache(extra: string[] = []) {
   invalidateMultiple([
@@ -43,7 +47,7 @@ export async function createInvoice(req: AuthRequest, res: Response) {
   );
   // High-value invoice → approval required
   const amount = Number(inv.totalAmount) || 0;
-  if (amount >= 50000) {
+  if (amount >= APPROVAL_THRESHOLD_HIGH) {
     createApprovalRequest({
       entityType: "payment",
       entityId: inv.id,
@@ -51,7 +55,7 @@ export async function createInvoice(req: AuthRequest, res: Response) {
       action: "approve_payment",
       requestedBy: req.user!.id,
       assignedRole: "Admin",
-      priority: amount >= 100000 ? "critical" : "high",
+      priority: amount >= APPROVAL_THRESHOLD_CRITICAL ? "critical" : "high",
     }).catch((err) =>
       logger.warn("Finance approval request failed", {
         error: (err as Error).message,

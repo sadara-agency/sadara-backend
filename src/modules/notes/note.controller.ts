@@ -4,6 +4,7 @@ import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import * as svc from "@modules/notes/note.service";
+import type { NoteQuery } from "@modules/notes/note.validation";
 
 // Notes has non-standard service signatures (role-aware list, userId on
 // update/delete), so we only reuse create from the factory and keep
@@ -23,8 +24,13 @@ const crud = createCrudController({
 });
 
 // Override list to pass user role for RBAC filtering + row-level scoping
+// req.query validated by noteQuerySchema middleware before reaching here
 export async function list(req: AuthRequest, res: Response) {
-  const result = await svc.listNotes(req.query, req.user?.role, req.user);
+  const result = await svc.listNotes(
+    req.query as unknown as NoteQuery,
+    req.user?.role,
+    req.user,
+  );
   sendPaginated(res, result.data, result.meta);
 }
 

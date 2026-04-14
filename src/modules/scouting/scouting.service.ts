@@ -13,7 +13,7 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { notifyByRole } from "@modules/notifications/notification.service";
 import { logger } from "@config/logger";
-import { AuthUser } from "@shared/types";
+import { AuthUser, ROLES, UserRole } from "@shared/types";
 import {
   buildRowScope,
   mergeScope,
@@ -285,7 +285,7 @@ export async function createScreeningCase(input: any, userId: string) {
   });
 
   // Notify Admin/Manager about new screening
-  notifyByRole(["Admin", "Manager"], {
+  notifyByRole([ROLES.ADMIN, ROLES.MANAGER], {
     type: "system",
     title: `Screening started: ${wl.prospectName}`,
     titleAr: `بدأ الفحص: ${wl.prospectNameAr || wl.prospectName}`,
@@ -345,7 +345,7 @@ export async function markPackReady(id: string, userId: string) {
   const wl = await Watchlist.findByPk(sc.watchlistId);
   const name = wl?.prospectName || sc.caseNumber;
   const nameAr = wl?.prospectNameAr || name;
-  notifyByRole(["Admin", "Manager"], {
+  notifyByRole([ROLES.ADMIN, ROLES.MANAGER], {
     type: "system",
     title: `Scouting pack ready: ${name}`,
     titleAr: `ملف الاستكشاف جاهز: ${nameAr}`,
@@ -394,7 +394,7 @@ export async function createDecision(input: any, userId: string) {
   // Notify Admin/Manager/Scout about decision
   const prospectName = (sc as any).watchlist?.prospectName || sc.caseNumber;
   const prospectNameAr = (sc as any).watchlist?.prospectNameAr || prospectName;
-  notifyByRole(["Admin", "Manager", "Scout"], {
+  notifyByRole([ROLES.ADMIN, ROLES.MANAGER, ROLES.SCOUT], {
     type: "system",
     title: `Decision: ${input.decision} — ${prospectName}`,
     titleAr: `القرار: ${input.decision === "Approved" ? "مقبول" : input.decision === "Rejected" ? "مرفوض" : "مؤجل"} — ${prospectNameAr}`,
@@ -636,7 +636,11 @@ export async function getScoutAnalytics(
   filters?: { scoutId?: string; dateFrom?: string; dateTo?: string },
   user?: AuthUser,
 ) {
-  const ANALYTICS_BYPASS = ["Admin", "Manager", "Executive"];
+  const ANALYTICS_BYPASS: UserRole[] = [
+    ROLES.ADMIN,
+    ROLES.MANAGER,
+    ROLES.EXECUTIVE,
+  ];
 
   // Scout role can only see their own analytics — force scoutId to their own id
   const resolvedScoutId =

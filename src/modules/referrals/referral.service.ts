@@ -17,6 +17,7 @@ import {
   checkRowAccess,
 } from "@shared/utils/rowScope";
 import type { AuthUser } from "@shared/types";
+import { ROLES } from "@shared/types";
 import {
   notifyByRole,
   notifyUser,
@@ -180,7 +181,7 @@ export async function createReferral(
   const typeLabel = input.referralType || "General";
 
   // Notify managers
-  notifyByRole(["Admin", "Manager"], {
+  notifyByRole([ROLES.ADMIN, ROLES.MANAGER], {
     type: "referral",
     title: `New ${typeLabel} referral: ${playerName}`,
     titleAr: `إحالة ${typeLabel} جديدة: ${playerNameAr}`,
@@ -662,7 +663,7 @@ export async function escalateReferral(
     {
       userId,
       userName: "",
-      userRole: "Manager" as any,
+      userRole: ROLES.MANAGER,
       ip: "",
     },
     `Escalated referral: ${input.escalationType} - ${input.escalationNote}`,

@@ -8,8 +8,8 @@ import * as clubService from "@modules/clubs/club.service";
 
 const crud = createCrudController({
   service: {
-    list: (query) => clubService.listClubs(query),
-    getById: (id) => clubService.getClubById(id),
+    list: (query, user) => clubService.listClubs(query, user),
+    getById: (id, user) => clubService.getClubById(id, user),
     create: (body) => clubService.createClub(body),
     update: (id, body) => clubService.updateClub(id, body),
     delete: (id) => clubService.deleteClub(id),

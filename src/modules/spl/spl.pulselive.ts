@@ -21,6 +21,8 @@ import type {
 
 const BASE_URL = "https://api.saudi-pro-league.pulselive.com";
 const COMP_ID = 72; // Roshn Saudi League
+// Update this when SPL transitions to a new season.
+// Future: move to SPL_DEFAULT_SEASON_ID env var for zero-downtime season rollover.
 const DEFAULT_SEASON_ID = 859; // 2025-26
 const REQUEST_DELAY = 500;
 const REQUEST_TIMEOUT = 15_000;

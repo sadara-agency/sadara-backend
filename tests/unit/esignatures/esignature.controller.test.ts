@@ -32,7 +32,10 @@ describe('E-Signature Controller', () => {
       (svc.createSignatureRequest as jest.Mock).mockResolvedValue({ id: 'req-1' });
       const res = mockRes();
       await controller.create(mockReq({ body: { title: 'Test' } }), res);
-      expect(svc.createSignatureRequest).toHaveBeenCalledWith({ title: 'Test' }, 'user-001');
+      expect(svc.createSignatureRequest).toHaveBeenCalledWith(
+        { title: 'Test' },
+        expect.objectContaining({ id: 'user-001', role: 'Admin' }),
+      );
       expect(res.status).toHaveBeenCalledWith(201);
     });
   });

@@ -21,6 +21,12 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
+  buildRowScope,
+  checkRowAccess,
+  mergeScope,
+} from "@shared/utils/rowScope";
+import type { AuthUser } from "@shared/types";
+import {
   CreateClubInput,
   UpdateClubInput,
   CreateContactInput,
@@ -61,13 +67,15 @@ const CLUB_AGGREGATES = [
 // ────────────────────────────────────────────────────────────
 // List Clubs (with aggregated financial data)
 // ────────────────────────────────────────────────────────────
-export async function listClubs(queryParams: any) {
+export async function listClubs(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "name",
   );
 
+  const scope = user ? await buildRowScope("clubs", user) : null;
   const where: any = { isActive: true };
+  if (scope) mergeScope(where, scope);
 
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.league) where.league = queryParams.league;
@@ -110,7 +118,7 @@ export async function listClubs(queryParams: any) {
 // ────────────────────────────────────────────────────────────
 // Get Club by ID (Full detail with contacts, players, contracts)
 // ────────────────────────────────────────────────────────────
-export async function getClubById(id: string) {
+export async function getClubById(id: string, user?: AuthUser) {
   const club = await Club.findByPk(id, {
     attributes: {
       include: CLUB_AGGREGATES,
@@ -118,6 +126,11 @@ export async function getClubById(id: string) {
   });
 
   if (!club) throw new AppError("Club not found", 404);
+
+  if (user) {
+    const allowed = await checkRowAccess("clubs", club, user);
+    if (!allowed) throw new AppError("Club not found", 404);
+  }
 
   // Fetch related entities in parallel
   // These use raw SQL because Contact/Player/Contract models

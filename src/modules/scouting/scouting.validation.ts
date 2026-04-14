@@ -88,7 +88,12 @@ export const updateScreeningSchema = z.object({
   fitAssessment: z.string().optional(),
   riskAssessment: z.string().optional(),
   medicalClearance: z.boolean().optional(),
-  baselineStats: z.record(z.any()).optional(),
+  baselineStats: z
+    .record(
+      z.string(),
+      z.union([z.number(), z.string(), z.boolean(), z.null()]).optional(),
+    )
+    .optional(),
   notes: z.string().optional(),
 });
 
