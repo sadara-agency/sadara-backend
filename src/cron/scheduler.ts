@@ -1143,5 +1143,5 @@ export async function startCronJobs() {
   // ── High-frequency ──
   schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes
 
-  logger.info("[CRON] 64 jobs scheduled ✓");
+  logger.info("[CRON] 62 jobs scheduled ✓");
 }

@@ -22,6 +22,7 @@ export type TicketType =
 
 interface TicketAttributes {
   id: string;
+  displayId: string | null;
   playerId: string;
   journeyStageId: string | null;
   title: string;
@@ -47,6 +48,7 @@ interface TicketAttributes {
 interface TicketCreationAttributes extends Optional<
   TicketAttributes,
   | "id"
+  | "displayId"
   | "journeyStageId"
   | "titleAr"
   | "description"
@@ -72,6 +74,7 @@ export class Ticket
   implements TicketAttributes
 {
   declare id: string;
+  declare displayId: string | null;
   declare playerId: string;
   declare journeyStageId: string | null;
   declare title: string;
@@ -100,6 +103,11 @@ Ticket.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
+      field: "display_id",
     },
     playerId: {
       type: DataTypes.UUID,

@@ -33,9 +33,6 @@ const mockOfferUpdate = jest.fn();
 const mockReferralFindAll = jest.fn();
 const mockReferralCount = jest.fn();
 const mockReferralUpdate = jest.fn();
-const mockClearanceFindAll = jest.fn();
-const mockClearanceCount = jest.fn();
-const mockClearanceUpdate = jest.fn();
 const mockEnrollmentFindAll = jest.fn();
 const mockEnrollmentCount = jest.fn();
 const mockEnrollmentUpdate = jest.fn();
@@ -134,13 +131,6 @@ jest.mock('../../../src/modules/referrals/referral.model', () => ({
     update: (...a: unknown[]) => mockReferralUpdate(...a),
   },
 }));
-jest.mock('../../../src/modules/clearances/clearance.model', () => ({
-  Clearance: {
-    findAll: (...a: unknown[]) => mockClearanceFindAll(...a),
-    count: (...a: unknown[]) => mockClearanceCount(...a),
-    update: (...a: unknown[]) => mockClearanceUpdate(...a),
-  },
-}));
 jest.mock('../../../src/modules/training/training.model', () => ({
   TrainingEnrollment: {
     findAll: (...a: unknown[]) => mockEnrollmentFindAll(...a),
@@ -204,7 +194,6 @@ describe('GDPR Service', () => {
       mockActivityFindAll.mockResolvedValue([]);
       mockOfferFindAll.mockResolvedValue([]);
       mockReferralFindAll.mockResolvedValue([]);
-      mockClearanceFindAll.mockResolvedValue([]);
       mockExtFindAll.mockResolvedValue([]);
       mockReportFindAll.mockResolvedValue([]);
 
@@ -240,7 +229,6 @@ describe('GDPR Service', () => {
       mockReferralFindAll.mockResolvedValue([{
         toJSON: () => ({ id: 'ref-001', isRestricted: true, referralType: 'Mental', triggerDesc: 'Secret', status: 'Open', priority: 'High', createdAt: new Date() }),
       }]);
-      mockClearanceFindAll.mockResolvedValue([]);
       mockExtFindAll.mockResolvedValue([]);
       mockReportFindAll.mockResolvedValue([]);
 
@@ -267,7 +255,6 @@ describe('GDPR Service', () => {
       mockValuationCount.mockResolvedValue(0);
       mockOfferCount.mockResolvedValue(0);
       mockReferralCount.mockResolvedValue(0);
-      mockClearanceCount.mockResolvedValue(0);
       mockEnrollmentCount.mockResolvedValue(0);
       mockActivityCount.mockResolvedValue(0);
       mockReportCount.mockResolvedValue(0);

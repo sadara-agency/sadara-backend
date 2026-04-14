@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, literal } from "sequelize";
 import { Task } from "@modules/tasks/task.model";
+import { generateDisplayId } from "@shared/utils/displayId";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
@@ -151,6 +152,7 @@ export async function createTask(input: CreateTaskInput, assignedBy: string) {
     input.playerId ? findOrThrow(Player, input.playerId, "Player") : null,
   ]);
 
+  const displayId = await generateDisplayId("tasks");
   const task = await Task.create({
     title: input.title,
     titleAr: input.titleAr,
@@ -164,6 +166,7 @@ export async function createTask(input: CreateTaskInput, assignedBy: string) {
     contractId: input.contractId,
     dueDate: input.dueDate,
     notes: input.notes,
+    displayId,
   });
 
   // Re-fetch with associations for the response

@@ -6,6 +6,7 @@ import type { UserRole } from "@shared/types";
 // ── Attribute interfaces ──
 interface TaskAttributes {
   id: string;
+  displayId: string | null;
   title: string;
   titleAr: string | null;
   description: string | null;
@@ -33,6 +34,7 @@ interface TaskAttributes {
 interface TaskCreationAttributes extends Optional<
   TaskAttributes,
   | "id"
+  | "displayId"
   | "titleAr"
   | "description"
   | "descriptionHtml"
@@ -61,6 +63,7 @@ export class Task
   implements TaskAttributes
 {
   declare id: string;
+  declare displayId: string | null;
   declare title: string;
   declare titleAr: string | null;
   declare description: string | null;
@@ -99,6 +102,11 @@ Task.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
+      field: "display_id",
     },
     title: {
       type: DataTypes.STRING(500),

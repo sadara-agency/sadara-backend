@@ -10,6 +10,9 @@ const ENTITY_PREFIX: Record<string, string> = {
   referrals: "TKT",
   invoices: "INV",
   sessions: "SES",
+  tickets: "TCK",
+  tasks: "TSK",
+  injuries: "INJ",
 };
 
 /**

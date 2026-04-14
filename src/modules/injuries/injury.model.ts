@@ -11,6 +11,7 @@ export type InjuryCause = "Training" | "Match" | "NonFootball" | "Unknown";
 
 interface InjuryAttributes {
   id: string;
+  displayId: string | null;
   playerId: string;
   matchId?: string | null;
   // Core
@@ -52,6 +53,7 @@ interface InjuryAttributes {
 interface InjuryCreation extends Optional<
   InjuryAttributes,
   | "id"
+  | "displayId"
   | "severity"
   | "cause"
   | "status"
@@ -66,6 +68,7 @@ export class Injury
   implements InjuryAttributes
 {
   declare id: string;
+  declare displayId: string | null;
   declare playerId: string;
   declare matchId: string | null;
   declare injuryType: string;
@@ -104,6 +107,11 @@ Injury.init(
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true,
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      unique: true,
+      field: "display_id",
     },
     playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
     matchId: { type: DataTypes.UUID, field: "match_id" },
