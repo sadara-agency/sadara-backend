@@ -1,5 +1,6 @@
 /// <reference types="jest" />
 import { mockOffer, mockPlayer, mockClub, mockContract, mockModelInstance } from '../../setup/test-helpers';
+import type { OfferQuery } from '../../../src/modules/offers/offer.validation';
 
 // ── Mock dependencies ──
 const mockFindAndCountAll = jest.fn();
@@ -95,7 +96,7 @@ describe('Offer Service', () => {
         rows: [mockModelInstance(mockOffer())],
       });
 
-      const result = await offerService.listOffers({ page: 1, limit: 10 });
+      const result = await offerService.listOffers({ page: 1, limit: 10 } as unknown as OfferQuery);
 
       expect(result.data).toHaveLength(1);
       expect(result.meta.total).toBe(1);
@@ -104,7 +105,7 @@ describe('Offer Service', () => {
     it('should filter by status', async () => {
       mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
 
-      await offerService.listOffers({ status: 'New', page: 1, limit: 10 });
+      await offerService.listOffers({ status: 'New', page: 1, limit: 10 } as unknown as OfferQuery);
 
       expect(mockFindAndCountAll).toHaveBeenCalled();
     });
@@ -112,7 +113,7 @@ describe('Offer Service', () => {
     it('should apply search filter', async () => {
       mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
 
-      await offerService.listOffers({ search: 'Salem', page: 1, limit: 10 });
+      await offerService.listOffers({ search: 'Salem', page: 1, limit: 10 } as unknown as OfferQuery);
 
       expect(mockFindAndCountAll).toHaveBeenCalled();
     });

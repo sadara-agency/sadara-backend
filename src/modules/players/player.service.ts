@@ -174,6 +174,7 @@ async function getPlayerCounts(playerId: string): Promise<PlayerCounts> {
 // Step 1: Fetch base player data with lightweight attributes (no heavy subqueries)
 // Step 2: Batch-load stats for all returned player IDs in a single query
 // Step 3: Merge stats into player objects
+
 export async function listPlayers(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,

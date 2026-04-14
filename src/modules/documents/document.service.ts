@@ -20,6 +20,7 @@ import {
   mergeScope,
   checkRowAccess,
 } from "@shared/utils/rowScope";
+import { DocumentQuery } from "@modules/documents/document.validation";
 
 const USER_ATTRS = ["id", "fullName"] as const;
 
@@ -156,7 +157,7 @@ const SENSITIVE_DOC_TYPES_BY_ROLE: Record<string, string[]> = {
 // ── List ──
 
 export async function listDocuments(
-  queryParams: any,
+  queryParams: DocumentQuery,
   userRole?: string,
   user?: AuthUser,
 ) {

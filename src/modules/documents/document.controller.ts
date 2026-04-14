@@ -10,6 +10,7 @@ import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
 import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import * as svc from "@modules/documents/document.service";
+import type { DocumentQuery } from "@modules/documents/document.validation";
 
 // Documents list takes req.user?.role for RBAC, so we override list.
 // Upload is custom (multipart/form-data).
@@ -28,8 +29,13 @@ const crud = createCrudController({
 });
 
 // Override list to pass user role for RBAC filtering + row-level scoping
+// req.query validated by documentQuerySchema middleware before reaching here
 export async function list(req: AuthRequest, res: Response) {
-  const r = await svc.listDocuments(req.query, req.user?.role, req.user);
+  const r = await svc.listDocuments(
+    req.query as unknown as DocumentQuery,
+    req.user?.role,
+    req.user,
+  );
   sendPaginated(res, r.data, r.meta);
 }
 

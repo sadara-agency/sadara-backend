@@ -4,6 +4,7 @@
 // regression test.
 // ─────────────────────────────────────────────────────────────
 import { mockContract, mockModelInstance, mockPlayer, mockClub } from '../../setup/test-helpers';
+import type { ContractQuery } from '../../../src/modules/contracts/contract.validation';
 
 // ── Mock Sequelize and models ──
 const mockFindAndCountAll = jest.fn();
@@ -104,7 +105,7 @@ describe('Contract Service', () => {
         rows: contracts,
       });
 
-      const result = await contractService.listContracts({ page: 1, limit: 10 });
+      const result = await contractService.listContracts({ page: 1, limit: 10 } as unknown as ContractQuery);
 
       expect(result).toHaveProperty('data');
       expect(result).toHaveProperty('meta');
@@ -115,7 +116,7 @@ describe('Contract Service', () => {
     it('should filter by status', async () => {
       mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
 
-      await contractService.listContracts({ status: 'Active' });
+      await contractService.listContracts({ status: 'Active' } as unknown as ContractQuery);
 
       expect(mockFindAndCountAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -127,7 +128,7 @@ describe('Contract Service', () => {
     it('should filter by playerId', async () => {
       mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
 
-      await contractService.listContracts({ playerId: 'player-001' });
+      await contractService.listContracts({ playerId: 'player-001' } as unknown as ContractQuery);
 
       expect(mockFindAndCountAll).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -147,7 +148,7 @@ describe('Contract Service', () => {
 
       // This payload would break the old literal() approach
       const maliciousSearch = "'; DROP TABLE contracts; --";
-      await contractService.listContracts({ search: maliciousSearch });
+      await contractService.listContracts({ search: maliciousSearch } as unknown as ContractQuery);
 
       // Verify the call was made (didn't crash) and used safe patterns
       expect(mockFindAndCountAll).toHaveBeenCalledTimes(1);
@@ -162,7 +163,7 @@ describe('Contract Service', () => {
     it('should search with safe pattern when search term provided', async () => {
       mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
 
-      await contractService.listContracts({ search: 'Salem' });
+      await contractService.listContracts({ search: 'Salem' } as unknown as ContractQuery);
 
       expect(mockFindAndCountAll).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -24,10 +24,11 @@ import {
   generateOfferAcceptedTask,
 } from "@modules/offers/offerAutoTasks";
 import { generateDisplayId } from "@shared/utils/displayId";
+import { OfferQuery } from "@modules/offers/offer.validation";
 
 // ── List Offers ──
 
-export async function listOffers(queryParams: any, user?: AuthUser) {
+export async function listOffers(queryParams: OfferQuery, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "createdAt",

@@ -14,6 +14,7 @@ import { sequelize } from "@config/database";
 import type {
   CreateEventInput,
   UpdateEventInput,
+  EventQuery,
 } from "@modules/calendar/event.validation";
 
 // ── Shared includes ──
@@ -50,7 +51,7 @@ const EVENT_INCLUDES = [
 ];
 
 // ── List Events ──
-export async function listEvents(queryParams: any) {
+export async function listEvents(queryParams: EventQuery) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
     "start_date",
