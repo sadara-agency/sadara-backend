@@ -100,8 +100,12 @@ export async function createSocialPost(
   data: CreateSocialPostInput,
   userId: string,
 ) {
+  // Bilingual fallback: DB column `title` is NOT NULL. Users may submit only
+  // Arabic (RTL mode) or only English — coalesce the missing side.
+  const title = data.title?.trim() || data.titleAr?.trim() || "";
   const post = await SocialPost.create({
     ...data,
+    title,
     scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
     createdBy: userId,
   });
@@ -118,10 +122,20 @@ export async function updateSocialPost(
   if (post.status === "published" || post.status === "archived") {
     throw new AppError("Cannot edit a published or archived post", 400);
   }
-  await post.update({
+
+  // Bilingual fallback for NOT NULL title column.
+  const patch: Record<string, unknown> = {
     ...data,
     scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
-  });
+  };
+  if ("title" in data || "titleAr" in data) {
+    const next = "title" in data ? data.title : post.title;
+    const nextAr = "titleAr" in data ? data.titleAr : post.titleAr;
+    const resolved = next?.trim() || nextAr?.trim() || "";
+    if (resolved) patch.title = resolved;
+  }
+
+  await post.update(patch);
   return getSocialPostById(id);
 }
 

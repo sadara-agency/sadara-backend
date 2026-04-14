@@ -10,6 +10,7 @@ import { logger } from "@config/logger";
 import { createCrudController } from "@shared/utils/crudController";
 import * as svc from "@modules/matches/match.service";
 import { generateAutoTasks } from "@modules/matches/matchAutoTasks";
+import { runSingleCompetition } from "@cron/engines/saudiLeagues.engine";
 
 // Matches create doesn't take userId, so we adapt.
 const crud = createCrudController({
@@ -36,6 +37,22 @@ export async function upcoming(req: AuthRequest, res: Response) {
   const limit = Number(req.query.limit) || 10;
   const matches = await svc.getUpcomingMatches(days, limit);
   sendSuccess(res, matches);
+}
+
+export async function syncMatches(req: AuthRequest, res: Response) {
+  const { competitionId, season } = req.body as {
+    competitionId: string;
+    season?: string;
+  };
+  const result = await runSingleCompetition(competitionId, season);
+  await logAudit(
+    "UPDATE",
+    "matches",
+    competitionId,
+    buildAuditContext(req.user!, req.ip),
+    `Manual SAFF+ sync: ${result.upserted} upserted, ${result.unmapped} unmapped, ${result.errors.length} errors`,
+  );
+  sendSuccess(res, result, "Sync complete");
 }
 
 export async function updateScore(req: AuthRequest, res: Response) {

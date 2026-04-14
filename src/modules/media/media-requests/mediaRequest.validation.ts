@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-// ── Create Media Request ──
+// ── Base (shared shape for create + update) ──
 
-export const createMediaRequestSchema = z.object({
-  journalistName: z.string().min(1).max(255),
+const mediaRequestBaseSchema = z.object({
+  journalistName: z.string().max(255).optional(),
   journalistNameAr: z.string().max(255).optional(),
-  outlet: z.string().min(1).max(255),
+  outlet: z.string().max(255).optional(),
   outletAr: z.string().max(255).optional(),
   journalistEmail: z.string().email().optional(),
   journalistPhone: z.string().max(100).optional(),
@@ -18,7 +18,7 @@ export const createMediaRequestSchema = z.object({
       "other",
     ])
     .default("interview"),
-  subject: z.string().min(1).max(500),
+  subject: z.string().max(500).optional(),
   subjectAr: z.string().max(500).optional(),
   description: z.string().max(2000).optional(),
   descriptionAr: z.string().max(2000).optional(),
@@ -33,9 +33,26 @@ export const createMediaRequestSchema = z.object({
   mediaContactId: z.string().uuid().optional(),
 });
 
+// ── Create Media Request ──
+// Requires at least one language for journalist name, outlet, and subject.
+
+export const createMediaRequestSchema = mediaRequestBaseSchema
+  .refine((d) => !!(d.journalistName?.trim() || d.journalistNameAr?.trim()), {
+    message: "Journalist name is required (English or Arabic)",
+    path: ["journalistName"],
+  })
+  .refine((d) => !!(d.outlet?.trim() || d.outletAr?.trim()), {
+    message: "Outlet is required (English or Arabic)",
+    path: ["outlet"],
+  })
+  .refine((d) => !!(d.subject?.trim() || d.subjectAr?.trim()), {
+    message: "Subject is required (English or Arabic)",
+    path: ["subject"],
+  });
+
 // ── Update Media Request ──
 
-export const updateMediaRequestSchema = createMediaRequestSchema.partial();
+export const updateMediaRequestSchema = mediaRequestBaseSchema.partial();
 
 // ── Update Status ──
 

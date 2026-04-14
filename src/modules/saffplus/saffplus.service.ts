@@ -76,6 +76,7 @@ function normalizeFixture(match: SaffPlusMatch): NormalizedFixture {
     awayTeamNameAr: match.awayTeamNameAr || match.awayTeamName || "",
     homeScore: match.homeScore ?? null,
     awayScore: match.awayScore ?? null,
+    status: match.status,
     stadium: match.stadium || "",
     city: match.city || "",
   };
@@ -348,6 +349,15 @@ export async function syncCompetitionMatches(
   }
 
   const clubCache = new Map<string, string | null>();
+  const saffDebug = process.env.SAFF_DEBUG === "1";
+  if (saffDebug && rawFixtures.length > 0) {
+    logger.info(
+      `[SAFF+ DEBUG] First raw fixture for ${slug}: ${JSON.stringify(rawFixtures[0])}`,
+    );
+  }
+
+  const now = Date.now();
+  const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
 
   for (const fixture of rawFixtures) {
     try {
@@ -366,25 +376,56 @@ export async function syncCompetitionMatches(
 
       if (!homeClubId || !awayClubId) result.unmapped++;
 
-      const status =
-        fixture.status === "finished" || fixture.status === "completed"
-          ? ("completed" as const)
-          : fixture.status === "live"
-            ? ("live" as const)
-            : ("upcoming" as const);
+      const rawStatus = fixture.status?.toLowerCase();
+      const homeScore = fixture.homeScore ?? null;
+      const awayScore = fixture.awayScore ?? null;
+      const matchDate = fixture.date ? new Date(fixture.date) : new Date();
+      const matchTime = matchDate.getTime();
+
+      // Primary: explicit status from provider
+      let status: "completed" | "live" | "upcoming" =
+        rawStatus === "finished" ||
+        rawStatus === "completed" ||
+        rawStatus === "ft" ||
+        rawStatus === "full_time"
+          ? "completed"
+          : rawStatus === "live" ||
+              rawStatus === "in_progress" ||
+              rawStatus === "1h" ||
+              rawStatus === "2h" ||
+              rawStatus === "ht"
+            ? "live"
+            : rawStatus === "scheduled" ||
+                rawStatus === "upcoming" ||
+                rawStatus === "ns"
+              ? "upcoming"
+              : // Fallback inference when provider status is missing/unknown
+                homeScore != null && awayScore != null
+                ? "completed"
+                : matchTime < now - TWO_HOURS_MS
+                  ? "completed"
+                  : matchTime < now + TWO_HOURS_MS
+                    ? "live"
+                    : "upcoming";
+
+      if (status === "completed" && (homeScore == null || awayScore == null)) {
+        logger.warn(
+          `[SAFF+] completed fixture missing scores: ${externalMatchId} (rawStatus=${fixture.status ?? "null"})`,
+        );
+      }
 
       const matchValues = {
         providerSource: "saffplus",
         externalMatchId,
         competitionId,
         season,
-        matchDate: fixture.date ? new Date(fixture.date) : new Date(),
+        matchDate,
         homeClubId,
         awayClubId,
         homeTeamName: fixture.homeTeamName || null,
         awayTeamName: fixture.awayTeamName || null,
-        homeScore: fixture.homeScore ?? null,
-        awayScore: fixture.awayScore ?? null,
+        homeScore,
+        awayScore,
         venue: fixture.stadium ?? null,
         status,
         round: fixture.week != null ? `Week ${fixture.week}` : null,

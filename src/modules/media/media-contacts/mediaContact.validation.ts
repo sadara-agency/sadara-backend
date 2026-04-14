@@ -1,11 +1,11 @@
 import { z } from "zod";
 
-// ── Create Media Contact ──
+// ── Base (shared shape for create + update) ──
 
-export const createMediaContactSchema = z.object({
-  name: z.string().min(1).max(255),
+const mediaContactBaseSchema = z.object({
+  name: z.string().max(255).optional(),
   nameAr: z.string().max(255).optional(),
-  outlet: z.string().min(1).max(255),
+  outlet: z.string().max(255).optional(),
   outletAr: z.string().max(255).optional(),
   email: z.string().email().optional(),
   phone: z.string().max(100).optional(),
@@ -13,9 +13,22 @@ export const createMediaContactSchema = z.object({
   notes: z.string().optional(),
 });
 
+// ── Create Media Contact ──
+// Requires at least one language for name and outlet.
+
+export const createMediaContactSchema = mediaContactBaseSchema
+  .refine((d) => !!(d.name?.trim() || d.nameAr?.trim()), {
+    message: "Name is required (English or Arabic)",
+    path: ["name"],
+  })
+  .refine((d) => !!(d.outlet?.trim() || d.outletAr?.trim()), {
+    message: "Outlet is required (English or Arabic)",
+    path: ["outlet"],
+  });
+
 // ── Update Media Contact ──
 
-export const updateMediaContactSchema = createMediaContactSchema.partial();
+export const updateMediaContactSchema = mediaContactBaseSchema.partial();
 
 // ── Query ──
 
