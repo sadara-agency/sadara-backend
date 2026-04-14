@@ -557,7 +557,7 @@ export async function createValuation(input: CreateValuationInput) {
 // ══════════════════════════════════════════
 
 // Roles that see company-wide financial data; all others are scoped to their own player record
-const FINANCE_BYPASS_ROLES = [
+const FINANCE_BYPASS_ROLES: UserRole[] = [
   ROLES.ADMIN,
   ROLES.MANAGER,
   ROLES.EXECUTIVE,

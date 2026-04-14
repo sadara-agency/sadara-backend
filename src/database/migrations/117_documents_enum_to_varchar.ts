@@ -1,88 +1,45 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 /**
  * Convert three ENUM columns in the documents table to VARCHAR(50).
  * CLAUDE.md mandates VARCHAR(50) for enum-like fields — Zod handles validation.
- * Existing data is preserved; PostgreSQL casts ENUM values to text transparently.
+ * Uses raw SQL because queryInterface.changeColumn is not available in this
+ * project's Umzug setup. PostgreSQL casts ENUM values to text transparently.
  */
 export async function up(queryInterface: QueryInterface) {
-  // entity_type: ENUM → VARCHAR(50)
-  await queryInterface.changeColumn("documents", "entity_type", {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  });
-
-  // type: ENUM → VARCHAR(50)
-  await queryInterface.changeColumn("documents", "type", {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    defaultValue: "Other",
-  });
-
-  // status: ENUM → VARCHAR(50)
-  await queryInterface.changeColumn("documents", "status", {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    defaultValue: "Active",
-  });
+  await queryInterface.sequelize.query(`
+    ALTER TABLE documents
+      ALTER COLUMN entity_type TYPE VARCHAR(50) USING entity_type::text,
+      ALTER COLUMN type        TYPE VARCHAR(50) USING type::text,
+      ALTER COLUMN status      TYPE VARCHAR(50) USING status::text;
+  `);
 
   // Drop the now-orphaned PostgreSQL ENUM types created by Sequelize
-  await queryInterface.sequelize.query(
-    `DO $$ BEGIN
-       IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_entity_type') THEN
-         DROP TYPE "enum_documents_entity_type";
-       END IF;
-       IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_type') THEN
-         DROP TYPE "enum_documents_type";
-       END IF;
-       IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_status') THEN
-         DROP TYPE "enum_documents_status";
-       END IF;
-     END $$;`,
-  );
+  await queryInterface.sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_entity_type') THEN
+        DROP TYPE "enum_documents_entity_type";
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_type') THEN
+        DROP TYPE "enum_documents_type";
+      END IF;
+      IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_documents_status') THEN
+        DROP TYPE "enum_documents_status";
+      END IF;
+    END $$;
+  `);
 }
 
 export async function down(queryInterface: QueryInterface) {
-  // Restore entity_type ENUM
-  await queryInterface.sequelize.query(
-    `CREATE TYPE "enum_documents_entity_type" AS ENUM ('Player', 'Contract', 'Match', 'Injury', 'Club', 'Offer')`,
-  );
-  await queryInterface.changeColumn("documents", "entity_type", {
-    type: DataTypes.ENUM(
-      "Player",
-      "Contract",
-      "Match",
-      "Injury",
-      "Club",
-      "Offer",
-    ) as any,
-    allowNull: true,
-  });
+  // Restore ENUM types and cast values back
+  await queryInterface.sequelize.query(`
+    CREATE TYPE "enum_documents_entity_type" AS ENUM ('Player', 'Contract', 'Match', 'Injury', 'Club', 'Offer');
+    CREATE TYPE "enum_documents_type"        AS ENUM ('Contract', 'Passport', 'Medical', 'ID', 'Agreement', 'Other');
+    CREATE TYPE "enum_documents_status"      AS ENUM ('Active', 'Valid', 'Pending', 'Expired');
 
-  // Restore type ENUM
-  await queryInterface.sequelize.query(
-    `CREATE TYPE "enum_documents_type" AS ENUM ('Contract', 'Passport', 'Medical', 'ID', 'Agreement', 'Other')`,
-  );
-  await queryInterface.changeColumn("documents", "type", {
-    type: DataTypes.ENUM(
-      "Contract",
-      "Passport",
-      "Medical",
-      "ID",
-      "Agreement",
-      "Other",
-    ) as any,
-    allowNull: false,
-    defaultValue: "Other",
-  });
-
-  // Restore status ENUM
-  await queryInterface.sequelize.query(
-    `CREATE TYPE "enum_documents_status" AS ENUM ('Active', 'Valid', 'Pending', 'Expired')`,
-  );
-  await queryInterface.changeColumn("documents", "status", {
-    type: DataTypes.ENUM("Active", "Valid", "Pending", "Expired") as any,
-    allowNull: false,
-    defaultValue: "Active",
-  });
+    ALTER TABLE documents
+      ALTER COLUMN entity_type TYPE "enum_documents_entity_type" USING entity_type::"enum_documents_entity_type",
+      ALTER COLUMN type        TYPE "enum_documents_type"        USING type::"enum_documents_type",
+      ALTER COLUMN status      TYPE "enum_documents_status"      USING status::"enum_documents_status";
+  `);
 }

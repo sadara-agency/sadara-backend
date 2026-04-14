@@ -636,7 +636,11 @@ export async function getScoutAnalytics(
   filters?: { scoutId?: string; dateFrom?: string; dateTo?: string },
   user?: AuthUser,
 ) {
-  const ANALYTICS_BYPASS = [ROLES.ADMIN, ROLES.MANAGER, ROLES.EXECUTIVE];
+  const ANALYTICS_BYPASS: UserRole[] = [
+    ROLES.ADMIN,
+    ROLES.MANAGER,
+    ROLES.EXECUTIVE,
+  ];
 
   // Scout role can only see their own analytics — force scoutId to their own id
   const resolvedScoutId =
