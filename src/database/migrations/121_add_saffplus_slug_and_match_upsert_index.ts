@@ -1,4 +1,4 @@
-import { QueryInterface, DataTypes, Op } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 /**
  * Migration 121
@@ -8,6 +8,9 @@ import { QueryInterface, DataTypes, Op } from "sequelize";
  *
  * 2. Add partial unique index on `matches(provider_source, external_match_id)`
  *    to support idempotent upserts from SAFF and SAFF+ scrapers.
+ *
+ * Both steps use IF NOT EXISTS / DO NOTHING guards so the migration is safe to
+ * re-run after a partial failure.
  */
 
 export async function up({
@@ -15,24 +18,27 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  // 1. saffplus_slug column on competitions
-  await queryInterface.addColumn("competitions", "saffplus_slug", {
-    type: DataTypes.STRING(120),
-    allowNull: true,
-    unique: true,
-  });
+  // 1. saffplus_slug column on competitions — idempotent
+  await queryInterface.sequelize.query(`
+    ALTER TABLE competitions
+      ADD COLUMN IF NOT EXISTS saffplus_slug VARCHAR(120) UNIQUE;
+  `);
 
-  // 2. Partial unique index on matches (provider_source, external_match_id)
-  //    Only applies when external_match_id is not null — avoids index bloat for manual matches.
-  await queryInterface.addIndex(
-    "matches",
-    ["provider_source", "external_match_id"],
-    {
-      unique: true,
-      where: { external_match_id: { [Op.ne]: null } },
-      name: "idx_matches_provider_external_unique",
-    },
-  );
+  // 2. Partial unique index on matches — idempotent via DO NOTHING on existing index name
+  await queryInterface.sequelize.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1 FROM pg_indexes
+        WHERE indexname = 'idx_matches_provider_external_unique'
+      ) THEN
+        CREATE UNIQUE INDEX idx_matches_provider_external_unique
+          ON matches (provider_source, external_match_id)
+          WHERE external_match_id IS NOT NULL;
+      END IF;
+    END
+    $$;
+  `);
 }
 
 export async function down({
@@ -40,9 +46,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  await queryInterface.removeIndex(
-    "matches",
-    "idx_matches_provider_external_unique",
+  await queryInterface.sequelize.query(
+    `DROP INDEX IF EXISTS idx_matches_provider_external_unique;`,
   );
-  await queryInterface.removeColumn("competitions", "saffplus_slug");
+  await queryInterface.sequelize.query(`
+    ALTER TABLE competitions DROP COLUMN IF EXISTS saffplus_slug;
+  `);
 }
