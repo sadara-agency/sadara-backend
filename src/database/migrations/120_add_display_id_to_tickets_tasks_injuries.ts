@@ -1,27 +1,15 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
-  await queryInterface.addColumn("tickets", "display_id", {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    unique: true,
-  });
-
-  await queryInterface.addColumn("tasks", "display_id", {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    unique: true,
-  });
-
-  await queryInterface.addColumn("injuries", "display_id", {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    unique: true,
-  });
+  await queryInterface.sequelize.query(`
+    ALTER TABLE tickets  ADD COLUMN IF NOT EXISTS display_id VARCHAR(20) UNIQUE;
+    ALTER TABLE tasks    ADD COLUMN IF NOT EXISTS display_id VARCHAR(20) UNIQUE;
+    ALTER TABLE injuries ADD COLUMN IF NOT EXISTS display_id VARCHAR(20) UNIQUE;
+  `);
 }
 
 export async function down({
