@@ -10,7 +10,11 @@ import { QueryInterface, DataTypes, Op } from "sequelize";
  *    to support idempotent upserts from SAFF and SAFF+ scrapers.
  */
 
-export async function up(queryInterface: QueryInterface): Promise<void> {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   // 1. saffplus_slug column on competitions
   await queryInterface.addColumn("competitions", "saffplus_slug", {
     type: DataTypes.STRING(120),
@@ -31,7 +35,11 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   );
 }
 
-export async function down(queryInterface: QueryInterface): Promise<void> {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.removeIndex(
     "matches",
     "idx_matches_provider_external_unique",

@@ -177,7 +177,11 @@ const COMPETITIONS: CompetitionSeed[] = [
   },
 ];
 
-export async function up(queryInterface: QueryInterface): Promise<void> {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   const now = new Date();
 
   for (const comp of COMPETITIONS) {
@@ -240,7 +244,11 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   }
 }
 
-export async function down(queryInterface: QueryInterface): Promise<void> {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   const names = COMPETITIONS.map((c) => c.name);
   await queryInterface.sequelize.query(
     `DELETE FROM competitions WHERE name IN (:names) AND country = 'Saudi Arabia'`,
