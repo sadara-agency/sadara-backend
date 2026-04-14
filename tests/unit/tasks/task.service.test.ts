@@ -27,6 +27,10 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('TSK-26-0001'),
+}));
+
 import * as taskService from '../../../src/modules/tasks/task.service';
 
 describe('Task Service', () => {
