@@ -43,15 +43,16 @@ export const logger = winston.createLogger({
   defaultMeta: { service: "sadara-api" },
   transports: [
     new winston.transports.Console(),
-    // In production, also log errors to a file
+    // Error log written in both dev and prod so we can capture crash details
+    new winston.transports.File({
+      filename: "logs/error.log",
+      level: "error",
+      maxsize: 5_242_880, // 5MB
+      maxFiles: 5,
+    }),
+    // Full combined log only in production
     ...(isProduction
       ? [
-          new winston.transports.File({
-            filename: "logs/error.log",
-            level: "error",
-            maxsize: 5_242_880, // 5MB
-            maxFiles: 5,
-          }),
           new winston.transports.File({
             filename: "logs/combined.log",
             maxsize: 5_242_880,

@@ -11,6 +11,7 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import { sequelize } from "@config/database";
+import { logger } from "@config/logger";
 import type {
   CreateEventInput,
   UpdateEventInput,
@@ -271,12 +272,15 @@ export async function listAggregatedEvents(
   userId: string,
   userRole: string,
 ) {
+  const now = new Date();
   const startRange = queryParams.startDate
     ? new Date(queryParams.startDate)
-    : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+    : new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const endRange = queryParams.endDate
     ? new Date(queryParams.endDate)
-    : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+    : new Date(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59),
+      );
 
   const startStr = startRange.toISOString().split("T")[0];
   const endStr = endRange.toISOString().split("T")[0];
@@ -304,124 +308,149 @@ export async function listAggregatedEvents(
     (!wantSource || wantSource === "referral") &&
     (!wantType || wantType === "ReferralDeadline");
 
-  const [calendarResult, sessions, matches, tasks, referrals] =
-    await Promise.all([
-      // 1. Calendar events
-      queryCalendar
-        ? CalendarEvent.findAll({
-            where: {
-              startDate: { [Op.lte]: endRange },
-              endDate: { [Op.gte]: startRange },
-              ...(wantType &&
-              ![
-                "Session",
-                "Match",
-                "TaskDeadline",
-                "ReferralDeadline",
-              ].includes(wantType)
-                ? { eventType: wantType }
-                : {}),
-            },
-            include: EVENT_INCLUDES,
-            order: [["startDate", "asc"]],
-          })
-        : Promise.resolve([]),
+  // Use allSettled so a single failing source degrades gracefully instead
+  // of collapsing the whole aggregation to zero results.
+  const settledResults = await Promise.allSettled([
+    // 1. Calendar events
+    queryCalendar
+      ? CalendarEvent.findAll({
+          where: {
+            startDate: { [Op.lte]: endRange },
+            endDate: { [Op.gte]: startRange },
+            ...(wantType &&
+            !["Session", "Match", "TaskDeadline", "ReferralDeadline"].includes(
+              wantType,
+            )
+              ? { eventType: wantType }
+              : {}),
+          },
+          include: EVENT_INCLUDES,
+          order: [["startDate", "asc"]],
+        })
+      : Promise.resolve([]),
 
-      // 2. Sessions
-      querySessions
-        ? Session.findAll({
-            where: {
-              sessionDate: { [Op.gte]: startStr, [Op.lte]: endStr },
+    // 2. Sessions
+    querySessions
+      ? Session.findAll({
+          where: {
+            sessionDate: { [Op.gte]: startStr, [Op.lte]: endStr },
+          },
+          include: [
+            { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+            {
+              model: User,
+              as: "responsible",
+              attributes: ["id", "fullName", "fullNameAr"],
             },
-            include: [
-              { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
-              {
-                model: User,
-                as: "responsible",
-                attributes: ["id", "fullName", "fullNameAr"],
-              },
-            ],
-          })
-        : Promise.resolve([]),
+          ],
+        })
+      : Promise.resolve([]),
 
-      // 3. Matches
-      queryMatches
-        ? Match.findAll({
-            where: {
-              matchDate: { [Op.gte]: startRange, [Op.lte]: endRange },
-              status: { [Op.ne]: "cancelled" },
-            },
-            attributes: [
-              "id",
-              "matchDate",
-              "venue",
-              "status",
-              "competition",
-              "round",
-              "homeTeamName",
-              "awayTeamName",
-            ],
-          })
-        : Promise.resolve([]),
+    // 3. Matches
+    queryMatches
+      ? Match.findAll({
+          where: {
+            matchDate: { [Op.gte]: startRange, [Op.lte]: endRange },
+            status: { [Op.ne]: "cancelled" },
+          },
+          attributes: [
+            "id",
+            "matchDate",
+            "venue",
+            "status",
+            "competition",
+            "round",
+            "homeTeamName",
+            "awayTeamName",
+          ],
+        })
+      : Promise.resolve([]),
 
-      // 4. Tasks (with dueDate)
-      queryTasks
-        ? Task.findAll({
-            where: {
-              dueDate: {
-                [Op.ne]: null as unknown as string,
-                [Op.gte]: startStr,
-                [Op.lte]: endStr,
-              },
-              status: { [Op.notIn]: ["Completed", "Canceled"] },
+    // 4. Tasks (with dueDate)
+    queryTasks
+      ? Task.findAll({
+          where: {
+            dueDate: {
+              [Op.ne]: null as unknown as string,
+              [Op.gte]: startStr,
+              [Op.lte]: endStr,
             },
-            include: [
-              { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
-              {
-                model: User,
-                as: "assignee",
-                attributes: ["id", "fullName", "fullNameAr"],
-              },
-            ],
-          })
-        : Promise.resolve([]),
+            status: { [Op.notIn]: ["Completed", "Canceled"] },
+          },
+          include: [
+            { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+            {
+              model: User,
+              as: "assignee",
+              attributes: ["id", "fullName", "fullNameAr"],
+            },
+          ],
+        })
+      : Promise.resolve([]),
 
-      // 5. Referrals (with dueDate, not Closed)
-      queryReferrals
-        ? Referral.findAll({
-            where: {
-              dueDate: {
-                [Op.ne]: null as unknown as string,
-                [Op.gte]: startStr,
-                [Op.lte]: endStr,
-              },
-              status: { [Op.ne]: "Closed" },
-              // Access control: non-privileged users only see unrestricted
-              ...(["Admin", "Manager", "Executive"].includes(userRole)
-                ? {}
-                : {
-                    [Op.or]: [
-                      { isRestricted: false },
-                      { restrictedTo: { [Op.contains]: [userId] } },
-                      { assignedTo: userId },
-                      { createdBy: userId },
-                    ],
-                  }),
+    // 5. Referrals (with dueDate, not Closed)
+    queryReferrals
+      ? Referral.findAll({
+          where: {
+            dueDate: {
+              [Op.ne]: null as unknown as string,
+              [Op.gte]: startStr,
+              [Op.lte]: endStr,
             },
-            include: [
-              { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
-              {
-                model: User,
-                as: "assignee",
-                attributes: ["id", "fullName", "fullNameAr"],
-              },
-            ],
-          })
-        : Promise.resolve([]),
-    ]);
+            status: { [Op.ne]: "Closed" },
+            // Access control: non-privileged users only see unrestricted
+            ...(["Admin", "Manager", "Executive"].includes(userRole)
+              ? {}
+              : {
+                  [Op.or]: [
+                    { isRestricted: false },
+                    { restrictedTo: { [Op.contains]: [userId] } },
+                    { assignedTo: userId },
+                    { createdBy: userId },
+                  ],
+                }),
+          },
+          include: [
+            { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+            {
+              model: User,
+              as: "assignee",
+              attributes: ["id", "fullName", "fullNameAr"],
+            },
+          ],
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const sourceNames = [
+    "calendar",
+    "sessions",
+    "matches",
+    "tasks",
+    "referrals",
+  ] as const;
+  const unwrap = <T>(idx: number): T[] => {
+    const r = settledResults[idx];
+    if (r.status === "fulfilled") return r.value as T[];
+    logger.error("listAggregatedEvents: source query failed", {
+      source: sourceNames[idx],
+      wantType,
+      wantSource,
+      startRange,
+      endRange,
+      err: r.reason instanceof Error ? r.reason.message : String(r.reason),
+      stack: r.reason instanceof Error ? r.reason.stack : undefined,
+    });
+    return [];
+  };
+  const calendarResult = unwrap<any>(0);
+  const sessions = unwrap<any>(1);
+  const matches = unwrap<any>(2);
+  const tasks = unwrap<any>(3);
+  const referrals = unwrap<any>(4);
 
   // ── Transform into unified CalendarItem[] ──
-  const items: CalendarItem[] = [];
+  let items: CalendarItem[] = [];
 
   // Calendar events
   for (const ev of calendarResult as any[]) {
@@ -634,7 +663,10 @@ export async function listAggregatedEvents(
   }
 
   // ── Media items (scheduled media requests & social posts) ──
-  if (!wantSource || wantSource === "media_request") {
+  if (
+    (!wantSource || wantSource === "media_request") &&
+    (!wantType || wantType === "Meeting")
+  ) {
     try {
       const { MediaRequest } =
         await import("@modules/media/media-requests/mediaRequest.model");
@@ -687,7 +719,10 @@ export async function listAggregatedEvents(
     }
   }
 
-  if (!wantSource || wantSource === "social_post") {
+  if (
+    (!wantSource || wantSource === "social_post") &&
+    (!wantType || wantType === "Custom")
+  ) {
     try {
       const { SocialPost } =
         await import("@modules/media/social-media/socialPost.model");
@@ -743,6 +778,11 @@ export async function listAggregatedEvents(
     } catch {
       // Media module may not be fully loaded — skip silently
     }
+  }
+
+  // Defensive: ensure no source leaked past its eventType gate
+  if (wantType) {
+    items = items.filter((i) => i.eventType === wantType);
   }
 
   // ── Search filter ──

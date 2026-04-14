@@ -189,6 +189,26 @@
  *     responses:
  *       200: { description: Player wellness profile }
  *       404: { description: Profile not found }
+ *   patch:
+ *     tags: [Wellness]
+ *     summary: Update a player's wellness profile (Coach/Admin)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: playerId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               heightCm: { type: number }
+ *               targetWeightKg: { type: number }
+ *               activityLevel: { type: string }
+ *     responses:
+ *       200: { description: Profile updated }
  *
  * /wellness/profiles:
  *   post:
@@ -210,28 +230,6 @@
  *               dietaryRestrictions: { type: array, items: { type: string } }
  *     responses:
  *       201: { description: Profile created }
- *
- * /wellness/profiles/{playerId}:
- *   patch:
- *     tags: [Wellness]
- *     summary: Update a player's wellness profile (Coach/Admin)
- *     security: [{ bearerAuth: [] }]
- *     parameters:
- *       - in: path
- *         name: playerId
- *         required: true
- *         schema: { type: string, format: uuid }
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               heightCm: { type: number }
- *               targetWeightKg: { type: number }
- *               activityLevel: { type: string }
- *     responses:
- *       200: { description: Profile updated }
  *
  * /wellness/profiles/{playerId}/macros:
  *   get:
