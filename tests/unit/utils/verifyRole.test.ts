@@ -106,6 +106,23 @@ describe('verifyUserRole — cache miss', () => {
   });
 });
 
+// ─── cacheSet failure is swallowed ─────────────────────────────────────────
+
+describe('verifyUserRole — cache write failure', () => {
+  it('resolves and logs a warning when cacheSet rejects', async () => {
+    mockCacheGet.mockResolvedValue(null);
+    mockQuery.mockResolvedValue([{ role: 'Admin', is_active: true }]);
+    mockCacheSet.mockRejectedValue(new Error('Redis write failed'));
+
+    await expect(verifyUserRole('user-8', 'Admin')).resolves.toBeUndefined();
+
+    expect(mockWarn).toHaveBeenCalledWith(
+      'Role verify cache write failed',
+      expect.objectContaining({ userId: 'user-8', error: 'Redis write failed' }),
+    );
+  });
+});
+
 // ─── cache read error falls through to DB ──────────────────────────────────
 
 describe('verifyUserRole — cache read error', () => {
