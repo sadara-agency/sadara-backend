@@ -67,6 +67,7 @@ import packageRoutes from "@modules/packages/package.routes";
 import tacticalRoutes from "@modules/tactical/tactical.routes";
 import mentalRoutes from "@modules/mental/mental.routes";
 import videoRoutes from "@modules/video/video.routes";
+import saudiLeaguesRoutes from "@modules/saudiLeagues/saudiLeagues.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -279,6 +280,7 @@ app.use("/api/v1/injuries", injuryRoutes);
 app.use("/api/v1/training", trainingRoutes);
 app.use("/api/v1/saff", saffRoutes);
 app.use("/api/v1/saffplus", saffPlusRoutes);
+app.use("/api/v1/saudi-leagues", saudiLeaguesRoutes);
 app.use("/api/v1/notifications", notificationRoutes);
 app.use("/api/v1/cron", cronRoutes);
 app.use("/api/v1/portal", portalRoutes);

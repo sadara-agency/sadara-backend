@@ -97,6 +97,11 @@ import {
 } from "./engines/spl.intelligence.engine";
 // E-signature expiry is lazy-loaded to avoid model init in test context
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
+import {
+  runTopTier,
+  runYouthTier,
+  runLiveTier,
+} from "./engines/saudiLeagues.engine";
 
 /**
  * Get today's date as YYYY-MM-DD in the server's local timezone.
@@ -1143,5 +1148,13 @@ export async function startCronJobs() {
   // ── High-frequency ──
   schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes
 
-  logger.info("[CRON] 62 jobs scheduled ✓");
+  // ── Saudi Leagues Engine ──
+  registerJob("saudi-leagues-top-tier", runTopTier);
+  registerJob("saudi-leagues-youth-tier", runYouthTier);
+  registerJob("saudi-leagues-live", runLiveTier);
+  schedule("0 */2 * * *", "saudi-leagues-top-tier"); // Every 2h (matchday-aware)
+  schedule("0 3 * * *", "saudi-leagues-youth-tier"); // Daily 03:00
+  schedule("*/15 * * * *", "saudi-leagues-live"); // Every 15 min (fast exit if no live)
+
+  logger.info("[CRON] 68 jobs scheduled ✓");
 }
