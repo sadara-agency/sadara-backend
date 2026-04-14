@@ -3,10 +3,14 @@ import { QueryInterface } from "sequelize";
 /**
  * Convert three ENUM columns in the documents table to VARCHAR(50).
  * CLAUDE.md mandates VARCHAR(50) for enum-like fields — Zod handles validation.
- * Uses raw SQL because queryInterface.changeColumn is not available in this
- * project's Umzug setup. PostgreSQL casts ENUM values to text transparently.
+ * Uses raw SQL; queryInterface.changeColumn is not available in this project's
+ * Umzug setup. PostgreSQL casts ENUM values to text transparently.
  */
-export async function up(queryInterface: QueryInterface) {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.sequelize.query(`
     ALTER TABLE documents
       ALTER COLUMN entity_type TYPE VARCHAR(50) USING entity_type::text,
@@ -30,8 +34,11 @@ export async function up(queryInterface: QueryInterface) {
   `);
 }
 
-export async function down(queryInterface: QueryInterface) {
-  // Restore ENUM types and cast values back
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.sequelize.query(`
     CREATE TYPE "enum_documents_entity_type" AS ENUM ('Player', 'Contract', 'Match', 'Injury', 'Club', 'Offer');
     CREATE TYPE "enum_documents_type"        AS ENUM ('Contract', 'Passport', 'Medical', 'ID', 'Agreement', 'Other');
