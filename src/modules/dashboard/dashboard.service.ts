@@ -159,7 +159,7 @@ export async function getTopPlayers(limit = 5) {
   return cacheOrFetch(
     buildCacheKey(`${P}:top-players`, { limit }),
     async () => {
-      const rows = await sequelize.query(
+      const rows = await sequelize.query<Record<string, unknown>>(
         `SELECT
            p.id,
            p.first_name,
@@ -193,7 +193,7 @@ export async function getTopPlayers(limit = 5) {
          LIMIT $1`,
         { bind: [limit], type: QueryTypes.SELECT },
       );
-      return (rows as any[]).map((r) => camelCaseKeys(r));
+      return rows.map(camelCaseKeys);
     },
     CacheTTL.MEDIUM,
   );
@@ -586,9 +586,10 @@ export async function getInjuryTrends(months = 6) {
           });
         }
         const entry = map.get(r.month)!;
-        const key = r.severity.toLowerCase() as keyof typeof entry;
-        if (key in entry && key !== "month") {
-          (entry as any)[key] = r.count;
+        type SeverityKey = Exclude<keyof typeof entry, "month">;
+        const key = r.severity.toLowerCase() as SeverityKey;
+        if (key in entry) {
+          entry[key] = r.count;
         }
       }
       return Array.from(map.values());
@@ -1078,7 +1079,7 @@ export async function getSportsManagerOverview() {
         ),
 
         // 5. Open referrals count
-        sequelize.query(
+        sequelize.query<{ count: number }>(
           `SELECT COUNT(*)::int AS count
            FROM referrals
            WHERE status IN ('Open', 'InProgress', 'Waiting')`,
@@ -1152,7 +1153,7 @@ export async function getSportsManagerOverview() {
         thisWeekSessions,
         incompleteSessions,
         lateSessions,
-        openReferralsCount: (openReferralsCount as any[])[0]?.count ?? 0,
+        openReferralsCount: openReferralsCount[0]?.count ?? 0,
         referralsByResponsible,
         criticalReferrals,
         waitingReferrals,
