@@ -3,6 +3,7 @@ import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AppError } from "@middleware/errorHandler";
 import { AuthRequest } from "@shared/types";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as portalService from "@modules/portal/portal.service";
 import * as documentService from "@modules/documents/document.service";
 
@@ -67,6 +68,9 @@ export async function signMyContract(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Player signed contract via portal (method: ${action})`,
   );
+  invalidateMultiple([CachePrefix.PORTAL, CachePrefix.CONTRACTS]).catch(
+    () => {},
+  );
   sendSuccess(res, contract, "Contract signed successfully");
 }
 
@@ -122,6 +126,7 @@ export async function uploadMyDocument(req: AuthRequest, res: Response) {
     `Player uploaded document: ${req.body.name || req.file.originalname} (${docType})`,
   );
 
+  invalidateMultiple([CachePrefix.PORTAL]).catch(() => {});
   sendCreated(res, doc, "Document uploaded successfully");
 }
 
@@ -136,6 +141,7 @@ export async function updateMyProfile(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Player updated profile via portal",
   );
+  invalidateMultiple([CachePrefix.PORTAL]).catch(() => {});
   sendSuccess(res, data, "Profile updated");
 }
 
@@ -173,6 +179,7 @@ export async function updatePlayerAccount(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Updated player account: ${data.email}`,
   );
+  invalidateMultiple([CachePrefix.PORTAL]).catch(() => {});
   sendSuccess(res, data, "Player account updated");
 }
 
@@ -188,6 +195,7 @@ export async function deletePlayerAccount(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Deleted player account",
   );
+  invalidateMultiple([CachePrefix.PORTAL]).catch(() => {});
   sendSuccess(res, data, "Player account deleted");
 }
 

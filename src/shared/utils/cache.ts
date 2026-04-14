@@ -26,6 +26,7 @@ export const CachePrefix = {
   GATES: "gates",
   REFERRALS: "referrals",
   REPORTS: "reports",
+  PORTAL: "portal",
   CLEARANCES: "clearances",
   WELLNESS: "wellness",
   SESSIONS: "sessions",

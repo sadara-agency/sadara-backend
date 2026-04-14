@@ -9,6 +9,7 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/reports/report.service";
 import { generateReportXlsx } from "@modules/reports/report.xlsx";
 import { generatePredefinedReportPdf } from "@modules/reports/report.predefined-pdf";
@@ -25,25 +26,31 @@ export async function getById(req: AuthRequest, res: Response) {
 
 export async function create(req: AuthRequest, res: Response) {
   const report = await svc.createReport(req.body, req.user!.id);
-  await logAudit(
-    "CREATE",
-    "technical_reports",
-    report.id,
-    buildAuditContext(req.user!, req.ip),
-    `Technical report generated for player ${req.body.playerId}`,
-  );
+  Promise.all([
+    invalidateMultiple([CachePrefix.REPORTS]),
+    logAudit(
+      "CREATE",
+      "technical_reports",
+      report.id,
+      buildAuditContext(req.user!, req.ip),
+      `Technical report generated for player ${req.body.playerId}`,
+    ),
+  ]).catch(() => {});
   sendCreated(res, report);
 }
 
 export async function remove(req: AuthRequest, res: Response) {
   const result = await svc.deleteReport(req.params.id);
-  await logAudit(
-    "DELETE",
-    "technical_reports",
-    result.id,
-    buildAuditContext(req.user!, req.ip),
-    "Technical report deleted",
-  );
+  Promise.all([
+    invalidateMultiple([CachePrefix.REPORTS]),
+    logAudit(
+      "DELETE",
+      "technical_reports",
+      result.id,
+      buildAuditContext(req.user!, req.ip),
+      "Technical report deleted",
+    ),
+  ]).catch(() => {});
   sendSuccess(res, result, "Report deleted");
 }
 

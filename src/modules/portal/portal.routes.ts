@@ -5,6 +5,8 @@ import { authenticate, authorize } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CachePrefix, CacheTTL } from "@shared/utils/cache";
 import * as portalController from "@modules/portal/portal.controller";
 import * as authController from "@modules/auth/auth.controller";
 
@@ -50,6 +52,7 @@ router.use(dynamicFieldAccess("portal"));
 router.get(
   "/me",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyProfile),
 );
 router.patch(
@@ -79,16 +82,19 @@ router.post(
 router.get(
   "/injuries",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMyInjuries),
 );
 router.get(
   "/schedule",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMySchedule),
 );
 router.get(
   "/documents",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyDocuments),
 );
 router.post(
@@ -101,6 +107,7 @@ router.post(
 router.get(
   "/contracts",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyContracts),
 );
 router.post(
@@ -112,11 +119,13 @@ router.post(
 router.get(
   "/development",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyDevelopment),
 );
 router.get(
   "/stats",
   authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyStats),
 );
 
@@ -132,6 +141,7 @@ router.post(
 router.get(
   "/accounts",
   authorize("Admin", "Manager"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM),
   asyncHandler(portalController.listPlayerAccounts),
 );
 router.patch(
