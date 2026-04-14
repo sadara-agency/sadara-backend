@@ -1,5 +1,4 @@
 import { QueryInterface } from "sequelize";
-import { v4 as uuidv4 } from "uuid";
 
 /**
  * Migration 122
@@ -222,12 +221,11 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
             agency_value, is_active, saff_id, sportmonks_league_id, saffplus_slug,
             created_at, updated_at)
          VALUES
-           (:id, :name, :nameAr, 'Saudi Arabia', :type, :tier, :ageGroup, 'men', 'outdoor',
+           (gen_random_uuid(), :name, :nameAr, 'Saudi Arabia', :type, :tier, :ageGroup, 'men', 'outdoor',
             :agencyValue, true, NULL, NULL, NULL,
             :now, :now)`,
         {
           replacements: {
-            id: uuidv4(),
             name: comp.name,
             nameAr: comp.nameAr,
             type: comp.type,
