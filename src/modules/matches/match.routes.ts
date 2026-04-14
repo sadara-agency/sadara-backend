@@ -17,6 +17,7 @@ import {
   playerMatchesQuerySchema,
   createMatchAnalysisSchema,
   updateMatchAnalysisSchema,
+  syncMatchesSchema,
 } from "@modules/matches/match.validation";
 import * as ctrl from "@modules/matches/match.controller";
 import analyticsRoutes from "@modules/matches/analytics/matchAnalytics.routes";
@@ -42,6 +43,39 @@ router.get(
   authorizeModule("matches", "read"),
   dynamicFieldAccess("matches"),
   asyncHandler(ctrl.upcoming),
+);
+
+// ── Manual SAFF+ Sync (admin trigger) ──
+/**
+ * @swagger
+ * /matches/sync:
+ *   post:
+ *     summary: Manually trigger SAFF+ sync for a competition
+ *     tags: [Matches]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [competitionId]
+ *             properties:
+ *               competitionId:
+ *                 type: string
+ *                 format: uuid
+ *               season:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Sync result with upserted / skipped / unmapped counts
+ */
+router.post(
+  "/sync",
+  authorizeModule("matches", "update"),
+  validate(syncMatchesSchema),
+  asyncHandler(ctrl.syncMatches),
 );
 
 // ── Player-centric routes (for player profile) ──

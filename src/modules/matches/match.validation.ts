@@ -149,6 +149,15 @@ export const playerMatchesQuerySchema = z.object({
   to: z.string().optional(),
 });
 
+// ── Manual Sync ──
+
+export const syncMatchesSchema = z.object({
+  competitionId: z.string().uuid("Invalid competition ID"),
+  season: z.string().max(20).optional(),
+});
+
+export type SyncMatchesInput = z.infer<typeof syncMatchesSchema>;
+
 // ── Match Analysis ──
 
 export const createMatchAnalysisSchema = z.object({

@@ -172,8 +172,19 @@ export async function createMediaRequest(
     }
   }
 
+  // Bilingual fallback: users may submit only Arabic (RTL mode) or only
+  // English. The DB columns journalist_name/outlet/subject are NOT NULL, so
+  // coalesce the missing side from its counterpart before insert.
+  const journalistName =
+    fillData.journalistName?.trim() || fillData.journalistNameAr?.trim() || "";
+  const outlet = fillData.outlet?.trim() || fillData.outletAr?.trim() || "";
+  const subject = fillData.subject?.trim() || fillData.subjectAr?.trim() || "";
+
   return MediaRequest.create({
     ...fillData,
+    journalistName,
+    outlet,
+    subject,
     deadline: fillData.deadline ? new Date(fillData.deadline) : undefined,
     scheduledAt: fillData.scheduledAt
       ? new Date(fillData.scheduledAt)
@@ -190,8 +201,31 @@ export async function updateMediaRequest(
 ) {
   const request = await MediaRequest.findByPk(id);
   if (!request) throw new AppError("Media request not found", 404);
+
+  // Bilingual fallback: if caller clears the English side but provides (or
+  // retains) an Arabic value, keep the NOT NULL columns populated.
+  const coalesce = (
+    primaryKey: "journalistName" | "outlet" | "subject",
+    secondaryKey: "journalistNameAr" | "outletAr" | "subjectAr",
+  ) => {
+    if (!(primaryKey in data) && !(secondaryKey in data)) return undefined;
+    const nextPrimary =
+      primaryKey in data ? data[primaryKey] : request[primaryKey];
+    const nextSecondary =
+      secondaryKey in data ? data[secondaryKey] : request[secondaryKey];
+    const resolved = nextPrimary?.trim() || nextSecondary?.trim() || "";
+    return resolved || undefined;
+  };
+
+  const journalistName = coalesce("journalistName", "journalistNameAr");
+  const outlet = coalesce("outlet", "outletAr");
+  const subject = coalesce("subject", "subjectAr");
+
   return request.update({
     ...data,
+    ...(journalistName !== undefined && { journalistName }),
+    ...(outlet !== undefined && { outlet }),
+    ...(subject !== undefined && { subject }),
     deadline: data.deadline ? new Date(data.deadline) : undefined,
     scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : undefined,
   });

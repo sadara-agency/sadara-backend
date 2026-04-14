@@ -133,6 +133,7 @@ export interface NormalizedFixture {
   awayTeamNameAr: string;
   homeScore: number | null;
   awayScore: number | null;
+  status?: string;
   stadium: string;
   city: string;
 }
