@@ -43,6 +43,27 @@ export interface PaginationQuery {
   search?: string;
 }
 
+// ── Role constants — use these instead of hardcoded strings ──
+export const ROLES = {
+  ADMIN: "Admin",
+  MANAGER: "Manager",
+  ANALYST: "Analyst",
+  SCOUT: "Scout",
+  PLAYER: "Player",
+  LEGAL: "Legal",
+  FINANCE: "Finance",
+  COACH: "Coach",
+  SKILL_COACH: "SkillCoach",
+  TACTICAL_COACH: "TacticalCoach",
+  FITNESS_COACH: "FitnessCoach",
+  NUTRITION_SPECIALIST: "NutritionSpecialist",
+  GYM_COACH: "GymCoach",
+  MEDIA: "Media",
+  EXECUTIVE: "Executive",
+  GOALKEEPER_COACH: "GoalkeeperCoach",
+  MENTAL_COACH: "MentalCoach",
+} as const satisfies Record<string, UserRole>;
+
 // ── Authenticated Request (Express-specific, stays in backend) ──
 export interface AuthUser {
   id: string;

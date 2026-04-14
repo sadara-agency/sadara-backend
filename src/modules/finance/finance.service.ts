@@ -26,7 +26,7 @@ import {
   CacheTTL,
   CachePrefix,
 } from "@shared/utils/cache";
-import { AuthUser } from "@shared/types";
+import { AuthUser, ROLES } from "@shared/types";
 import {
   buildRowScope,
   mergeScope,
@@ -558,11 +558,11 @@ export async function createValuation(input: CreateValuationInput) {
 
 // Roles that see company-wide financial data; all others are scoped to their own player record
 const FINANCE_BYPASS_ROLES = [
-  "Admin",
-  "Manager",
-  "Executive",
-  "Finance",
-  "Legal",
+  ROLES.ADMIN,
+  ROLES.MANAGER,
+  ROLES.EXECUTIVE,
+  ROLES.FINANCE,
+  ROLES.LEGAL,
 ];
 
 export async function getFinancialDashboard(
