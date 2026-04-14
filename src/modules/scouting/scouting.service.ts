@@ -13,7 +13,7 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { notifyByRole } from "@modules/notifications/notification.service";
 import { logger } from "@config/logger";
-import { AuthUser, ROLES } from "@shared/types";
+import { AuthUser, ROLES, UserRole } from "@shared/types";
 import {
   buildRowScope,
   mergeScope,

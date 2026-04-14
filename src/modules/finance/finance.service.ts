@@ -26,7 +26,7 @@ import {
   CacheTTL,
   CachePrefix,
 } from "@shared/utils/cache";
-import { AuthUser, ROLES } from "@shared/types";
+import { AuthUser, ROLES, UserRole } from "@shared/types";
 import {
   buildRowScope,
   mergeScope,
