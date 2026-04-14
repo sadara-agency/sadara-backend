@@ -7,6 +7,7 @@ import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { hasPermission } from "@modules/permissions/permission.service";
 import { AuthUser } from "@shared/types";
 import { buildRowScope, mergeScope } from "@shared/utils/rowScope";
+import { NoteQuery } from "@modules/notes/note.validation";
 
 /**
  * Maps NoteOwnerType to the backend permission module name.
@@ -23,7 +24,7 @@ const OWNER_TYPE_TO_MODULE: Record<string, string> = {
 };
 
 export async function listNotes(
-  queryParams: any,
+  queryParams: NoteQuery,
   userRole?: string,
   user?: AuthUser,
 ) {

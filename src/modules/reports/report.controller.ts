@@ -11,11 +11,13 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/reports/report.service";
+import type { ReportQuery } from "@modules/reports/report.validation";
 import { generateReportXlsx } from "@modules/reports/report.xlsx";
 import { generatePredefinedReportPdf } from "@modules/reports/report.predefined-pdf";
 
 export async function list(req: AuthRequest, res: Response) {
-  const result = await svc.listReports(req.query);
+  // req.query validated by reportQuerySchema middleware before reaching here
+  const result = await svc.listReports(req.query as unknown as ReportQuery);
   sendPaginated(res, result.data, result.meta);
 }
 
