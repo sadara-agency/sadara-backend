@@ -27,6 +27,7 @@ const config: Config = {
     '!src/**/*.swagger.ts',
     '!src/**/*.swagger.docs.ts',
     '!src/cron/**',
+    '!src/database/migrations/**',
     '!src/database/csv-import/**',
     '!src/database/reset-for-production.ts',
     '!src/database/validate-production.ts',

@@ -27,7 +27,6 @@ import {
   Expense,
 } from "@modules/finance/finance.model";
 import { Document } from "@modules/documents/document.model";
-import { Clearance } from "@modules/clearances/clearance.model";
 import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
 import {
   TrainingActivity,
@@ -276,13 +275,6 @@ export function setupAssociations() {
 
   // Document (polymorphic via entityType + entityId — no direct FK associations)
   Document.belongsTo(User, { foreignKey: "uploadedBy", as: "uploader" });
-
-  // Clearance
-  Contract.hasMany(Clearance, { foreignKey: "contractId", as: "clearances" });
-  Clearance.belongsTo(Contract, { foreignKey: "contractId", as: "contract" });
-  Player.hasMany(Clearance, { foreignKey: "playerId", as: "clearances" });
-  Clearance.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  Clearance.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 
   // ── Injuries (NO duplicates) ──
   Player.hasMany(Injury, { foreignKey: "playerId", as: "injuries" });

@@ -48,7 +48,6 @@ import {
   checkStaleGates,
   checkChecklistFollowups,
   checkGateProgressionNudge,
-  checkClearanceFollowups,
 } from "./engines/gate.engine";
 import {
   checkWatchlistStaleness,
@@ -923,7 +922,6 @@ registerJob("gate-auto-verify", runGateAutoVerification);
 registerJob("gate-stale-detector", checkStaleGates);
 registerJob("checklist-follow-up", checkChecklistFollowups);
 registerJob("gate-progression-nudge", checkGateProgressionNudge);
-registerJob("clearance-follow-up", checkClearanceFollowups);
 
 // ── Scouting Pipeline Engine ──
 registerJob("watchlist-staleness", checkWatchlistStaleness);
@@ -1086,7 +1084,6 @@ export async function startCronJobs() {
 
   // ── Mid-morning: analytics (9:00–9:50 AM) ──
   schedule("0 9 * * *", "consecutive-low-ratings"); // 9:00 AM  (was 10:00)
-  schedule("10 9 * * *", "clearance-follow-up"); // 9:10 AM  (was 10:00)
   schedule("20 9 * * *", "document-expiry-tasks"); // 9:20 AM  (was 10:00)
   schedule("30 9 * * *", "gate-stale-detector"); // 9:30 AM  (was 10:30)
   schedule("40 9 * * *", "draft-contract-stale"); // 9:40 AM  (was 11:30)
@@ -1146,5 +1143,5 @@ export async function startCronJobs() {
   // ── High-frequency ──
   schedule("*/10 * * * *", "calendar-reminders"); // Every 10 minutes
 
-  logger.info("[CRON] 64 jobs scheduled ✓");
+  logger.info("[CRON] 62 jobs scheduled ✓");
 }

@@ -1,6 +1,7 @@
 import { Op, WhereOptions } from "sequelize";
 import { Ticket } from "./ticket.model";
 import { AppError } from "@middleware/errorHandler";
+import { generateDisplayId } from "@shared/utils/displayId";
 import type {
   CreateTicketInput,
   UpdateTicketInput,
@@ -65,7 +66,8 @@ export async function getTicketById(id: string) {
 
 // ── Create ──
 export async function createTicket(body: CreateTicketInput, userId: string) {
-  return Ticket.create({ ...body, createdBy: userId });
+  const displayId = await generateDisplayId("tickets");
+  return Ticket.create({ ...body, displayId, createdBy: userId });
 }
 
 // ── Update ──

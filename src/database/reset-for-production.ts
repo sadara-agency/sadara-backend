@@ -57,7 +57,6 @@ const DATA_TABLES = [
   "approval_requests",
   "approval_chain_template_steps",
   "approval_chain_templates",
-  "clearances",
   "ledger_entries",
   "expenses",
   "valuations",

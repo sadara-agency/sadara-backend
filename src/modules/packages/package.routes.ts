@@ -27,4 +27,7 @@ router.patch(
 );
 router.get("/modules", authorize("Admin"), packageController.getModules);
 
+router.get("/tiers", authorize("Admin"), packageController.getTiers);
+router.patch("/tiers/:code", authorize("Admin"), packageController.updateTier);
+
 export default router;

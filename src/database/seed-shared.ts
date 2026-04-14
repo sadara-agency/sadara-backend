@@ -485,12 +485,6 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("spl-sync", ["Manager"], { canRead: true, canCreate: true }),
 
-  ...forRoles(
-    "clearances",
-    ["Admin", "Manager", "Legal", "Finance", "Executive"],
-    { canRead: true },
-  ),
-
   ...forRoles("wellness", ["Admin", "Manager"], {
     canCreate: true,
     canRead: true,

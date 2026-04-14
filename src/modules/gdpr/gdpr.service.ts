@@ -22,7 +22,6 @@ import {
 } from "@modules/finance/finance.model";
 import { Offer } from "@modules/offers/offer.model";
 import { Referral } from "@modules/referrals/referral.model";
-import { Clearance } from "@modules/clearances/clearance.model";
 import {
   TrainingEnrollment,
   TrainingActivity,
@@ -62,7 +61,6 @@ export async function exportPlayerData(playerId: string) {
     activities,
     offers,
     referrals,
-    clearances,
     externalMappings,
     technicalReports,
   ] = await Promise.all([
@@ -117,7 +115,6 @@ export async function exportPlayerData(playerId: string) {
     TrainingActivity.findAll({ where: { playerId } }),
     Offer.findAll({ where: { playerId } }),
     Referral.findAll({ where: { playerId } }),
-    Clearance.findAll({ where: { playerId } }),
     ExternalProviderMapping.findAll({ where: { playerId } }),
     TechnicalReport.findAll({
       where: { playerId },
@@ -181,7 +178,6 @@ export async function exportPlayerData(playerId: string) {
     },
     offers: offers.map((o: any) => o.toJSON()),
     referrals: referralData,
-    clearances: clearances.map((c: any) => c.toJSON()),
     externalProviders: externalMappings.map((m: any) => m.toJSON()),
     technicalReports: technicalReports.map((r: any) => r.toJSON()),
   };
@@ -432,26 +428,7 @@ export async function anonymizePlayerData(
       anonymizedTables.push("referrals");
     }
 
-    // 9. Clearances
-    const clrCount = await Clearance.count({
-      where: { playerId },
-      ...txOpts,
-    });
-    if (clrCount > 0) {
-      await Clearance.update(
-        {
-          reason: "[REDACTED]",
-          outstandingDetails: null,
-          declarationText: null,
-          signedDocumentUrl: null,
-          notes: null,
-        } as any,
-        { where: { playerId }, ...txOpts },
-      );
-      anonymizedTables.push("clearances");
-    }
-
-    // 10. Training
+    // 9. Training
     const enrollCount = await TrainingEnrollment.count({
       where: { playerId },
       ...txOpts,

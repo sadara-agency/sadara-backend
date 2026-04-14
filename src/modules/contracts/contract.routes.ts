@@ -13,7 +13,6 @@ import {
 } from "@modules/contracts/contract.validation";
 import * as contractController from "@modules/contracts/contract.controller";
 import * as templateController from "@modules/contracts/contractTemplate.controller";
-import { getByContract as getClearancesByContract } from "@modules/clearances/clearance.controller";
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
@@ -70,11 +69,6 @@ router.post(
 );
 
 // ── Sub-resource routes MUST come before /:id ──
-router.get(
-  "/:contractId/clearances",
-  authorizeModule("contracts", "read"),
-  asyncHandler(getClearancesByContract),
-);
 router.get(
   "/:id/history",
   authorizeModule("contracts", "read"),

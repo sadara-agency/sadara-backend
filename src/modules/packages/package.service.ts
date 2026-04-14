@@ -1,3 +1,4 @@
+import { Package } from "./package.model";
 import { PackageConfig } from "./packageConfig.model";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
@@ -44,7 +45,6 @@ const ALL_MODULES = [
   "social_media",
   "calendar",
   "messaging",
-  "clearances",
   "esignatures",
   "audit",
   "settings",
@@ -214,4 +214,36 @@ export async function updatePlayerPackage(
  */
 export function getAvailableModules(): string[] {
   return [...ALL_MODULES];
+}
+
+/**
+ * Get all package tier definitions (A, B, C) with names and descriptions.
+ * Results are cached for 1 hour.
+ */
+export async function getPackageTiers() {
+  return cacheOrFetch(
+    "package-tiers:all",
+    async () => {
+      const tiers = await Package.findAll({
+        where: { isActive: true },
+        order: [["code", "ASC"]],
+      });
+      return tiers.map((t) => t.toJSON());
+    },
+    3600,
+  );
+}
+
+/**
+ * Update a package tier's metadata.
+ */
+export async function updatePackageTier(
+  code: string,
+  data: { name?: string; nameAr?: string; description?: string },
+) {
+  const tier = await Package.findOne({ where: { code } });
+  if (!tier) throw new Error(`Package tier "${code}" not found`);
+  await tier.update(data);
+  await invalidateByPrefix("package-tiers");
+  return tier;
 }

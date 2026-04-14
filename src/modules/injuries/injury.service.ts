@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { generateDisplayId } from "@shared/utils/displayId";
 import { Player } from "@modules/players/player.model";
 import { Match } from "@modules/matches/match.model";
 import { AppError } from "@middleware/errorHandler";
@@ -136,8 +137,10 @@ export async function createInjury(
     await findOrThrow(Match, input.matchId, "Match");
   }
 
+  const displayId = await generateDisplayId("injuries");
+
   const injury = await transaction(async (t) => {
-    const inj = await Injury.create({ ...input, createdBy } as any, {
+    const inj = await Injury.create({ ...input, displayId, createdBy } as any, {
       transaction: t,
     });
 

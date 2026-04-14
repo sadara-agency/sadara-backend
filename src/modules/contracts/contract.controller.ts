@@ -31,35 +31,16 @@ export async function terminate(req: AuthRequest, res: Response) {
     req.user!.id,
   );
 
-  await invalidateMultiple([
-    CachePrefix.CONTRACTS,
-    CachePrefix.DASHBOARD,
-    CachePrefix.CLEARANCES,
-  ]);
+  await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
-  if (req.body.method === "clearance" && "clearance" in result) {
-    await logAudit(
-      "CREATE",
-      "clearances",
-      result.clearance.id,
-      buildAuditContext(req.user!, req.ip),
-      `Clearance created for contract — Reason: ${req.body.reason}`,
-    );
-    sendCreated(
-      res,
-      result,
-      "Clearance created — contract will terminate upon completion",
-    );
-  } else {
-    await logAudit(
-      "UPDATE",
-      "contracts",
-      req.params.id,
-      buildAuditContext(req.user!, req.ip),
-      `Contract terminated: ${(result as any).title || "Untitled"} — Reason: ${req.body.reason}`,
-    );
-    sendSuccess(res, result, "Contract terminated");
-  }
+  await logAudit(
+    "UPDATE",
+    "contracts",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    `Contract terminated: ${(result as any).title || "Untitled"} — Reason: ${req.body.reason}`,
+  );
+  sendSuccess(res, result, "Contract terminated");
 }
 
 // ── Upload Signed Contract Document ──

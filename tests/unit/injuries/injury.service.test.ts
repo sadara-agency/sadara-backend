@@ -72,6 +72,10 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('INJ-26-0001'),
+}));
+
 import * as injuryService from '../../../src/modules/injuries/injury.service';
 
 describe('Injury Service', () => {

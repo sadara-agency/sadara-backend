@@ -6,7 +6,6 @@ const KNOWN_MODULES = [
   "audit",
   "auth",
   "calendar",
-  "clearances",
   "clubs",
   "competitions",
   "contracts",

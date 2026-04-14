@@ -196,7 +196,6 @@ export function getFullAccessMap(
       "journey",
       "gates",
       "approvals",
-      "clearances",
       "spl",
       "sportmonks",
       "integrations",
