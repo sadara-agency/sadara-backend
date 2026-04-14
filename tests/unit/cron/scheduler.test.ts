@@ -137,6 +137,12 @@ jest.mock('../../../src/cron/engines/spl.intelligence.engine', () => ({
   syncCompetitionData: jest.fn(),
   cleanupExpiredInsights: jest.fn(),
 }));
+jest.mock('../../../src/cron/engines/saudiLeagues.engine', () => ({
+  runTopTier: jest.fn(),
+  runYouthTier: jest.fn(),
+  runLiveTier: jest.fn(),
+  runSingleCompetition: jest.fn(),
+}));
 
 // Mock appSettings to prevent DB call in syncDisabledJobsToRedis
 jest.mock('../../../src/shared/utils/appSettings', () => ({
