@@ -159,13 +159,30 @@ export async function runSync(
 const cronJobs: ScheduledTask[] = [];
 
 export function startSaffScheduler(): void {
-  // ARCHIVED: SAFF scraper is disabled — website returns 404 for all tournaments.
-  // Data is preserved as read-only. Competition data now lives in the `competitions` table.
-  // Sportmonks is the primary fixture data source going forward.
-  logger.info(
-    "[SAFF Scheduler] ARCHIVED — scraper disabled (SAFF website returns 404). " +
-      "Use Sportmonks for fixture data. Historical SAFF data is still available via read-only endpoints.",
-  );
+  // Re-enabled 2026-04-14: saff.com.sa verified alive. Acts as secondary source;
+  // SAFF+ and the Saudi Leagues cron engine are primary.
+  // runSync() handles 404 responses gracefully — warns and returns without throwing.
+  logger.info("[SAFF Scheduler] Starting SAFF sync scheduler...");
+
+  for (const schedule of SCHEDULES) {
+    const job = cron.schedule(schedule.cron, () => {
+      runSync(
+        schedule.agencyValues,
+        getCurrentSeason(),
+        `cron:${schedule.name}`,
+      ).catch((err) =>
+        logger.error(
+          `[SAFF Scheduler] Cron job '${schedule.name}' failed: ${(err as Error).message}`,
+        ),
+      );
+    });
+    cronJobs.push(job);
+    logger.info(
+      `[SAFF Scheduler] Scheduled: ${schedule.name} (${schedule.cron})`,
+    );
+  }
+
+  logger.info(`[SAFF Scheduler] ${cronJobs.length} cron jobs active ✓`);
 }
 
 export function stopSaffScheduler(): void {

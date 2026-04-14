@@ -29,6 +29,7 @@ interface CompetitionAttributes {
   agencyValue: AgencyValue;
   sportmonksLeagueId: number | null;
   saffId: number | null;
+  saffplusSlug: string | null;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -55,6 +56,7 @@ export class Competition
   declare agencyValue: AgencyValue;
   declare sportmonksLeagueId: number | null;
   declare saffId: number | null;
+  declare saffplusSlug: string | null;
   declare isActive: boolean;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -106,6 +108,11 @@ Competition.init(
       type: DataTypes.INTEGER,
       unique: true,
       field: "saff_id",
+    },
+    saffplusSlug: {
+      type: DataTypes.STRING(120),
+      unique: true,
+      field: "saffplus_slug",
     },
     isActive: {
       type: DataTypes.BOOLEAN,

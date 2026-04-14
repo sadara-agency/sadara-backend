@@ -258,13 +258,218 @@ export async function fetchStandings(
   return [];
 }
 
+// ── Rate-limit helper ──
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /**
- * Fetch matches — placeholder, requires competition detail page scraping.
+ * Extract all JSON-like objects from RSC flight chunks that look like match records.
+ * Looks for objects containing both home/away team fields and a date.
+ */
+function extractMatchesFromRsc(rscChunks: string[]): SaffPlusMatch[] {
+  const matches: SaffPlusMatch[] = [];
+  const seen = new Set<string>();
+
+  for (const chunk of rscChunks) {
+    // Walk the chunk looking for objects with match-like keys
+    // Pattern: "home_club" + "away_club" + date-like field, or "home_team" + "away_team"
+    const matchBlocks = chunk.matchAll(
+      /\{[^{}]*"(?:home_club|home_team)"[^{}]*"(?:away_club|away_team)"[^{}]*\}/gs,
+    );
+
+    for (const block of matchBlocks) {
+      try {
+        const obj = JSON.parse(block[0]);
+        const id =
+          obj.id ??
+          obj.uuid ??
+          obj.slug ??
+          JSON.stringify(block[0]).slice(0, 40);
+        if (seen.has(String(id))) continue;
+        seen.add(String(id));
+
+        const homeTeam =
+          obj.home_club?.name ?? obj.home_team?.name ?? obj.home_team ?? "";
+        const awayTeam =
+          obj.away_club?.name ?? obj.away_team?.name ?? obj.away_team ?? "";
+
+        if (!homeTeam || !awayTeam) continue;
+
+        matches.push({
+          id: String(id),
+          competitionId: obj.competition?.slug ?? obj.season?.competition ?? "",
+          date: obj.date ?? obj.match_date ?? obj.start_date ?? "",
+          time: obj.time ?? obj.match_time ?? undefined,
+          homeTeamId: obj.home_club?.id ?? obj.home_team?.id ?? 0,
+          homeTeamName: homeTeam,
+          homeTeamNameAr:
+            obj.home_club?.name_ar ?? obj.home_team?.name_ar ?? undefined,
+          homeTeamLogo:
+            obj.home_club?.thumbnail_url ?? obj.home_club?.logo ?? undefined,
+          awayTeamId: obj.away_club?.id ?? obj.away_team?.id ?? 0,
+          awayTeamName: awayTeam,
+          awayTeamNameAr:
+            obj.away_club?.name_ar ?? obj.away_team?.name_ar ?? undefined,
+          awayTeamLogo:
+            obj.away_club?.thumbnail_url ?? obj.away_club?.logo ?? undefined,
+          homeScore: obj.home_score ?? obj.fields?.home_score ?? null,
+          awayScore: obj.away_score ?? obj.fields?.away_score ?? null,
+          status:
+            obj.status ?? (obj.home_score != null ? "finished" : "scheduled"),
+          stadium: obj.stadium ?? obj.venue ?? obj.fields?.stadium ?? undefined,
+          week: obj.week ?? obj.round ?? undefined,
+        });
+      } catch {
+        // skip malformed blocks
+      }
+    }
+
+    // Also try a looser array extraction — SAFF+ sometimes emits match arrays
+    // as: ["match-slug-1", {...}, "match-slug-2", {...}] in flight payloads
+    const arrayMatch = chunk.match(/"matches"\s*:\s*(\[[\s\S]*?\])/);
+    if (arrayMatch) {
+      try {
+        const arr = JSON.parse(arrayMatch[1]) as Array<Record<string, unknown>>;
+        for (const item of arr) {
+          if (typeof item !== "object" || !item) continue;
+          const home =
+            ((item.home_team as Record<string, unknown>)?.name as string) ?? "";
+          const away =
+            ((item.away_team as Record<string, unknown>)?.name as string) ?? "";
+          if (!home || !away) continue;
+          const id = String(item.id ?? item.slug ?? Math.random());
+          if (seen.has(id)) continue;
+          seen.add(id);
+          matches.push({
+            id,
+            competitionId: String(
+              (item.competition as Record<string, unknown>)?.slug ?? "",
+            ),
+            date: String(item.date ?? item.match_date ?? ""),
+            homeTeamId: String(
+              (item.home_team as Record<string, unknown>)?.id ?? "",
+            ),
+            homeTeamName: home,
+            awayTeamId: String(
+              (item.away_team as Record<string, unknown>)?.id ?? "",
+            ),
+            awayTeamName: away,
+            homeScore: (item.home_score as number) ?? null,
+            awayScore: (item.away_score as number) ?? null,
+            status: String(item.status ?? "scheduled"),
+          });
+        }
+      } catch {
+        // skip
+      }
+    }
+  }
+
+  return matches;
+}
+
+/**
+ * Scrape fixture rows from a rendered HTML table (fallback when RSC parsing yields nothing).
+ */
+function extractMatchesFromHtml(html: string, slug: string): SaffPlusMatch[] {
+  const $ = cheerio.load(html);
+  const matches: SaffPlusMatch[] = [];
+
+  // Common SAFF+ / Motto fixture card selectors
+  $("[class*=fixture], [class*=match-card], [class*=game-row], table tr").each(
+    (i, el) => {
+      const cells = $(el)
+        .find("td, [class*=team]")
+        .map((_, c) => $(c).text().trim())
+        .get();
+      if (cells.length < 2) return;
+
+      // Heuristic: first non-empty cell with Arabic/Latin text = home team, last = away team
+      const teams = cells.filter((c) => c.length > 1 && !/^\d+$/.test(c));
+      if (teams.length < 2) return;
+
+      const dateEl = $(el).find("time, [class*=date], [datetime]").first();
+      const date = dateEl.attr("datetime") ?? dateEl.text().trim();
+
+      matches.push({
+        id: `${slug}-${i}`,
+        competitionId: slug,
+        date,
+        homeTeamId: 0,
+        homeTeamName: teams[0],
+        awayTeamId: 0,
+        awayTeamName: teams[teams.length - 1],
+        homeScore: null,
+        awayScore: null,
+        status: "scheduled",
+      });
+    },
+  );
+
+  return matches;
+}
+
+/**
+ * Fetch matches for a competition from SAFF+.
+ *
+ * Strategy:
+ * 1. Fetch /competitions/{slug}/fixtures (upcoming) and /competitions/{slug}/results (completed).
+ * 2. Try RSC flight payload extraction first.
+ * 3. Fall back to HTML table scraping.
+ * 4. Rate-limit: 1500 ms between requests.
  */
 export async function fetchMatches(
-  _competitionId: number | string,
+  competitionSlug: number | string,
   _season?: string,
 ): Promise<SaffPlusMatch[]> {
-  // TODO: scrape /competitions/{slug}/fixtures page
-  return [];
+  const slug = String(competitionSlug);
+  const allMatches: SaffPlusMatch[] = [];
+  const seen = new Set<string>();
+
+  const paths = [
+    `/en/competitions/${slug}/fixtures`,
+    `/en/competitions/${slug}/results`,
+    `/ar/competitions/${slug}/fixtures`,
+  ];
+
+  for (const path of paths) {
+    try {
+      const html = await fetchPage(path);
+      await sleep(1500);
+
+      const rscChunks = extractRscData(html);
+      const fromRsc = extractMatchesFromRsc(rscChunks);
+
+      if (fromRsc.length > 0) {
+        for (const m of fromRsc) {
+          if (!seen.has(String(m.id))) {
+            seen.add(String(m.id));
+            allMatches.push(m);
+          }
+        }
+      } else {
+        // RSC yielded nothing — try HTML table fallback
+        const fromHtml = extractMatchesFromHtml(html, slug);
+        for (const m of fromHtml) {
+          const key = `${m.homeTeamName}-${m.awayTeamName}-${m.date}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            allMatches.push(m);
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] fetchMatches failed for ${path}: ${(err as Error).message}`,
+      );
+      // Throttle between retried paths
+      await sleep(1500);
+    }
+  }
+
+  logger.info(
+    `[SAFF+] fetchMatches(${slug}): ${allMatches.length} fixtures found`,
+  );
+  return allMatches;
 }

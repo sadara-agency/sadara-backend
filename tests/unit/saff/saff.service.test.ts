@@ -94,6 +94,9 @@ jest.mock('../../../src/modules/saff/saff.scraper', () => ({
   scrapeBatch: jest.fn(),
   scrapeTeamLogos: jest.fn(),
 }));
+jest.mock('../../../src/modules/saff/seasonSync.model', () => ({
+  SeasonSync: { create: jest.fn(), findOne: jest.fn(), name: 'SeasonSync' },
+}));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));

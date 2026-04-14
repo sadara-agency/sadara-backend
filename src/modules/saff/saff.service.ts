@@ -18,6 +18,7 @@ import { findExistingLeagueEnrollment } from "@modules/competitions/competition.
 import { Watchlist } from "@modules/scouting/scouting.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
+import { SeasonSync } from "@modules/saff/seasonSync.model";
 import { logger } from "@config/logger";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
@@ -1419,4 +1420,113 @@ export async function getWatchlistMatches(season: string, limit: number = 20) {
   });
 
   return { fixtures: enriched };
+}
+
+// ══════════════════════════════════════════
+// PROJECT SAFF FIXTURES → MATCHES TABLE
+// ══════════════════════════════════════════
+
+/**
+ * Bridge: reads already-scraped saff_fixtures for a tournament/season and
+ * upserts them into the core `matches` table.
+ *
+ * Idempotent — keyed on (provider_source='saff', external_match_id).
+ * Backfills saff_fixtures.match_id after upsert.
+ * Writes a season_syncs audit row.
+ */
+export async function projectFixturesToMatches(
+  tournamentId: string,
+  season: string,
+): Promise<{ upserted: number; skipped: number; errors: string[] }> {
+  const result = { upserted: 0, skipped: 0, errors: [] as string[] };
+
+  // Resolve the Competition row via the SaffTournament.saffId
+  const tournament = await SaffTournament.findByPk(tournamentId);
+  if (!tournament) {
+    throw new AppError(`SAFF tournament ${tournamentId} not found`, 404);
+  }
+
+  const competition = await Competition.findOne({
+    where: { saffId: tournament.saffId },
+  });
+  // competition may be null if not yet mapped — matches still persist with null competitionId
+
+  const fixtures = await SaffFixture.findAll({
+    where: { tournamentId, season },
+  });
+
+  for (const fixture of fixtures) {
+    try {
+      const externalMatchId = `saff:${tournament.saffId}:${fixture.saffHomeTeamId}-${fixture.saffAwayTeamId}:${fixture.matchDate}`;
+
+      const matchDate = new Date(
+        `${fixture.matchDate}T${fixture.matchTime ?? "00:00"}:00Z`,
+      );
+
+      const matchValues = {
+        providerSource: "saff",
+        externalMatchId,
+        competitionId: competition?.id ?? null,
+        competition: competition ? undefined : tournament.name,
+        season,
+        matchDate,
+        homeClubId: fixture.homeClubId ?? null,
+        awayClubId: fixture.awayClubId ?? null,
+        homeTeamName: fixture.homeTeamNameEn || null,
+        awayTeamName: fixture.awayTeamNameEn || null,
+        homeScore: fixture.homeScore ?? null,
+        awayScore: fixture.awayScore ?? null,
+        venue: fixture.stadium ?? null,
+        status:
+          fixture.status === "completed"
+            ? ("completed" as const)
+            : fixture.status === "cancelled"
+              ? ("cancelled" as const)
+              : ("upcoming" as const),
+        round: fixture.week != null ? `Week ${fixture.week}` : null,
+      };
+
+      // Find existing or create
+      let match = await Match.findOne({
+        where: { providerSource: "saff", externalMatchId },
+      });
+
+      if (match) {
+        await match.update(matchValues);
+      } else {
+        match = await Match.create(matchValues);
+      }
+
+      // Backfill saff_fixtures.match_id
+      if (fixture.matchId !== match.id) {
+        await fixture.update({ matchId: match.id });
+      }
+
+      result.upserted++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(`[SAFF Bridge] Fixture ${fixture.id} failed: ${msg}`);
+      result.errors.push(msg);
+      result.skipped++;
+    }
+  }
+
+  // Write audit row
+  await SeasonSync.upsert({
+    source: "saff",
+    competition: tournament.name,
+    competitionId: competition?.id ?? null,
+    season,
+    dataType: "fixtures",
+    status: result.errors.length === 0 ? "completed" : "failed",
+    syncedAt: new Date(),
+    recordCount: result.upserted,
+    errorMessage: result.errors.length > 0 ? result.errors.join("; ") : null,
+  } as any);
+
+  logger.info(
+    `[SAFF Bridge] ${tournament.name} ${season}: ${result.upserted} upserted, ${result.skipped} skipped`,
+  );
+
+  return result;
 }

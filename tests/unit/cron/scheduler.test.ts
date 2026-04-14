@@ -137,6 +137,12 @@ jest.mock('../../../src/cron/engines/spl.intelligence.engine', () => ({
   syncCompetitionData: jest.fn(),
   cleanupExpiredInsights: jest.fn(),
 }));
+jest.mock('../../../src/cron/engines/saudiLeagues.engine', () => ({
+  runTopTier: jest.fn(),
+  runYouthTier: jest.fn(),
+  runLiveTier: jest.fn(),
+  runSingleCompetition: jest.fn(),
+}));
 
 // Mock appSettings to prevent DB call in syncDisabledJobsToRedis
 jest.mock('../../../src/shared/utils/appSettings', () => ({
@@ -246,10 +252,10 @@ describe('Cron Scheduler', () => {
   });
 
   describe('startCronJobs', () => {
-    it('should schedule all 62 cron jobs', async () => {
+    it('should schedule all 65 cron jobs', async () => {
       await startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(62);
+      expect(cron.schedule).toHaveBeenCalledTimes(65);
     });
 
     it('should log initialization', async () => {
