@@ -26,8 +26,6 @@ export interface GateOnboardingConfig {
   checklistOverdueDays: number; // days an assigned item can sit incomplete (default 7)
   // gate-progression-nudge
   nudgeCompletionPct: number; // % complete to trigger "almost done" nudge (default 80)
-  // clearance-follow-up
-  clearanceStaleDays: number; // days a Processing clearance can sit idle (default 7)
 }
 
 const DEFAULT_CONFIG: GateOnboardingConfig = {
@@ -36,7 +34,6 @@ const DEFAULT_CONFIG: GateOnboardingConfig = {
   staleGateDays: 14,
   checklistOverdueDays: 7,
   nudgeCompletionPct: 80,
-  clearanceStaleDays: 7,
 };
 
 let _config: GateOnboardingConfig = { ...DEFAULT_CONFIG };
@@ -747,114 +744,6 @@ export async function checkGateProgressionNudge(): Promise<{
   return {
     gatesChecked: Number(countRow?.cnt ?? 0),
     almostDone: rows.length,
-    tasksCreated,
-  };
-}
-
-// ══════════════════════════════════════════════════════════════
-// JOB 5: Clearance Follow-up (daily — 10:00 AM)
-//
-// Processing-status clearances idle for 7+ days.
-// Creates task to finalize or escalate.
-// ══════════════════════════════════════════════════════════════
-
-export async function checkClearanceFollowups(): Promise<{
-  clearancesChecked: number;
-  stale: number;
-  tasksCreated: number;
-}> {
-  if (!_config.enabled)
-    return { clearancesChecked: 0, stale: 0, tasksCreated: 0 };
-
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - _config.clearanceStaleDays);
-
-  const rows: any[] = await sequelize.query(
-    `
-    SELECT
-      cl.id AS clearance_id,
-      cl.clearance_number,
-      cl.player_id,
-      cl.contract_id,
-      cl.reason,
-      cl.has_outstanding,
-      cl.outstanding_amount,
-      cl.outstanding_currency,
-      cl.created_at,
-      cl.updated_at,
-      cl.created_by,
-      EXTRACT(DAY FROM NOW() - cl.updated_at) AS days_idle,
-      p.first_name, p.last_name,
-      p.first_name_ar, p.last_name_ar,
-      p.agent_id
-    FROM clearances cl
-    JOIN players p ON p.id = cl.player_id
-    WHERE cl.status = 'Processing'
-      AND cl.updated_at < :cutoff
-    ORDER BY cl.updated_at ASC
-    `,
-    {
-      replacements: { cutoff: cutoff.toISOString() },
-      type: "SELECT" as any,
-    },
-  );
-
-  let tasksCreated = 0;
-
-  for (const row of rows) {
-    const playerName = `${row.first_name} ${row.last_name}`.trim();
-    const playerNameAr = row.first_name_ar
-      ? `${row.first_name_ar} ${row.last_name_ar || ""}`.trim()
-      : playerName;
-    const daysIdle = Math.round(Number(row.days_idle));
-    const clearanceNum = row.clearance_number || row.clearance_id.slice(0, 8);
-
-    const created = await createGateTask({
-      playerId: row.player_id,
-      triggerRuleId: "clearance_stale",
-      title: `Stale clearance: ${playerName} — #${clearanceNum} (${daysIdle}d)`,
-      titleAr: `إخلاء طرف متوقف: ${playerNameAr} — #${clearanceNum} (${daysIdle} يوم)`,
-      description:
-        `Clearance #${clearanceNum} for ${playerName} has been in Processing status for ${daysIdle} days. ` +
-        `${row.reason ? `Reason: ${row.reason}. ` : ""}` +
-        `${row.has_outstanding ? `Outstanding amount: ${Number(row.outstanding_amount).toLocaleString()} ${row.outstanding_currency}. ` : ""}` +
-        `Finalize the clearance or escalate outstanding issues.`,
-      descriptionAr:
-        `إخلاء الطرف #${clearanceNum} لـ ${playerNameAr} في حالة معالجة منذ ${daysIdle} يوم. ` +
-        `${row.reason ? `السبب: ${row.reason}. ` : ""}` +
-        `${row.has_outstanding ? `مبلغ مستحق: ${Number(row.outstanding_amount).toLocaleString()} ${row.outstanding_currency}. ` : ""}` +
-        `إنهاء إخلاء الطرف أو تصعيد المسائل المعلقة.`,
-      priority: daysIdle >= _config.clearanceStaleDays * 2 ? "high" : "medium",
-      dueDays: 2,
-      assignedTo: row.created_by || row.agent_id || null,
-    });
-
-    if (created) {
-      tasksCreated++;
-
-      await notifyByRole(["Admin", "Manager", "Legal"], {
-        type: "system",
-        title: `Stale clearance: ${playerName} — ${daysIdle}d idle`,
-        titleAr: `إخلاء طرف متوقف: ${playerNameAr} — ${daysIdle} يوم`,
-        body: `Clearance #${clearanceNum} pending since ${daysIdle} days.${row.has_outstanding ? ` Outstanding: ${Number(row.outstanding_amount).toLocaleString()} ${row.outstanding_currency}.` : ""}`,
-        bodyAr: `إخلاء الطرف #${clearanceNum} معلق منذ ${daysIdle} يوم.${row.has_outstanding ? ` مستحقات: ${Number(row.outstanding_amount).toLocaleString()} ${row.outstanding_currency}.` : ""}`,
-        link: "/dashboard/clearances",
-        sourceType: "clearance",
-        sourceId: row.clearance_id,
-        priority: "high",
-      });
-    }
-  }
-
-  // Count total Processing clearances
-  const [countRow] = (await sequelize.query(
-    `SELECT COUNT(*) AS cnt FROM clearances WHERE status = 'Processing'`,
-    { type: "SELECT" as any },
-  )) as any[];
-
-  return {
-    clearancesChecked: Number(countRow?.cnt ?? 0),
-    stale: rows.length,
     tasksCreated,
   };
 }

@@ -48,7 +48,6 @@ const MODULES = [
   "sessions",
   "wellness",
   "calendar",
-  "clearances",
   "competitions",
   "media_requests",
   "press_releases",

@@ -8,6 +8,7 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   CreateReportInput,
   ReportQuery,
+  ReportFilters,
 } from "@modules/reports/report.validation";
 import { generateReportPdf } from "@modules/reports/report.pdf";
 import { logger } from "@config/logger";
@@ -294,15 +295,6 @@ export async function gatherReportData(
 // ════════════════════════════════════════════════════════════
 // PREDEFINED REPORTS (PRD Section 12)
 // ════════════════════════════════════════════════════════════
-
-interface ReportFilters {
-  dateFrom?: string;
-  dateTo?: string;
-  playerId?: string;
-  clubId?: string;
-  playerContractType?: string;
-  expiryWindow?: number;
-}
 
 /** Build parameterized WHERE fragments. Returns { clauses, binds, nextIdx }. */
 function buildSafeWhere(

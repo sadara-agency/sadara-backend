@@ -56,12 +56,10 @@ interface ContractAttributes {
   agentSigningMethod: string | null;
   // Alerts & Termination
   expiryAlertSent: boolean;
-  terminatedByClearanceId: string | null;
   // Termination-type specific fields
   terminationReason: string | null;
   terminationDate: string | null;
   terminationType: "mutual" | "unilateral" | null;
-  clearanceNumber: string | null;
   outstandingAmount: number | null;
   outstandingCurrency: string | null;
   outstandingDetails: string | null;
@@ -105,11 +103,9 @@ interface ContractCreationAttributes extends Optional<
   | "agentSignedAt"
   | "agentSigningMethod"
   | "expiryAlertSent"
-  | "terminatedByClearanceId"
   | "terminationReason"
   | "terminationDate"
   | "terminationType"
-  | "clearanceNumber"
   | "outstandingAmount"
   | "outstandingCurrency"
   | "outstandingDetails"
@@ -175,11 +171,9 @@ export class Contract
   declare agentSignedAt: Date | null;
   declare agentSigningMethod: string | null;
   declare expiryAlertSent: boolean;
-  declare terminatedByClearanceId: string | null;
   declare terminationReason: string | null;
   declare terminationDate: string | null;
   declare terminationType: "mutual" | "unilateral" | null;
-  declare clearanceNumber: string | null;
   declare outstandingAmount: number | null;
   declare outstandingCurrency: string | null;
   declare outstandingDetails: string | null;
@@ -353,10 +347,6 @@ Contract.init(
       defaultValue: false,
       field: "expiry_alert_sent",
     },
-    terminatedByClearanceId: {
-      type: DataTypes.UUID,
-      field: "terminated_by_clearance_id",
-    },
     terminationReason: {
       type: DataTypes.TEXT,
       field: "termination_reason",
@@ -368,11 +358,6 @@ Contract.init(
     terminationType: {
       type: DataTypes.STRING(20),
       field: "termination_type",
-    },
-    clearanceNumber: {
-      type: DataTypes.STRING(50),
-      unique: true,
-      field: "clearance_number",
     },
     outstandingAmount: {
       type: DataTypes.DECIMAL(15, 2),

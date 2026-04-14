@@ -17,5 +17,15 @@ export const reportQuerySchema = z.object({
   status: z.enum(["Draft", "Generating", "Generated", "Failed"]).optional(),
 });
 
+export const reportFiltersSchema = z.object({
+  dateFrom: z.string().optional(),
+  dateTo: z.string().optional(),
+  playerId: z.string().uuid().optional(),
+  clubId: z.string().uuid().optional(),
+  playerContractType: z.string().optional(),
+  expiryWindow: z.coerce.number().optional(),
+});
+
 export type CreateReportInput = z.infer<typeof createReportSchema>;
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
+export type ReportFilters = z.infer<typeof reportFiltersSchema>;

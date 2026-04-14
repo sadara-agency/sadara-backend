@@ -11,7 +11,10 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/reports/report.service";
-import type { ReportQuery } from "@modules/reports/report.validation";
+import type {
+  ReportQuery,
+  ReportFilters,
+} from "@modules/reports/report.validation";
 import { generateReportXlsx } from "@modules/reports/report.xlsx";
 import { generatePredefinedReportPdf } from "@modules/reports/report.predefined-pdf";
 
@@ -80,42 +83,58 @@ export async function download(req: AuthRequest, res: Response): Promise<void> {
 // ── Predefined Reports ──
 
 export async function playerPortfolio(req: AuthRequest, res: Response) {
-  const data = await svc.getPlayerPortfolioReport(req.query as any);
+  const data = await svc.getPlayerPortfolioReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function contractCommission(req: AuthRequest, res: Response) {
-  const data = await svc.getContractCommissionReport(req.query as any);
+  const data = await svc.getContractCommissionReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function injurySummary(req: AuthRequest, res: Response) {
-  const data = await svc.getInjurySummaryReport(req.query as any);
+  const data = await svc.getInjurySummaryReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function matchTasks(req: AuthRequest, res: Response) {
-  const data = await svc.getMatchTasksReport(req.query as any);
+  const data = await svc.getMatchTasksReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function upcomingMatchesTasks(req: AuthRequest, res: Response) {
-  const data = await svc.getUpcomingMatchesTasksReport(req.query as any);
+  const data = await svc.getUpcomingMatchesTasksReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function financialSummary(req: AuthRequest, res: Response) {
-  const data = await svc.getFinancialSummaryReport(req.query as any);
+  const data = await svc.getFinancialSummaryReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function scoutingPipeline(req: AuthRequest, res: Response) {
-  const data = await svc.getScoutingPipelineReport(req.query as any);
+  const data = await svc.getScoutingPipelineReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
 export async function expiringContracts(req: AuthRequest, res: Response) {
-  const data = await svc.getExpiringContractsReport(req.query as any);
+  const data = await svc.getExpiringContractsReport(
+    req.query as unknown as ReportFilters,
+  );
   sendSuccess(res, data);
 }
 
@@ -187,7 +206,7 @@ export async function exportXlsx(
     throw new AppError("Invalid report type", 400);
   }
 
-  const data = await config.fetch(req.query as any);
+  const data = await config.fetch(req.query as unknown as ReportFilters);
   const summary = data.summary || data.overview;
   const buffer = await generateReportXlsx({
     reportTitle: config.title,
@@ -214,7 +233,7 @@ export async function exportPdf(
     throw new AppError("Invalid report type", 400);
   }
 
-  const data = await config.fetch(req.query as any);
+  const data = await config.fetch(req.query as unknown as ReportFilters);
   const summary = data.summary || data.overview;
   const buffer = await generatePredefinedReportPdf({
     reportTitle: config.title,

@@ -75,3 +75,32 @@ export async function getModules(
     next(err);
   }
 }
+
+export async function getTiers(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const tiers = await packageService.getPackageTiers();
+    sendSuccess(res, tiers);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function updateTier(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const tier = await packageService.updatePackageTier(
+      req.params.code,
+      req.body,
+    );
+    sendSuccess(res, tier, "Package tier updated");
+  } catch (err) {
+    next(err);
+  }
+}
