@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-// ── Create Press Release ──
+// ── Base (shared shape for create + update) ──
 
-export const createPressReleaseSchema = z.object({
-  title: z.string().min(1).max(500),
+const pressReleaseBaseSchema = z.object({
+  title: z.string().max(500).optional(),
   titleAr: z.string().max(500).optional(),
   category: z
     .enum(["transfer", "injury", "achievement", "announcement", "general"])
@@ -19,9 +19,20 @@ export const createPressReleaseSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+// ── Create Press Release ──
+// Requires at least one language for the title.
+
+export const createPressReleaseSchema = pressReleaseBaseSchema.refine(
+  (d) => !!(d.title?.trim() || d.titleAr?.trim()),
+  {
+    message: "Title is required (English or Arabic)",
+    path: ["title"],
+  },
+);
+
 // ── Update Press Release ──
 
-export const updatePressReleaseSchema = createPressReleaseSchema.partial();
+export const updatePressReleaseSchema = pressReleaseBaseSchema.partial();
 
 // ── Update Status ──
 

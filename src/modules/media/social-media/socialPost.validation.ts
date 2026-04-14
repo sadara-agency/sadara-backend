@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-// ── Create ──
+// ── Base (shared shape for create + update) ──
 
-export const createSocialPostSchema = z.object({
-  title: z.string().min(1).max(500),
+const socialPostBaseSchema = z.object({
+  title: z.string().max(500).optional(),
   titleAr: z.string().max(500).optional(),
   contentEn: z.string().optional(),
   contentAr: z.string().optional(),
@@ -26,9 +26,20 @@ export const createSocialPostSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+// ── Create ──
+// Requires at least one language for the title.
+
+export const createSocialPostSchema = socialPostBaseSchema.refine(
+  (d) => !!(d.title?.trim() || d.titleAr?.trim()),
+  {
+    message: "Title is required (English or Arabic)",
+    path: ["title"],
+  },
+);
+
 // ── Update ──
 
-export const updateSocialPostSchema = createSocialPostSchema.partial();
+export const updateSocialPostSchema = socialPostBaseSchema.partial();
 
 // ── Update Status ──
 

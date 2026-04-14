@@ -131,8 +131,17 @@ export async function createPressRelease(
   data: CreatePressReleaseInput,
   userId: string,
 ) {
-  const slug = generateSlug(data.title);
-  return PressRelease.create({ ...data, slug, createdBy: userId });
+  // Bilingual fallback: the DB column `title` is NOT NULL. Users may submit
+  // only Arabic (RTL mode) or only English — coalesce the missing side so the
+  // column is always populated.
+  const title = data.title?.trim() || data.titleAr?.trim() || "";
+  const slug = generateSlug(title);
+  return PressRelease.create({
+    ...data,
+    title,
+    slug,
+    createdBy: userId,
+  });
 }
 
 // ── Update ──
@@ -144,10 +153,20 @@ export async function updatePressRelease(
   const release = await PressRelease.findByPk(id);
   if (!release) throw new AppError("Press release not found", 404);
 
-  // Regenerate slug if title changed
   const updatePayload: Record<string, unknown> = { ...data };
-  if (data.title && data.title !== release.title) {
-    updatePayload.slug = generateSlug(data.title);
+
+  // Bilingual fallback for the NOT NULL title column when caller touches
+  // either language side.
+  if ("title" in data || "titleAr" in data) {
+    const nextTitle = "title" in data ? data.title : release.title;
+    const nextTitleAr = "titleAr" in data ? data.titleAr : release.titleAr;
+    const resolved = nextTitle?.trim() || nextTitleAr?.trim() || "";
+    if (resolved) {
+      updatePayload.title = resolved;
+      if (resolved !== release.title) {
+        updatePayload.slug = generateSlug(resolved);
+      }
+    }
   }
 
   return release.update(updatePayload);

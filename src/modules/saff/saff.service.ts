@@ -427,7 +427,10 @@ export async function fetchFromSaff(input: FetchRequest) {
             awayScore: f.awayScore,
             stadium: f.stadium,
             city: f.city,
-            status: f.homeScore !== null ? "completed" : "upcoming",
+            status:
+              f.homeScore !== null
+                ? ("completed" as const)
+                : ("upcoming" as const),
           })),
           {
             transaction: txn,
