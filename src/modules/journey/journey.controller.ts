@@ -6,6 +6,7 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateByPrefix } from "@shared/utils/cache";
 import * as journeyService from "./journey.service";
 
 // ── List ──
@@ -30,13 +31,16 @@ export async function getPlayerJourney(req: AuthRequest, res: Response) {
 export async function create(req: AuthRequest, res: Response) {
   const stage = await journeyService.createJourney(req.body, req.user!.id);
 
-  await logAudit(
-    "CREATE",
-    "journey",
-    stage.id,
-    buildAuditContext(req.user!, req.ip),
-    `Journey stage created: ${stage.stageName}`,
-  );
+  await Promise.all([
+    logAudit(
+      "CREATE",
+      "journey",
+      stage.id,
+      buildAuditContext(req.user!, req.ip),
+      `Journey stage created: ${stage.stageName}`,
+    ),
+    invalidateByPrefix("journey"),
+  ]);
 
   sendCreated(res, stage, "Journey stage created");
 }
@@ -45,13 +49,16 @@ export async function create(req: AuthRequest, res: Response) {
 export async function update(req: AuthRequest, res: Response) {
   const stage = await journeyService.updateJourney(req.params.id, req.body);
 
-  await logAudit(
-    "UPDATE",
-    "journey",
-    req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    `Journey stage updated: ${stage.stageName}`,
-  );
+  await Promise.all([
+    logAudit(
+      "UPDATE",
+      "journey",
+      req.params.id,
+      buildAuditContext(req.user!, req.ip),
+      `Journey stage updated: ${stage.stageName}`,
+    ),
+    invalidateByPrefix("journey"),
+  ]);
 
   sendSuccess(res, stage, "Journey stage updated");
 }
@@ -60,13 +67,16 @@ export async function update(req: AuthRequest, res: Response) {
 export async function remove(req: AuthRequest, res: Response) {
   const stage = await journeyService.deleteJourney(req.params.id);
 
-  await logAudit(
-    "DELETE",
-    "journey",
-    req.params.id,
-    buildAuditContext(req.user!, req.ip),
-    `Journey stage deleted: ${stage.stageName}`,
-  );
+  await Promise.all([
+    logAudit(
+      "DELETE",
+      "journey",
+      req.params.id,
+      buildAuditContext(req.user!, req.ip),
+      `Journey stage deleted: ${stage.stageName}`,
+    ),
+    invalidateByPrefix("journey"),
+  ]);
 
   sendSuccess(res, null, "Journey stage deleted");
 }
@@ -75,13 +85,16 @@ export async function remove(req: AuthRequest, res: Response) {
 export async function reorder(req: AuthRequest, res: Response) {
   const stages = await journeyService.reorderStages(req.body);
 
-  await logAudit(
-    "UPDATE",
-    "journey",
-    null,
-    buildAuditContext(req.user!, req.ip),
-    `Journey stages reordered for player ${req.body.playerId}`,
-  );
+  await Promise.all([
+    logAudit(
+      "UPDATE",
+      "journey",
+      null,
+      buildAuditContext(req.user!, req.ip),
+      `Journey stages reordered for player ${req.body.playerId}`,
+    ),
+    invalidateByPrefix("journey"),
+  ]);
 
   sendSuccess(res, stages, "Stages reordered");
 }

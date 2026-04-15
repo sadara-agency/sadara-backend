@@ -223,8 +223,9 @@ export async function login(input: LoginInput) {
     }
 
     if (!(await bcrypt.compare(input.password, user.passwordHash))) {
-      // Atomic increment to prevent race condition on concurrent failed logins
-
+      // Atomic increment to prevent race condition on concurrent failed logins.
+      // Sequelize's typed update() rejects `Literal` values for column fields,
+      // so the object is cast — the atomic SQL expression is the whole point.
       await User.update(
         {
           failedLoginAttempts: sequelize.literal(
@@ -319,8 +320,7 @@ export async function login(input: LoginInput) {
   }
 
   if (!(await bcrypt.compare(input.password, playerAccount.passwordHash))) {
-    // Atomic increment to prevent race condition on concurrent failed logins
-
+    // Atomic increment — see matching comment in the users-table branch above.
     await PlayerAccount.update(
       {
         failedLoginAttempts: sequelize.literal(

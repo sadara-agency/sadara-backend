@@ -51,6 +51,10 @@ export async function listCases(query: PlayerCareQuery, user?: AuthUser) {
       { triggerDesc: { [Op.iLike]: `%${search}%` } },
       { outcome: { [Op.iLike]: `%${search}%` } },
       { notes: { [Op.iLike]: `%${search}%` } },
+      { "$player.first_name$": { [Op.iLike]: `%${search}%` } },
+      { "$player.last_name$": { [Op.iLike]: `%${search}%` } },
+      { "$player.first_name_ar$": { [Op.iLike]: `%${search}%` } },
+      { "$player.last_name_ar$": { [Op.iLike]: `%${search}%` } },
     ];
   }
 

@@ -7,6 +7,7 @@
 
 import axios, { AxiosInstance } from "axios";
 import { logger } from "@config/logger";
+import { env } from "@config/env";
 import type {
   PulseLivePlayerStatsResponse,
   PulseLiveTeamStatsResponse,
@@ -21,9 +22,9 @@ import type {
 
 const BASE_URL = "https://api.saudi-pro-league.pulselive.com";
 const COMP_ID = 72; // Roshn Saudi League
-// Update this when SPL transitions to a new season.
-// Future: move to SPL_DEFAULT_SEASON_ID env var for zero-downtime season rollover.
-const DEFAULT_SEASON_ID = 859; // 2025-26
+// Season ID comes from SPL_DEFAULT_SEASON_ID env var (validated in config/env.ts).
+// Bump the env var when SPL rolls a new season — no code change required.
+const DEFAULT_SEASON_ID = env.spl.defaultSeasonId;
 const REQUEST_DELAY = 500;
 const REQUEST_TIMEOUT = 15_000;
 

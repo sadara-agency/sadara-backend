@@ -67,6 +67,7 @@ import packageRoutes from "@modules/packages/package.routes";
 import tacticalRoutes from "@modules/tactical/tactical.routes";
 import mentalRoutes from "@modules/mental/mental.routes";
 import videoRoutes from "@modules/video/video.routes";
+import saudiLeaguesRoutes from "@modules/saudiLeagues/saudiLeagues.routes";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -322,6 +323,7 @@ app.use("/api/v1/packages", packageRoutes);
 app.use("/api/v1/tactical", tacticalRoutes);
 app.use("/api/v1/mental", mentalRoutes);
 app.use("/api/v1/video", videoRoutes);
+app.use("/api/v1/saudi-leagues", saudiLeaguesRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(
