@@ -23,6 +23,7 @@ jest.mock('../../../src/modules/tasks/task.model', () => ({
 jest.mock('../../../src/modules/players/player.model', () => ({ Player: { name: 'Player' } }));
 jest.mock('../../../src/modules/users/user.model', () => ({ User: { name: 'User' } }));
 jest.mock('../../../src/modules/matches/match.model', () => ({ Match: { name: 'Match' } }));
+jest.mock('../../../src/modules/referrals/referral.model', () => ({ Referral: { name: 'Referral', findByPk: jest.fn() } }));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
