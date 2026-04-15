@@ -66,6 +66,27 @@ interface UserCreationAttributes extends Optional<
   | "emailVerificationTokenExpiry"
 > {}
 
+/** Fields stripped from every serialized User — never sent to the client. */
+const SENSITIVE_FIELDS = [
+  "passwordHash",
+  "failedLoginAttempts",
+  "lockedUntil",
+  "resetToken",
+  "resetTokenExpiry",
+  "inviteToken",
+  "inviteTokenExpiry",
+  "emailVerificationToken",
+  "emailVerificationTokenExpiry",
+] as const;
+
+type SensitiveField = (typeof SENSITIVE_FIELDS)[number];
+
+/** The safe shape of a User as it leaves the API — no secrets, no internal state. */
+export type SafeUser = Omit<
+  UserAttributes & { createdAt: Date; updatedAt: Date },
+  SensitiveField
+>;
+
 export class User
   extends Model<UserAttributes, UserCreationAttributes>
   implements UserAttributes
@@ -91,6 +112,23 @@ export class User
   declare emailVerifiedAt: Date | null;
   declare emailVerificationToken: string | null;
   declare emailVerificationTokenExpiry: Date | null;
+
+  /**
+   * Strip all sensitive / internal fields before the model is serialized.
+   * Called automatically by JSON.stringify (via res.json) and explicitly
+   * via user.toJSON(). This is the single place where the allow-list is
+   * enforced — no service function needs its own destructure.
+   */
+  toJSON(): SafeUser {
+    const raw = super.toJSON() as UserAttributes & {
+      createdAt: Date;
+      updatedAt: Date;
+    };
+    for (const field of SENSITIVE_FIELDS) {
+      delete (raw as unknown as Record<string, unknown>)[field];
+    }
+    return raw as SafeUser;
+  }
 }
 
 User.init(

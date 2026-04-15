@@ -116,5 +116,12 @@ SeasonSync.init(
     tableName: "season_syncs",
     underscored: true,
     timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        name: "season_syncs_source_competition_season_data_type_key",
+        fields: ["source", "competition", "season", "data_type"],
+      },
+    ],
   },
 );
