@@ -109,6 +109,11 @@ router.post(
   authorizeModule("saff-data", "create"),
   asyncHandler(saffController.triggerSync),
 );
+router.get(
+  "/sync-debug",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.syncDebug),
+);
 
 // ── Player-centric endpoints ──
 router.get(

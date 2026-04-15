@@ -62,3 +62,9 @@ export async function reorderSubTasks(req: AuthRequest, res: Response) {
   await taskService.reorderSubTasks(req.params.id, req.body.orderedIds);
   sendSuccess(res, null, "Sub-tasks reordered");
 }
+
+// ── Suggested Assignees ──
+export async function suggestedAssignees(req: AuthRequest, res: Response) {
+  const data = await taskService.getSuggestedAssignees(req.params.id, req.user);
+  sendSuccess(res, data);
+}

@@ -14,6 +14,7 @@
 //   DELETE /:id           → delete
 // ─────────────────────────────────────────────────────────────
 import { Router } from "express";
+import { z } from "zod";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
@@ -25,6 +26,8 @@ import {
   taskQuerySchema,
 } from "@modules/tasks/task.validation";
 import * as taskController from "@modules/tasks/task.controller";
+
+const taskIdParamSchema = z.object({ id: z.string().uuid() });
 
 const router = Router();
 router.use(authenticate);
@@ -41,6 +44,12 @@ router.get(
   "/:id",
   authorizeModule("tasks", "read"),
   asyncHandler(taskController.getById),
+);
+router.get(
+  "/:id/suggested-assignees",
+  authorizeModule("tasks", "update"),
+  validate(taskIdParamSchema, "params"),
+  asyncHandler(taskController.suggestedAssignees),
 );
 
 // ── Write ──

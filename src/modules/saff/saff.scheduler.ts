@@ -77,16 +77,38 @@ export function getSyncStatus(): SyncStatus & {
 // CORE SYNC FUNCTION
 // ══════════════════════════════════════════
 
+export interface RunSyncResult {
+  skipped?: boolean;
+  tournaments: number;
+  standings: number;
+  fixtures: number;
+  teams: number;
+  season: string;
+  agencyValues: string[];
+  error: string | null;
+  targetTournamentNames: string[];
+}
+
 export async function runSync(
   agencyValues: string[],
   season: string = getCurrentSeason(),
   triggerSource: string = "scheduler",
-): Promise<void> {
+): Promise<RunSyncResult> {
   if (syncStatus.isRunning) {
     logger.warn(
       `[SAFF Scheduler] Sync already running, skipping (triggered by ${triggerSource})`,
     );
-    return;
+    return {
+      skipped: true,
+      tournaments: 0,
+      standings: 0,
+      fixtures: 0,
+      teams: 0,
+      season,
+      agencyValues,
+      error: "Sync already running",
+      targetTournamentNames: [],
+    };
   }
 
   syncStatus.isRunning = true;
@@ -114,13 +136,23 @@ export async function runSync(
         `[SAFF Scheduler] No active tournaments for values [${agencyValues.join(", ")}]`,
       );
       syncStatus.isRunning = false;
-      return;
+      return {
+        tournaments: 0,
+        standings: 0,
+        fixtures: 0,
+        teams: 0,
+        season,
+        agencyValues,
+        error: null,
+        targetTournamentNames: [],
+      };
     }
 
     const tournamentIds = targetTournaments.map((t: any) => t.saffId);
+    const tournamentNames = targetTournaments.map((t: any) => t.name as string);
 
     logger.info(
-      `[SAFF Scheduler] Found ${tournamentIds.length} tournaments to sync: ${targetTournaments.map((t: any) => t.name).join(", ")}`,
+      `[SAFF Scheduler] Found ${tournamentIds.length} tournaments to sync: ${tournamentNames.join(", ")}`,
     );
 
     // 2. Fetch from SAFF
@@ -143,10 +175,31 @@ export async function runSync(
       `[SAFF Scheduler] ✓ Sync complete — ${result.results} tournaments, ` +
         `${result.standings} standings, ${result.fixtures} fixtures, ${result.teams} teams`,
     );
+
+    return {
+      tournaments: result.results,
+      standings: result.standings,
+      fixtures: result.fixtures,
+      teams: result.teams,
+      season,
+      agencyValues,
+      error: null,
+      targetTournamentNames: tournamentNames,
+    };
   } catch (error: any) {
     syncStatus.lastError = error.message;
     syncStatus.totalErrors++;
     logger.error(`[SAFF Scheduler] ✗ Sync failed: ${error.message}`);
+    return {
+      tournaments: 0,
+      standings: 0,
+      fixtures: 0,
+      teams: 0,
+      season,
+      agencyValues,
+      error: error.message,
+      targetTournamentNames: [],
+    };
   } finally {
     syncStatus.isRunning = false;
   }

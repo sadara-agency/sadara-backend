@@ -13,6 +13,7 @@ import { Op, Sequelize, literal } from "sequelize";
 import { Task } from "@modules/tasks/task.model";
 import { generateDisplayId } from "@shared/utils/displayId";
 import { Player } from "@modules/players/player.model";
+import { Referral } from "@modules/referrals/referral.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -320,6 +321,98 @@ async function syncParentStatus(parentTaskId: string) {
       await parent.update({ status: "InProgress" });
     }
   }
+}
+
+// ────────────────────────────────────────────────────────────
+// Suggested Assignees
+// Returns users already related to the task's linked entities so an admin
+// reassigning doesn't have to recall a name. Priority order:
+//   agent > coach > analyst > referral_owner > creator
+// A user appearing in multiple roles is surfaced once with the highest-
+// priority label. The task's current assignee is excluded.
+// ────────────────────────────────────────────────────────────
+type SuggestedRelationship =
+  | "agent"
+  | "coach"
+  | "analyst"
+  | "referral_owner"
+  | "creator";
+
+export async function getSuggestedAssignees(taskId: string, user?: AuthUser) {
+  const task = await Task.findByPk(taskId, {
+    attributes: ["id", "assignedTo", "assignedBy", "playerId", "referralId"],
+  });
+  if (!task) throw new AppError("Task not found", 404);
+
+  const hasAccess = await checkRowAccess("tasks", task, user);
+  if (!hasAccess) throw new AppError("Task not found", 404);
+
+  const candidates: { userId: string; relationship: SuggestedRelationship }[] =
+    [];
+
+  if (task.playerId) {
+    const player = await Player.findByPk(task.playerId, {
+      attributes: ["id", "agentId", "coachId", "analystId"],
+    });
+    if (player) {
+      if (player.agentId)
+        candidates.push({ userId: player.agentId, relationship: "agent" });
+      if (player.coachId)
+        candidates.push({ userId: player.coachId, relationship: "coach" });
+      if (player.analystId)
+        candidates.push({ userId: player.analystId, relationship: "analyst" });
+    }
+  }
+
+  if (task.referralId) {
+    const referral = await Referral.findByPk(task.referralId, {
+      attributes: ["id", "assignedTo"],
+    });
+    if (referral?.assignedTo) {
+      candidates.push({
+        userId: referral.assignedTo,
+        relationship: "referral_owner",
+      });
+    }
+  }
+
+  if (task.assignedBy) {
+    candidates.push({ userId: task.assignedBy, relationship: "creator" });
+  }
+
+  // Dedupe by userId (keep first = highest priority). Exclude current assignee.
+  const seen = new Set<string>();
+  if (task.assignedTo) seen.add(task.assignedTo);
+  const unique: typeof candidates = [];
+  for (const c of candidates) {
+    if (!seen.has(c.userId)) {
+      seen.add(c.userId);
+      unique.push(c);
+    }
+  }
+
+  if (unique.length === 0) return [];
+
+  const ids = unique.map((c) => c.userId);
+  const users = await User.findAll({
+    where: { id: { [Op.in]: ids } },
+    attributes: ["id", "fullName", "fullNameAr"],
+  });
+  const byId = new Map(users.map((u) => [u.id, u]));
+
+  // Preserve priority order; drop users that couldn't be fetched.
+  return unique
+    .map((c) => {
+      const u = byId.get(c.userId);
+      if (!u) return null;
+      return {
+        id: u.id,
+        fullName: u.fullName,
+        fullNameAr: u.fullNameAr,
+        relationship: c.relationship,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 }
 
 // ────────────────────────────────────────────────────────────
