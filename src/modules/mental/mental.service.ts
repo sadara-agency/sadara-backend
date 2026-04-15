@@ -136,7 +136,13 @@ export async function listAssessments(
       {
         model: Player,
         as: "player",
-        attributes: ["id", "fullName", "fullNameAr"],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+        ],
       },
     ],
   });
@@ -154,7 +160,13 @@ export async function getAssessmentById(id: string, user: AuthUser) {
       {
         model: Player,
         as: "player",
-        attributes: ["id", "fullName", "fullNameAr"],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+        ],
       },
       {
         model: User,
@@ -264,7 +276,13 @@ export async function getAlerts(user: AuthUser) {
       {
         model: Player,
         as: "player",
-        attributes: ["id", "fullName", "fullNameAr"],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+        ],
       },
       {
         model: MentalAssessmentTemplate,

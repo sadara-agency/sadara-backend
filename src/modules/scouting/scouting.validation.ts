@@ -88,12 +88,10 @@ export const updateScreeningSchema = z.object({
   fitAssessment: z.string().optional(),
   riskAssessment: z.string().optional(),
   medicalClearance: z.boolean().optional(),
-  baselineStats: z
-    .record(
-      z.string(),
-      z.union([z.number(), z.string(), z.boolean(), z.null()]).optional(),
-    )
-    .optional(),
+  // Stat keys stay free-form (each league publishes a different metric set),
+  // but values must be finite numbers to match the frontend Record<string, number>
+  // contract and prevent mixed-type payloads from leaking into JSONB.
+  baselineStats: z.record(z.string().min(1), z.number().finite()).optional(),
   notes: z.string().optional(),
 });
 

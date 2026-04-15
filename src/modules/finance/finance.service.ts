@@ -600,7 +600,7 @@ export async function getFinancialDashboard(
         commissionTypeJoin =
           "JOIN players p ON c.player_id = p.id AND p.contract_type = :contractType";
         commissionPayJoin =
-          "JOIN contracts cc ON pay.contract_id = cc.id JOIN players pp ON cc.player_id = pp.id AND pp.contract_type = :contractType";
+          "JOIN players pp ON pay.player_id = pp.id AND pp.contract_type = :contractType";
         trendTypeJoin =
           "JOIN players p ON v.player_id = p.id AND p.contract_type = :contractType";
         playerTypeJoin = "AND p.contract_type = :contractType";

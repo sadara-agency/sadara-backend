@@ -72,6 +72,18 @@ const envSchema = z.object({
   // Sportmonks Fixtures API (optional)
   SPORTMONKS_API_TOKEN: z.string().default(""),
 
+  // SPL PulseLive season — bump when the Saudi Pro League rolls a new season
+  // so no code change is required for season transition.
+  SPL_DEFAULT_SEASON_ID: z.coerce.number().int().positive().default(859),
+
+  // Finance approval thresholds (SAR). Invoices ≥HIGH require approval;
+  // ≥CRITICAL are flagged as critical priority instead of high.
+  FINANCE_APPROVAL_THRESHOLD_HIGH: z.coerce.number().positive().default(50_000),
+  FINANCE_APPROVAL_THRESHOLD_CRITICAL: z.coerce
+    .number()
+    .positive()
+    .default(100_000),
+
   // Database SSL
   DB_SSL_REJECT_UNAUTHORIZED: z
     .enum(["true", "false"])
@@ -200,6 +212,15 @@ export const env = {
 
   sportmonks: {
     apiToken: validated.SPORTMONKS_API_TOKEN,
+  },
+
+  spl: {
+    defaultSeasonId: validated.SPL_DEFAULT_SEASON_ID,
+  },
+
+  finance: {
+    approvalThresholdHigh: validated.FINANCE_APPROVAL_THRESHOLD_HIGH,
+    approvalThresholdCritical: validated.FINANCE_APPROVAL_THRESHOLD_CRITICAL,
   },
 
   sentry: {
