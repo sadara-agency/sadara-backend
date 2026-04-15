@@ -16,6 +16,8 @@ import {
   getSyncStatus as getSchedulerStatus,
   runSync,
 } from "@modules/saff/saff.scheduler";
+import { scrapeChampionship } from "@modules/saff/saff.scraper";
+import { SaffTournament } from "@modules/saff/saff.model";
 import type {
   TournamentQuery,
   StandingQuery,
@@ -159,14 +161,81 @@ export async function getSyncStatus(req: AuthRequest, res: Response) {
   sendSuccess(res, status);
 }
 
+// ── Sync Debug (diagnostic, read-only scrape) ──
+//
+// Runs scrapeChampionship() against ONE tournament and returns the raw result
+// without writing to the DB. Lets admins diagnose scraper drift / network
+// failures without waiting on the cron or mutating data.
+export async function syncDebug(req: AuthRequest, res: Response) {
+  const saffIdRaw = req.query.saffId ?? req.query.tournamentId;
+  const saffId = Number(saffIdRaw);
+  const season = (req.query.season as string) || getCurrentSeason();
+
+  if (!saffIdRaw || Number.isNaN(saffId)) {
+    return sendSuccess(
+      res,
+      { error: "Missing or invalid saffId query parameter" },
+      "Bad request",
+      400,
+    );
+  }
+
+  const tournament = await SaffTournament.findOne({ where: { saffId } });
+
+  let result;
+  let error: string | null = null;
+  const startedAt = Date.now();
+
+  try {
+    result = await scrapeChampionship(saffId, season);
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+
+  const durationMs = Date.now() - startedAt;
+
+  sendSuccess(
+    res,
+    {
+      saffId,
+      season,
+      tournamentName: tournament?.name ?? null,
+      tournamentActive: tournament?.isActive ?? null,
+      durationMs,
+      error,
+      counts: result
+        ? {
+            standings: result.standings.length,
+            fixtures: result.fixtures.length,
+            teams: result.teams.length,
+          }
+        : null,
+      sampleStanding: result?.standings?.[0] ?? null,
+      sampleFixture: result?.fixtures?.[0] ?? null,
+      standings: result?.standings ?? [],
+      fixtures: (result?.fixtures ?? []).slice(0, 10),
+    },
+    error ? "Scrape failed" : "Scrape complete (no DB writes)",
+  );
+}
+
 export async function triggerSync(req: AuthRequest, res: Response) {
   const { agencyValues = ["Critical", "High"], season = getCurrentSeason() } =
     req.body;
 
-  // Run in background — don't await
-  runSync(agencyValues, season, `manual:${req.user!.email}`);
+  const result = await runSync(
+    agencyValues,
+    season,
+    `manual:${req.user!.email}`,
+  );
 
-  sendSuccess(res, { agencyValues, season }, "Sync triggered in background");
+  const message = result.error
+    ? `Sync failed: ${result.error}`
+    : result.skipped
+      ? "Sync already running"
+      : `Synced ${result.tournaments} tournaments — ${result.standings} standings, ${result.fixtures} fixtures, ${result.teams} teams`;
+
+  sendSuccess(res, result, message);
 }
 
 // ── Player-centric endpoints ──

@@ -131,4 +131,41 @@
  *               status: { type: string, enum: [Open, InProgress, Completed, Canceled] }
  *     responses:
  *       200: { description: Status updated }
+ *
+ * /tasks/{id}/suggested-assignees:
+ *   get:
+ *     tags: [Tasks]
+ *     summary: Suggested users to reassign this task to
+ *     description: >
+ *       Returns users already related to the task's linked entities
+ *       (player agent/coach/analyst, referral owner, task creator),
+ *       deduped and excluding the current assignee. Ordered by priority:
+ *       agent > coach > analyst > referral_owner > creator.
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Ordered list of suggested users
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success: { type: boolean }
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string, format: uuid }
+ *                       fullName: { type: string }
+ *                       fullNameAr: { type: string, nullable: true }
+ *                       relationship:
+ *                         type: string
+ *                         enum: [agent, coach, analyst, referral_owner, creator]
+ *       404: { description: Task not found }
  */
