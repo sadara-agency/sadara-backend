@@ -24,10 +24,10 @@ export async function up({
   `);
 
   await queryInterface.sequelize.query(`
-    INSERT INTO packages (code, name, name_ar, description) VALUES
-      ('A', 'Premium',  'بريميوم', 'Full platform access including all modules and features'),
-      ('B', 'Standard', 'ستاندرد', 'Core features plus specialist development modules'),
-      ('C', 'Basic',    'أساسي',   'Essential player management and communication features')
+    INSERT INTO packages (id, code, name, name_ar, description, is_active, created_at, updated_at) VALUES
+      (gen_random_uuid(), 'A', 'Premium',  'بريميوم', 'Full platform access including all modules and features', true, now(), now()),
+      (gen_random_uuid(), 'B', 'Standard', 'ستاندرد', 'Core features plus specialist development modules',       true, now(), now()),
+      (gen_random_uuid(), 'C', 'Basic',    'أساسي',   'Essential player management and communication features',  true, now(), now())
     ON CONFLICT (code) DO NOTHING;
   `);
 }

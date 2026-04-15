@@ -411,6 +411,15 @@ export function mockModelInstance(data: Record<string, any>) {
     reload: jest.fn(async function (this: any) { return this; }),
     increment: jest.fn(async () => undefined),
     decrement: jest.fn(async () => undefined),
-    toJSON: jest.fn(() => ({ ...data })),
+    toJSON: jest.fn(() => {
+      const result = { ...data };
+      // Mirror User.toJSON() — strip sensitive fields so tests reflect real serialization.
+      for (const f of [
+        'passwordHash', 'failedLoginAttempts', 'lockedUntil',
+        'resetToken', 'resetTokenExpiry', 'inviteToken', 'inviteTokenExpiry',
+        'emailVerificationToken', 'emailVerificationTokenExpiry',
+      ]) delete result[f];
+      return result;
+    }),
   };
 }

@@ -145,12 +145,7 @@ export async function register(input: RegisterInput) {
     throw err;
   }
 
-  const {
-    passwordHash: _,
-    emailVerificationToken: _evt,
-    emailVerificationTokenExpiry: _evte,
-    ...safe
-  } = user.get({ plain: true });
+  const safe = user.toJSON();
 
   // Send verification email (non-blocking — don't fail registration if email fails)
   const verifyUrl = `${env.frontend.url}/verify-email?token=${rawToken}`;
@@ -192,7 +187,7 @@ export async function invite(input: InviteInput) {
     throw err;
   }
 
-  const { passwordHash: _, ...safe } = user.get({ plain: true });
+  const safe = user.toJSON();
 
   // Send invite email (non-blocking)
   const loginUrl = `${env.frontend.url}/login`;
@@ -273,12 +268,7 @@ export async function login(input: LoginInput) {
       failedLoginAttempts: 0,
       lockedUntil: null,
     });
-    const {
-      passwordHash,
-      failedLoginAttempts: _f,
-      lockedUntil: _l,
-      ...userWithoutPassword
-    } = user.get({ plain: true });
+    const userWithoutPassword = user.toJSON();
 
     // If the user is a Player, look up their playerId from player_accounts
     let playerId: string | null = null;
@@ -548,11 +538,7 @@ export async function refreshSession(rawToken: string) {
 // ── Get Profile ──
 export async function getProfile(userId: string) {
   // Check users table first (exclude sensitive fields)
-  const user = await User.findByPk(userId, {
-    attributes: {
-      exclude: ["passwordHash", "inviteToken", "inviteTokenExpiry"],
-    },
-  });
+  const user = await User.findByPk(userId);
   if (user) return user;
 
   // Fall back to player_accounts
@@ -611,13 +597,7 @@ export async function updateProfile(
   const user = await User.findByPk(userId);
   if (!user) throw new AppError("User not found", 404);
   await user.update(data);
-  const {
-    passwordHash: _,
-    resetToken: _rt,
-    resetTokenExpiry: _rte,
-    ...safeUser
-  } = user.get({ plain: true });
-  return safeUser;
+  return user.toJSON();
 }
 
 // ── Change Password (authenticated user) ──
