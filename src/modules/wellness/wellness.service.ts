@@ -807,7 +807,6 @@ export async function getHeatmapData(days = 14, user?: AuthUser) {
        ds.summary_date AS date,
        ds.ring_score
      FROM players p
-     INNER JOIN wellness_profiles wp ON wp.player_id = p.id
      LEFT JOIN wellness_daily_summaries ds
        ON ds.player_id = p.id
        AND ds.summary_date >= :startDate
