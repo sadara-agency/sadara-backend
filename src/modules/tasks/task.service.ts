@@ -80,6 +80,7 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
   if (queryParams.referralId) where.referralId = queryParams.referralId;
   if (queryParams.mediaTaskType)
     where.mediaTaskType = queryParams.mediaTaskType;
+  if (queryParams.isAutoCreated === "true") where.isAutoCreated = true;
 
   if (search) {
     const pattern = `%${search}%`;

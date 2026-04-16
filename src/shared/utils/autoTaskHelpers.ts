@@ -52,7 +52,16 @@ export interface RuleConfig {
 }
 
 export function cfg(ruleId: string): RuleConfig {
-  return getTaskRuleConfig()[ruleId] ?? { enabled: true, dueDays: 3 };
+  const config = getTaskRuleConfig();
+  const rc = config[ruleId];
+  if (!rc) {
+    logger.warn(
+      "Auto-task rule ID not found in config — defaulting to DISABLED",
+      { ruleId },
+    );
+    return { enabled: false, dueDays: 3 };
+  }
+  return rc;
 }
 
 // ── Deduplicated auto-task creation ──
@@ -111,19 +120,19 @@ export async function createAutoTaskIfNotExists(
   const rc = cfg(input.ruleId);
   if (!rc.enabled) return null;
 
-  // Duplicate check — same rule + same entity (7-day window)
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // Duplicate check — same rule + same entity (7-day updatedAt window).
+  // Uses updatedAt (not createdAt) so actively-touched Open tasks don't
+  // re-spawn a duplicate after 7 days while still genuinely in progress.
+  const updateCutoff = new Date();
+  updateCutoff.setDate(updateCutoff.getDate() - 7);
 
   const dupeWhere: any = {
     triggerRuleId: input.ruleId,
     isAutoCreated: true,
-    // Cast status to text to avoid PostgreSQL enum validation errors
-    // if the DB enum doesn't yet include all values (e.g. "Canceled")
     [Op.and]: [
       Sequelize.literal(`"status"::text NOT IN ('Completed', 'Canceled')`),
     ],
-    createdAt: { [Op.gte]: sevenDaysAgo },
+    updatedAt: { [Op.gte]: updateCutoff },
   };
 
   if (input.contractId) dupeWhere.contractId = input.contractId;
@@ -136,8 +145,11 @@ export async function createAutoTaskIfNotExists(
   let existing: Task | null = null;
   try {
     existing = await Task.findOne({ where: dupeWhere });
-  } catch {
-    // If duplicate check fails (enum mismatch etc.), proceed to create
+  } catch (err) {
+    logger.warn("Auto-task dedup check failed — proceeding with create", {
+      ruleId: input.ruleId,
+      error: (err as Error).message,
+    });
     existing = null;
   }
   if (existing) return null;
