@@ -110,6 +110,13 @@ router.get(
   asyncHandler(ctrl.trainingAnalytics),
 );
 
+router.get(
+  "/admin/leaderboard",
+  authorizeModule("training", "read"),
+  cacheRoute(CachePrefix.TRAINING, CacheTTL.SHORT),
+  asyncHandler(ctrl.trainingLeaderboard),
+);
+
 // ══════════════════════════════════════════
 // MODULES (under a course)
 // ══════════════════════════════════════════
