@@ -1,6 +1,10 @@
 import { QueryInterface } from "sequelize";
 
-export async function up(queryInterface: QueryInterface) {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   // Fix 1: trigger_rule_id was incorrectly created as UUID and FK'd to a
   // legacy trigger_rules table (5 seeded rows, never used by application code).
   // Auto-task rules use string identifiers (e.g. "contract_legal_review") from
@@ -30,7 +34,11 @@ export async function up(queryInterface: QueryInterface) {
   );
 }
 
-export async function down(queryInterface: QueryInterface) {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   // Reverting to UUID will fail if any string rule IDs have been written.
   // The FK to trigger_rules is not restored (that table is legacy/unused).
   await queryInterface.sequelize.query(

@@ -563,7 +563,7 @@ export async function checkStaleApprovals(): Promise<{
     if (existing) continue;
 
     await notifyByRole(["Admin"], {
-      type: "approval",
+      type: "system",
       title: `Approval pending > 48h: ${ar.title ?? ar.entity_type}`,
       titleAr: `طلب موافقة معلق أكثر من 48 ساعة`,
       body: `A ${ar.priority}-priority approval (${ar.entity_type}) has been pending since ${new Date(ar.created_at).toLocaleDateString()}.`,
