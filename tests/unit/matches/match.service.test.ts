@@ -102,6 +102,11 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/matches/matchAutoTasks', () => ({
+  generateMatchCoverTask: jest.fn().mockResolvedValue(null),
+  getTaskRuleConfig: jest.fn().mockReturnValue({}),
+}));
+
 import * as matchService from '../../../src/modules/matches/match.service';
 
 describe('Match Service', () => {
