@@ -689,7 +689,7 @@ export async function getEmployeePerformance(limit = 20) {
            GROUP BY user_id
          ),
          completed_counts AS (
-           SELECT assigned_to, COUNT(*)::int AS tasksCompleted30d
+           SELECT assigned_to, COUNT(*)::int AS tasks_completed30d
            FROM tasks
            WHERE status = 'Completed'
              AND completed_at >= NOW() - INTERVAL '30 days'
@@ -706,7 +706,7 @@ export async function getEmployeePerformance(limit = 20) {
            u.id, u.full_name, u.full_name_ar, u.role, u.avatar_url,
            u.last_login,
            COALESCE(a.actions30d, 0) AS actions30d,
-           COALESCE(c.tasksCompleted30d, 0) AS tasksCompleted30d,
+           COALESCE(c.tasks_completed30d, 0) AS tasks_completed30d,
            COALESCE(o.overdue_tasks, 0) AS overdue_tasks
          FROM users u
          LEFT JOIN action_counts a ON a.user_id = u.id
