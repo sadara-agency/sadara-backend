@@ -54,6 +54,8 @@ export async function listInjuries(queryParams: any, user?: AuthUser) {
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   if (queryParams.status) where.status = queryParams.status;
   if (queryParams.severity) where.severity = queryParams.severity;
+  if (queryParams.bodyPart)
+    where.bodyPart = { [Op.iLike]: `%${queryParams.bodyPart}%` };
 
   const dateRange = buildDateRange(queryParams.from, queryParams.to);
   if (dateRange) where.injuryDate = dateRange;

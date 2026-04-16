@@ -125,6 +125,7 @@ export const taskQuerySchema = z.object({
   parentTaskId: z.string().uuid().optional(),
   topLevelOnly: z.string().optional(),
   mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
+  isAutoCreated: z.string().optional(),
 });
 
 // ── Inferred types ──

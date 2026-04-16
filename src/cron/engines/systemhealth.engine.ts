@@ -6,9 +6,12 @@
 // risk radar consistency, and duplicate detection.
 // ═══════════════════════════════════════════════════════════════
 
+import { Op } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import { notifyByRole } from "@modules/notifications/notification.service";
+import { Task } from "@modules/tasks/task.model";
+import { cfg } from "@shared/utils/autoTaskHelpers";
 
 // ── Configurable thresholds (loaded from app_settings) ──
 
@@ -472,4 +475,108 @@ export async function detectDuplicateRecords(): Promise<{
     `[SystemHealthEngine] duplicate-detector: players=${duplicatePlayers}, invoices=${duplicateInvoices}`,
   );
   return { duplicatePlayers, duplicateInvoices };
+}
+
+// ══════════════════════════════════════════════════════════════
+// JOB 6: Overdue Task Threshold Notification
+//
+// Daily check: if total overdue tasks ≥ threshold (default 10),
+// notify Admin + Manager roles with a link to the tasks page.
+// ══════════════════════════════════════════════════════════════
+
+export async function checkOverdueTaskThreshold(): Promise<{
+  count: number;
+}> {
+  const rc = cfg("overdue_task_threshold");
+  if (!rc.enabled) return { count: 0 };
+
+  const threshold = rc.threshold ?? 10;
+
+  const count = await Task.count({
+    where: {
+      status: { [Op.in]: ["Open", "InProgress"] },
+      dueDate: { [Op.lt]: new Date() },
+    },
+  });
+
+  if (count >= threshold) {
+    await notifyByRole(["Admin", "Manager"], {
+      type: "task",
+      title: `${count} overdue tasks require attention`,
+      titleAr: `${count} مهمة متأخرة تحتاج مراجعة`,
+      body: `There are ${count} overdue tasks. Review and reassign as needed.`,
+      bodyAr: `يوجد ${count} مهمة متأخرة. راجعها وأعد توزيعها حسب الحاجة.`,
+      link: "/dashboard/tasks",
+      sourceType: "system",
+      sourceId: "overdue-task-threshold",
+      priority: count > 20 ? "high" : "normal",
+    }).catch(() => {});
+  }
+
+  logger.info(
+    `[SystemHealthEngine] overdue-task-threshold: count=${count}, threshold=${threshold}`,
+  );
+  return { count };
+}
+
+// ══════════════════════════════════════════════════════════════
+// JOB 7: High-Priority Approval Escalation (48h)
+//
+// Every 6h: find high/critical approval requests pending > 48h,
+// notify Admin. Uses sourceId dedup to avoid repeat notifications.
+// ══════════════════════════════════════════════════════════════
+
+export async function checkStaleApprovals(): Promise<{
+  escalated: number;
+}> {
+  const rc = cfg("approval_escalation_48h");
+  if (!rc.enabled) return { escalated: 0 };
+
+  const cutoff = new Date();
+  cutoff.setHours(cutoff.getHours() - 48);
+
+  const stale: any[] = await sequelize.query(
+    `SELECT ar.id, ar.title, ar.priority, ar.entity_type, ar.entity_id, ar.created_at
+     FROM approval_requests ar
+     WHERE ar.status = 'Pending'
+       AND ar.priority IN ('high', 'critical')
+       AND ar.created_at < :cutoff
+     ORDER BY ar.priority DESC, ar.created_at ASC
+     LIMIT 50`,
+    { type: "SELECT" as any, replacements: { cutoff } },
+  );
+
+  if (!stale.length) return { escalated: 0 };
+
+  for (const ar of stale) {
+    const sourceId = `approval-escalation-48h-${ar.id}`;
+
+    // Dedup: skip if we already notified for this approval in the last 24h
+    const [existing]: any = await sequelize.query(
+      `SELECT id FROM notifications
+       WHERE source_type = 'system' AND source_id = :sourceId
+         AND created_at > NOW() - INTERVAL '24 hours'
+       LIMIT 1`,
+      { type: "SELECT" as any, replacements: { sourceId } },
+    );
+
+    if (existing) continue;
+
+    await notifyByRole(["Admin"], {
+      type: "system",
+      title: `Approval pending > 48h: ${ar.title ?? ar.entity_type}`,
+      titleAr: `طلب موافقة معلق أكثر من 48 ساعة`,
+      body: `A ${ar.priority}-priority approval (${ar.entity_type}) has been pending since ${new Date(ar.created_at).toLocaleDateString()}.`,
+      bodyAr: `طلب موافقة بأولوية ${ar.priority} معلق منذ ${new Date(ar.created_at).toLocaleDateString()}.`,
+      link: "/dashboard/approvals?status=pending",
+      sourceType: "system",
+      sourceId,
+      priority: ar.priority === "critical" ? "high" : "normal",
+    }).catch(() => {});
+  }
+
+  logger.info(
+    `[SystemHealthEngine] approval-escalation-48h: escalated=${stale.length}`,
+  );
+  return { escalated: stale.length };
 }

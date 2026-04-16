@@ -356,3 +356,9 @@ export async function trainingAnalytics(req: AuthRequest, res: Response) {
   const data = await svc.getTrainingAnalytics();
   sendSuccess(res, data);
 }
+
+export async function trainingLeaderboard(req: AuthRequest, res: Response) {
+  const limit = Math.min(Number(req.query.limit) || 5, 20);
+  const data = await svc.getLeaderboard(limit);
+  sendSuccess(res, data);
+}

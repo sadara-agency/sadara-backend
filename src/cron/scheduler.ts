@@ -73,6 +73,8 @@ import {
   escalateStaleTasks,
   checkRiskRadarConsistency,
   detectDuplicateRecords,
+  checkOverdueTaskThreshold,
+  checkStaleApprovals,
 } from "./engines/systemhealth.engine";
 import { checkOfferDeadlines } from "@modules/offers/offerAutoTasks";
 import {
@@ -975,6 +977,8 @@ registerJob("player-data-completeness", checkPlayerDataCompleteness);
 registerJob("stale-task-escalator", escalateStaleTasks);
 registerJob("risk-radar-consistency", checkRiskRadarConsistency);
 registerJob("duplicate-record-detector", detectDuplicateRecords);
+registerJob("overdue-task-threshold", checkOverdueTaskThreshold);
+registerJob("approval-escalation-48h", checkStaleApprovals);
 
 // ── Wellness Engine ──
 registerJob("wellness-daily-summary", aggregateDailySummaries);

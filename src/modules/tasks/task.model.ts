@@ -243,6 +243,16 @@ Task.init(
       { fields: ["match_id"] },
       { fields: ["referral_id"] },
       { fields: ["parent_task_id"] },
+      {
+        name: "idx_tasks_cron_dedup",
+        fields: [
+          "player_id",
+          "trigger_rule_id",
+          "is_auto_created",
+          "created_at",
+        ],
+        where: { is_auto_created: true },
+      },
     ],
   },
 );

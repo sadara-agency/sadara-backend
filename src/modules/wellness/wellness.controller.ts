@@ -310,6 +310,12 @@ export async function coachHeatmap(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+export async function coachMoodHeatmap(req: AuthRequest, res: Response) {
+  const days = Number(req.query.days) || 7;
+  const data = await svc.getMoodHeatmapData(days, req.user);
+  sendSuccess(res, data);
+}
+
 export async function myDashboard(req: AuthRequest, res: Response) {
   const playerId = (req.user as any)?.playerId;
   if (!playerId) {

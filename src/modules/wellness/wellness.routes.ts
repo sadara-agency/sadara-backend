@@ -257,6 +257,11 @@ router.get(
   asyncHandler(ctrl.coachHeatmap),
 );
 router.get(
+  "/dashboard/mood-heatmap",
+  authorizeModule("wellness", "read"),
+  asyncHandler(ctrl.coachMoodHeatmap),
+);
+router.get(
   "/dashboard/player/:playerId",
   authorizeModule("wellness", "read"),
   authorizePlayerPackage("wellness", "read"),

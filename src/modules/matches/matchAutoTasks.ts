@@ -155,6 +155,10 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   media_match_cover: { enabled: true, dueDays: 1 },
   media_injury_update: { enabled: true, dueDays: 1 },
   media_return_from_injury: { enabled: true, dueDays: 1 },
+
+  // System health proactive rules
+  overdue_task_threshold: { enabled: true, dueDays: 0, threshold: 10 },
+  approval_escalation_48h: { enabled: true, dueDays: 0 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {

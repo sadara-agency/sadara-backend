@@ -923,3 +923,83 @@ export async function getTrainingAnalytics() {
     playerStats,
   };
 }
+
+// ── Training Leaderboard ──
+
+export async function getLeaderboard(limit = 5) {
+  const { sequelize: sq } = await import("@config/database");
+
+  const rows = await sq.query<{
+    player_id: string;
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+    photo_url: string | null;
+    total_enrollments: string;
+    completed_count: string;
+    in_progress_count: string;
+    has_expert: string;
+    has_fast: string;
+    has_on_fire: string;
+  }>(
+    `SELECT
+       p.id AS player_id,
+       p.first_name, p.last_name,
+       p.first_name_ar, p.last_name_ar,
+       p.photo_url,
+       COUNT(te.id)::text AS total_enrollments,
+       COUNT(CASE WHEN te.status = 'Completed' THEN 1 END)::text AS completed_count,
+       COUNT(CASE WHEN te.status = 'InProgress' THEN 1 END)::text AS in_progress_count,
+       MAX(CASE WHEN te.progress_pct >= 100 THEN 1 ELSE 0 END)::text AS has_expert,
+       MAX(CASE
+         WHEN te.status = 'Completed'
+          AND te.completed_at IS NOT NULL
+          AND te.enrolled_at IS NOT NULL
+          AND EXTRACT(EPOCH FROM (te.completed_at - te.enrolled_at)) < 86400 * 7
+         THEN 1 ELSE 0
+       END)::text AS has_fast,
+       MAX(CASE WHEN
+         (SELECT COUNT(*) FROM training_enrollments te2
+          WHERE te2.player_id = p.id AND te2.status = 'Completed') >= 3
+         THEN 1 ELSE 0 END)::text AS has_on_fire
+     FROM players p
+     JOIN training_enrollments te ON te.player_id = p.id
+     GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url
+     HAVING COUNT(te.id) > 0
+     ORDER BY
+       (COUNT(CASE WHEN te.status = 'Completed' THEN 1 END) * 500
+        + COUNT(CASE WHEN te.progress_pct >= 75 AND te.status != 'Completed' THEN 1 END) * 250
+        + COUNT(CASE WHEN te.progress_pct >= 50 AND te.progress_pct < 75 THEN 1 END) * 100) DESC
+     LIMIT :limit`,
+    { replacements: { limit }, type: "SELECT" as any },
+  );
+
+  return (rows as any[]).map((r, i) => {
+    const completedCount = parseInt(r.completed_count, 10);
+    const totalEnrollments = parseInt(r.total_enrollments, 10);
+    const inProgressCount = parseInt(r.in_progress_count, 10);
+
+    const points =
+      completedCount * 500 + inProgressCount * (inProgressCount > 0 ? 100 : 0);
+
+    const badges: string[] = [];
+    if (parseInt(r.has_expert, 10)) badges.push("expert");
+    if (parseInt(r.has_fast, 10)) badges.push("fast_learner");
+    if (parseInt(r.has_on_fire, 10)) badges.push("on_fire");
+
+    return {
+      rank: i + 1,
+      playerId: r.player_id,
+      name: `${r.first_name} ${r.last_name}`.trim(),
+      nameAr: r.first_name_ar
+        ? `${r.first_name_ar} ${r.last_name_ar || ""}`.trim()
+        : null,
+      photoUrl: r.photo_url,
+      points,
+      completedCount,
+      totalEnrollments,
+      badges,
+    };
+  });
+}
