@@ -115,10 +115,10 @@ export async function getPlayerAttentionData(): Promise<PlayerAttention[]> {
         raw: true,
       }) as Promise<any[]>,
 
-      // Last session (referral) per player
+      // Last session per player (actual session_date, not referral creation date)
       sequelize.query<{ player_id: string; last_date: string }>(
-        `SELECT player_id, MAX(created_at) as last_date
-         FROM referrals
+        `SELECT player_id, MAX(session_date) as last_date
+         FROM sessions
          WHERE player_id = ANY($1)
          GROUP BY player_id`,
         {

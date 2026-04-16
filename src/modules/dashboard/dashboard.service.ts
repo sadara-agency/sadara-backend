@@ -501,15 +501,23 @@ export async function getQuickStats() {
         completed_gates: number;
         active_referrals: number;
         watchlist_count: number;
-        completion_rate: number;
+        completion_rate: number | null;
+        overdue_tasks: number;
       }>(
         `SELECT
            (SELECT COUNT(*)::INT FROM gates WHERE status = 'Completed') AS completed_gates,
            (SELECT COUNT(*)::INT FROM referrals WHERE status IN ('Open', 'InProgress')) AS active_referrals,
            (SELECT COUNT(*)::INT FROM watchlists WHERE status = 'Active') AS watchlist_count,
-           (SELECT CASE WHEN COUNT(*) = 0 THEN 0
-             ELSE ROUND(COUNT(*) FILTER (WHERE status = 'Completed')::NUMERIC / COUNT(*)::NUMERIC * 100)
-           END FROM tasks) AS completion_rate`,
+           (SELECT CASE
+             WHEN COUNT(*) FILTER (WHERE status::text != 'Canceled') = 0 THEN NULL
+             ELSE ROUND(
+               COUNT(*) FILTER (WHERE status = 'Completed')::NUMERIC /
+               NULLIF(COUNT(*) FILTER (WHERE status::text != 'Canceled'), 0)::NUMERIC * 100
+             )
+           END FROM tasks) AS completion_rate,
+           (SELECT COUNT(*)::int FROM tasks
+            WHERE status::text NOT IN ('Completed', 'Canceled')
+            AND due_date < CURRENT_DATE) AS overdue_tasks`,
         { type: QueryTypes.SELECT },
       );
 
@@ -517,7 +525,8 @@ export async function getQuickStats() {
         completedGates: result?.completed_gates ?? 0,
         activeReferrals: result?.active_referrals ?? 0,
         watchlistCount: result?.watchlist_count ?? 0,
-        taskCompletionRate: result?.completion_rate ?? 0,
+        taskCompletionRate: result?.completion_rate ?? null,
+        overdueTaskCount: result?.overdue_tasks ?? 0,
       };
     },
     CacheTTL.SHORT,
