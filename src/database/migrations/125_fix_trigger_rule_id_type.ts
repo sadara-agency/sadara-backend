@@ -5,8 +5,8 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  // Fix 1: trigger_rule_id was incorrectly created as UUID and FK'd to a
-  // legacy trigger_rules table (5 seeded rows, never used by application code).
+  // trigger_rule_id was incorrectly created as UUID and FK'd to a legacy
+  // trigger_rules table (5 seeded rows, never used by application code).
   // Auto-task rules use string identifiers (e.g. "contract_legal_review") from
   // DEFAULT_TASK_RULE_CONFIG — not UUIDs. Drop the orphaned FK, convert type.
   await queryInterface.sequelize.query(
@@ -25,13 +25,6 @@ export async function up({
     ON tasks (player_id, trigger_rule_id, is_auto_created, created_at)
     WHERE is_auto_created = true
   `);
-
-  // Fix 2: task_status enum was missing 'Canceled'.
-  // The dedup query uses status NOT IN ('Completed', 'Canceled') —
-  // without this value the cast workaround is needed indefinitely.
-  await queryInterface.sequelize.query(
-    `ALTER TYPE task_status ADD VALUE IF NOT EXISTS 'Canceled'`,
-  );
 }
 
 export async function down({
@@ -54,5 +47,4 @@ export async function down({
     ON tasks (player_id, trigger_rule_id, is_auto_created, created_at)
     WHERE is_auto_created = true
   `);
-  // NOTE: PostgreSQL cannot remove enum values — 'Canceled' stays in task_status
 }
