@@ -159,6 +159,10 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
   // System health proactive rules
   overdue_task_threshold: { enabled: true, dueDays: 0, threshold: 10 },
   approval_escalation_48h: { enabled: true, dueDays: 0 },
+
+  // Wellness rules (triggered by wellness.engine.ts)
+  wellness_weight_stale: { enabled: true, dueDays: 3 },
+  wellness_under_fueling: { enabled: true, dueDays: 2 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
