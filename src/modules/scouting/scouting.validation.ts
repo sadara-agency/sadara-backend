@@ -5,10 +5,28 @@ import { z } from "zod";
 export const createWatchlistSchema = z.object({
   prospectName: z.string().min(1).max(255),
   prospectNameAr: z.string().max(255).optional(),
-  dateOfBirth: z.string().optional(),
+  dateOfBirth: z
+    .string()
+    .refine(
+      (dob) => {
+        const d = new Date(dob);
+        if (isNaN(d.getTime())) return false;
+        const today = new Date();
+        const age =
+          today.getFullYear() -
+          d.getFullYear() -
+          (today.getMonth() < d.getMonth() ||
+          (today.getMonth() === d.getMonth() && today.getDate() < d.getDate())
+            ? 1
+            : 0);
+        return age >= 14 && age <= 45;
+      },
+      { message: "Prospect age must be between 14 and 45 years" },
+    )
+    .optional(),
   nationality: z.string().max(100).optional(),
-  position: z.string().max(100).optional(),
-  currentClub: z.string().max(255).optional(),
+  position: z.string().max(100),
+  currentClub: z.string().max(255),
   currentLeague: z.string().max(255).optional(),
   source: z.string().max(255).optional(),
   videoClips: z.number().int().min(0).default(0),
