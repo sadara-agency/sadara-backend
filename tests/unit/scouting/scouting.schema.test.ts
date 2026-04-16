@@ -9,22 +9,25 @@ import {
 
 const UUID = '550e8400-e29b-41d4-a716-446655440001';
 
+// Minimum valid watchlist input — position and currentClub are now required
+const VALID_WATCHLIST = { prospectName: 'Ahmed Ali', position: 'ST', currentClub: 'Al Hilal' };
+
 describe('Scouting Schemas', () => {
   describe('createWatchlistSchema', () => {
     it('should accept valid prospect', () => {
-      expect(createWatchlistSchema.safeParse({ prospectName: 'Ahmed Ali' }).success).toBe(true);
+      expect(createWatchlistSchema.safeParse(VALID_WATCHLIST).success).toBe(true);
     });
     it('should reject empty name', () => {
-      expect(createWatchlistSchema.safeParse({ prospectName: '' }).success).toBe(false);
+      expect(createWatchlistSchema.safeParse({ ...VALID_WATCHLIST, prospectName: '' }).success).toBe(false);
     });
     it('should default priority to Medium', () => {
-      expect(createWatchlistSchema.parse({ prospectName: 'Test' }).priority).toBe('Medium');
+      expect(createWatchlistSchema.parse(VALID_WATCHLIST).priority).toBe('Medium');
     });
     it('should default videoClips to 0', () => {
-      expect(createWatchlistSchema.parse({ prospectName: 'Test' }).videoClips).toBe(0);
+      expect(createWatchlistSchema.parse(VALID_WATCHLIST).videoClips).toBe(0);
     });
     it('should reject rating > 10', () => {
-      expect(createWatchlistSchema.safeParse({ prospectName: 'Test', technicalRating: 11 }).success).toBe(false);
+      expect(createWatchlistSchema.safeParse({ ...VALID_WATCHLIST, technicalRating: 11 }).success).toBe(false);
     });
   });
 

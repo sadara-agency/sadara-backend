@@ -37,7 +37,7 @@ function createVerificationToken(): { rawToken: string; tokenHash: string } {
 const DEFAULT_ROLE = "Analyst";
 
 /** Account lockout settings */
-const MAX_FAILED_ATTEMPTS = 5;
+const MAX_FAILED_ATTEMPTS = 10;
 const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 /** Refresh token expiry in ms (parsed from env, e.g. "30d") */
@@ -680,6 +680,13 @@ export async function forgotPassword(email: string) {
     user.fullName || user.fullNameAr || "",
     resetUrl,
   );
+
+  if (!emailSent) {
+    logger.warn("Password reset email failed to deliver", {
+      userId: user.id,
+      email: user.email,
+    });
+  }
 
   return {
     message: "If this email exists, a reset link has been sent.",

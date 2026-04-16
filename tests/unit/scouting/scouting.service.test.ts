@@ -48,6 +48,7 @@ jest.mock('../../../src/config/logger', () => ({
 }));
 
 import * as scoutingService from '../../../src/modules/scouting/scouting.service';
+import { sequelize } from '../../../src/config/database';
 
 describe('Scouting Service', () => {
   beforeEach(() => { jest.clearAllMocks(); });
@@ -285,19 +286,17 @@ describe('Scouting Service', () => {
 
   describe('getPipelineSummary', () => {
     it('should return pipeline counts', async () => {
-      mockWatchlistCount
-        .mockResolvedValueOnce(10) // Active
-        .mockResolvedValueOnce(5)  // Shortlisted
-        .mockResolvedValueOnce(2)  // Rejected
-        .mockResolvedValueOnce(20); // Total
-      mockScreeningCount
-        .mockResolvedValueOnce(3)  // InProgress
-        .mockResolvedValueOnce(1); // PackReady
-      mockDecisionCount.mockResolvedValue(8);
+      (sequelize.query as jest.Mock).mockResolvedValueOnce([{
+        watchlist: '10',
+        screening: '3',
+        pack_ready: '1',
+        decided: '8',
+        rejected: '2',
+      }]);
       const result = await scoutingService.getPipelineSummary();
-      expect(result).toHaveProperty('total');
-      expect(result).toHaveProperty('watchlist');
-      expect(result).toHaveProperty('screening');
+      expect(result).toHaveProperty('total', 24);
+      expect(result).toHaveProperty('watchlist', 10);
+      expect(result).toHaveProperty('screening', 3);
     });
   });
 });
