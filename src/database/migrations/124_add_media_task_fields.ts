@@ -1,34 +1,20 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  // Extend the existing tasks.type PostgreSQL enum
   await queryInterface.sequelize.query(
     `ALTER TYPE "enum_tasks_type" ADD VALUE IF NOT EXISTS 'Media'`,
   );
 
-  // Which kind of creative content (match_cover, post, story, etc.)
-  await queryInterface.addColumn("tasks", "media_task_type", {
-    type: DataTypes.STRING(50),
-    allowNull: true,
-  });
-
-  // Which platforms this work targets (JSONB array: instagram, twitter, etc.)
-  await queryInterface.addColumn("tasks", "media_platforms", {
-    type: DataTypes.JSONB,
-    allowNull: true,
-    defaultValue: [],
-  });
-
-  // Uploaded deliverable files (JSONB array of {url, thumbnailUrl, uploadedBy, uploadedAt, caption})
-  await queryInterface.addColumn("tasks", "deliverables", {
-    type: DataTypes.JSONB,
-    allowNull: true,
-    defaultValue: [],
-  });
+  await queryInterface.sequelize.query(`
+    ALTER TABLE tasks
+      ADD COLUMN IF NOT EXISTS media_task_type  VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS media_platforms  JSONB NOT NULL DEFAULT '[]',
+      ADD COLUMN IF NOT EXISTS deliverables     JSONB NOT NULL DEFAULT '[]'
+  `);
 }
 
 export async function down({
