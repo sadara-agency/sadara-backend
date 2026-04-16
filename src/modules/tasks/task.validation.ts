@@ -16,7 +16,33 @@ const TASK_TYPES = [
   "Report",
   "Offer",
   "General",
+  "Media",
 ] as const;
+
+export const MEDIA_TASK_TYPES = [
+  "match_cover",
+  "post",
+  "story",
+  "announcement",
+  "injury_update",
+  "return_from_injury",
+  "transfer_news",
+  "general",
+] as const;
+
+export const MEDIA_PLATFORMS = [
+  "instagram",
+  "twitter",
+  "facebook",
+  "tiktok",
+  "linkedin",
+  "snapchat",
+  "youtube",
+] as const;
+
+export const addDeliverableSchema = z.object({
+  caption: z.string().max(200).optional(),
+});
 const TASK_STATUSES = ["Open", "InProgress", "Completed", "Canceled"] as const;
 const TASK_PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
@@ -38,6 +64,8 @@ export const createTaskSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
     .optional(),
   notes: z.string().optional(),
+  mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
+  mediaPlatforms: z.array(z.enum(MEDIA_PLATFORMS)).optional(),
 });
 
 // ── Update Task (partial — any field except assignedBy) ──
@@ -59,6 +87,8 @@ export const updateTaskSchema = z.object({
     .nullable()
     .optional(),
   notes: z.string().nullable().optional(),
+  mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
+  mediaPlatforms: z.array(z.enum(MEDIA_PLATFORMS)).optional(),
 });
 
 // ── Update Status (dedicated endpoint for status transitions) ──
@@ -94,6 +124,7 @@ export const taskQuerySchema = z.object({
   referralId: z.string().uuid().optional(),
   parentTaskId: z.string().uuid().optional(),
   topLevelOnly: z.string().optional(),
+  mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
 });
 
 // ── Inferred types ──

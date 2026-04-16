@@ -3,6 +3,8 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { AppError } from "@middleware/errorHandler";
+import { uploadFile } from "@shared/utils/storage";
 import * as taskService from "@modules/tasks/task.service";
 
 const crud = createCrudController({
@@ -67,4 +69,33 @@ export async function reorderSubTasks(req: AuthRequest, res: Response) {
 export async function suggestedAssignees(req: AuthRequest, res: Response) {
   const data = await taskService.getSuggestedAssignees(req.params.id, req.user);
   sendSuccess(res, data);
+}
+
+// ── Add Deliverable (Media tasks) ──
+export async function addDeliverable(req: AuthRequest, res: Response) {
+  if (!req.file) throw new AppError("No file uploaded", 400);
+
+  const result = await uploadFile({
+    folder: "photos",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: true,
+  });
+
+  const { caption } = req.body;
+  const task = await taskService.addDeliverable(
+    req.params.id,
+    req.user!.id,
+    { url: result.url, thumbnailUrl: result.thumbnailUrl },
+    caption,
+  );
+  sendSuccess(res, task);
+}
+
+// ── Remove Deliverable (Media tasks) ──
+export async function removeDeliverable(req: AuthRequest, res: Response) {
+  const { id, index } = req.params;
+  const task = await taskService.removeDeliverable(id, parseInt(index, 10));
+  sendSuccess(res, task);
 }

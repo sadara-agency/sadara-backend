@@ -10,12 +10,13 @@
 //   - Auto-set completedAt when status → Completed
 // ─────────────────────────────────────────────────────────────
 import { Op, Sequelize, literal } from "sequelize";
-import { Task } from "@modules/tasks/task.model";
+import { Task, MediaTaskDeliverable } from "@modules/tasks/task.model";
 import { generateDisplayId } from "@shared/utils/displayId";
 import { Player } from "@modules/players/player.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
+import { notifyByRole } from "@modules/notifications/notification.service";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import {
@@ -77,6 +78,8 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
   if (queryParams.assignedTo) where.assignedTo = queryParams.assignedTo;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   if (queryParams.referralId) where.referralId = queryParams.referralId;
+  if (queryParams.mediaTaskType)
+    where.mediaTaskType = queryParams.mediaTaskType;
 
   if (search) {
     const pattern = `%${search}%`;
@@ -420,4 +423,53 @@ export async function getSuggestedAssignees(taskId: string, user?: AuthUser) {
 // ────────────────────────────────────────────────────────────
 export async function deleteTask(id: string) {
   return destroyById(Task, id, "Task");
+}
+
+// ────────────────────────────────────────────────────────────
+// Add Deliverable (Media tasks)
+// ────────────────────────────────────────────────────────────
+export async function addDeliverable(
+  taskId: string,
+  userId: string,
+  uploadResult: { url: string; thumbnailUrl: string | null },
+  caption?: string,
+): Promise<Task> {
+  const task = await getTaskById(taskId);
+  const deliverable: MediaTaskDeliverable = {
+    url: uploadResult.url,
+    thumbnailUrl: uploadResult.thumbnailUrl,
+    uploadedBy: userId,
+    uploadedAt: new Date().toISOString(),
+    caption: caption ?? null,
+  };
+  const existing = (task.deliverables as MediaTaskDeliverable[]) ?? [];
+  await task.update({ deliverables: [...existing, deliverable] });
+
+  notifyByRole(["Admin", "Manager"], {
+    type: "task",
+    title: "Media deliverable uploaded",
+    titleAr: "تم رفع عمل إعلامي",
+    body: task.title,
+    link: "/dashboard/media/tasks",
+    sourceType: "task",
+    sourceId: task.id,
+  } as any).catch(() => {});
+
+  return task.reload();
+}
+
+// ────────────────────────────────────────────────────────────
+// Remove Deliverable (Media tasks)
+// ────────────────────────────────────────────────────────────
+export async function removeDeliverable(
+  taskId: string,
+  index: number,
+): Promise<Task> {
+  const task = await getTaskById(taskId);
+  const existing = [...((task.deliverables as MediaTaskDeliverable[]) ?? [])];
+  if (index < 0 || index >= existing.length)
+    throw new AppError("Deliverable not found", 404);
+  existing.splice(index, 1);
+  await task.update({ deliverables: existing });
+  return task.reload();
 }

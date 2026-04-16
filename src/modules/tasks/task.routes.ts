@@ -19,6 +19,7 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
 import {
   createTaskSchema,
   updateTaskSchema,
@@ -90,6 +91,32 @@ router.delete(
   "/:id",
   authorizeModule("tasks", "delete"),
   asyncHandler(taskController.remove),
+);
+
+// ── Deliverables (Media tasks only) ──
+router.post(
+  "/:id/deliverables",
+  authorizeModule("tasks", "update"),
+  (req, res, next) => {
+    uploadSingle(req, res, (err: any) => {
+      if (err) {
+        const msg =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "File too large. Maximum size is 25MB."
+            : err.message || "Upload failed";
+        return res.status(400).json({ success: false, message: msg });
+      }
+      next();
+    });
+  },
+  verifyFileType,
+  asyncHandler(taskController.addDeliverable),
+);
+
+router.delete(
+  "/:id/deliverables/:index",
+  authorizeModule("tasks", "update"),
+  asyncHandler(taskController.removeDeliverable),
 );
 
 export default router;

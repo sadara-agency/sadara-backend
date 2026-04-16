@@ -10,6 +10,7 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { generateDisplayId } from "@shared/utils/displayId";
+import { generateMatchCoverTask } from "@modules/matches/matchAutoTasks";
 
 const CLUB_ATTRS = ["id", "name", "nameAr", "logoUrl"] as const;
 const PLAYER_ATTRS = [
@@ -235,7 +236,12 @@ export async function createMatch(input: any) {
 
   const displayId = await generateDisplayId("matches");
   const match = await Match.create({ ...input, displayId });
-  return getMatchById(match.id);
+  const createdMatch = await getMatchById(match.id);
+
+  // Fire-and-forget: auto-create media cover task
+  generateMatchCoverTask(createdMatch as any).catch(() => {});
+
+  return createdMatch;
 }
 
 export async function updateMatch(id: string, input: any) {

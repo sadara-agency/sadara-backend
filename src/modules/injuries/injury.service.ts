@@ -18,7 +18,11 @@ import type {
   UpdateInjuryInput,
   AddInjuryUpdateInput,
 } from "@modules/injuries/injury.validation";
-import { generateCriticalInjuryTask } from "@modules/injuries/injuryAutoTasks";
+import {
+  generateCriticalInjuryTask,
+  generateInjuryUpdateMediaTask,
+  generateReturnFromInjuryMediaTask,
+} from "@modules/injuries/injuryAutoTasks";
 import { generateAutoReferralForInjury } from "@modules/injuries/injuryAutoReferral";
 import { AuthUser } from "@shared/types";
 import {
@@ -180,6 +184,17 @@ export async function createInjury(
     }),
   );
 
+  // Fire-and-forget: auto-create media injury update graphic task
+  generateInjuryUpdateMediaTask({
+    playerId: input.playerId,
+    player: player as any,
+  }).catch((err) =>
+    logger.warn("Media injury update task generation failed", {
+      injuryId: injury.id,
+      error: (err as Error).message,
+    }),
+  );
+
   // Fire-and-forget: auto-create Medical case for every injury
   generateAutoReferralForInjury(injury.id, input.playerId, createdBy).catch(
     (err) =>
@@ -255,6 +270,18 @@ export async function updateInjury(id: string, input: UpdateInjuryInput) {
         { where: { id: injury.playerId } },
       );
     }
+  }
+
+  // Fire-and-forget: auto-create media return-from-injury graphic task
+  if (input.status === "Recovered") {
+    generateReturnFromInjuryMediaTask({
+      playerId: injury.playerId,
+    }).catch((err) =>
+      logger.warn("Media return-from-injury task generation failed", {
+        injuryId: id,
+        error: (err as Error).message,
+      }),
+    );
   }
 
   return getInjuryById(updated.id);
