@@ -64,7 +64,14 @@ export interface AutoTaskInput {
   titleAr: string;
   description: string;
   descriptionAr?: string;
-  type: "Match" | "Contract" | "Health" | "Report" | "Offer" | "General";
+  type:
+    | "Match"
+    | "Contract"
+    | "Health"
+    | "Report"
+    | "Offer"
+    | "General"
+    | "Media";
   priority: "low" | "medium" | "high" | "critical";
   assignedTo?: string | null;
   assignedBy?: string | null;
@@ -76,6 +83,10 @@ export interface AutoTaskInput {
   /** Explicit due date string (YYYY-MM-DD). Takes precedence over dueDays. */
   dueDateStr?: string;
   notes?: string;
+  /** Media-specific: which kind of creative content */
+  mediaTaskType?: string;
+  /** Media-specific: target platforms (e.g. ["instagram", "twitter"]) */
+  mediaPlatforms?: string[];
 }
 
 export interface AutoTaskNotify {
@@ -152,6 +163,8 @@ export async function createAutoTaskIfNotExists(
     isAutoCreated: true,
     triggerRuleId: input.ruleId,
     notes: input.notes ?? input.descriptionAr ?? null,
+    mediaTaskType: input.mediaTaskType ?? null,
+    mediaPlatforms: input.mediaPlatforms ?? [],
   } as any);
 
   // Send notifications (fire-and-forget)

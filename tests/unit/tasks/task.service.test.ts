@@ -32,6 +32,11 @@ jest.mock('../../../src/shared/utils/displayId', () => ({
   generateDisplayId: jest.fn().mockResolvedValue('TSK-26-0001'),
 }));
 
+jest.mock('../../../src/modules/notifications/notification.service', () => ({
+  notifyByRole: jest.fn().mockResolvedValue(undefined),
+  notifyUser: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as taskService from '../../../src/modules/tasks/task.service';
 
 describe('Task Service', () => {

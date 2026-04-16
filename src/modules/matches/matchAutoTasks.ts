@@ -29,6 +29,10 @@ import {
 } from "@modules/notifications/notification.service";
 import { User } from "@modules/users/user.model";
 import { logger } from "@config/logger";
+import {
+  createAutoTaskIfNotExists,
+  findUserByRole,
+} from "@shared/utils/autoTaskHelpers";
 
 // ── Configurable thresholds ──
 // Defaults can be overridden via the settings API (GET/PATCH /settings/task-rules)
@@ -146,6 +150,11 @@ export const DEFAULT_TASK_RULE_CONFIG: Record<string, TaskRuleConfig> = {
 
   // Report triggers
   report_generation_failed: { enabled: true, dueDays: 1 },
+
+  // Media auto-task triggers
+  media_match_cover: { enabled: true, dueDays: 1 },
+  media_injury_update: { enabled: true, dueDays: 1 },
+  media_return_from_injury: { enabled: true, dueDays: 1 },
 };
 
 let _ruleConfig: Record<string, TaskRuleConfig> = {
@@ -939,4 +948,51 @@ export async function generateMatchLevelPreTasks(
   }
 
   return { created: createdRules.length, rules: createdRules };
+}
+
+// ══════════════════════════════════════════════════════════════
+// Media Auto-Task: Match Cover
+// Triggered immediately when a new match is created.
+// ══════════════════════════════════════════════════════════════
+
+export async function generateMatchCoverTask(match: {
+  id: string;
+  matchDate: string | Date;
+  homeClub?: { name?: string; nameAr?: string };
+  awayClub?: { name?: string; nameAr?: string };
+}): Promise<void> {
+  const rc = cfg("media_match_cover");
+  if (!rc.enabled) return;
+
+  const mediaUser = await findUserByRole("Media");
+
+  const homeEn = (match.homeClub as any)?.name ?? "Home";
+  const awayEn = (match.awayClub as any)?.name ?? "Away";
+  const homeAr = (match.homeClub as any)?.nameAr ?? homeEn;
+  const awayAr = (match.awayClub as any)?.nameAr ?? awayEn;
+
+  // Due date: rc.dueDays before match day
+  const matchDay = new Date(match.matchDate);
+  matchDay.setDate(matchDay.getDate() - (rc.dueDays ?? 1));
+  const dueDateStr = matchDay.toISOString().split("T")[0];
+
+  await createAutoTaskIfNotExists(
+    {
+      ruleId: "media_match_cover",
+      title: `Design match cover — ${homeEn} vs ${awayEn}`,
+      titleAr: `تصميم غلاف المباراة — ${homeAr} ضد ${awayAr}`,
+      description: `Create a match day cover graphic for the upcoming fixture on ${new Date(match.matchDate).toLocaleDateString()}.`,
+      type: "Media",
+      mediaTaskType: "match_cover",
+      mediaPlatforms: ["instagram", "twitter", "facebook"],
+      priority: "high",
+      matchId: match.id,
+      assignedTo: mediaUser?.id ?? null,
+      dueDateStr,
+    },
+    {
+      roles: ["Admin", "Manager"],
+      link: "/dashboard/media/tasks",
+    },
+  );
 }

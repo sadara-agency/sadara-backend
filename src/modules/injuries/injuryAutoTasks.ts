@@ -150,6 +150,95 @@ export async function checkInjuryReturnOverdue(): Promise<{ created: number }> {
   return { created };
 }
 
+// ── 15. Real-time: injury update media graphic ──
+
+export async function generateInjuryUpdateMediaTask(injury: {
+  id?: string;
+  playerId: string;
+  player?: {
+    firstName?: string;
+    lastName?: string;
+    firstNameAr?: string;
+    lastNameAr?: string;
+  };
+}): Promise<void> {
+  const rc = cfg("media_injury_update");
+  if (!rc.enabled) return;
+
+  const mediaUser = await findUserByRole("Media");
+
+  const playerEn = injury.player
+    ? `${injury.player.firstName ?? ""} ${injury.player.lastName ?? ""}`.trim()
+    : "Player";
+  const playerAr = injury.player
+    ? `${injury.player.firstNameAr ?? injury.player.firstName ?? ""} ${injury.player.lastNameAr ?? injury.player.lastName ?? ""}`.trim()
+    : playerEn;
+
+  await createAutoTaskIfNotExists(
+    {
+      ruleId: "media_injury_update",
+      title: `Design injury update graphic — ${playerEn}`,
+      titleAr: `تصميم غرافيك تحديث الإصابة — ${playerAr}`,
+      description: `Create an injury announcement graphic for ${playerEn}.`,
+      type: "Media",
+      mediaTaskType: "injury_update",
+      mediaPlatforms: ["instagram", "twitter"],
+      priority: "medium",
+      playerId: injury.playerId,
+      assignedTo: mediaUser?.id ?? null,
+      dueDays: rc.dueDays ?? 1,
+    },
+    {
+      roles: ["Admin", "Manager"],
+      link: "/dashboard/media/tasks",
+    },
+  );
+}
+
+// ── 16. Real-time: return-from-injury media graphic ──
+
+export async function generateReturnFromInjuryMediaTask(injury: {
+  playerId: string;
+  player?: {
+    firstName?: string;
+    lastName?: string;
+    firstNameAr?: string;
+    lastNameAr?: string;
+  };
+}): Promise<void> {
+  const rc = cfg("media_return_from_injury");
+  if (!rc.enabled) return;
+
+  const mediaUser = await findUserByRole("Media");
+
+  const playerEn = injury.player
+    ? `${injury.player.firstName ?? ""} ${injury.player.lastName ?? ""}`.trim()
+    : "Player";
+  const playerAr = injury.player
+    ? `${injury.player.firstNameAr ?? injury.player.firstName ?? ""} ${injury.player.lastNameAr ?? injury.player.lastName ?? ""}`.trim()
+    : playerEn;
+
+  await createAutoTaskIfNotExists(
+    {
+      ruleId: "media_return_from_injury",
+      title: `Design return-from-injury graphic — ${playerEn}`,
+      titleAr: `تصميم غرافيك عودة اللاعب — ${playerAr}`,
+      description: `Create a return-from-injury announcement graphic for ${playerEn}.`,
+      type: "Media",
+      mediaTaskType: "return_from_injury",
+      mediaPlatforms: ["instagram", "twitter"],
+      priority: "medium",
+      playerId: injury.playerId,
+      assignedTo: mediaUser?.id ?? null,
+      dueDays: rc.dueDays ?? 1,
+    },
+    {
+      roles: ["Admin", "Manager"],
+      link: "/dashboard/media/tasks",
+    },
+  );
+}
+
 // ── 14. Cron: injury treatment stale ──
 
 export async function checkInjuryTreatmentStale(): Promise<{

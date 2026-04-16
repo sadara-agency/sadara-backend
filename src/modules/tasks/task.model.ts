@@ -3,6 +3,15 @@ import { sequelize } from "@config/database";
 import { logAudit } from "@shared/utils/audit";
 import type { UserRole } from "@shared/types";
 
+// ── Media deliverable shape (stored in JSONB) ──
+export interface MediaTaskDeliverable {
+  url: string;
+  thumbnailUrl: string | null;
+  uploadedBy: string;
+  uploadedAt: string;
+  caption: string | null;
+}
+
 // ── Attribute interfaces ──
 interface TaskAttributes {
   id: string;
@@ -11,7 +20,14 @@ interface TaskAttributes {
   titleAr: string | null;
   description: string | null;
   descriptionHtml: string | null;
-  type: "Match" | "Contract" | "Health" | "Report" | "Offer" | "General";
+  type:
+    | "Match"
+    | "Contract"
+    | "Health"
+    | "Report"
+    | "Offer"
+    | "General"
+    | "Media";
   status: "Open" | "InProgress" | "Completed" | "Canceled";
   priority: "low" | "medium" | "high" | "critical";
   assignedTo: string | null;
@@ -27,6 +43,9 @@ interface TaskAttributes {
   parentTaskId: string | null;
   sortOrder: number;
   notes: string | null;
+  mediaTaskType: string | null;
+  mediaPlatforms: string[] | null;
+  deliverables: MediaTaskDeliverable[] | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -54,6 +73,9 @@ interface TaskCreationAttributes extends Optional<
   | "parentTaskId"
   | "sortOrder"
   | "notes"
+  | "mediaTaskType"
+  | "mediaPlatforms"
+  | "deliverables"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -74,7 +96,8 @@ export class Task
     | "Health"
     | "Report"
     | "Offer"
-    | "General";
+    | "General"
+    | "Media";
   declare status: "Open" | "InProgress" | "Completed" | "Canceled";
   declare priority: "low" | "medium" | "high" | "critical";
   declare assignedTo: string | null;
@@ -90,6 +113,9 @@ export class Task
   declare parentTaskId: string | null;
   declare sortOrder: number;
   declare notes: string | null;
+  declare mediaTaskType: string | null;
+  declare mediaPlatforms: string[] | null;
+  declare deliverables: MediaTaskDeliverable[] | null;
 
   // Associations (populated by include)
   declare subTasks?: Task[];
@@ -131,6 +157,7 @@ Task.init(
         "Report",
         "Offer",
         "General",
+        "Media",
       ),
       defaultValue: "General",
     },
@@ -196,6 +223,13 @@ Task.init(
     notes: {
       type: DataTypes.TEXT,
     },
+    mediaTaskType: { type: DataTypes.STRING(50), field: "media_task_type" },
+    mediaPlatforms: {
+      type: DataTypes.JSONB,
+      field: "media_platforms",
+      defaultValue: [],
+    },
+    deliverables: { type: DataTypes.JSONB, defaultValue: [] },
   },
   {
     sequelize,

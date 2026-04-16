@@ -51,6 +51,8 @@ jest.mock('../../../src/modules/injuries/injuryAutoTasks', () => ({
   generateCriticalInjuryTask: jest.fn().mockResolvedValue(null),
   checkInjuryReturnOverdue: jest.fn().mockResolvedValue(undefined),
   checkInjuryTreatmentStale: jest.fn().mockResolvedValue(undefined),
+  generateInjuryUpdateMediaTask: jest.fn().mockResolvedValue(null),
+  generateReturnFromInjuryMediaTask: jest.fn().mockResolvedValue(null),
 }));
 
 jest.mock('../../../src/modules/injuries/injuryAutoReferral', () => ({
