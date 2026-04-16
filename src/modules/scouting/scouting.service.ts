@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 import {
   Watchlist,
@@ -428,27 +428,48 @@ export async function getDecision(id: string) {
 }
 
 // ── Pipeline Summary (for KPIs) ──
-
+// Uses stage-based exclusive counts (mirrors deriveStage on the frontend)
+// so that sum(watchlist + screening + packReady + decided + rejected) = total.
+// Each Watchlist entry is counted in exactly one bucket.
 export async function getPipelineSummary() {
-  const [watchlist, screening, packReady, decisions] = await Promise.all([
-    Watchlist.count({ where: { status: "Active" } }),
-    ScreeningCase.count({ where: { status: "InProgress" } }),
-    ScreeningCase.count({ where: { status: "PackReady" } }),
-    SelectionDecision.count(),
-  ]);
-  const shortlisted = await Watchlist.count({
-    where: { status: "Shortlisted" },
-  });
-  const rejected = await Watchlist.count({ where: { status: "Rejected" } });
-  const total = await Watchlist.count();
+  type SummaryRow = {
+    watchlist: string;
+    screening: string;
+    pack_ready: string;
+    decided: string;
+    rejected: string;
+  };
+  const [row] = await sequelize.query<SummaryRow>(
+    `WITH latest_sc AS (
+       SELECT DISTINCT ON (watchlist_id) watchlist_id, status
+       FROM screening_cases
+       ORDER BY watchlist_id, created_at DESC
+     )
+     SELECT
+       COUNT(*) FILTER (
+         WHERE w.status NOT IN ('Rejected','Archived') AND ls.watchlist_id IS NULL
+       )::int AS watchlist,
+       COUNT(*) FILTER (WHERE ls.status = 'InProgress')::int  AS screening,
+       COUNT(*) FILTER (WHERE ls.status = 'PackReady')::int   AS pack_ready,
+       COUNT(*) FILTER (WHERE ls.status = 'Closed')::int      AS decided,
+       COUNT(*) FILTER (WHERE w.status = 'Rejected')::int     AS rejected
+     FROM watchlist w
+     LEFT JOIN latest_sc ls ON ls.watchlist_id = w.id`,
+    { type: QueryTypes.SELECT },
+  );
+
+  const watchlist = Number(row?.watchlist ?? 0);
+  const screening = Number(row?.screening ?? 0);
+  const packReady = Number(row?.pack_ready ?? 0);
+  const decided = Number(row?.decided ?? 0);
+  const rejected = Number(row?.rejected ?? 0);
 
   return {
-    total,
+    total: watchlist + screening + packReady + decided + rejected,
     watchlist,
-    shortlisted,
     screening,
     packReady,
-    decisions,
+    decided,
     rejected,
   };
 }
