@@ -345,7 +345,9 @@ export async function getPlayerPortfolioReport(filters: ReportFilters) {
     }
 
     const players = await sequelize.query<any>(
-      `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+      `SELECT p.id,
+              CONCAT(p.first_name, ' ', p.last_name) AS name,
+              CONCAT(COALESCE(p.first_name_ar,''), ' ', COALESCE(p.last_name_ar,'')) AS name_ar,
               p.position, p.player_type, p.contract_type, p.market_value,
               p.status, p.date_of_birth, p.nationality, p.photo_url,
               c.name AS club_name, c.name_ar AS club_name_ar
@@ -397,7 +399,8 @@ export async function getContractCommissionReport(filters: ReportFilters) {
       `SELECT c.id, c.title, c.status, c.start_date, c.end_date,
               c.base_salary, c.salary_currency, c.commission_pct, c.total_commission,
               c.player_contract_type,
-              p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+              CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+              CONCAT(COALESCE(p.first_name_ar,''), ' ', COALESCE(p.last_name_ar,'')) AS player_name_ar,
               cl.name AS club_name, cl.name_ar AS club_name_ar
        FROM contracts c
        LEFT JOIN players p ON c.player_id = p.id
@@ -572,7 +575,9 @@ export async function getFinancialSummaryReport(filters: ReportFilters) {
     );
 
     const topPlayers = await sequelize.query<any>(
-      `SELECT p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+      `SELECT p.id,
+              CONCAT(p.first_name, ' ', p.last_name) AS name,
+              CONCAT(COALESCE(p.first_name_ar,''), ' ', COALESCE(p.last_name_ar,'')) AS name_ar,
               p.market_value, p.market_value_currency, p.position, p.photo_url,
               c.name AS club_name, c.name_ar AS club_name_ar
        FROM players p
@@ -826,7 +831,8 @@ export async function getExpiringContractsReport(filters: ReportFilters) {
       `SELECT c.id, c.title, c.status, c.start_date, c.end_date,
               c.base_salary, c.salary_currency, c.player_contract_type,
               (c.end_date - CURRENT_DATE)::INT AS days_remaining,
-              p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+              CONCAT(p.first_name, ' ', p.last_name) AS player_name,
+              CONCAT(COALESCE(p.first_name_ar,''), ' ', COALESCE(p.last_name_ar,'')) AS player_name_ar,
               cl.name AS club_name, cl.name_ar AS club_name_ar
        FROM contracts c
        LEFT JOIN players p ON c.player_id = p.id

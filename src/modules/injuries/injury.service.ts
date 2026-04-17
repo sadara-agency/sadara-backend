@@ -31,6 +31,13 @@ import {
   checkRowAccess,
 } from "@shared/utils/rowScope";
 import { Referral } from "@modules/referrals/referral.model";
+import { logAudit } from "@shared/utils/audit";
+
+const SYSTEM_CTX = {
+  userId: "system",
+  userName: "System",
+  userRole: "Admin" as const,
+};
 
 const PLAYER_ATTRS = [
   "id",
@@ -267,10 +274,24 @@ export async function updateInjury(id: string, input: UpdateInjuryInput) {
       },
     });
     if (activeInjuries === 0) {
+      const player = await Player.findByPk(injury.playerId, {
+        attributes: ["id", "status"],
+      });
+      const prevStatus = player?.getDataValue("status") ?? null;
       await Player.update(
         { status: "active" },
         { where: { id: injury.playerId } },
       );
+      logAudit(
+        "UPDATE",
+        "players",
+        injury.playerId,
+        SYSTEM_CTX,
+        `Status auto-restored to active after injury #${id} recovery`,
+        prevStatus !== "active"
+          ? { status: { old: prevStatus, new: "active" } }
+          : undefined,
+      ).catch(() => {});
     }
   }
 
@@ -331,10 +352,25 @@ export async function addInjuryUpdate(
           transaction: t,
         });
         if (activeCount === 0) {
+          const player = await Player.findByPk(injury.playerId, {
+            attributes: ["id", "status"],
+            transaction: t,
+          });
+          const prevStatus = player?.getDataValue("status") ?? null;
           await Player.update(
             { status: "active" },
             { where: { id: injury.playerId }, transaction: t },
           );
+          logAudit(
+            "UPDATE",
+            "players",
+            injury.playerId,
+            SYSTEM_CTX,
+            `Status auto-restored to active after injury update on #${injuryId}`,
+            prevStatus !== "active"
+              ? { status: { old: prevStatus, new: "active" } }
+              : undefined,
+          ).catch(() => {});
         }
       }
     }

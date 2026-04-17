@@ -53,6 +53,9 @@ export const watchlistQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).default("desc"),
   search: z.string().optional(),
   status: z.enum(["Active", "Shortlisted", "Archived", "Rejected"]).optional(),
+  stage: z
+    .enum(["Watchlist", "Screening", "Selection", "Decided", "Rejected"])
+    .optional(),
   priority: z.enum(["High", "Medium", "Low"]).optional(),
   position: z.string().optional(),
   nationality: z.string().optional(),

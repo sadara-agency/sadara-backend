@@ -40,6 +40,48 @@ export async function listWatchlist(queryParams: any, user?: AuthUser) {
   if (queryParams.nationality)
     where.nationality = { [Op.iLike]: `%${queryParams.nationality}%` };
 
+  // Stage filter — mirrors deriveStage() on the frontend
+  if (queryParams.stage) {
+    switch (queryParams.stage) {
+      case "Rejected":
+        where.status = "Rejected";
+        break;
+      case "Watchlist":
+        // No InProgress/PackReady/Closed screening case
+        where[Op.and] = [
+          ...(where[Op.and] ?? []),
+          sequelize.literal(
+            `NOT EXISTS (SELECT 1 FROM screening_cases sc WHERE sc.watchlist_id = "Watchlist"."id" AND sc.status IN ('InProgress','PackReady','Closed'))`,
+          ),
+        ];
+        break;
+      case "Screening":
+        where[Op.and] = [
+          ...(where[Op.and] ?? []),
+          sequelize.literal(
+            `EXISTS (SELECT 1 FROM screening_cases sc WHERE sc.watchlist_id = "Watchlist"."id" AND sc.status = 'InProgress')`,
+          ),
+        ];
+        break;
+      case "Selection":
+        where[Op.and] = [
+          ...(where[Op.and] ?? []),
+          sequelize.literal(
+            `EXISTS (SELECT 1 FROM screening_cases sc WHERE sc.watchlist_id = "Watchlist"."id" AND sc.status = 'PackReady')`,
+          ),
+        ];
+        break;
+      case "Decided":
+        where[Op.and] = [
+          ...(where[Op.and] ?? []),
+          sequelize.literal(
+            `EXISTS (SELECT 1 FROM screening_cases sc WHERE sc.watchlist_id = "Watchlist"."id" AND sc.status = 'Closed')`,
+          ),
+        ];
+        break;
+    }
+  }
+
   if (search) {
     where[Op.or] = [
       { prospectName: { [Op.iLike]: `%${search}%` } },
@@ -604,18 +646,35 @@ export async function getScoutDashboard(userId: string) {
     avgDays = 0;
   }
 
-  // Conversion rates — query historical totals (how many EVER entered each stage)
+  // Conversion rates — count distinct prospects (watchlist_id) at each stage
+  // Uses DISTINCT watchlist_id so re-screened prospects are not double-counted
+  // and everScreened can never exceed pipeline.total.
   let conversionRates = {
     watchlistToScreening: 0,
     screeningToPackReady: 0,
     packReadyToDecided: 0,
   };
   try {
-    const everScreened = await ScreeningCase.count(); // every prospect that ever got a screening
-    const everPackReady = await ScreeningCase.count({
-      where: { isPackReady: true },
-    });
-    const everDecided = await SelectionDecision.count();
+    const [[screenedRow], [packReadyRow], [decidedRow]] = await Promise.all([
+      sequelize.query<{ n: string }>(
+        `SELECT COUNT(DISTINCT watchlist_id)::text AS n FROM screening_cases`,
+        { type: "SELECT" as any },
+      ),
+      sequelize.query<{ n: string }>(
+        `SELECT COUNT(DISTINCT watchlist_id)::text AS n FROM screening_cases WHERE is_pack_ready = true`,
+        { type: "SELECT" as any },
+      ),
+      sequelize.query<{ n: string }>(
+        `SELECT COUNT(DISTINCT sc.watchlist_id)::text AS n
+         FROM selection_decisions sd
+         JOIN screening_cases sc ON sc.id = sd.screening_case_id`,
+        { type: "SELECT" as any },
+      ),
+    ]);
+
+    const everScreened = Number((screenedRow as any)?.n ?? 0);
+    const everPackReady = Number((packReadyRow as any)?.n ?? 0);
+    const everDecided = Number((decidedRow as any)?.n ?? 0);
 
     conversionRates = {
       watchlistToScreening:
@@ -722,8 +781,11 @@ export async function getScoutAnalytics(
       COALESCE(u.full_name, 'Unknown') as scout_name,
       COUNT(DISTINCT w.id)::text as total,
       COUNT(DISTINCT sc.id)::text as screened,
-      COUNT(DISTINCT CASE WHEN sd.decision = 'Approved' THEN sd.id END)::text as approved,
-      COUNT(DISTINCT CASE WHEN sd.decision = 'Rejected' THEN sd.id END)::text as rejected
+      COUNT(DISTINCT CASE WHEN sd.decision = 'Approved' THEN w.id END)::text as approved,
+      COUNT(DISTINCT CASE
+        WHEN sd.decision = 'Rejected' THEN w.id
+        WHEN w.status    = 'Rejected' THEN w.id
+      END)::text as rejected
     FROM watchlists w
     LEFT JOIN users u ON u.id = w.scouted_by
     LEFT JOIN screening_cases sc ON sc.watchlist_id = w.id
