@@ -39,7 +39,19 @@ export const createPlayerSchema = z.object({
     .refine(
       (val) => new Date(val) <= new Date(),
       "Date of birth cannot be in the future",
-    ),
+    )
+    .refine((val) => {
+      const dob = new Date(val);
+      const today = new Date();
+      const age =
+        today.getFullYear() -
+        dob.getFullYear() -
+        (today.getMonth() < dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+          ? 1
+          : 0);
+      return age >= 14;
+    }, "Player must be at least 14 years old"),
   nationality: z.string().min(1, "Nationality is required"),
   secondaryNationality: z.string().optional(),
   playerType: z.enum(["Pro", "Youth", "Amateur"]).default("Pro"),
@@ -64,6 +76,10 @@ export const createPlayerSchema = z.object({
   overallGrade: z
     .string()
     .max(10, "Grade must be 10 characters or less")
+    .optional(),
+  nationalId: z
+    .string()
+    .max(50, "National ID must be 50 characters or less")
     .optional(),
   notes: z
     .string()

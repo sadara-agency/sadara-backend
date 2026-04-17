@@ -31,7 +31,7 @@ export async function generateReportXlsx(
 
   if (options.summary) {
     for (const [key, val] of Object.entries(options.summary)) {
-      const row = summarySheet.addRow([formatLabel(key), val]);
+      const row = summarySheet.addRow([formatLabel(key), formatCell(val)]);
       row.getCell(1).font = { bold: true, color: { argb: "555555" } };
     }
   }
@@ -59,7 +59,7 @@ export async function generateReportXlsx(
 
     // Data rows
     for (const row of section.rows) {
-      sheet.addRow(cols.map((c) => row[c] ?? ""));
+      sheet.addRow(cols.map((c) => formatCell(row[c])));
     }
 
     // Freeze header
@@ -72,6 +72,28 @@ export async function generateReportXlsx(
 
 function formatLabel(key: string): string {
   return key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d+)?Z?)?$/;
+
+function formatCell(value: unknown): string | number {
+  if (value === null || value === undefined) return "—";
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value ? "✓" : "✗";
+  if (typeof value === "string") {
+    if (ISO_DATE_RE.test(value)) {
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-GB", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+    }
+    return value;
+  }
+  return String(value);
 }
 
 function autoFitColumns(sheet: ExcelJS.Worksheet) {

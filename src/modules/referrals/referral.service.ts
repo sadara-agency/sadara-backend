@@ -338,7 +338,21 @@ async function syncInjuryFromCase(
     },
   });
   if (activeCount === 0) {
+    const player = await Player.findByPk(playerId, {
+      attributes: ["id", "status"],
+    });
+    const prevStatus = player?.getDataValue("status") ?? null;
     await Player.update({ status: "active" }, { where: { id: playerId } });
+    logAudit(
+      "UPDATE",
+      "players",
+      playerId,
+      { userId: "system", userName: "System", userRole: "Admin" as const },
+      `Status auto-restored to active after referral case closure for injury #${injuryId}`,
+      prevStatus !== "active"
+        ? { status: { old: prevStatus, new: "active" } }
+        : undefined,
+    ).catch(() => {});
   }
 }
 
