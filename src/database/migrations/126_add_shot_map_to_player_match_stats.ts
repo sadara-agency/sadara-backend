@@ -1,15 +1,14 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  await queryInterface.addColumn("player_match_stats", "shot_map", {
-    type: DataTypes.JSONB,
-    allowNull: false,
-    defaultValue: [],
-  });
+  await queryInterface.sequelize.query(`
+    ALTER TABLE player_match_stats
+    ADD COLUMN IF NOT EXISTS shot_map JSONB NOT NULL DEFAULT '[]'
+  `);
 }
 
 export async function down({
@@ -17,5 +16,8 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  await queryInterface.removeColumn("player_match_stats", "shot_map");
+  await queryInterface.sequelize.query(`
+    ALTER TABLE player_match_stats
+    DROP COLUMN IF EXISTS shot_map
+  `);
 }
