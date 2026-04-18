@@ -222,6 +222,13 @@ export async function playerAggregateStats(req: AuthRequest, res: Response) {
   sendSuccess(res, stats);
 }
 
+export async function playerShotMap(req: AuthRequest, res: Response) {
+  const { playerId } = req.params;
+  const { season } = req.query as { season?: string };
+  const data = await svc.getPlayerShotMap(playerId, season);
+  sendSuccess(res, data);
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  MATCH ANALYSIS
 // ═══════════════════════════════════════════════════════════════

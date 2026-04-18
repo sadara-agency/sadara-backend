@@ -15,6 +15,7 @@ import {
   bulkStatsSchema,
   updateStatsSchema,
   playerMatchesQuerySchema,
+  playerShotMapQuerySchema,
   createMatchAnalysisSchema,
   updateMatchAnalysisSchema,
   syncMatchesSchema,
@@ -91,6 +92,13 @@ router.get(
   authorizeModule("matches", "read"),
   dynamicFieldAccess("matches"),
   asyncHandler(ctrl.playerAggregateStats),
+);
+router.get(
+  "/player/:playerId/shotmap",
+  authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
+  validate(playerShotMapQuerySchema, "query"),
+  asyncHandler(ctrl.playerShotMap),
 );
 
 // ── Match CRUD ──
