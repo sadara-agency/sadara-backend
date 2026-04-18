@@ -505,6 +505,7 @@ export async function upsertStats(matchId: string, stats: Array<any>) {
       "redCards",
       "rating",
       "positionInMatch",
+      "shotMap",
       "updatedAt",
     ],
   });
@@ -659,6 +660,38 @@ export async function getPlayerAggregateStats(
   });
 
   return result[0] ?? {};
+}
+
+export async function getPlayerShotMap(playerId: string, season?: string) {
+  const statsWhere: Record<string, unknown> = { playerId };
+
+  if (season) {
+    const matchIds = await Match.findAll({
+      where: { season },
+      attributes: ["id"],
+      raw: true,
+    }).then((rows) => rows.map((r) => r.id));
+    statsWhere.matchId = { [Op.in]: matchIds };
+  }
+
+  const rows = await PlayerMatchStats.findAll({
+    where: statsWhere,
+    attributes: ["shotMap", "matchId"],
+    raw: true,
+  });
+
+  const shots = rows.flatMap((r) =>
+    (
+      (r.shotMap as unknown as Array<{
+        x: number;
+        y: number;
+        outcome: string;
+        minute?: number;
+      }>) ?? []
+    ).map((s) => ({ ...s, matchId: r.matchId })),
+  );
+
+  return { shots, total: shots.length };
 }
 
 // ═══════════════════════════════════════════════════════════════

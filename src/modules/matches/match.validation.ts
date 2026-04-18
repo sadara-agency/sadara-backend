@@ -105,6 +105,15 @@ export const updateMatchPlayerSchema = matchPlayerSchema
   .partial()
   .omit({ playerId: true });
 
+// ── Shot Event (for pitch shot map) ──
+
+export const shotEventSchema = z.object({
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  outcome: z.enum(["goal", "saved", "missed"]),
+  minute: z.number().int().min(0).max(120).optional(),
+});
+
 // ── Player Match Stats ──
 
 export const playerMatchStatsSchema = z.object({
@@ -128,6 +137,7 @@ export const playerMatchStatsSchema = z.object({
   redCards: z.number().int().min(0).optional(),
   rating: z.number().min(0).max(10).optional(),
   positionInMatch: z.string().max(50).optional(),
+  shotMap: z.array(shotEventSchema).optional(),
 });
 
 export const bulkStatsSchema = z.object({
@@ -137,6 +147,12 @@ export const bulkStatsSchema = z.object({
 export const updateStatsSchema = playerMatchStatsSchema
   .partial()
   .omit({ playerId: true });
+
+// ── Player Shot Map Query ──
+
+export const playerShotMapQuerySchema = z.object({
+  season: z.string().max(20).optional(),
+});
 
 // ── Player Matches Query (for player profile) ──
 
@@ -180,6 +196,7 @@ export type MatchQuery = z.infer<typeof matchQuerySchema>;
 export type CalendarQuery = z.infer<typeof calendarQuerySchema>;
 export type MatchPlayerInput = z.infer<typeof matchPlayerSchema>;
 export type PlayerMatchStatsInput = z.infer<typeof playerMatchStatsSchema>;
+export type PlayerShotMapQuery = z.infer<typeof playerShotMapQuerySchema>; // { season?: string }
 export type CreateMatchAnalysisInput = z.infer<
   typeof createMatchAnalysisSchema
 >;

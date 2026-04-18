@@ -3,6 +3,13 @@ import { sequelize } from "@config/database";
 
 // ── Attribute Interfaces ──
 
+export interface ShotEvent {
+  x: number;
+  y: number;
+  outcome: "goal" | "saved" | "missed";
+  minute?: number;
+}
+
 export interface PlayerMatchStatsAttributes {
   id: string;
   playerId: string;
@@ -31,6 +38,7 @@ export interface PlayerMatchStatsAttributes {
   cleanSheet?: boolean | null;
   goalsConceded?: number | null;
   penaltiesSaved?: number | null;
+  shotMap?: ShotEvent[];
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -73,6 +81,7 @@ export class PlayerMatchStats
   declare cleanSheet: boolean | null;
   declare goalsConceded: number | null;
   declare penaltiesSaved: number | null;
+  declare shotMap: ShotEvent[];
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -128,6 +137,12 @@ PlayerMatchStats.init(
     cleanSheet: { type: DataTypes.BOOLEAN, field: "clean_sheet" },
     goalsConceded: { type: DataTypes.INTEGER, field: "goals_conceded" },
     penaltiesSaved: { type: DataTypes.INTEGER, field: "penalties_saved" },
+    shotMap: {
+      type: DataTypes.JSONB,
+      field: "shot_map",
+      allowNull: false,
+      defaultValue: [],
+    },
   },
   {
     sequelize,
