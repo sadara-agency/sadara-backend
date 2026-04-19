@@ -68,6 +68,8 @@ import tacticalRoutes from "@modules/tactical/tactical.routes";
 import mentalRoutes from "@modules/mental/mental.routes";
 import videoRoutes from "@modules/video/video.routes";
 import saudiLeaguesRoutes from "@modules/saudiLeagues/saudiLeagues.routes";
+import queueRoutes from "@modules/queues/queues.routes";
+import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -81,6 +83,7 @@ if (env.nodeEnv === "production") {
 app.use(helmet());
 app.use(compression());
 app.use(cookieParser());
+app.use(locale);
 app.use(
   cors({
     origin(origin, callback) {
@@ -350,6 +353,9 @@ app.get(
 
 // ── Swagger UI ──
 setupSwagger(app);
+
+// ── Bull Board (admin queue dashboard) ──
+app.use("/admin/queues", queueRoutes);
 
 // ── 404 ──
 app.use((_req, res) => {

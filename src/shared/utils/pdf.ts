@@ -224,3 +224,19 @@ export async function mergeWithBrandPages(
 
   return Buffer.from(await merged.save());
 }
+
+// ── Async enqueue helper ──
+
+export async function enqueueReportPdf(
+  input: Record<string, unknown>,
+  requestedBy: string,
+): Promise<{ jobId: string }> {
+  // Dynamic import avoids circular-dependency risk between queues module and pdf util.
+  const { enqueue, QueueName } = await import("@modules/queues/queues");
+  const jobId = await enqueue(QueueName.PdfGeneration, "render-report", {
+    kind: "report",
+    input,
+    requestedBy,
+  });
+  return { jobId };
+}

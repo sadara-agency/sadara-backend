@@ -223,6 +223,10 @@ async function startSchedulers(): Promise<void> {
   startSaffScheduler();
   logger.info("[jobs] Starting cron jobs...");
   await withTimeout(startCronJobs(), 15_000, "startCronJobs");
+  if (env.queue.runWorkers) {
+    const { startWorkers } = await import("@modules/queues/workers");
+    startWorkers();
+  }
   logger.info("[jobs] All schedulers running");
 }
 
@@ -409,6 +413,13 @@ async function shutdown(): Promise<void> {
     logger.info("[shutdown] Closing HTTP server...");
     await new Promise<void>((res) => httpServer!.close(() => res()));
   }
+  logger.info("[shutdown] Closing BullMQ workers and queues...");
+  const { stopWorkers } = await import("@modules/queues/workers");
+  const { closeAllQueues } = await import("@modules/queues/queues");
+  const { closeQueueRedis } = await import("@config/queue");
+  await stopWorkers();
+  await closeAllQueues();
+  await closeQueueRedis();
   logger.info("[shutdown] Closing SSE subscriber...");
   await closeSSESubscriber();
   logger.info("[shutdown] Closing Redis...");

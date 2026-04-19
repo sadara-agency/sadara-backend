@@ -99,8 +99,10 @@ import {
 } from "./engines/spl.intelligence.engine";
 // E-signature expiry is lazy-loaded to avoid model init in test context
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
+import { env } from "@config/env";
 import {
   runTopTier,
+  runTopTierDaily,
   runYouthTier,
   runLiveTier,
 } from "./engines/saudiLeagues.engine";
@@ -1046,6 +1048,32 @@ export async function startCronJobs() {
     cron.schedule(expr, safeJob(name));
   }
 
+  // Variant that enqueues the job into BullMQ instead of running inline.
+  // Falls back to safeJob when QUEUE_ENABLED=false.
+  function scheduleEnqueued(expr: string, name: string) {
+    jobSchedules[name] = expr;
+    if (!env.queue.enabled) {
+      cron.schedule(expr, safeJob(name));
+      return;
+    }
+    cron.schedule(expr, async () => {
+      try {
+        const { enqueue, QueueName } = await import("@modules/queues/queues");
+        await enqueue(
+          QueueName.EngineTask,
+          name,
+          { jobName: name },
+          { jobId: name },
+        );
+        logger.debug(`[CRON] Enqueued engine task: ${name}`);
+      } catch (err) {
+        logger.error(`[CRON] Failed to enqueue ${name}`, {
+          error: (err as Error).message,
+        });
+      }
+    });
+  }
+
   // ═══════════════════════════════════════════════════════════
   // Daily jobs staggered to avoid DB contention.
   // No two daily jobs share the same minute.
@@ -1060,7 +1088,7 @@ export async function startCronJobs() {
 
   // ── Pre-business: data sync & verification (5:00–5:50 AM) ──
   schedule("0 5 * * *", "calendar-auto-sync"); // 5:00 AM  (was 6:00)
-  schedule("10 5 * * *", "gate-auto-verify"); // 5:10 AM  (was 6:30)
+  scheduleEnqueued("10 5 * * *", "gate-auto-verify"); // 5:10 AM  (was 6:30)
   schedule("20 5 * * *", "esignature-expire-overdue"); // 5:20 AM  (was 7:00)
   schedule("30 5 * * *", "stale-task-escalator"); // 5:30 AM  (was 7:45)
   schedule("40 5 * * *", "document-expiry"); // 5:40 AM  (was 9:30)
@@ -1071,7 +1099,7 @@ export async function startCronJobs() {
   schedule("0 6 * * *", "upcoming-matches"); // 6:00 AM  (was 7:00)
   schedule("0 6,19 * * *", "contract-status"); // 6:00 AM & 7:00 PM  (was 7:00)
   schedule("10 6 * * *", "fatigue-risk"); // 6:10 AM  (was 7:15)
-  schedule("20 6 * * *", "return-to-play"); // 6:20 AM  (was 7:30)
+  scheduleEnqueued("20 6 * * *", "return-to-play"); // 6:20 AM  (was 7:30)
   schedule("30 6 * * *", "contract-expiry"); // 6:30 AM  (was 8:00)
   schedule("40 6 * * *", "surgery-milestones"); // 6:40 AM  (was 8:00)
   schedule("50 6 * * *", "offer-deadlines"); // 6:50 AM  (was 8:00)
@@ -1096,7 +1124,7 @@ export async function startCronJobs() {
   schedule("20 9 * * *", "document-expiry-tasks"); // 9:20 AM  (was 10:00)
   schedule("30 9 * * *", "gate-stale-detector"); // 9:30 AM  (was 10:30)
   schedule("40 9 * * *", "draft-contract-stale"); // 9:40 AM  (was 11:30)
-  schedule("50 9 * * *", "invoice-aging-tracker"); // 9:50 AM  (was 11:00)
+  scheduleEnqueued("50 9 * * *", "invoice-aging-tracker"); // 9:50 AM  (was 11:00)
 
   // ── Late morning (10:00–10:50 AM) ──
   schedule("0 10 * * *", "injury-recurrence"); // 10:00 AM (was 11:00)
@@ -1154,11 +1182,13 @@ export async function startCronJobs() {
 
   // ── Saudi Leagues Engine ──
   registerJob("saudi-leagues-top-tier", runTopTier);
+  registerJob("saudi-leagues-top-tier-daily", runTopTierDaily);
   registerJob("saudi-leagues-youth-tier", runYouthTier);
   registerJob("saudi-leagues-live", runLiveTier);
   schedule("0 */2 * * *", "saudi-leagues-top-tier"); // Every 2h (matchday-aware)
+  schedule("0 4 * * *", "saudi-leagues-top-tier-daily"); // Daily 04:00 (unconditional fixture fetch)
   schedule("0 3 * * *", "saudi-leagues-youth-tier"); // Daily 03:00
   schedule("*/15 * * * *", "saudi-leagues-live"); // Every 15 min (fast exit if no live)
 
-  logger.info("[CRON] 68 jobs scheduled ✓");
+  logger.info("[CRON] 69 jobs scheduled ✓");
 }

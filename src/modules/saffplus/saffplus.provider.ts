@@ -154,7 +154,7 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
     // SAFF+ renders competition cards with links to /competitions/{slug}
     $('a[href*="/competitions/"]').each((_, el) => {
       const href = $(el).attr("href") || "";
-      const slug = href.replace("/competitions/", "").split("/")[0];
+      const slug = href.match(/\/competitions\/([^/]+)/)?.[1] ?? "";
       if (!slug || slug === "competitions") return;
 
       const name =

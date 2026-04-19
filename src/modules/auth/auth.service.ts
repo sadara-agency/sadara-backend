@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import * as argon2 from "argon2";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { Op, QueryTypes } from "sequelize";
@@ -19,6 +20,34 @@ import {
   sendInviteEmail,
   sendEmailVerificationEmail,
 } from "@shared/utils/mail";
+
+// ── Password hashing — argon2id (new) with bcrypt fallback (legacy) ──
+
+const ARGON2_OPTIONS: argon2.Options & { raw?: false } = {
+  type: argon2.argon2id,
+  memoryCost: 19456, // 19 MiB — OWASP recommended
+  timeCost: 2,
+  parallelism: 1,
+};
+
+/** Hash a new password — always produces argon2id. */
+async function hashPassword(plain: string): Promise<string> {
+  return argon2.hash(plain, ARGON2_OPTIONS);
+}
+
+/** Verify a password against a stored hash (argon2id or legacy bcrypt). */
+async function verifyPassword(
+  plain: string,
+  hash: string,
+): Promise<{ valid: boolean; needsRehash: boolean }> {
+  if (hash.startsWith("$argon2")) {
+    const valid = await argon2.verify(hash, plain);
+    return { valid, needsRehash: false };
+  }
+  // Legacy bcrypt hash — verify then flag for transparent upgrade on next save
+  const valid = await bcrypt.compare(plain, hash);
+  return { valid, needsRehash: valid };
+}
 
 /** Email verification token validity — 24 hours. */
 const VERIFICATION_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
@@ -119,7 +148,7 @@ export async function revokeAllUserTokens(
 
 // ── Public Register (default role, no role selection) ──
 export async function register(input: RegisterInput) {
-  const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
+  const passwordHash = await hashPassword(input.password);
 
   // Generate email verification token up-front so it's persisted atomically with the user row.
   const { rawToken, tokenHash } = createVerificationToken();
@@ -165,7 +194,7 @@ export async function register(input: RegisterInput) {
 
 // ── Admin Invite (Admin assigns role) ──
 export async function invite(input: InviteInput) {
-  const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
+  const passwordHash = await hashPassword(input.password);
 
   let user: User;
   try {
@@ -222,7 +251,8 @@ export async function login(input: LoginInput) {
       );
     }
 
-    if (!(await bcrypt.compare(input.password, user.passwordHash))) {
+    const pwCheck = await verifyPassword(input.password, user.passwordHash);
+    if (!pwCheck.valid) {
       // Atomic increment to prevent race condition on concurrent failed logins.
       // Sequelize's typed update() rejects `Literal` values for column fields,
       // so the object is cast — the atomic SQL expression is the whole point.
@@ -240,6 +270,12 @@ export async function login(input: LoginInput) {
         { where: { id: user.id } },
       );
       throw new AppError("Invalid email or password", 401);
+    }
+    // Transparently upgrade legacy bcrypt hash to argon2id on successful login
+    if (pwCheck.needsRehash) {
+      hashPassword(input.password)
+        .then((newHash) => user.update({ passwordHash: newHash }))
+        .catch(() => {});
     }
 
     // Gate 1: email verification (self-service) — must be checked before
@@ -319,7 +355,11 @@ export async function login(input: LoginInput) {
     );
   }
 
-  if (!(await bcrypt.compare(input.password, playerAccount.passwordHash))) {
+  const playerPwCheck = await verifyPassword(
+    input.password,
+    playerAccount.passwordHash,
+  );
+  if (!playerPwCheck.valid) {
     // Atomic increment — see matching comment in the users-table branch above.
     await PlayerAccount.update(
       {
@@ -335,6 +375,12 @@ export async function login(input: LoginInput) {
       { where: { id: playerAccount.id } },
     );
     throw new AppError("Invalid email or password", 401);
+  }
+  // Transparently upgrade legacy bcrypt hash to argon2id on successful login
+  if (playerPwCheck.needsRehash) {
+    hashPassword(input.password)
+      .then((newHash) => playerAccount.update({ passwordHash: newHash }))
+      .catch(() => {});
   }
 
   if (playerAccount.status !== "active") {
@@ -610,10 +656,11 @@ export async function changePassword(
   const user = await User.findByPk(userId);
 
   if (user) {
-    if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    const check = await verifyPassword(currentPassword, user.passwordHash);
+    if (!check.valid) {
       throw new AppError("Current password is incorrect", 400);
     }
-    const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
+    const newHash = await hashPassword(newPassword);
     await user.update({ passwordHash: newHash });
     // Revoke all refresh tokens on password change
     await revokeAllUserTokens(userId, "user");
@@ -631,11 +678,15 @@ export async function changePassword(
 
   if (!account) throw new AppError("User not found", 404);
 
-  if (!(await bcrypt.compare(currentPassword, account.passwordHash))) {
+  const accountCheck = await verifyPassword(
+    currentPassword,
+    account.passwordHash,
+  );
+  if (!accountCheck.valid) {
     throw new AppError("Current password is incorrect", 400);
   }
 
-  const newHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
+  const newHash = await hashPassword(newPassword);
   await account.update({ passwordHash: newHash });
   // Revoke all refresh tokens on password change
   await revokeAllUserTokens(userId, "player");
@@ -712,7 +763,7 @@ export async function resetPassword(token: string, newPassword: string) {
   }
 
   // Hash the new password and clear the reset token
-  const passwordHash = await bcrypt.hash(newPassword, env.bcrypt.saltRounds);
+  const passwordHash = await hashPassword(newPassword);
 
   await user.update({
     passwordHash,

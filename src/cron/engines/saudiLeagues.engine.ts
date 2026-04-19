@@ -226,6 +226,26 @@ export async function runLiveTier(): Promise<void> {
 }
 
 // ══════════════════════════════════════════
+// TOP TIER DAILY — unconditional fixture fetch at 04:00
+// Ensures upcoming fixtures are always loaded regardless of whether
+// today is a matchday (breaks the matchday-gate feedback loop).
+// ══════════════════════════════════════════
+
+export async function runTopTierDaily(): Promise<void> {
+  return withMutex(async () => {
+    const season = getCurrentSeason();
+    const competitionIds = await getCompetitionIds(TOP_TIER_NAMES);
+    if (!competitionIds.length) {
+      logger.info(
+        "[SaudiLeagues] No top-tier competitions found — check migration 122",
+      );
+      return;
+    }
+    await syncBatch(competitionIds, season, "top-tier daily");
+  });
+}
+
+// ══════════════════════════════════════════
 // SINGLE COMPETITION — for manual admin trigger
 // ══════════════════════════════════════════
 
