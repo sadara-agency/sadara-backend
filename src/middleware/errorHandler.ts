@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import * as Sentry from "@sentry/node";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { translateKey } from "@config/i18n";
 
 export class AppError extends Error {
   statusCode: number;
@@ -10,18 +11,43 @@ export class AppError extends Error {
   errorDetail?: string | { field: string; message: string }[];
   /** Optional stable error code clients can branch on (e.g. "EMAIL_NOT_VERIFIED") */
   code?: string;
+  /** i18n key for bilingual error responses (e.g. "errors:notFound") */
+  i18nKey?: string;
+  /** Interpolation params for the i18n key (e.g. { entity: "Player" }) */
+  i18nParams?: Record<string, unknown>;
 
   constructor(
     message: string,
     statusCode = 400,
     isOperational = true,
     code?: string,
+    i18nKey?: string,
+    i18nParams?: Record<string, unknown>,
   ) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
     this.code = code;
+    this.i18nKey = i18nKey;
+    this.i18nParams = i18nParams;
     Object.setPrototypeOf(this, AppError.prototype);
+  }
+
+  /** Factory for errors with a bilingual i18n key. */
+  static localized(
+    message: string,
+    statusCode: number,
+    i18nKey: string,
+    i18nParams?: Record<string, unknown>,
+  ): AppError {
+    return new AppError(
+      message,
+      statusCode,
+      true,
+      undefined,
+      i18nKey,
+      i18nParams,
+    );
   }
 
   /** Create a validation error with field-level detail matching Zod middleware format */
@@ -59,9 +85,17 @@ export function errorHandler(
       method: req.method,
     });
 
+    // Include Arabic translation when client requests AR and the error has an i18n key
+    const reqLocale = (req as any).locale as string | undefined;
+    const messageAr =
+      err.i18nKey && reqLocale === "ar"
+        ? translateKey(err.i18nKey, "ar", err.i18nParams)
+        : undefined;
+
     res.status(err.statusCode).json({
       success: false,
       message: err.message,
+      ...(messageAr && { messageAr }),
       ...(err.code && { code: err.code }),
       ...(err.errorDetail && { error: err.errorDetail }),
     });

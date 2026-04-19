@@ -110,6 +110,21 @@ const envSchema = z.object({
     .default("false")
     .transform((v) => v === "true"),
 
+  // ClamAV virus scanning (optional — defaults to disabled in dev)
+  CLAMAV_HOST: z.string().default("localhost"),
+  CLAMAV_PORT: z.coerce.number().default(3310),
+  CLAMAV_ENABLED: z
+    .preprocess((v) => String(v) === "true", z.boolean())
+    .default(false),
+
+  // BullMQ background job queues
+  QUEUE_ENABLED: z
+    .preprocess((v) => (String(v) === "false" ? false : true), z.boolean())
+    .default(true),
+  RUN_WORKERS: z
+    .preprocess((v) => (String(v) === "false" ? false : true), z.boolean())
+    .default(true),
+
   // Puppeteer (optional — override Chromium binary path)
   PUPPETEER_EXECUTABLE_PATH: z.string().default(""),
 
@@ -242,6 +257,17 @@ export const env = {
 
   csrf: {
     enforce: validated.CSRF_ENFORCE,
+  },
+
+  clamav: {
+    host: validated.CLAMAV_HOST,
+    port: validated.CLAMAV_PORT,
+    enabled: validated.CLAMAV_ENABLED,
+  },
+
+  queue: {
+    enabled: validated.QUEUE_ENABLED,
+    runWorkers: validated.RUN_WORKERS,
   },
 
   puppeteer: {

@@ -154,7 +154,7 @@ interface MailOptions {
   text?: string; // plain-text fallback
 }
 
-export async function sendMail(options: MailOptions): Promise<boolean> {
+export async function sendMailDirect(options: MailOptions): Promise<boolean> {
   const transporter = await getTransporter();
 
   if (!transporter) {
@@ -187,6 +187,15 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
     });
     return false;
   }
+}
+
+export async function sendMail(options: MailOptions): Promise<boolean> {
+  if (env.queue.enabled) {
+    const { enqueue, QueueName } = await import("@modules/queues/queues");
+    await enqueue(QueueName.Email, "send-email", options);
+    return true;
+  }
+  return sendMailDirect(options);
 }
 
 // ═══════════════════════════════════════════════════════════

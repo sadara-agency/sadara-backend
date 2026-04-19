@@ -7,6 +7,7 @@ import {
 import { User } from "@modules/users/user.model";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { logger } from "@config/logger";
+import { env } from "@config/env";
 import {
   publishNotification,
   type SSENotificationPayload,
@@ -48,12 +49,25 @@ export async function createNotification(input: CreateNotificationInput) {
             ? notif.createdAt.toISOString()
             : String(notif.createdAt),
       };
-      publishNotification(input.userId, payload).catch((err) =>
-        logger.warn("SSE publish failed", {
-          userId: input.userId,
-          error: (err as Error).message,
-        }),
-      );
+      (async () => {
+        try {
+          if (env.queue.enabled) {
+            const { enqueue, QueueName } =
+              await import("@modules/queues/queues");
+            await enqueue(QueueName.NotificationFanout, "push", {
+              userId: input.userId,
+              payload,
+            });
+          } else {
+            await publishNotification(input.userId, payload);
+          }
+        } catch (err) {
+          logger.warn("SSE push failed", {
+            userId: input.userId,
+            error: (err as Error).message,
+          });
+        }
+      })();
     }
 
     return notif;

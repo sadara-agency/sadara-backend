@@ -1,0 +1,14 @@
+{
+  "notFound": "{{entity}} غير موجود",
+  "forbidden": "ليس لديك صلاحية الوصول إلى هذا المورد",
+  "unauthorized": "غير مصرح",
+  "duplicate": "{{entity}} موجود مسبقاً",
+  "uploadInfected": "فشل فحص الملف من الفيروسات",
+  "avServiceUnavailable": "خدمة مكافحة الفيروسات غير متاحة",
+  "validationFailed": "فشل التحقق من البيانات",
+  "accountLocked": "تم قفل الحساب مؤقتاً. حاول مجدداً بعد {{minutes}} دقيقة.",
+  "accountInactive": "حسابك في انتظار موافقة المسؤول.",
+  "emailNotVerified": "يرجى التحقق من بريدك الإلكتروني قبل تسجيل الدخول.",
+  "invalidCredentials": "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+  "internalError": "خطأ داخلي في الخادم"
+}

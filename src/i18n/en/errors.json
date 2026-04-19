@@ -1,0 +1,14 @@
+{
+  "notFound": "{{entity}} not found",
+  "forbidden": "You do not have permission to access this resource",
+  "unauthorized": "Unauthorized",
+  "duplicate": "{{entity}} already exists",
+  "uploadInfected": "File failed virus scan",
+  "avServiceUnavailable": "AV service unavailable",
+  "validationFailed": "Validation failed",
+  "accountLocked": "Account is temporarily locked. Try again in {{minutes}} minute(s).",
+  "accountInactive": "Your account is waiting for admin approval.",
+  "emailNotVerified": "Please verify your email address before signing in.",
+  "invalidCredentials": "Invalid email or password",
+  "internalError": "Internal server error"
+}
