@@ -4,7 +4,7 @@
  *   - name: SAFF+
  *     description: SAFF+ data provider — Saudi football competitions, clubs, standings, and matches
  *
- * /saff-plus/discover:
+ * /saffplus/discover:
  *   get:
  *     tags: [SAFF+]
  *     summary: Discover available SAFF+ competitions and leagues
@@ -22,7 +22,7 @@
  *                 data: { type: object }
  *       502: { description: SAFF+ provider unreachable }
  *
- * /saff-plus/competitions:
+ * /saffplus/competitions:
  *   get:
  *     tags: [SAFF+]
  *     summary: List all SAFF+ competitions
@@ -38,7 +38,7 @@
  *                 success: { type: boolean }
  *                 data: { type: array, items: { type: object } }
  *
- * /saff-plus/clubs:
+ * /saffplus/clubs:
  *   get:
  *     tags: [SAFF+]
  *     summary: List all SAFF+ clubs / teams
@@ -54,7 +54,7 @@
  *                 success: { type: boolean }
  *                 data: { type: array, items: { type: object } }
  *
- * /saff-plus/competitions/{competitionId}/standings:
+ * /saffplus/competitions/{competitionId}/standings:
  *   get:
  *     tags: [SAFF+]
  *     summary: Get standings for a SAFF+ competition
@@ -77,7 +77,7 @@
  *                 data: { type: array, items: { type: object } }
  *       404: { description: Competition not found }
  *
- * /saff-plus/competitions/{competitionId}/matches:
+ * /saffplus/competitions/{competitionId}/matches:
  *   get:
  *     tags: [SAFF+]
  *     summary: Get matches for a SAFF+ competition
@@ -100,7 +100,7 @@
  *                 data: { type: array, items: { type: object } }
  *       404: { description: Competition not found }
  *
- * /saff-plus/sync:
+ * /saffplus/sync:
  *   post:
  *     tags: [SAFF+]
  *     summary: Sync Saudi league matches from SAFF+ into the local database
