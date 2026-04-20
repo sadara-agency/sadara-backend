@@ -69,7 +69,8 @@ export async function getJobStatus(req: AuthRequest, res: Response) {
   const queue = getQueue(QueueName.SaffFetch);
   const job = await queue.getJob(jobId);
   if (!job) {
-    return res.status(404).json({ success: false, message: "Job not found" });
+    res.status(404).json({ success: false, message: "Job not found" });
+    return;
   }
   const status = await job.getState();
   sendSuccess(res, {

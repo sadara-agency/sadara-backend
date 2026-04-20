@@ -97,7 +97,6 @@ export function createSaffWorker(): Worker<SaffJobData, SaffJobResult> {
   worker.on("completed", (job, result) =>
     logger.info("[SaffWorker] Job completed", {
       jobId: job.id,
-      kind: job.data.kind,
       ...result,
     }),
   );
