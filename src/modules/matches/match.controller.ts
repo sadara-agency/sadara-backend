@@ -32,6 +32,11 @@ export const { list, getById, create, update, remove } = crud;
 //  CUSTOM MATCH HANDLERS
 // ═══════════════════════════════════════════════════════════════
 
+export async function leaderboard(req: AuthRequest, res: Response) {
+  const data = await svc.getLeaderboard(req.query as any);
+  sendSuccess(res, data);
+}
+
 export async function upcoming(req: AuthRequest, res: Response) {
   const days = Number(req.query.days) || 7;
   const limit = Number(req.query.limit) || 10;

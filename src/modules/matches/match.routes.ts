@@ -19,6 +19,7 @@ import {
   createMatchAnalysisSchema,
   updateMatchAnalysisSchema,
   syncMatchesSchema,
+  leaderboardQuerySchema,
 } from "@modules/matches/match.validation";
 import * as ctrl from "@modules/matches/match.controller";
 import analyticsRoutes from "@modules/matches/analytics/matchAnalytics.routes";
@@ -28,6 +29,14 @@ router.use(authenticate);
 
 // ── Analytics sub-module ──
 router.use("/analytics", analyticsRoutes);
+
+// ── Stats Leaderboard (must be before /:id) ──
+router.get(
+  "/stats/leaderboard",
+  authorizeModule("matches", "read"),
+  validate(leaderboardQuerySchema, "query"),
+  asyncHandler(ctrl.leaderboard),
+);
 
 // ── Calendar (must be before /:id to avoid route conflict) ──
 router.get(

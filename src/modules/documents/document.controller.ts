@@ -137,3 +137,58 @@ export async function download(req: AuthRequest, res: Response) {
   // Remote URLs (GCS signed URLs etc.): redirect
   res.redirect(url);
 }
+
+// ── Preview (serve file for inline viewing) ──
+export async function preview(req: AuthRequest, res: Response) {
+  const doc = await svc.getDocumentById(req.params.id, req.user);
+  if (!doc?.fileUrl) {
+    throw new AppError("Document file not available", 404);
+  }
+
+  const url = await resolveFileUrl(doc.fileUrl, 15); // 15 min expiry
+
+  // Local files: serve directly with proper headers for preview
+  if (url.startsWith("/uploads/")) {
+    const path = await import("path");
+    const fs = await import("fs");
+    const filePath = path.resolve(url.slice(1)); // strip leading /
+    if (!fs.existsSync(filePath)) {
+      throw new AppError("File not found on disk", 404);
+    }
+    // Set appropriate content-type for preview
+    const mimeType = doc.mimeType || "application/octet-stream";
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${encodeURIComponent(doc.name)}"`,
+    );
+    return res.sendFile(filePath);
+  }
+
+  // For remote files (GCS etc.), we need to proxy to avoid CORS/auth issues in browser
+  try {
+    const axiosModule = await import("axios");
+    const axios = axiosModule.default || axiosModule;
+    const fileResponse = await axios.get(url, {
+      responseType: "arraybuffer",
+      timeout: 10000,
+    });
+
+    // Set headers for inline preview
+    const contentType =
+      fileResponse.headers["content-type"] ||
+      doc.mimeType ||
+      "application/octet-stream";
+    res.setHeader("Content-Type", contentType);
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="${encodeURIComponent(doc.name)}"`,
+    );
+    res.setHeader("Cache-Control", "private, max-age=300"); // 5 minutes
+
+    res.send(fileResponse.data);
+  } catch (error) {
+    // If proxy fails, fall back to redirect (though this won't work well for previews)
+    res.redirect(url);
+  }
+}
