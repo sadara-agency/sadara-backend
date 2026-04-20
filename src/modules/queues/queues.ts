@@ -2,6 +2,14 @@ import { Queue, JobsOptions } from "bullmq";
 import { getQueueConnection } from "@config/queue";
 import { logger } from "@config/logger";
 
+function createQueue<T>(name: string): Queue<T> {
+  const q = new Queue<T>(name, { connection: getQueueConnection() });
+  q.on("error", (err) =>
+    logger.error(`[Queue:${name}] error`, { error: err.message }),
+  );
+  return q;
+}
+
 export enum QueueName {
   PdfGeneration = "pdf-generation",
   Email = "email",
@@ -22,7 +30,7 @@ const queues = new Map<QueueName, Queue>();
 export function getQueue<T = unknown>(name: QueueName): Queue<T> {
   let q = queues.get(name);
   if (!q) {
-    q = new Queue(name, { connection: getQueueConnection() });
+    q = createQueue<T>(name);
     queues.set(name, q);
   }
   return q as Queue<T>;
