@@ -2,6 +2,7 @@
 jest.mock('../../../src/modules/documents/document.service');
 jest.mock('../../../src/shared/utils/storage', () => ({
   uploadFile: jest.fn().mockResolvedValue({ url: 'http://cdn.test/doc.pdf', size: 2048, mimeType: 'application/pdf' }),
+  resolveFileUrl: jest.fn().mockImplementation((url) => Promise.resolve(url)), // Simple passthrough for testing
 }));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
@@ -22,7 +23,12 @@ const mockReq = (overrides = {}) => ({
 }) as any;
 
 const mockRes = () => {
-  const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis() };
+  const res = { 
+    status: jest.fn().mockReturnThis(), 
+    json: jest.fn().mockReturnThis(),
+    setHeader: jest.fn().mockReturnThis(),
+    sendFile: jest.fn()
+  };
   return res as any;
 };
 
@@ -84,6 +90,84 @@ describe('Document Controller', () => {
       const res = mockRes();
       await controller.remove(mockReq({ params: { id: 'd1' } }), res);
       expect(res.status).toHaveBeenCalledWith(200);
+    });
+  });
+
+  describe('preview', () => {
+    it('should set correct headers for local file preview', async () => {
+      (svc.getDocumentById as jest.Mock).mockResolvedValue({
+        id: 'd1',
+        fileUrl: '/uploads/documents/test.pdf',
+        mimeType: 'application/pdf',
+        name: 'test.pdf'
+      });
+      
+      const res = mockRes();
+      // Mock sendFile to avoid actual file system access
+      res.sendFile = jest.fn();
+      
+      // Mock the path and fs imports inside the function
+      // The controller does: path.resolve(url.slice(1)) where url starts with "/uploads/"
+      // So we need to mock path.resolve to return the expected path
+      const pathMock = { 
+        resolve: (path: string) => {
+          // Simulate path.resolve behavior for our test case
+          if (path === 'uploads/documents/test.pdf') {
+            return '/absolute/path/uploads/documents/test.pdf';
+          }
+          return path; // fallback
+        }
+      };
+      jest.doMock('path', () => pathMock);
+      
+      const fsMock = { existsSync: () => true };
+      jest.doMock('fs', () => fsMock);
+      
+      await controller.preview(mockReq({ params: { id: 'd1' } }), res);
+      
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/pdf');
+      expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'inline; filename="test.pdf"');
+      // Check that sendFile was called with the resolved path
+      expect(res.sendFile).toHaveBeenCalledWith('/absolute/path/uploads/documents/test.pdf');
+      
+      // Cleanup mocks
+      jest.unmock('path');
+      jest.unmock('fs');
+    });
+
+    it('should handle missing file gracefully', async () => {
+      (svc.getDocumentById as jest.Mock).mockResolvedValue({
+        id: 'd1',
+        fileUrl: '/uploads/documents/missing.pdf',
+        mimeType: 'application/pdf',
+        name: 'missing.pdf'
+      });
+      
+      const res = mockRes();
+      res.status = jest.fn().mockReturnThis();
+      res.json = jest.fn().mockReturnThis();
+      
+      // Mock the path and fs imports inside the function
+      const pathMock = { 
+        resolve: (path: string) => {
+          // Simulate path.resolve behavior for our test case
+          if (path === 'uploads/documents/missing.pdf') {
+            return '/absolute/path/uploads/documents/missing.pdf';
+          }
+          return path; // fallback
+        }
+      };
+      jest.doMock('path', () => pathMock);
+      
+      const fsMock = { existsSync: () => false };
+      jest.doMock('fs', () => fsMock);
+      
+      await expect(controller.preview(mockReq({ params: { id: 'd1' } }), res))
+        .rejects.toThrow();
+      
+      // Cleanup mocks
+      jest.unmock('path');
+      jest.unmock('fs');
     });
   });
 });

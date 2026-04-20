@@ -662,6 +662,96 @@ export async function getPlayerAggregateStats(
   return result[0] ?? {};
 }
 
+export async function getLeaderboard(params: {
+  from?: string;
+  to?: string;
+  competition?: string;
+  clubId?: string;
+  season?: string;
+  limit?: number;
+}) {
+  const matchWhere: any = {};
+  if (params.from || params.to) {
+    matchWhere.matchDate = {};
+    if (params.from) matchWhere.matchDate[Op.gte] = new Date(params.from);
+    if (params.to) matchWhere.matchDate[Op.lte] = new Date(params.to);
+  }
+  if (params.competition)
+    matchWhere.competition = { [Op.iLike]: `%${params.competition}%` };
+  if (params.season) matchWhere.season = params.season;
+  if (params.clubId)
+    matchWhere[Op.or] = [
+      { homeClubId: params.clubId },
+      { awayClubId: params.clubId },
+    ];
+
+  const rows = await PlayerMatchStats.findAll({
+    attributes: [
+      "playerId",
+      [
+        Sequelize.fn("COUNT", Sequelize.col("PlayerMatchStats.id")),
+        "matchesPlayed",
+      ],
+      [Sequelize.fn("SUM", Sequelize.col("goals")), "goals"],
+      [Sequelize.fn("SUM", Sequelize.col("assists")), "assists"],
+      [Sequelize.fn("SUM", Sequelize.col("minutes_played")), "minutesPlayed"],
+      [Sequelize.fn("SUM", Sequelize.col("yellow_cards")), "yellowCards"],
+      [Sequelize.fn("SUM", Sequelize.col("red_cards")), "redCards"],
+      [Sequelize.fn("AVG", Sequelize.col("rating")), "avgRating"],
+      [Sequelize.fn("SUM", Sequelize.col("shots_total")), "shotsTotal"],
+      [Sequelize.fn("SUM", Sequelize.col("shots_on_target")), "shotsOnTarget"],
+      [Sequelize.fn("SUM", Sequelize.col("passes_total")), "passesTotal"],
+      [
+        Sequelize.fn("SUM", Sequelize.col("passes_completed")),
+        "passesCompleted",
+      ],
+      [Sequelize.fn("SUM", Sequelize.col("tackles_total")), "tacklesTotal"],
+      [Sequelize.fn("SUM", Sequelize.col("key_passes")), "keyPasses"],
+    ],
+    include: [
+      {
+        model: Match,
+        as: "match",
+        where: Object.keys(matchWhere).length > 0 ? matchWhere : undefined,
+        attributes: [],
+        required: Object.keys(matchWhere).length > 0,
+      },
+      {
+        model: Player,
+        as: "player",
+        attributes: [...PLAYER_ATTRS],
+      },
+    ],
+    group: ["playerId", "player.id"],
+    order: [[Sequelize.literal('"goals"'), "DESC"]],
+    limit: params.limit ?? 20,
+    subQuery: false,
+    raw: false,
+  });
+
+  return rows.map((r: any) => {
+    const plain = r.get({ plain: true });
+    return {
+      player: plain.player,
+      matchesPlayed: Number(plain.matchesPlayed) || 0,
+      goals: Number(plain.goals) || 0,
+      assists: Number(plain.assists) || 0,
+      minutesPlayed: Number(plain.minutesPlayed) || 0,
+      yellowCards: Number(plain.yellowCards) || 0,
+      redCards: Number(plain.redCards) || 0,
+      avgRating: plain.avgRating
+        ? Number(Number(plain.avgRating).toFixed(1))
+        : null,
+      shotsTotal: Number(plain.shotsTotal) || 0,
+      shotsOnTarget: Number(plain.shotsOnTarget) || 0,
+      passesTotal: Number(plain.passesTotal) || 0,
+      passesCompleted: Number(plain.passesCompleted) || 0,
+      tacklesTotal: Number(plain.tacklesTotal) || 0,
+      keyPasses: Number(plain.keyPasses) || 0,
+    };
+  });
+}
+
 export async function getPlayerShotMap(playerId: string, season?: string) {
   const statsWhere: Record<string, unknown> = { playerId };
 

@@ -31,6 +31,11 @@ router.get(
   authorizeModule("documents", "read"),
   asyncHandler(ctrl.download),
 );
+router.get(
+  "/:id/preview",
+  authorizeModule("documents", "read"),
+  asyncHandler(ctrl.preview),
+);
 
 // Upload real file (multipart/form-data) — metadata in form fields
 router.post(

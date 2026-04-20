@@ -165,6 +165,19 @@ export const playerMatchesQuerySchema = z.object({
   to: z.string().optional(),
 });
 
+// ── Stats Leaderboard ──
+
+export const leaderboardQuerySchema = z.object({
+  from: z.string().optional(),
+  to: z.string().optional(),
+  competition: z.string().optional(),
+  clubId: z.string().uuid().optional(),
+  season: z.string().optional(),
+  limit: z.coerce.number().min(1).max(50).default(20),
+});
+
+export type LeaderboardQuery = z.infer<typeof leaderboardQuerySchema>;
+
 // ── Manual Sync ──
 
 export const syncMatchesSchema = z.object({
