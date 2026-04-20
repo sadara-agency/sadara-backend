@@ -75,6 +75,21 @@ export const importRequestSchema = z.object({
   importTypes: z.array(z.enum(["clubs", "matches", "standings"])).min(1),
 });
 
+// ── Job status polling ──
+
+export const jobIdParamSchema = z.object({
+  jobId: z.string().min(1),
+});
+
+// ── Discover tournaments from SAFF site ──
+
+export const syncTournamentsSchema = z.object({
+  season: z
+    .string()
+    .regex(/^\d{4}-\d{4}$/, "Season must be YYYY-YYYY format")
+    .optional(),
+});
+
 // ── Inferred Types ──
 
 export type TournamentQuery = z.infer<typeof tournamentQuerySchema>;
@@ -84,3 +99,5 @@ export type FixtureQuery = z.infer<typeof fixtureQuerySchema>;
 export type TeamMapQuery = z.infer<typeof teamMapQuerySchema>;
 export type MapTeamInput = z.infer<typeof mapTeamSchema>;
 export type ImportRequest = z.infer<typeof importRequestSchema>;
+export type JobIdParams = z.infer<typeof jobIdParamSchema>;
+export type SyncTournamentsInput = z.infer<typeof syncTournamentsSchema>;

@@ -3,11 +3,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { Response } from "express";
-import {
-  sendSuccess,
-  sendPaginated,
-  sendCreated,
-} from "@shared/utils/apiResponse";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AuthRequest } from "@shared/types";
 import * as saffService from "@modules/saff/saff.service";
@@ -18,6 +14,8 @@ import {
 } from "@modules/saff/saff.scheduler";
 import { scrapeChampionship } from "@modules/saff/saff.scraper";
 import { SaffTournament } from "@modules/saff/saff.model";
+import { enqueue, getQueue, QueueName } from "@modules/queues/queues";
+import { logger } from "@config/logger";
 import type {
   TournamentQuery,
   StandingQuery,
@@ -46,18 +44,42 @@ export async function seedTournaments(req: AuthRequest, res: Response) {
   sendSuccess(res, { count }, `Seeded ${count} new tournaments`);
 }
 
-// ── Fetch (Scrape) ──
+// ── Fetch (Scrape) — enqueues a BullMQ job, returns immediately ──
 
 export async function fetchFromSaff(req: AuthRequest, res: Response) {
-  const result = await saffService.fetchFromSaff(req.body);
+  const jobId = await enqueue(QueueName.SaffFetch, "scrape", {
+    kind: "scrape",
+    fetchRequest: req.body,
+    triggeredBy: req.user!.email,
+  });
   await logAudit(
     "CREATE",
     "saff_standings",
     null,
     buildAuditContext(req.user!, req.ip),
-    `SAFF fetch: ${result.results} tournaments, ${result.standings} standings, ${result.fixtures} fixtures`,
+    `SAFF fetch job enqueued: ${jobId} (${req.body.tournamentIds?.length ?? 0} tournaments)`,
   );
-  sendSuccess(res, result, `Fetched data from ${result.results} tournaments`);
+  res.status(202).json({ success: true, data: { jobId } });
+}
+
+// ── Job status ──
+
+export async function getJobStatus(req: AuthRequest, res: Response) {
+  const { jobId } = req.params;
+  const queue = getQueue(QueueName.SaffFetch);
+  const job = await queue.getJob(jobId);
+  if (!job) {
+    res.status(404).json({ success: false, message: "Job not found" });
+    return;
+  }
+  const status = await job.getState();
+  sendSuccess(res, {
+    jobId,
+    status,
+    progress: job.progress ?? null,
+    result: job.returnvalue ?? null,
+    error: job.failedReason ?? null,
+  });
 }
 
 // ── Standings ──
@@ -223,19 +245,37 @@ export async function triggerSync(req: AuthRequest, res: Response) {
   const { agencyValues = ["Critical", "High"], season = getCurrentSeason() } =
     req.body;
 
-  const result = await runSync(
-    agencyValues,
-    season,
-    `manual:${req.user!.email}`,
+  const currentStatus = getSchedulerStatus();
+  if (currentStatus.isRunning) {
+    return sendSuccess(res, { skipped: true }, "Sync already running");
+  }
+
+  // Fire-and-forget — response returns in <100ms; status pill polls progress
+  runSync(agencyValues, season, `manual:${req.user!.email}`).catch(
+    (err: Error) =>
+      logger.error(`[SAFF] triggerSync background error: ${err.message}`),
   );
 
-  const message = result.error
-    ? `Sync failed: ${result.error}`
-    : result.skipped
-      ? "Sync already running"
-      : `Synced ${result.tournaments} tournaments — ${result.standings} standings, ${result.fixtures} fixtures, ${result.teams} teams`;
+  sendSuccess(res, { started: true }, "Sync started");
+}
 
-  sendSuccess(res, result, message);
+// ── Discover tournaments from saff.com.sa ──
+
+export async function syncTournaments(req: AuthRequest, res: Response) {
+  const season = req.body.season || getCurrentSeason();
+  const jobId = await enqueue(QueueName.SaffFetch, "discover", {
+    kind: "discover",
+    season,
+    triggeredBy: req.user!.email,
+  });
+  await logAudit(
+    "CREATE",
+    "saff_tournaments",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF tournament discovery job enqueued: ${jobId}`,
+  );
+  res.status(202).json({ success: true, data: { jobId } });
 }
 
 // ── Player-centric endpoints ──
