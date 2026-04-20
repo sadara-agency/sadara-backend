@@ -258,7 +258,7 @@ describe('Scouting Service', () => {
       mockDecisionCreate.mockResolvedValue(mockModelInstance({ id: 'dec-001' }));
       const result = await scoutingService.createDecision({ screeningCaseId: 'sc-001', decision: 'Approved', committeeName: 'Board' }, 'user-001');
       expect(result).toBeDefined();
-      expect(sc.update).toHaveBeenCalledWith({ status: 'Closed' });
+      expect(sc.update).toHaveBeenCalledWith({ status: 'Closed' }, expect.objectContaining({ transaction: expect.anything() }));
     });
 
     it('should throw 400 if pack not ready', async () => {
