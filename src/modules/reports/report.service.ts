@@ -130,10 +130,7 @@ export async function createReport(
       detail: err.original?.message || err.parent?.message,
       sql: err.sql,
     });
-    throw new AppError(
-      `Failed to create report: ${err.original?.message || err.message}`,
-      500,
-    );
+    throw new AppError("Failed to create report", 500);
   }
 
   // Fire-and-forget PDF generation — don't block the API response

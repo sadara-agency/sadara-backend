@@ -10,6 +10,7 @@ import { AuthUser } from "@shared/types";
 import { logger } from "@config/logger";
 import { withTimeout } from "@shared/utils/timeout";
 import type { RedisClientType } from "redis";
+import { isUserActive } from "@middleware/auth";
 
 // ── SSE Notification Payload ──
 
@@ -247,14 +248,13 @@ function extractToken(req: Request): string | undefined {
   if (authHeader?.startsWith("Bearer ")) {
     return authHeader.split(" ")[1];
   }
-  // 3. Query param (EventSource can't set headers, some clients use this)
-  if (typeof req.query.token === "string") {
-    return req.query.token;
-  }
   return undefined;
 }
 
-export function handleSSEConnection(req: Request, res: Response): void {
+export async function handleSSEConnection(
+  req: Request,
+  res: Response,
+): Promise<void> {
   // ── Auth ──
   const token = extractToken(req);
   if (!token) {
@@ -271,6 +271,18 @@ export function handleSSEConnection(req: Request, res: Response): void {
   }
 
   const userId = user.id;
+
+  // Check account is still active — fail-closed (same policy as authenticate middleware)
+  try {
+    const active = await isUserActive(userId);
+    if (!active) {
+      res.status(401).json({ message: "Account deactivated" });
+      return;
+    }
+  } catch {
+    res.status(503).json({ message: "Service temporarily unavailable" });
+    return;
+  }
 
   // ── SSE Headers ──
   res.writeHead(200, {

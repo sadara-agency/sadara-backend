@@ -7,7 +7,12 @@ import {
   updateDocumentSchema,
   documentQuerySchema,
 } from "@modules/documents/document.validation";
-import { uploadSingle, verifyFileType, sanitizeCsv } from "@middleware/upload";
+import {
+  uploadSingle,
+  verifyFileType,
+  sanitizeCsv,
+  virusScan,
+} from "@middleware/upload";
 import { uploadLimiter } from "@middleware/rateLimiter";
 import * as ctrl from "@modules/documents/document.controller";
 
@@ -56,6 +61,7 @@ router.post(
   },
   verifyFileType,
   sanitizeCsv,
+  virusScan,
   asyncHandler(ctrl.upload),
 );
 
