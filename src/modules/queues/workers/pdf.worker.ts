@@ -61,5 +61,8 @@ export function createPdfWorker(): Worker<PdfJobData, PdfJobResult> {
   worker.on("failed", (job, err) =>
     logger.error("PDF job failed", { jobId: job?.id, error: err.message }),
   );
+  worker.on("error", (err) =>
+    logger.error("[PdfWorker] Worker error", { error: err.message }),
+  );
   return worker;
 }

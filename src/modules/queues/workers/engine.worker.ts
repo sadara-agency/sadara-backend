@@ -37,6 +37,9 @@ export function createEngineWorker(): Worker<EngineJobData, void> {
       error: err.message,
     }),
   );
+  worker.on("error", (err) =>
+    logger.error("[EngineWorker] Worker error", { error: err.message }),
+  );
 
   return worker;
 }
