@@ -142,32 +142,19 @@ describe('Document Controller', () => {
         mimeType: 'application/pdf',
         name: 'missing.pdf'
       });
-      
+
       const res = mockRes();
       res.status = jest.fn().mockReturnThis();
       res.json = jest.fn().mockReturnThis();
-      
-      // Mock the path and fs imports inside the function
-      const pathMock = { 
-        resolve: (path: string) => {
-          // Simulate path.resolve behavior for our test case
-          if (path === 'uploads/documents/missing.pdf') {
-            return '/absolute/path/uploads/documents/missing.pdf';
-          }
-          return path; // fallback
-        }
-      };
-      jest.doMock('path', () => pathMock);
-      
-      const fsMock = { existsSync: () => false };
-      jest.doMock('fs', () => fsMock);
-      
+
+      // Spy on the real cached fs instance so dynamic import() picks up the override
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const existsSpy = jest.spyOn(require('fs'), 'existsSync').mockReturnValueOnce(false);
+
       await expect(controller.preview(mockReq({ params: { id: 'd1' } }), res))
         .rejects.toThrow();
-      
-      // Cleanup mocks
-      jest.unmock('path');
-      jest.unmock('fs');
+
+      existsSpy.mockRestore();
     });
   });
 });
