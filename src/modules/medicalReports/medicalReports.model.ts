@@ -1,6 +1,5 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
-import { Document } from "@modules/documents/document.model";
 
 export type ParseStatus = "pending" | "parsed" | "manual" | "failed";
 export type LabFlag = "H" | "L" | "N" | "" | null;
@@ -165,20 +164,3 @@ MedicalLabResult.init(
     timestamps: true,
   },
 );
-
-// ── Associations ─────────────────────────────────────────
-
-MedicalReport.hasMany(MedicalLabResult, {
-  foreignKey: "medicalReportId",
-  as: "labResults",
-  onDelete: "CASCADE",
-});
-MedicalLabResult.belongsTo(MedicalReport, {
-  foreignKey: "medicalReportId",
-  as: "report",
-});
-
-MedicalReport.belongsTo(Document, {
-  foreignKey: "documentId",
-  as: "document",
-});
