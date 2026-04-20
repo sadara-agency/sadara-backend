@@ -16,7 +16,11 @@ const mockDecisionCreate = jest.fn();
 const mockDecisionCount = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { query: jest.fn(), authenticate: jest.fn() },
+  sequelize: {
+    query: jest.fn(),
+    authenticate: jest.fn(),
+    transaction: jest.fn(async (cb: (t: unknown) => Promise<unknown>) => cb({})),
+  },
 }));
 
 jest.mock('../../../src/modules/scouting/scouting.model', () => ({

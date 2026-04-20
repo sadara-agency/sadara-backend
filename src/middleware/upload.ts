@@ -7,7 +7,7 @@ import multer from "multer";
 import path from "path";
 import { Request, Response, NextFunction, RequestHandler } from "express";
 import { logger } from "@config/logger";
-import { virusScan } from "@middleware/virusScan";
+export { virusScan } from "@middleware/virusScan";
 
 // Legacy export: signing services write PDFs directly to this directory
 export const UPLOAD_DIR_PATH = path.resolve(
