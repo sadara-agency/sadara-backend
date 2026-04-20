@@ -184,7 +184,7 @@ describe('SAFF Service', () => {
 
   describe('mapTeamToClub', () => {
     it('should map a SAFF team to a Sadara club', async () => {
-      const club = { id: 'club-001', name: 'Al Hilal', nameAr: 'الهلال' };
+      const club = { id: 'club-001', name: 'Al Hilal', nameAr: 'الهلال', saffTeamId: null, update: jest.fn().mockResolvedValue({}) };
       mockClubFindByPk.mockResolvedValue(club);
       const teamMap = { id: 'tm-001', update: jest.fn().mockResolvedValue({}) };
       mockTeamMapFindOrCreate.mockResolvedValue([teamMap, false]);

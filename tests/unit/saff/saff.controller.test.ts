@@ -4,6 +4,13 @@ jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
 }));
+jest.mock('../../../src/modules/queues/queues', () => ({
+  enqueue: jest.fn().mockResolvedValue('mock-job-id'),
+  getQueue: jest.fn().mockReturnValue({
+    getJob: jest.fn().mockResolvedValue(null),
+  }),
+  QueueName: { SaffFetch: 'saff-fetch' },
+}));
 
 import * as controller from '../../../src/modules/saff/saff.controller';
 import * as svc from '../../../src/modules/saff/saff.service';
@@ -46,7 +53,7 @@ describe('SAFF Controller', () => {
       (svc.fetchFromSaff as jest.Mock).mockResolvedValue({ fetched: 5 });
       const res = mockRes();
       await controller.fetchFromSaff(mockReq({ body: { tournamentIds: [1], season: '2024-2025' } }), res);
-      expect(res.status).toHaveBeenCalledWith(200);
+      expect(res.status).toHaveBeenCalledWith(202);
     });
   });
 
