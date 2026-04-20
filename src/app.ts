@@ -6,6 +6,7 @@ import compression from "compression";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
 import fs from "fs";
+import { QueryTypes } from "sequelize";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
 import { errorHandler } from "@middleware/errorHandler";
@@ -170,6 +171,19 @@ app.get(
   async (req, res) => {
     const authReq = req as AuthRequest;
     const filename = path.basename(authReq.params.filename);
+
+    // Row-level check: filename must correspond to a DB record (prevents IDOR)
+    type Row = { id: string };
+    const [record] = await sequelize.query<Row>(
+      "SELECT id FROM documents WHERE file_url LIKE :pattern LIMIT 1",
+      { replacements: { pattern: `%${filename}` }, type: QueryTypes.SELECT },
+    );
+    if (!record) {
+      return res
+        .status(404)
+        .json({ success: false, message: "File not found" });
+    }
+
     const filePath = path.join(UPLOADS_ROOT, "documents", filename);
     if (!fs.existsSync(filePath)) {
       return res
@@ -180,7 +194,7 @@ app.get(
       logAudit(
         "DOWNLOAD",
         "documents",
-        null,
+        record.id,
         buildAuditContext(authReq.user, authReq.ip),
         `Downloaded: ${filename}`,
       );
@@ -197,6 +211,22 @@ app.get(
   async (req, res) => {
     const authReq = req as AuthRequest;
     const filename = path.basename(authReq.params.filename);
+
+    // Row-level check: filename must correspond to a DB record (prevents IDOR)
+    type Row = { id: string };
+    const [record] = await sequelize.query<Row>(
+      `SELECT id FROM contracts
+       WHERE signed_document_url LIKE :pattern
+          OR document_url LIKE :pattern
+       LIMIT 1`,
+      { replacements: { pattern: `%${filename}` }, type: QueryTypes.SELECT },
+    );
+    if (!record) {
+      return res
+        .status(404)
+        .json({ success: false, message: "File not found" });
+    }
+
     const filePath = path.join(UPLOADS_ROOT, "signed-contracts", filename);
     if (!fs.existsSync(filePath)) {
       return res
@@ -207,7 +237,7 @@ app.get(
       logAudit(
         "DOWNLOAD",
         "contracts",
-        null,
+        record.id,
         buildAuditContext(authReq.user, authReq.ip),
         `Downloaded signed contract: ${filename}`,
       );

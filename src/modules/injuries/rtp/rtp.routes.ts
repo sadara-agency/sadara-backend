@@ -7,6 +7,8 @@ import {
   updateRtpProtocolSchema,
   advancePhaseSchema,
   rtpQuerySchema,
+  rtpParamSchema,
+  rtpInjuryParamSchema,
 } from "./rtp.validation";
 import * as ctrl from "./rtp.controller";
 
@@ -22,12 +24,18 @@ router.get(
 );
 
 // GET /api/v1/injuries/rtp/:id
-router.get("/:id", authorizeModule("rtp", "read"), asyncHandler(ctrl.getById));
+router.get(
+  "/:id",
+  authorizeModule("rtp", "read"),
+  validate(rtpParamSchema, "params"),
+  asyncHandler(ctrl.getById),
+);
 
 // GET /api/v1/injuries/rtp/by-injury/:injuryId
 router.get(
   "/by-injury/:injuryId",
   authorizeModule("rtp", "read"),
+  validate(rtpInjuryParamSchema, "params"),
   asyncHandler(ctrl.getByInjury),
 );
 
@@ -43,6 +51,7 @@ router.post(
 router.patch(
   "/:id",
   authorizeModule("rtp", "update"),
+  validate(rtpParamSchema, "params"),
   validate(updateRtpProtocolSchema),
   asyncHandler(ctrl.update),
 );
@@ -51,6 +60,7 @@ router.patch(
 router.post(
   "/:id/advance",
   authorizeModule("rtp", "update"),
+  validate(rtpParamSchema, "params"),
   validate(advancePhaseSchema),
   asyncHandler(ctrl.advancePhase),
 );
@@ -59,6 +69,7 @@ router.post(
 router.delete(
   "/:id",
   authorizeModule("rtp", "delete"),
+  validate(rtpParamSchema, "params"),
   asyncHandler(ctrl.remove),
 );
 

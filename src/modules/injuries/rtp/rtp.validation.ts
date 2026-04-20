@@ -52,6 +52,9 @@ export const rtpQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
 
+export const rtpParamSchema = z.object({ id: z.string().uuid() });
+export const rtpInjuryParamSchema = z.object({ injuryId: z.string().uuid() });
+
 export type CreateRtpProtocolInput = z.infer<typeof createRtpProtocolSchema>;
 export type UpdateRtpProtocolInput = z.infer<typeof updateRtpProtocolSchema>;
 export type AdvancePhaseInput = z.infer<typeof advancePhaseSchema>;

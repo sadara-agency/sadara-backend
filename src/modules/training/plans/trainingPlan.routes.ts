@@ -9,6 +9,8 @@ import {
   trainingPlanQuerySchema,
   upsertWeekSchema,
   logProgressSchema,
+  trainingPlanParamSchema,
+  playerParamSchema,
 } from "./trainingPlan.validation";
 import * as ctrl from "./trainingPlan.controller";
 
@@ -28,16 +30,23 @@ router.get(
 router.get(
   "/player/:playerId/active",
   authorizeModule("training-plans", "read"),
+  validate(playerParamSchema, "params"),
   ctrl.getActive,
 );
 
 // GET /api/v1/training/plans/:id
-router.get("/:id", authorizeModule("training-plans", "read"), ctrl.getById);
+router.get(
+  "/:id",
+  authorizeModule("training-plans", "read"),
+  validate(trainingPlanParamSchema, "params"),
+  ctrl.getById,
+);
 
 // GET /api/v1/training/plans/:id/report
 router.get(
   "/:id/report",
   authorizeModule("training-plans", "read"),
+  validate(trainingPlanParamSchema, "params"),
   ctrl.progressionReport,
 );
 
@@ -45,6 +54,7 @@ router.get(
 router.get(
   "/:id/progress",
   authorizeModule("training-plans", "read"),
+  validate(trainingPlanParamSchema, "params"),
   ctrl.progressLogs,
 );
 
@@ -60,6 +70,7 @@ router.post(
 router.patch(
   "/:id",
   authorizeModule("training-plans", "update"),
+  validate(trainingPlanParamSchema, "params"),
   validate(updateTrainingPlanSchema),
   ctrl.update,
 );
@@ -68,6 +79,7 @@ router.patch(
 router.put(
   "/:id/weeks",
   authorizeModule("training-plans", "update"),
+  validate(trainingPlanParamSchema, "params"),
   validate(upsertWeekSchema),
   ctrl.upsertWeek,
 );
@@ -76,11 +88,17 @@ router.put(
 router.post(
   "/:id/progress",
   authorizeModule("training-plans", "create"),
+  validate(trainingPlanParamSchema, "params"),
   validate(logProgressSchema),
   ctrl.logProgress,
 );
 
 // DELETE /api/v1/training/plans/:id
-router.delete("/:id", authorizeModule("training-plans", "delete"), ctrl.remove);
+router.delete(
+  "/:id",
+  authorizeModule("training-plans", "delete"),
+  validate(trainingPlanParamSchema, "params"),
+  ctrl.remove,
+);
 
 export default router;

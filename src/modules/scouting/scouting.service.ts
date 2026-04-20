@@ -316,17 +316,19 @@ export async function createScreeningCase(input: any, userId: string) {
   const count = await ScreeningCase.count();
   const caseNumber = `SC-${String(count + 1).padStart(5, "0")}`;
 
-  // Move watchlist to Shortlisted
-  if (wl.status === "Active")
-    await wl.update({ status: "Shortlisted" as WatchlistAttributes["status"] });
-
-  const sc = await ScreeningCase.create({
-    ...input,
-    caseNumber,
-    createdBy: userId,
+  const sc = await sequelize.transaction(async (t) => {
+    if (wl.status === "Active")
+      await wl.update(
+        { status: "Shortlisted" as WatchlistAttributes["status"] },
+        { transaction: t },
+      );
+    return ScreeningCase.create(
+      { ...input, caseNumber, createdBy: userId },
+      { transaction: t },
+    );
   });
 
-  // Notify Admin/Manager about new screening
+  // Notify Admin/Manager about new screening — fire-and-forget, outside transaction
   notifyByRole([ROLES.ADMIN, ROLES.MANAGER], {
     type: "system",
     title: `Screening started: ${wl.prospectName}`,
@@ -418,22 +420,34 @@ export async function createDecision(input: any, userId: string) {
   if (!sc.isPackReady)
     throw new AppError("Pack must be ready before a decision can be made", 400);
 
-  const decision = await SelectionDecision.create({
-    ...input,
-    recordedBy: userId,
+  const decision = await sequelize.transaction(async (t) => {
+    const d = await SelectionDecision.create(
+      { ...input, recordedBy: userId },
+      { transaction: t },
+    );
+
+    if (input.decision === "Approved") {
+      await sc.update(
+        { status: "Closed" as ScreeningCaseAttributes["status"] },
+        { transaction: t },
+      );
+    } else if (input.decision === "Rejected") {
+      await sc.update(
+        { status: "Closed" as ScreeningCaseAttributes["status"] },
+        { transaction: t },
+      );
+      const wl = (sc as any).watchlist;
+      if (wl)
+        await wl.update(
+          { status: "Rejected" as WatchlistAttributes["status"] },
+          { transaction: t },
+        );
+    }
+
+    return d;
   });
 
-  // If Approved, close case; if Rejected, reject the watchlist entry
-  if (input.decision === "Approved") {
-    await sc.update({ status: "Closed" as ScreeningCaseAttributes["status"] });
-  } else if (input.decision === "Rejected") {
-    await sc.update({ status: "Closed" as ScreeningCaseAttributes["status"] });
-    const wl = (sc as any).watchlist;
-    if (wl)
-      await wl.update({ status: "Rejected" as WatchlistAttributes["status"] });
-  }
-
-  // Notify Admin/Manager/Scout about decision
+  // Notify Admin/Manager/Scout about decision — fire-and-forget, outside transaction
   const prospectName = (sc as any).watchlist?.prospectName || sc.caseNumber;
   const prospectNameAr = (sc as any).watchlist?.prospectNameAr || prospectName;
   notifyByRole([ROLES.ADMIN, ROLES.MANAGER, ROLES.SCOUT], {

@@ -6,8 +6,11 @@ import { handleSSEConnection } from "@modules/notifications/notification.sse";
 
 const router = Router();
 
-// SSE stream — before authenticate middleware (handles its own JWT verification)
-router.get("/stream", (req, res) => handleSSEConnection(req, res));
+// SSE stream — before authenticate middleware (handles its own JWT + active-user check)
+router.get(
+  "/stream",
+  asyncHandler(async (req, res, _next) => handleSSEConnection(req, res)),
+);
 
 router.use(authenticate);
 

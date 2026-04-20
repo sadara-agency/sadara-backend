@@ -4,7 +4,11 @@ import { QueryTypes } from "sequelize";
 import { env } from "@config/env";
 import { sequelize } from "@config/database";
 import { AuthRequest, AuthUser, UserRole } from "@shared/types";
-import { sendUnauthorized, sendForbidden } from "@shared/utils/apiResponse";
+import {
+  sendUnauthorized,
+  sendForbidden,
+  sendError,
+} from "@shared/utils/apiResponse";
 import { COOKIE_NAME } from "@shared/utils/cookie";
 import {
   hasPermission,
@@ -19,7 +23,7 @@ import { cacheGet, cacheSet, cacheDel } from "@shared/utils/cache";
 export const USER_ACTIVE_CACHE_KEY = (id: string) => `user_active:${id}`;
 const USER_ACTIVE_TTL = 60; // seconds
 
-async function isUserActive(userId: string): Promise<boolean> {
+export async function isUserActive(userId: string): Promise<boolean> {
   const key = USER_ACTIVE_CACHE_KEY(userId);
   const cached = await cacheGet<boolean>(key);
   if (cached !== null) return cached;
@@ -105,7 +109,7 @@ export async function authenticate(
   }
 
   // Check if the account is still active (Redis-cached, 60-second TTL).
-  // Fail-open if Redis/DB is unavailable — don't block all requests.
+  // Fail-closed: if Redis/DB is unavailable, return 503 rather than letting deactivated users through.
   try {
     const active = await isUserActive(decoded.id);
     if (!active) {
@@ -113,10 +117,12 @@ export async function authenticate(
       return;
     }
   } catch (err) {
-    logger.warn("isUserActive check failed — allowing request through", {
+    logger.error("isUserActive check failed — blocking request", {
       userId: decoded.id,
       error: (err as Error).message,
     });
+    sendError(res, "Service temporarily unavailable", 503);
+    return;
   }
 
   req.user = decoded;

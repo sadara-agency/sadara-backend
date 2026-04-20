@@ -72,5 +72,8 @@ export const logProgressSchema = z.object({
 export type CreateTrainingPlanInput = z.infer<typeof createTrainingPlanSchema>;
 export type UpdateTrainingPlanInput = z.infer<typeof updateTrainingPlanSchema>;
 export type TrainingPlanQuery = z.infer<typeof trainingPlanQuerySchema>;
+export const trainingPlanParamSchema = z.object({ id: z.string().uuid() });
+export const playerParamSchema = z.object({ playerId: z.string().uuid() });
+
 export type UpsertWeekInput = z.infer<typeof upsertWeekSchema>;
 export type LogProgressInput = z.infer<typeof logProgressSchema>;
