@@ -8,7 +8,12 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
-import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
+import {
+  uploadFile,
+  resolveFileUrl,
+  streamFileBuffer,
+  isPrivateKey,
+} from "@shared/utils/storage";
 import * as svc from "@modules/documents/document.service";
 import type { DocumentQuery } from "@modules/documents/document.validation";
 
@@ -145,50 +150,31 @@ export async function preview(req: AuthRequest, res: Response) {
     throw new AppError("Document file not available", 404);
   }
 
-  const url = await resolveFileUrl(doc.fileUrl, 15); // 15 min expiry
+  const mimeType = doc.mimeType || "application/octet-stream";
+  const disposition = `inline; filename="${encodeURIComponent(doc.name)}"`;
 
-  // Local files: serve directly with proper headers for preview
-  if (url.startsWith("/uploads/")) {
-    const path = await import("path");
+  // Private GCS key — stream directly using service-account credentials
+  // (avoids signed-URL generation which requires iam.serviceAccounts.signBlob)
+  if (isPrivateKey(doc.fileUrl)) {
+    const buffer = await streamFileBuffer(doc.fileUrl);
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Content-Disposition", disposition);
+    res.setHeader("Cache-Control", "private, max-age=300");
+    res.send(buffer);
+  } else if (doc.fileUrl.startsWith("/uploads/")) {
+    // Local /uploads/ path
+    const pathMod = await import("path");
     const fs = await import("fs");
-    const filePath = path.resolve(url.slice(1)); // strip leading /
+    const filePath = pathMod.resolve(doc.fileUrl.slice(1));
     if (!fs.existsSync(filePath)) {
       throw new AppError("File not found on disk", 404);
     }
-    // Set appropriate content-type for preview
-    const mimeType = doc.mimeType || "application/octet-stream";
     res.setHeader("Content-Type", mimeType);
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${encodeURIComponent(doc.name)}"`,
-    );
-    return res.sendFile(filePath);
-  }
-
-  // For remote files (GCS etc.), we need to proxy to avoid CORS/auth issues in browser
-  try {
-    const axiosModule = await import("axios");
-    const axios = axiosModule.default || axiosModule;
-    const fileResponse = await axios.get(url, {
-      responseType: "arraybuffer",
-      timeout: 10000,
-    });
-
-    // Set headers for inline preview
-    const contentType =
-      fileResponse.headers["content-type"] ||
-      doc.mimeType ||
-      "application/octet-stream";
-    res.setHeader("Content-Type", contentType);
-    res.setHeader(
-      "Content-Disposition",
-      `inline; filename="${encodeURIComponent(doc.name)}"`,
-    );
-    res.setHeader("Cache-Control", "private, max-age=300"); // 5 minutes
-
-    res.send(fileResponse.data);
-  } catch (error) {
-    // If proxy fails, fall back to redirect (though this won't work well for previews)
+    res.setHeader("Content-Disposition", disposition);
+    res.sendFile(filePath);
+  } else {
+    // Public URL (e.g. storage.googleapis.com) — redirect to the public URL
+    const url = await resolveFileUrl(doc.fileUrl, 15);
     res.redirect(url);
   }
 }

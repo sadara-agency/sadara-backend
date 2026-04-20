@@ -311,6 +311,7 @@ export async function parsePdfBuffer(buffer: Buffer): Promise<ParsedPdf> {
   let labResults: ParsedLabResult[] = [];
   if (provider === "delta") labResults = parseDelta(text);
   else if (provider === "quest") labResults = parseQuest(text);
+  else labResults = parseGeneric(text); // fallback for any other structured PDF
 
   return {
     provider:
@@ -587,6 +588,131 @@ export function parseQuest(text: string): ParsedLabResult[] {
           refRangeText,
           comment: null,
         });
+      }
+    }
+
+    i++;
+  }
+
+  return out;
+}
+
+// ── Generic fallback parser ─────────────────────────────
+//
+// Applied when the provider is unrecognised. Uses the same test-row regex as
+// Delta but without requiring known category headers — any line matching
+// <name> <numeric> [unit] [H|L|N] is captured, with the optional
+// "Reference Range : …" lookahead. Enough to extract values from most
+// structured lab PDFs that have a text layer.
+
+// Common noise prefixes found across many lab systems
+const GENERIC_NOISE_PREFIXES = [
+  "Patient",
+  "Registered",
+  "Reported",
+  "Collected",
+  "Received",
+  "Validated",
+  "Approved",
+  "Page ",
+  "DOB",
+  "Sex:",
+  "Specimen",
+  "Requisition",
+  "Report Status",
+  "Client #",
+  "FINAL",
+  "Historical",
+  "Lab ID",
+  "Order #",
+  "Physician",
+  "Accession",
+  "Fax",
+  "Tel",
+  "Phone",
+  "Address",
+  "Date of",
+];
+
+export function parseGeneric(text: string): ParsedLabResult[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const out: ParsedLabResult[] = [];
+  let currentCategory: string | null = null;
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Skip noise
+    if (GENERIC_NOISE_PREFIXES.some((p) => line.startsWith(p))) {
+      i++;
+      continue;
+    }
+
+    // Short all-caps or title-case lines with no numbers → likely category headers
+    if (
+      line.length < 80 &&
+      !/\d/.test(line) &&
+      /^[A-Za-zÀ-ÿ\s\-/()&,]+$/.test(line) &&
+      line.length > 3
+    ) {
+      // Could be a section header — track it but don't break
+      currentCategory = line;
+      i++;
+      continue;
+    }
+
+    const testMatch = line.match(DELTA_TEST_ROW);
+    if (testMatch) {
+      const [, rawName, rawValue, rawUnit, rawFlag] = testMatch;
+      const name = rawName.trim();
+
+      if (name.length >= 3 && !/^\d/.test(name)) {
+        const valueNumeric = Number(rawValue.replace(",", "."));
+        const unit = rawUnit.trim() || null;
+        const flag: LabFlag =
+          rawFlag && FLAGS.has(rawFlag) ? (rawFlag as LabFlag) : null;
+
+        let refRangeLow: number | null = null;
+        let refRangeHigh: number | null = null;
+        let refRangeText: string | null = null;
+
+        if (i + 1 < lines.length) {
+          const next = lines[i + 1];
+          const refMatch = next.match(DELTA_REF_RANGE_LINE);
+          if (refMatch) {
+            const range = refMatch[1].trim();
+            const numericRange = range.match(
+              /^(-?\d+(?:[.,]\d+)?)\s*-\s*(-?\d+(?:[.,]\d+)?)/,
+            );
+            if (numericRange) {
+              refRangeLow = Number(numericRange[1].replace(",", "."));
+              refRangeHigh = Number(numericRange[2].replace(",", "."));
+            } else {
+              refRangeText = range;
+            }
+            i++;
+          }
+        }
+
+        if (Number.isFinite(valueNumeric)) {
+          out.push({
+            category: currentCategory,
+            name,
+            valueNumeric,
+            valueText: `${rawValue}${unit ? ` ${unit}` : ""}`.trim(),
+            unit,
+            flag,
+            refRangeLow,
+            refRangeHigh,
+            refRangeText,
+            comment: null,
+          });
+        }
       }
     }
 
