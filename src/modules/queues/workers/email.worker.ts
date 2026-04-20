@@ -31,6 +31,9 @@ export function createEmailWorker(): Worker<EmailJobData, boolean> {
       error: err.message,
     }),
   );
+  worker.on("error", (err) =>
+    logger.error("[EmailWorker] Worker error", { error: err.message }),
+  );
 
   return worker;
 }

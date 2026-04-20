@@ -106,6 +106,9 @@ export function createSaffWorker(): Worker<SaffJobData, SaffJobResult> {
       error: err.message,
     }),
   );
+  worker.on("error", (err) =>
+    logger.error("[SaffWorker] Worker error", { error: err.message }),
+  );
 
   return worker;
 }

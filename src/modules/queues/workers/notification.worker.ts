@@ -30,6 +30,9 @@ export function createNotificationWorker(): Worker<NotificationJobData, void> {
       error: err.message,
     }),
   );
+  worker.on("error", (err) =>
+    logger.error("[NotificationWorker] Worker error", { error: err.message }),
+  );
 
   return worker;
 }
