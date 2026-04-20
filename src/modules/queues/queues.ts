@@ -7,6 +7,7 @@ export enum QueueName {
   Email = "email",
   NotificationFanout = "notification-fanout",
   EngineTask = "engine-task",
+  SaffFetch = "saff-fetch",
 }
 
 export const DEFAULT_JOB_OPTIONS: JobsOptions = {

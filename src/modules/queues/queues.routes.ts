@@ -14,6 +14,7 @@ createBullBoard({
     new BullMQAdapter(getQueue(QueueName.Email)),
     new BullMQAdapter(getQueue(QueueName.NotificationFanout)),
     new BullMQAdapter(getQueue(QueueName.EngineTask)),
+    new BullMQAdapter(getQueue(QueueName.SaffFetch)),
   ],
   serverAdapter,
 });

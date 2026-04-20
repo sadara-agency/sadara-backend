@@ -10,6 +10,8 @@ import {
   teamMapQuerySchema,
   mapTeamSchema,
   importRequestSchema,
+  jobIdParamSchema,
+  syncTournamentsSchema,
 } from "@modules/saff/saff.validation";
 import * as saffController from "@modules/saff/saff.controller";
 
@@ -29,6 +31,12 @@ router.post(
   "/tournaments/seed",
   authorizeModule("saff-data", "create"),
   asyncHandler(saffController.seedTournaments),
+);
+router.post(
+  "/tournaments/sync",
+  authorizeModule("saff-data", "create"),
+  validate(syncTournamentsSchema),
+  asyncHandler(saffController.syncTournaments),
 );
 
 // ── Fetch (Scrape from SAFF) ──
@@ -96,6 +104,14 @@ router.get(
   "/stats",
   authorizeModule("saff-data", "read"),
   asyncHandler(saffController.getStats),
+);
+
+// ── Job status polling ──
+router.get(
+  "/jobs/:jobId",
+  authorizeModule("saff-data", "read"),
+  validate(jobIdParamSchema, "params"),
+  asyncHandler(saffController.getJobStatus),
 );
 
 // ── Sync (Scheduler) ──

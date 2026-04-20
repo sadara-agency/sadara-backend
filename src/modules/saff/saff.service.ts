@@ -24,6 +24,7 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   scrapeBatch,
   scrapeTeamLogos,
+  scrapeTournamentList,
   type ScrapeResult,
 } from "@modules/saff/saff.scraper";
 import type {
@@ -310,6 +311,40 @@ export async function seedTournaments(): Promise<number> {
     if (created) count++;
   }
   return count;
+}
+
+// ── Discover tournaments dynamically from saff.com.sa ──
+
+export async function syncTournamentsFromSaff(
+  _season: string = getCurrentSeason(),
+): Promise<number> {
+  const scraped = await scrapeTournamentList();
+  let created = 0;
+
+  for (const t of scraped) {
+    const [existing, wasCreated] = await SaffTournament.findOrCreate({
+      where: { saffId: t.saffId },
+      defaults: {
+        saffId: t.saffId,
+        name: t.name,
+        nameAr: t.nameAr || t.name,
+        category: "pro",
+        tier: 2,
+        agencyValue: "Low",
+        isActive: true,
+      } as any,
+    });
+    if (wasCreated) {
+      created++;
+    } else if (!existing.nameAr && t.nameAr) {
+      await existing.update({ nameAr: t.nameAr });
+    }
+  }
+
+  logger.info(
+    `[SAFF Service] Discovery complete — ${scraped.length} found, ${created} new`,
+  );
+  return created;
 }
 
 // ── List tournaments ──

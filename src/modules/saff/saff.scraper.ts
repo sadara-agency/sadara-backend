@@ -529,7 +529,7 @@ export async function scrapeTeamLogos(
 export async function scrapeWeek(
   saffId: number,
   season: string,
-  week: number,
+  _week: number,
 ): Promise<ScrapedFixture[]> {
   // The SAFF site uses JavaScript to switch weeks via dropdown
   // For server-side scraping, we'd need to find if there's a
@@ -556,6 +556,64 @@ export async function scrapeAllWeeks(
   );
   const result = await scrapeChampionship(saffId, season);
   return result.fixtures;
+}
+
+// ══════════════════════════════════════════
+// DISCOVER TOURNAMENT LIST FROM SAFF SITE
+// ══════════════════════════════════════════
+
+export interface ScrapedTournamentMeta {
+  saffId: number;
+  name: string;
+  nameAr: string;
+}
+
+export async function scrapeTournamentList(): Promise<ScrapedTournamentMeta[]> {
+  const results = new Map<number, ScrapedTournamentMeta>();
+
+  // EN pass — pick up English names + IDs
+  try {
+    const $en = await fetchPage(`${BASE_URL_EN}/championships.php`, "en");
+    $en('a[href*="championship.php?id="]').each((_, el) => {
+      const href = $en(el).attr("href") || "";
+      const match = href.match(/championship\.php\?id=(\d+)/);
+      const id = match ? parseInt(match[1], 10) : 0;
+      const name = $en(el).text().trim();
+      if (id && name) {
+        results.set(id, { saffId: id, name, nameAr: "" });
+      }
+    });
+    logger.info(
+      `[SAFF Scraper] Tournament list EN: found ${results.size} entries`,
+    );
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`[SAFF Scraper] EN tournament list failed: ${msg}`);
+  }
+
+  // AR pass — fill in Arabic names
+  try {
+    await delay(REQUEST_DELAY);
+    const $ar = await fetchPage(`${BASE_URL_AR}/championships.php`, "ar");
+    $ar('a[href*="championship.php?id="]').each((_, el) => {
+      const href = $ar(el).attr("href") || "";
+      const match = href.match(/championship\.php\?id=(\d+)/);
+      const id = match ? parseInt(match[1], 10) : 0;
+      const nameAr = $ar(el).text().trim();
+      if (!id || !nameAr) return;
+      const existing = results.get(id);
+      if (existing) {
+        existing.nameAr = nameAr;
+      } else {
+        results.set(id, { saffId: id, name: nameAr, nameAr });
+      }
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`[SAFF Scraper] AR tournament list failed: ${msg}`);
+  }
+
+  return Array.from(results.values()).filter((t) => t.name);
 }
 
 // ══════════════════════════════════════════
