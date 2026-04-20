@@ -1,5 +1,9 @@
 import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
+import {
+  MedicalReport,
+  MedicalLabResult,
+} from "@modules/medicalReports/medicalReports.model";
 import { User } from "@modules/users/user.model";
 import { Task } from "@modules/tasks/task.model";
 import { Contract } from "@modules/contracts/contract.model";
@@ -537,4 +541,19 @@ export function setupAssociations() {
   MealPlan.belongsTo(Player, { foreignKey: "playerId", as: "player" });
   Player.hasMany(MealPlan, { foreignKey: "playerId", as: "mealPlans" });
   MealPlan.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+
+  // ── Medical Reports ──
+  MedicalReport.hasMany(MedicalLabResult, {
+    foreignKey: "medicalReportId",
+    as: "labResults",
+    onDelete: "CASCADE",
+  });
+  MedicalLabResult.belongsTo(MedicalReport, {
+    foreignKey: "medicalReportId",
+    as: "report",
+  });
+  MedicalReport.belongsTo(Document, {
+    foreignKey: "documentId",
+    as: "document",
+  });
 }
