@@ -684,6 +684,10 @@ export async function mapTeamToClub(input: MapTeamInput) {
 
     await teamMap.update({ clubId: input.clubId }, { transaction: txn });
 
+    if (!club.saffTeamId) {
+      await club.update({ saffTeamId: input.saffTeamId }, { transaction: txn });
+    }
+
     // Also update any existing standings/fixtures with this team
     await SaffStanding.update(
       { clubId: input.clubId },
@@ -805,6 +809,7 @@ export async function importToSadara(input: ImportRequest) {
               country: "Saudi Arabia",
               city: tm.city || undefined,
               league: tournament.name,
+              saffTeamId: tm.saffTeamId,
             },
             transaction: txn,
           });
@@ -814,6 +819,12 @@ export async function importToSadara(input: ImportRequest) {
           }
           if (!created && !club.isActive) {
             await club.update({ isActive: true }, { transaction: txn });
+          }
+          if (!club.saffTeamId) {
+            await club.update(
+              { saffTeamId: tm.saffTeamId },
+              { transaction: txn },
+            );
           }
 
           await tm.update({ clubId: club.id }, { transaction: txn });

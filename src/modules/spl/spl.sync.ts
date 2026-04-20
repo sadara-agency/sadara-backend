@@ -12,7 +12,7 @@
 // Performances: raw SQL using ON CONFLICT (player_id, season, competition)
 // ─────────────────────────────────────────────────────────────
 
-import { Op, Sequelize } from "sequelize";
+import { Op, QueryTypes, Sequelize } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import { Player } from "@modules/players/player.model";
@@ -29,6 +29,10 @@ import {
   SplSyncSummary,
 } from "@modules/spl/spl.types";
 import { fetchPlayerStats } from "@modules/spl/spl.pulselive";
+import {
+  canOverwrite,
+  PERFORMANCE_PRIORITY,
+} from "@shared/utils/providerPriority";
 
 const PROVIDER_SPL = "SPL";
 const PROVIDER_PULSELIVE = "PulseLive";
@@ -246,6 +250,22 @@ async function upsertPerformance(
   const competition = "Saudi Pro League";
   const starts = stats.appearances - stats.substitutions;
 
+  const existing = await sequelize.query<{ data_source: string | null }>(
+    `SELECT data_source FROM performances
+     WHERE player_id = :playerId AND season = :season AND competition = :competition
+     LIMIT 1`,
+    {
+      replacements: { playerId, season, competition },
+      type: QueryTypes.SELECT,
+    },
+  );
+  if (!canOverwrite(existing[0]?.data_source, "SPL", PERFORMANCE_PRIORITY)) {
+    logger.debug(
+      `[SPL Sync] Skipping performance downgrade for player ${playerId}: existing source ${existing[0]?.data_source} outranks SPL`,
+    );
+    return;
+  }
+
   await sequelize.query(
     `INSERT INTO performances (
        id, player_id, season, competition, data_source,
@@ -308,6 +328,24 @@ export async function upsertDetailedPerformance(
   const aerialDuelsWon = plStats.aerial_won ?? 0;
   const keyPasses = plStats.big_chance_created ?? 0;
   const successfulDribbles = plStats.successful_final_third_passes ?? 0;
+
+  const existing = await sequelize.query<{ data_source: string | null }>(
+    `SELECT data_source FROM performances
+     WHERE player_id = :playerId AND season = :season AND competition = :competition
+     LIMIT 1`,
+    {
+      replacements: { playerId, season, competition },
+      type: QueryTypes.SELECT,
+    },
+  );
+  if (
+    !canOverwrite(existing[0]?.data_source, "PulseLive", PERFORMANCE_PRIORITY)
+  ) {
+    logger.debug(
+      `[PulseLive Sync] Skipping performance downgrade for player ${playerId}: existing source ${existing[0]?.data_source} outranks PulseLive`,
+    );
+    return;
+  }
 
   await sequelize.query(
     `INSERT INTO performances (

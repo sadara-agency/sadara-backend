@@ -33,6 +33,7 @@ interface ClubAttributes {
   splTeamId?: number | null;
   espnTeamId?: number | null;
   sportmonksTeamId?: number | null;
+  saffTeamId?: number | null;
 }
 
 interface ClubCreationAttributes extends Optional<
@@ -65,6 +66,7 @@ export class Club
   declare splTeamId: number | null;
   declare espnTeamId: number | null;
   declare sportmonksTeamId: number | null;
+  declare saffTeamId: number | null;
 }
 
 Club.init(
@@ -145,6 +147,11 @@ Club.init(
     sportmonksTeamId: {
       type: DataTypes.INTEGER,
       field: "sportmonks_team_id",
+      unique: true,
+    },
+    saffTeamId: {
+      type: DataTypes.INTEGER,
+      field: "saff_team_id",
       unique: true,
     },
     isActive: {
