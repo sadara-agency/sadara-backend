@@ -1,5 +1,48 @@
 /// <reference types="jest" />
-jest.mock('../../../src/modules/saff/saff.service');
+jest.mock('../../../src/config/database', () => ({
+  sequelize: { query: jest.fn(), authenticate: jest.fn() },
+}));
+jest.mock('../../../src/config/env', () => ({
+  env: {
+    db: { host: 'localhost', port: 5432, name: 'test', user: 'u', password: 'p' },
+    redis: { url: 'redis://localhost:6379' },
+  },
+}));
+jest.mock('../../../src/config/logger', () => ({
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
+}));
+jest.mock('../../../src/modules/saff/saff.model', () => ({
+  SaffTournament: { findAll: jest.fn(), findByPk: jest.fn(), upsert: jest.fn(), name: 'SaffTournament' },
+  SaffStanding: { findAll: jest.fn(), name: 'SaffStanding' },
+  SaffFixture: { findAll: jest.fn(), name: 'SaffFixture' },
+  SaffTeamMap: { findAll: jest.fn(), findOne: jest.fn(), upsert: jest.fn(), name: 'SaffTeamMap' },
+}));
+jest.mock('../../../src/modules/saff/saff.scheduler', () => ({
+  getSyncStatus: jest.fn().mockReturnValue({}),
+  runSync: jest.fn().mockResolvedValue(undefined),
+}));
+jest.mock('../../../src/modules/saff/saff.scraper', () => ({
+  scrapeChampionship: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../src/modules/saff/saff.service', () => ({
+  getCurrentSeason: jest.fn().mockReturnValue('2024-2025'),
+  seedTournaments: jest.fn(),
+  syncTournamentsFromSaff: jest.fn(),
+  listTournaments: jest.fn(),
+  fetchFromSaff: jest.fn(),
+  listStandings: jest.fn(),
+  listFixtures: jest.fn(),
+  listTeamMaps: jest.fn(),
+  mapTeamToClub: jest.fn(),
+  importToSadara: jest.fn(),
+  fetchTeamLogos: jest.fn(),
+  bulkFetchMenLeagues: jest.fn(),
+  getStats: jest.fn(),
+  getPlayerUpcomingMatches: jest.fn(),
+  getPlayerCompetitionStats: jest.fn(),
+  getWatchlistMatches: jest.fn(),
+  projectFixturesToMatches: jest.fn(),
+}));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),

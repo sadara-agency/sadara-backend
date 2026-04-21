@@ -21,6 +21,7 @@ import { isRedisConnected, getRedisClient } from "@config/redis";
 // Route imports
 import authRoutes from "@modules/auth/auth.routes";
 import playerRoutes from "@modules/players/player.routes";
+import playerExportRoutes from "@modules/player-export/player-export.routes";
 import clubRoutes from "@modules/clubs/club.routes";
 import contractRoutes from "@modules/contracts/contract.routes";
 import taskRoutes from "@modules/tasks/task.routes";
@@ -295,6 +296,7 @@ app.get("/api/health", async (_req, res) => {
 // ── API Routes ──
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/players", playerRoutes);
+app.use("/api/v1/players", playerExportRoutes);
 app.use("/api/v1/clubs", clubRoutes);
 app.use("/api/v1/contracts", contractRoutes);
 app.use("/api/v1/tasks", taskRoutes);
