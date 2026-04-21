@@ -395,7 +395,9 @@ export async function convertOfferToContract(
         offer.salaryOffered != null ? String(offer.salaryOffered) : "0",
       salaryCurrency: offer.feeCurrency || "SAR",
       signingBonus: offer.transferFee ?? 0,
-      commissionPct: offer.agentFee != null ? String(offer.agentFee) : "10",
+      commissionPct: Number.isFinite(offer.agentFee as number)
+        ? String(offer.agentFee)
+        : "10",
       notes: `Auto-created from offer #${offerId}. Requires review and signing before activation.`,
       createdBy,
     } as any);
