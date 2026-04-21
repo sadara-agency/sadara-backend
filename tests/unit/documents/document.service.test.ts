@@ -44,6 +44,11 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
 jest.mock('../../../src/modules/offers/offer.model', () => ({
   Offer: { findByPk: (...a: unknown[]) => mockOfferFindByPk(...a), name: 'Offer' },
 }));
+jest.mock('../../../src/modules/scouting/scouting.model', () => ({
+  ScreeningCase: { findByPk: jest.fn(), name: 'ScreeningCase' },
+  Watchlist: { findByPk: jest.fn(), name: 'Watchlist' },
+  SelectionDecision: { findByPk: jest.fn(), name: 'SelectionDecision' },
+}));
 jest.mock('../../../src/modules/users/user.model', () => ({
   User: { name: 'User' },
 }));
