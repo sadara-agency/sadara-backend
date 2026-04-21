@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
+import { ROLES } from "@shared/types";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
@@ -19,6 +20,9 @@ import {
   updateScreeningSchema,
   markPackReadySchema,
   createDecisionSchema,
+  attachScreeningDocumentSchema,
+  verifyClearanceSchema,
+  signProspectSchema,
 } from "@modules/scouting/scouting.validation";
 import * as ctrl from "@modules/scouting/scouting.controller";
 import { generatePackPdf } from "@modules/scouting/scouting.pdf.controller";
@@ -147,6 +151,18 @@ router.patch(
   validate(markPackReadySchema),
   asyncHandler(ctrl.markPackReady),
 );
+router.patch(
+  "/screening/:id/attach-document",
+  authorizeModule("scouting", "update"),
+  validate(attachScreeningDocumentSchema),
+  asyncHandler(ctrl.attachScreeningDocument),
+);
+router.patch(
+  "/screening/:id/verify-clearance",
+  authorize(ROLES.ADMIN, ROLES.MANAGER),
+  validate(verifyClearanceSchema),
+  asyncHandler(ctrl.verifyClearance),
+);
 router.get(
   "/screening/:id/pdf",
   authorizeModule("scouting", "read"),
@@ -165,6 +181,13 @@ router.get(
   authorizeModule("scouting", "read"),
   dynamicFieldAccess("scouting"),
   asyncHandler(ctrl.getDecision),
+);
+router.post(
+  "/decisions/:id/sign",
+  authorizeModule("scouting", "update"),
+  authorizeModule("players", "create"),
+  validate(signProspectSchema),
+  asyncHandler(ctrl.signProspect),
 );
 
 export default router;

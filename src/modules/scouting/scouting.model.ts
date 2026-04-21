@@ -136,6 +136,15 @@ export interface ScreeningCaseAttributes {
   packPreparedBy?: string | null;
   notes?: string | null;
   createdBy?: string | null;
+  hasExistingAgencyContract?: boolean | null;
+  idCardDocumentId?: string | null;
+  clearanceDocumentId?: string | null;
+  clearanceVerifiedAt?: Date | null;
+  clearanceVerifiedBy?: string | null;
+  signedPlayerId?: string | null;
+  signedContractId?: string | null;
+  signedAt?: Date | null;
+  signedBy?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -173,6 +182,15 @@ export class ScreeningCase
   declare packPreparedBy: string | null;
   declare notes: string | null;
   declare createdBy: string | null;
+  declare hasExistingAgencyContract: boolean | null;
+  declare idCardDocumentId: string | null;
+  declare clearanceDocumentId: string | null;
+  declare clearanceVerifiedAt: Date | null;
+  declare clearanceVerifiedBy: string | null;
+  declare signedPlayerId: string | null;
+  declare signedContractId: string | null;
+  declare signedAt: Date | null;
+  declare signedBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -235,6 +253,28 @@ ScreeningCase.init(
     packPreparedBy: { type: DataTypes.UUID, field: "pack_prepared_by" },
     notes: { type: DataTypes.TEXT },
     createdBy: { type: DataTypes.UUID, field: "created_by" },
+    hasExistingAgencyContract: {
+      type: DataTypes.BOOLEAN,
+      allowNull: true,
+      field: "has_existing_agency_contract",
+    },
+    idCardDocumentId: { type: DataTypes.UUID, field: "id_card_document_id" },
+    clearanceDocumentId: {
+      type: DataTypes.UUID,
+      field: "clearance_document_id",
+    },
+    clearanceVerifiedAt: {
+      type: DataTypes.DATE,
+      field: "clearance_verified_at",
+    },
+    clearanceVerifiedBy: {
+      type: DataTypes.UUID,
+      field: "clearance_verified_by",
+    },
+    signedPlayerId: { type: DataTypes.UUID, field: "signed_player_id" },
+    signedContractId: { type: DataTypes.UUID, field: "signed_contract_id" },
+    signedAt: { type: DataTypes.DATE, field: "signed_at" },
+    signedBy: { type: DataTypes.UUID, field: "signed_by" },
   },
   {
     sequelize,

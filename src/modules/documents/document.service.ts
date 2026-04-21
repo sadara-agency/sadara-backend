@@ -9,6 +9,7 @@ import { Match } from "@modules/matches/match.model";
 import { Injury } from "@modules/injuries/injury.model";
 import { Club } from "@modules/clubs/club.model";
 import { Offer } from "@modules/offers/offer.model";
+import { ScreeningCase } from "@modules/scouting/scouting.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -41,7 +42,8 @@ type EntityModel =
   | typeof Match
   | typeof Injury
   | typeof Club
-  | typeof Offer;
+  | typeof Offer
+  | typeof ScreeningCase;
 
 const ENTITY_MODELS: Record<DocumentEntityType, EntityModel> = {
   Player: Player,
@@ -50,6 +52,7 @@ const ENTITY_MODELS: Record<DocumentEntityType, EntityModel> = {
   Injury: Injury,
   Club: Club,
   Offer: Offer,
+  Scouting: ScreeningCase,
 };
 
 /** Resolve a human-readable label for the given entity. */
@@ -102,6 +105,12 @@ export async function resolveEntityLabel(
         ? `${o.getDataValue("offerType")} Offer #${entityId.slice(0, 8)}`
         : null;
     }
+    case "Scouting": {
+      const sc = await ScreeningCase.findByPk(entityId, {
+        attributes: ["caseNumber"],
+      });
+      return sc ? `Scouting ${sc.getDataValue("caseNumber")}` : null;
+    }
     default:
       return null;
   }
@@ -141,6 +150,7 @@ const ENTITY_TYPE_TO_MODULE: Record<string, string> = {
   Injury: "injuries",
   Club: "clubs",
   Offer: "offers",
+  Scouting: "scouting",
 };
 
 /**

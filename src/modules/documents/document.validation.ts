@@ -6,6 +6,7 @@ const docTypes = [
   "Medical",
   "ID",
   "Agreement",
+  "Clearance",
   "Other",
 ] as const;
 const docStatuses = ["Active", "Valid", "Pending", "Expired"] as const;
@@ -16,6 +17,7 @@ const entityTypes = [
   "Injury",
   "Club",
   "Offer",
+  "Scouting",
 ] as const;
 
 export const createDocumentSchema = z.object({
