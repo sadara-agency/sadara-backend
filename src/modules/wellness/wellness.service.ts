@@ -213,7 +213,8 @@ export async function computeMacros(
  */
 export async function recalculateTargets(playerId: string) {
   const profile = await getProfile(playerId);
-  const computed = await computeMacros(playerId, profile);
+  if (!profile) throw new AppError("Wellness profile not found", 404);
+  const computed = await computeMacros(playerId, profile ?? undefined);
   await profile.update({
     targetCalories: computed.macros.calories,
     targetProteinG: computed.macros.proteinG,

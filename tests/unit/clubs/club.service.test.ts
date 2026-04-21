@@ -5,6 +5,7 @@ import { mockClub, mockModelInstance } from '../../setup/test-helpers';
 const mockFindAndCountAll = jest.fn();
 const mockFindByPk = jest.fn();
 const mockClubCreate = jest.fn();
+const mockCount = jest.fn().mockResolvedValue(0);
 
 jest.mock('../../../src/config/database', () => ({
   sequelize: {
@@ -23,6 +24,7 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
     findAndCountAll: (...a: unknown[]) => mockFindAndCountAll(...a),
     findByPk: (...a: unknown[]) => mockFindByPk(...a),
     create: (...a: unknown[]) => mockClubCreate(...a),
+    count: (...a: unknown[]) => mockCount(...a),
   },
 }));
 
