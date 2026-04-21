@@ -71,6 +71,9 @@ jest.mock('../../../src/modules/matches/matchPlayer.model', () => ({
 jest.mock('../../../src/modules/matches/playerMatchStats.model', () => ({
   PlayerMatchStats: { findAll: (...a: unknown[]) => mockPlayerMatchStatsFindAll(...a), name: 'PlayerMatchStats' },
 }));
+jest.mock('../../../src/modules/users/user.model', () => ({
+  User: { findAll: jest.fn().mockResolvedValue([]), name: 'User' },
+}));
 
 const mockHasPermission = jest.fn();
 const mockGetHiddenFields = jest.fn();
