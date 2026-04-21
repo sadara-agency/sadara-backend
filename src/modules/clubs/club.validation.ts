@@ -56,7 +56,7 @@ export const updateClubSchema = createClubBaseSchema.partial();
 // ── Query / List Clubs ──
 export const clubQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(200).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["name", "created_at", "updated_at", "country", "league", "type"])
     .default("name"),
