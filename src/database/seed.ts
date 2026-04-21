@@ -452,6 +452,21 @@ async function seedAllData(tx: Transaction): Promise<void> {
   await Club.bulkCreate(SPL_CLUBS, opts);
   console.log("  ✅ Clubs seeded (18 SPL teams)");
 
+  // ── 2b. ClubCompetition junction — link SPL clubs to Roshn Saudi League ──
+  await sequelize.query(
+    `INSERT INTO club_competitions (id, club_id, competition_id, season, created_at, updated_at)
+     SELECT gen_random_uuid(), cl.id, co.id, '2025-2026', NOW(), NOW()
+     FROM clubs cl
+     CROSS JOIN competitions co
+     WHERE cl.league = 'Saudi Pro League'
+       AND co.name = 'Roshn Saudi League'
+     ON CONFLICT (club_id, competition_id, season) DO NOTHING`,
+    { transaction: tx },
+  );
+  console.log(
+    "  ✅ ClubCompetition junction linked (SPL clubs → Roshn Saudi League)",
+  );
+
   // ── 3. Players (20) ──
   const playerDefs = [
     {
