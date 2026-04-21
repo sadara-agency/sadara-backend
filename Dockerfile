@@ -17,7 +17,7 @@ RUN npm run build
 # ── Stage 2: Production ──────────────────────────────────
 FROM node:20-slim
 
-# Install Chrome dependencies + Arabic fonts (for Puppeteer PDF generation)
+# Install Chromium + system libs for Puppeteer PDF generation
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
@@ -25,10 +25,7 @@ RUN apt-get update && apt-get install -y \
     fonts-noto-cjk \
     fonts-noto-core \
     fonts-noto \
-    fonts-arabeyes \
-    fonts-hosny-amiri \
-    fonts-kacst \
-    fonts-kacst-one \
+    fontconfig \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
     libcups2 \
@@ -46,6 +43,10 @@ RUN apt-get update && apt-get install -y \
     curl \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
+
+# Install IBM Plex Sans Arabic (brand font for PDF generation)
+COPY fonts/ /usr/local/share/fonts/arabic/
+RUN fc-cache -f
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
