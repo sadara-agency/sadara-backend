@@ -224,8 +224,14 @@ async function startSchedulers(): Promise<void> {
   logger.info("[jobs] Starting cron jobs...");
   await withTimeout(startCronJobs(), 15_000, "startCronJobs");
   if (env.queue.runWorkers) {
-    const { startWorkers } = await import("@modules/queues/workers");
-    startWorkers();
+    try {
+      const { startWorkers } = await import("@modules/queues/workers");
+      startWorkers();
+    } catch (err) {
+      logger.error("[jobs] Failed to start BullMQ workers — queues disabled", {
+        error: (err as Error).message,
+      });
+    }
   }
   logger.info("[jobs] All schedulers running");
 }

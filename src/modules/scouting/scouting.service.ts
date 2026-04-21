@@ -509,7 +509,7 @@ export async function getPipelineSummary() {
        COUNT(*) FILTER (WHERE ls.status = 'PackReady')::int   AS pack_ready,
        COUNT(*) FILTER (WHERE ls.status = 'Closed')::int      AS decided,
        COUNT(*) FILTER (WHERE w.status = 'Rejected')::int     AS rejected
-     FROM watchlist w
+     FROM "watchlists" w
      LEFT JOIN latest_sc ls ON ls.watchlist_id = w.id`,
     { type: QueryTypes.SELECT },
   );
