@@ -77,6 +77,9 @@ import {
   SplTrackedPlayer,
 } from "@modules/spl/spl.intelligence.model";
 import { Ticket } from "@modules/tickets/ticket.model";
+import TransferWindow from "@modules/transfer-windows/transferWindow.model";
+import ClubNeed from "@modules/club-needs/clubNeed.model";
+import { ScoringCard } from "@modules/scouting/scoringCard.model";
 
 let associationsReady = false;
 
@@ -535,6 +538,31 @@ export function setupAssociations() {
   User.hasMany(SplTrackedPlayer, {
     foreignKey: "userId",
     as: "trackedPlayers",
+  });
+
+  // ── Transfer Framework ─────────────────────────────────────
+  Club.hasMany(ClubNeed, { foreignKey: "clubId", as: "needs" });
+  ClubNeed.belongsTo(Club, { foreignKey: "clubId", as: "club" });
+
+  TransferWindow.hasMany(ClubNeed, { foreignKey: "windowId", as: "needs" });
+  ClubNeed.belongsTo(TransferWindow, { foreignKey: "windowId", as: "window" });
+
+  // ── Scoring Cards (T2) ─────────────────────────────────────
+  Watchlist.hasMany(ScoringCard, {
+    foreignKey: "watchlistId",
+    as: "scoringCards",
+  });
+  ScoringCard.belongsTo(Watchlist, {
+    foreignKey: "watchlistId",
+    as: "watchlist",
+  });
+  TransferWindow.hasMany(ScoringCard, {
+    foreignKey: "windowId",
+    as: "scoringCards",
+  });
+  ScoringCard.belongsTo(TransferWindow, {
+    foreignKey: "windowId",
+    as: "window",
   });
 
   // Meal Plans

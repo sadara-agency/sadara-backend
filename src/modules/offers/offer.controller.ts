@@ -5,6 +5,8 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { logger } from "@config/logger";
 import { createCrudController } from "@shared/utils/crudController";
 import * as offerService from "@modules/offers/offer.service";
+import * as importerService from "@modules/offers/importer.service";
+import { AppError } from "@middleware/errorHandler";
 import {
   createApprovalRequest,
   resolveApprovalByEntity,
@@ -80,6 +82,35 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   }
 
   sendSuccess(res, offer, `Offer status updated to ${offer.status}`);
+}
+
+export async function updatePhase(req: AuthRequest, res: Response) {
+  const offer = await offerService.updateOfferPhase(
+    req.params.id,
+    req.body,
+    req.user,
+  );
+  sendSuccess(res, offer, "Offer phase updated");
+}
+
+export async function importCsv(req: AuthRequest, res: Response) {
+  if (!req.file) throw new AppError("CSV file required", 422);
+
+  const content = req.file.buffer.toString("utf-8");
+  const lines = content
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const headers = lines[0]
+    .split(",")
+    .map((h) => h.trim().replace(/^"|"$/g, ""));
+  const rows = lines.slice(1).map((line) => {
+    const values = line.split(",").map((v) => v.trim().replace(/^"|"$/g, ""));
+    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? ""]));
+  });
+
+  const count = await importerService.importOffersFromCsv(rows, req.user!.id);
+  sendSuccess(res, { imported: count }, `${count} deals imported`);
 }
 
 export async function convertToContract(req: AuthRequest, res: Response) {

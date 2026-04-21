@@ -5,6 +5,7 @@ import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
 import * as dashboardController from "@modules/dashboard/dashboard.controller";
 import * as configController from "@modules/dashboard/dashboardConfig.controller";
+import * as transferPortfolioController from "@modules/dashboard/transferPortfolio.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -219,6 +220,13 @@ router.get(
   ),
   cacheRoute("dash", CacheTTL.SHORT),
   asyncHandler(dashboardController.getSportsManagerOverview),
+);
+
+router.get(
+  "/transfer-framework",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("tf-portfolio", CacheTTL.SHORT),
+  transferPortfolioController.getStats,
 );
 
 export default router;

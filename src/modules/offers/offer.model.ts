@@ -39,6 +39,16 @@ interface OfferAttributes {
   convertedContractId?: string | null;
   convertedAt?: Date | null;
 
+  // Pipeline tracking
+  phase?: "ID" | "Acquire" | "Map" | "Negotiate" | "Media" | "Close" | null;
+  windowId?: string | null;
+  saffRegDate?: string | null;
+  itcFiledDate?: string | null;
+  medicalDate?: string | null;
+  hotSignedDate?: string | null;
+  blockerNotes?: string | null;
+  mediaEmbargoLiftedAt?: Date | null;
+
   // Notes & meta
   notes?: string | null;
   displayId?: string | null;
@@ -55,6 +65,14 @@ interface OfferCreationAttributes extends Optional<
   | "feeCurrency"
   | "displayId"
   | "submittedAt"
+  | "phase"
+  | "windowId"
+  | "saffRegDate"
+  | "itcFiledDate"
+  | "medicalDate"
+  | "hotSignedDate"
+  | "blockerNotes"
+  | "mediaEmbargoLiftedAt"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -95,6 +113,22 @@ export class Offer
 
   declare convertedContractId: string | null;
   declare convertedAt: Date | null;
+
+  declare phase:
+    | "ID"
+    | "Acquire"
+    | "Map"
+    | "Negotiate"
+    | "Media"
+    | "Close"
+    | null;
+  declare windowId: string | null;
+  declare saffRegDate: string | null;
+  declare itcFiledDate: string | null;
+  declare medicalDate: string | null;
+  declare hotSignedDate: string | null;
+  declare blockerNotes: string | null;
+  declare mediaEmbargoLiftedAt: Date | null;
 
   declare notes: string | null;
   declare displayId: string | null;
@@ -203,6 +237,40 @@ Offer.init(
     convertedAt: {
       type: DataTypes.DATE,
       field: "converted_at",
+    },
+
+    // Pipeline tracking
+    phase: { type: DataTypes.STRING(20), allowNull: true },
+    windowId: { type: DataTypes.UUID, allowNull: true, field: "window_id" },
+    saffRegDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: "saff_reg_date",
+    },
+    itcFiledDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: "itc_filed_date",
+    },
+    medicalDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: "medical_date",
+    },
+    hotSignedDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: "hot_signed_date",
+    },
+    blockerNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "blocker_notes",
+    },
+    mediaEmbargoLiftedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "media_embargo_lifted_at",
     },
 
     // Notes & meta

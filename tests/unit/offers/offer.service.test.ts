@@ -79,6 +79,10 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/gates/gate.service', () => ({
+  initializeClosingGate: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as offerService from '../../../src/modules/offers/offer.service';
 
 describe('Offer Service', () => {
