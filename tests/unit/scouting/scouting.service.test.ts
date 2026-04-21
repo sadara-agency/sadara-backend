@@ -43,6 +43,21 @@ jest.mock('../../../src/modules/scouting/scouting.model', () => ({
   },
 }));
 
+jest.mock('../../../src/modules/players/player.model', () => ({
+  Player: {
+    create: jest.fn(),
+    findByPk: jest.fn(),
+    name: 'Player',
+  },
+}));
+
+jest.mock('../../../src/modules/documents/document.model', () => ({
+  Document: {
+    update: jest.fn(),
+    findByPk: jest.fn(),
+  },
+}));
+
 jest.mock('../../../src/modules/users/user.model', () => ({ User: { name: 'User' } }));
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
@@ -224,11 +239,32 @@ describe('Scouting Service', () => {
 
   describe('markPackReady', () => {
     it('should mark pack ready', async () => {
-      const sc = mockModelInstance(mockScreeningCase({ status: 'InProgress', identityCheck: 'Verified', medicalClearance: true }));
+      const sc = mockModelInstance(mockScreeningCase({
+        status: 'InProgress',
+        identityCheck: 'Verified',
+        medicalClearance: true,
+        idCardDocumentId: 'doc-id-001',
+        hasExistingAgencyContract: false,
+      }));
       mockScreeningFindByPk.mockResolvedValue(sc);
       mockWatchlistFindByPk.mockResolvedValue(mockModelInstance(mockWatchlist()));
       await scoutingService.markPackReady('sc-001', 'user-001');
       expect(sc.update).toHaveBeenCalledWith(expect.objectContaining({ isPackReady: true, status: 'PackReady' }));
+    });
+
+    it('should mark pack ready with verified clearance', async () => {
+      const sc = mockModelInstance(mockScreeningCase({
+        status: 'InProgress',
+        identityCheck: 'Verified',
+        medicalClearance: true,
+        idCardDocumentId: 'doc-id-001',
+        hasExistingAgencyContract: true,
+        clearanceDocumentId: 'doc-cl-001',
+      }));
+      mockScreeningFindByPk.mockResolvedValue(sc);
+      mockWatchlistFindByPk.mockResolvedValue(mockModelInstance(mockWatchlist()));
+      await scoutingService.markPackReady('sc-001', 'user-001');
+      expect(sc.update).toHaveBeenCalledWith(expect.objectContaining({ isPackReady: true }));
     });
 
     it('should throw 400 if identity not verified', async () => {
@@ -241,6 +277,42 @@ describe('Scouting Service', () => {
       const sc = mockModelInstance(mockScreeningCase({ status: 'InProgress', identityCheck: 'Verified', medicalClearance: false }));
       mockScreeningFindByPk.mockResolvedValue(sc);
       await expect(scoutingService.markPackReady('sc-001', 'user-001')).rejects.toThrow('Medical clearance is required');
+    });
+
+    it('should throw 400 if ID card not uploaded', async () => {
+      const sc = mockModelInstance(mockScreeningCase({
+        status: 'InProgress',
+        identityCheck: 'Verified',
+        medicalClearance: true,
+        idCardDocumentId: null,
+      }));
+      mockScreeningFindByPk.mockResolvedValue(sc);
+      await expect(scoutingService.markPackReady('sc-001', 'user-001')).rejects.toThrow('Player ID Card upload is required');
+    });
+
+    it('should throw 400 if existing-contract status not declared', async () => {
+      const sc = mockModelInstance(mockScreeningCase({
+        status: 'InProgress',
+        identityCheck: 'Verified',
+        medicalClearance: true,
+        idCardDocumentId: 'doc-id-001',
+        hasExistingAgencyContract: null,
+      }));
+      mockScreeningFindByPk.mockResolvedValue(sc);
+      await expect(scoutingService.markPackReady('sc-001', 'user-001')).rejects.toThrow('Existing agency-contract status must be declared');
+    });
+
+    it('should throw 400 if clearance document missing when prior contract exists', async () => {
+      const sc = mockModelInstance(mockScreeningCase({
+        status: 'InProgress',
+        identityCheck: 'Verified',
+        medicalClearance: true,
+        idCardDocumentId: 'doc-id-001',
+        hasExistingAgencyContract: true,
+        clearanceDocumentId: null,
+      }));
+      mockScreeningFindByPk.mockResolvedValue(sc);
+      await expect(scoutingService.markPackReady('sc-001', 'user-001')).rejects.toThrow('Clearance document required');
     });
 
     it('should throw 404 if not found', async () => {

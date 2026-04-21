@@ -113,11 +113,35 @@ export const updateScreeningSchema = z.object({
   // but values must be finite numbers to match the frontend Record<string, number>
   // contract and prevent mixed-type payloads from leaking into JSONB.
   baselineStats: z.record(z.string().min(1), z.number().finite()).optional(),
+  hasExistingAgencyContract: z.boolean().nullable().optional(),
   notes: z.string().optional(),
 });
 
 export const markPackReadySchema = z.object({
   isPackReady: z.literal(true),
+});
+
+// ── Identity & Clearance ──
+
+export const attachScreeningDocumentSchema = z.object({
+  kind: z.enum(["idCard", "clearance"]),
+  documentId: z.string().uuid(),
+});
+
+export const verifyClearanceSchema = z.object({
+  verified: z.boolean(),
+});
+
+export const signProspectSchema = z.object({
+  firstName: z.string().min(1).max(100),
+  lastName: z.string().min(1).max(100),
+  firstNameAr: z.string().max(100).optional(),
+  lastNameAr: z.string().max(100).optional(),
+  playerType: z.enum(["Pro", "Youth", "Amateur"]),
+  playerPackage: z.enum(["A", "B", "C"]),
+  nationalId: z.string().max(50).optional(),
+  email: z.string().email().max(255).optional(),
+  phone: z.string().max(30).optional(),
 });
 
 // ── Selection Decision (immutable — create only) ──
@@ -153,3 +177,8 @@ export type WatchlistQuery = z.infer<typeof watchlistQuerySchema>;
 export type CreateScreeningInput = z.infer<typeof createScreeningSchema>;
 export type UpdateScreeningInput = z.infer<typeof updateScreeningSchema>;
 export type CreateDecisionInput = z.infer<typeof createDecisionSchema>;
+export type AttachScreeningDocumentInput = z.infer<
+  typeof attachScreeningDocumentSchema
+>;
+export type VerifyClearanceInput = z.infer<typeof verifyClearanceSchema>;
+export type SignProspectInput = z.infer<typeof signProspectSchema>;

@@ -7,6 +7,7 @@ export type DocumentType =
   | "Medical"
   | "ID"
   | "Agreement"
+  | "Clearance"
   | "Other";
 export type DocumentStatus = "Active" | "Valid" | "Pending" | "Expired";
 export type DocumentEntityType =
@@ -15,7 +16,8 @@ export type DocumentEntityType =
   | "Match"
   | "Injury"
   | "Club"
-  | "Offer";
+  | "Offer"
+  | "Scouting";
 
 export interface DocumentAttributes {
   id: string;

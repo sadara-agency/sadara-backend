@@ -8,6 +8,8 @@ import {
   type ScreeningCaseAttributes,
 } from "@modules/scouting/scouting.model";
 import { User } from "@modules/users/user.model";
+import { Player } from "@modules/players/player.model";
+import { Document } from "@modules/documents/document.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
@@ -377,6 +379,15 @@ export async function markPackReady(id: string, userId: string) {
     throw new AppError("Identity check must be verified first", 400);
   if (!sc.medicalClearance)
     throw new AppError("Medical clearance is required", 400);
+  if (!sc.idCardDocumentId)
+    throw new AppError("Player ID Card upload is required", 400);
+  if (sc.hasExistingAgencyContract === null)
+    throw new AppError("Existing agency-contract status must be declared", 400);
+  if (sc.hasExistingAgencyContract === true && !sc.clearanceDocumentId)
+    throw new AppError(
+      "Clearance document required when player has an existing agency contract",
+      400,
+    );
 
   await sc.update({
     isPackReady: true,
@@ -919,4 +930,192 @@ export async function getProspectTimeline(watchlistId: string) {
     userName: log.userName,
     changes: log.changes,
   }));
+}
+
+// ══════════════════════════════════════════
+// IDENTITY & CLEARANCE
+// ══════════════════════════════════════════
+
+type ScreeningDocKind = "idCard" | "clearance";
+
+const EXPECTED_DOC_TYPE: Record<ScreeningDocKind, "ID" | "Clearance"> = {
+  idCard: "ID",
+  clearance: "Clearance",
+};
+
+export async function attachScreeningDocument(
+  id: string,
+  kind: ScreeningDocKind,
+  documentId: string,
+) {
+  const sc = await findOrThrow(ScreeningCase, id, "Screening case");
+  if (sc.status === "Closed")
+    throw new AppError("Cannot modify a closed screening case", 400);
+
+  const doc = await Document.findByPk(documentId);
+  if (!doc) throw new AppError("Document not found", 404);
+  if (doc.type !== EXPECTED_DOC_TYPE[kind])
+    throw new AppError(
+      `Document type must be "${EXPECTED_DOC_TYPE[kind]}" for ${kind}`,
+      422,
+    );
+
+  // Bind the document to this screening case so it's discoverable on the
+  // prospect's documents list and survives until the sign step relinks it.
+  await doc.update({ entityType: "Scouting", entityId: sc.id });
+
+  const patch: Partial<ScreeningCaseAttributes> =
+    kind === "idCard"
+      ? { idCardDocumentId: doc.id }
+      : {
+          clearanceDocumentId: doc.id,
+          // A new clearance file resets any prior verification.
+          clearanceVerifiedAt: null,
+          clearanceVerifiedBy: null,
+        };
+  return sc.update(patch);
+}
+
+export async function verifyClearance(
+  id: string,
+  verified: boolean,
+  verifiedBy: string,
+) {
+  const sc = await findOrThrow(ScreeningCase, id, "Screening case");
+  if (sc.hasExistingAgencyContract !== true)
+    throw new AppError(
+      "Clearance verification is only applicable when the prospect has an existing agency contract",
+      422,
+    );
+  if (!sc.clearanceDocumentId)
+    throw new AppError("No clearance document has been uploaded", 422);
+
+  return sc.update({
+    clearanceVerifiedAt: verified ? new Date() : null,
+    clearanceVerifiedBy: verified ? verifiedBy : null,
+  });
+}
+
+export async function signProspect(
+  decisionId: string,
+  input: {
+    firstName: string;
+    lastName: string;
+    firstNameAr?: string;
+    lastNameAr?: string;
+    playerType: "Pro" | "Youth" | "Amateur";
+    playerPackage: "A" | "B" | "C";
+    nationalId?: string;
+    email?: string;
+    phone?: string;
+  },
+  userId: string,
+) {
+  const decision = await SelectionDecision.findByPk(decisionId);
+  if (!decision) throw new AppError("Decision not found", 404);
+  if (decision.decision !== "Approved")
+    throw new AppError("Prospect not approved by committee", 422);
+
+  const sc = await ScreeningCase.findByPk(decision.screeningCaseId, {
+    include: [{ model: Watchlist, as: "watchlist" }],
+  });
+  if (!sc) throw new AppError("Screening case not found", 404);
+
+  // Idempotency
+  if (sc.signedPlayerId) throw new AppError("Prospect already signed", 409);
+
+  // Precondition re-check (defense in depth — UI enforces the same)
+  if (!sc.idCardDocumentId) throw new AppError("Player ID Card required", 422);
+  if (sc.hasExistingAgencyContract === null)
+    throw new AppError("Existing-contract status not declared", 422);
+  if (sc.hasExistingAgencyContract === true) {
+    if (!sc.clearanceDocumentId)
+      throw new AppError("Clearance document required", 422);
+    if (!sc.clearanceVerifiedAt)
+      throw new AppError("Clearance document pending admin verification", 403);
+  }
+
+  const wl = (sc as any).watchlist as Watchlist | undefined;
+  if (!wl) throw new AppError("Prospect watchlist entry missing", 500);
+
+  const contractType =
+    input.playerType === "Pro"
+      ? "Professional"
+      : input.playerType === "Youth"
+        ? "Youth"
+        : "Amateur";
+
+  const result = await sequelize.transaction(async (t) => {
+    const player = await Player.create(
+      {
+        firstName: input.firstName,
+        lastName: input.lastName,
+        firstNameAr: input.firstNameAr ?? null,
+        lastNameAr: input.lastNameAr ?? null,
+        dateOfBirth: wl.dateOfBirth ?? null,
+        nationality: wl.nationality ?? null,
+        position: wl.position ?? null,
+        playerType: input.playerType,
+        playerPackage: input.playerPackage,
+        contractType,
+        marketValueCurrency: "SAR",
+        status: "active",
+        nationalId: input.nationalId ?? null,
+        email: input.email ?? null,
+        phone: input.phone ?? null,
+        notes: wl.notes ?? null,
+        createdBy: userId,
+      },
+      { transaction: t },
+    );
+
+    // Relink the ID card + clearance documents to the new Player so they stay
+    // discoverable on the player's documents tab for the lifetime of the record.
+    const docIds = [sc.idCardDocumentId, sc.clearanceDocumentId].filter(
+      (x): x is string => !!x,
+    );
+    if (docIds.length > 0) {
+      await Document.update(
+        { entityType: "Player", entityId: player.id },
+        { where: { id: docIds }, transaction: t },
+      );
+    }
+
+    await sc.update(
+      {
+        signedPlayerId: player.id,
+        signedAt: new Date(),
+        signedBy: userId,
+      },
+      { transaction: t },
+    );
+
+    await wl.update(
+      { status: "Archived" as WatchlistAttributes["status"] },
+      { transaction: t },
+    );
+
+    return player;
+  });
+
+  // Notify Admin/Manager — fire-and-forget
+  const prospectName = wl.prospectName || sc.caseNumber;
+  const prospectNameAr = wl.prospectNameAr || prospectName;
+  notifyByRole([ROLES.ADMIN, ROLES.MANAGER], {
+    type: "system",
+    title: `Prospect signed: ${prospectName}`,
+    titleAr: `تم توقيع اللاعب: ${prospectNameAr}`,
+    body: `${prospectName} is now a Sadara player`,
+    bodyAr: `${prospectNameAr} أصبح الآن لاعبًا لدى صدارة`,
+    link: `/dashboard/players/${result.id}`,
+    sourceType: "player",
+    sourceId: result.id,
+    priority: "high",
+  }).catch((err) =>
+    logger.warn("Sign-prospect notification failed", {
+      error: (err as Error).message,
+    }),
+  );
+
+  return { playerId: result.id };
 }

@@ -228,3 +228,64 @@ export async function prospectTimeline(req: AuthRequest, res: Response) {
   const events = await scoutingService.getProspectTimeline(req.params.id);
   sendSuccess(res, events);
 }
+
+// ══════════════════════════════════════════
+// IDENTITY & CLEARANCE
+// ══════════════════════════════════════════
+
+export async function attachScreeningDocument(req: AuthRequest, res: Response) {
+  const { kind, documentId } = req.body;
+  const sc = await scoutingService.attachScreeningDocument(
+    req.params.id,
+    kind,
+    documentId,
+  );
+  await logAudit(
+    "UPDATE",
+    "screening_cases",
+    sc.id,
+    buildAuditContext(req.user!, req.ip),
+    kind === "idCard"
+      ? `ID card attached to ${sc.caseNumber}`
+      : `Clearance document attached to ${sc.caseNumber}`,
+  );
+  sendSuccess(res, sc, "Document attached");
+}
+
+export async function verifyClearance(req: AuthRequest, res: Response) {
+  const sc = await scoutingService.verifyClearance(
+    req.params.id,
+    req.body.verified,
+    req.user!.id,
+  );
+  await logAudit(
+    "UPDATE",
+    "screening_cases",
+    sc.id,
+    buildAuditContext(req.user!, req.ip),
+    req.body.verified
+      ? `Clearance verified for ${sc.caseNumber}`
+      : `Clearance verification revoked for ${sc.caseNumber}`,
+  );
+  sendSuccess(
+    res,
+    sc,
+    req.body.verified ? "Clearance verified" : "Verification revoked",
+  );
+}
+
+export async function signProspect(req: AuthRequest, res: Response) {
+  const result = await scoutingService.signProspect(
+    req.params.id,
+    req.body,
+    req.user!.id,
+  );
+  await logAudit(
+    "CREATE",
+    "players",
+    result.playerId,
+    buildAuditContext(req.user!, req.ip),
+    `Prospect signed via decision ${req.params.id}`,
+  );
+  sendCreated(res, result, "Player signed with Sadara");
+}
