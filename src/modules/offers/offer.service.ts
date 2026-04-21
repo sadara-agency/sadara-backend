@@ -187,9 +187,20 @@ export async function createOffer(input: any, createdBy: string) {
 export async function updateOffer(id: string, input: any) {
   const offer = await findOrThrow(Offer, id, "Offer");
 
-  // Prevent updates on terminal offers
-  if (["Accepted", "Rejected", "Closed", "Converted"].includes(offer.status)) {
+  const isTerminal = ["Accepted", "Rejected", "Closed", "Converted"].includes(
+    offer.status,
+  );
+  // Allow playerId-only reassignment on terminal offers to repair broken offers
+  // (e.g. player was deleted after the offer was accepted)
+  const isPlayerReassignOnly =
+    isTerminal && input.playerId && Object.keys(input).length === 1;
+
+  if (isTerminal && !isPlayerReassignOnly) {
     throw new AppError("Cannot update a closed/accepted/rejected offer", 400);
+  }
+
+  if (input.playerId) {
+    await findOrThrow(Player, input.playerId, "Player");
   }
 
   return await offer.update(input);
@@ -337,6 +348,23 @@ export async function convertOfferToContract(
   if (!clubExists) {
     throw new AppError(
       `Cannot convert: the resolved club (${clubId}) no longer exists`,
+      400,
+    );
+  }
+
+  // Validate that the player exists before hitting the FK constraint
+  if (!offer.playerId) {
+    throw new AppError(
+      "Cannot convert: this offer has no player assigned",
+      400,
+    );
+  }
+  const playerExists = await Player.findByPk(offer.playerId, {
+    attributes: ["id"],
+  });
+  if (!playerExists) {
+    throw new AppError(
+      "Cannot convert: the player linked to this offer no longer exists. Please reassign the offer to an active player.",
       400,
     );
   }

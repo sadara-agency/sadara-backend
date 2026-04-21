@@ -966,7 +966,7 @@ export async function attachScreeningDocument(
 
   const patch: Partial<ScreeningCaseAttributes> =
     kind === "idCard"
-      ? { idCardDocumentId: doc.id }
+      ? { idCardDocumentId: doc.id, identityCheck: "Verified" }
       : {
           clearanceDocumentId: doc.id,
           // A new clearance file resets any prior verification.
