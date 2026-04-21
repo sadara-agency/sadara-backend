@@ -24,6 +24,7 @@ import { Document } from "@modules/documents/document.model";
 import { Note } from "@modules/notes/note.model";
 import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { User } from "@modules/users/user.model";
 import type { AuthUser } from "@shared/types";
 import { SectionKey } from "./player-export.validation";
 
@@ -57,6 +58,25 @@ export interface AggregatedPlayerExport {
 }
 
 // ── utils ──
+
+async function resolveUserNames(
+  ids: (string | null | undefined)[],
+  locale: string,
+): Promise<Map<string, string>> {
+  const clean = ids.filter((id): id is string => !!id);
+  if (!clean.length) return new Map();
+  const users = await User.findAll({
+    where: { id: clean },
+    attributes: ["id", "fullName", "fullNameAr"],
+  });
+  return new Map(
+    users.map((u) => [
+      u.get("id") as string,
+      ((locale === "ar" ? u.get("fullNameAr") : null) ??
+        u.get("fullName")) as string,
+    ]),
+  );
+}
 
 function toPlain(row: unknown): Record<string, unknown> {
   if (row && typeof (row as { get?: unknown }).get === "function") {
@@ -132,7 +152,7 @@ export async function aggregatePlayerData(
     }
 
     try {
-      sections[key] = await loadSection(key, playerId, role, userId);
+      sections[key] = await loadSection(key, playerId, role, userId, locale);
     } catch (err) {
       logger.warn("player-export section load failed", {
         key,
@@ -159,6 +179,7 @@ async function loadSection(
   playerId: string,
   role: string,
   userId: string,
+  locale: "en" | "ar",
 ): Promise<SectionRows> {
   switch (key) {
     case "contracts":
@@ -170,7 +191,7 @@ async function loadSection(
     case "sessions":
       return loadSessions(playerId, role, userId);
     case "training":
-      return loadTraining(playerId, role, userId);
+      return loadTraining(playerId, role, userId, locale);
     case "wellness":
       return loadWellness(playerId, role, userId);
     case "reports":
@@ -178,9 +199,9 @@ async function loadSection(
     case "finance":
       return loadFinance(playerId, role, userId);
     case "documents":
-      return loadDocuments(playerId, role, userId);
+      return loadDocuments(playerId, role, userId, locale);
     case "notes":
-      return loadNotes(playerId, role, userId);
+      return loadNotes(playerId, role, userId, locale);
     case "stats":
       return loadStats(playerId, role, userId);
     default:
@@ -241,6 +262,7 @@ async function loadTraining(
   playerId: string,
   role: string,
   userId: string,
+  locale: "en" | "ar",
 ): Promise<SectionRows> {
   const enrollments = await TrainingEnrollment.findAll({
     where: { playerId },
@@ -255,7 +277,7 @@ async function loadTraining(
   const courseMap = new Map(courses.map((c) => [c.get("id") as string, c]));
 
   const hidden = await getHiddenFields(role, "training-plans", userId);
-  const rows = enrollments.map((e) => {
+  const plains = enrollments.map((e) => {
     const plain = toPlain(e);
     const course = courseMap.get(plain.courseId as string);
     if (course) {
@@ -266,6 +288,15 @@ async function loadTraining(
     }
     return stripFields(plain, hidden);
   });
+
+  const userNames = await resolveUserNames(
+    plains.map((r) => r.assignedBy as string | null),
+    locale,
+  );
+  const rows = plains.map((r) => ({
+    ...r,
+    assignedBy: userNames.get(r.assignedBy as string) ?? r.assignedBy,
+  }));
   return { rows };
 }
 
@@ -353,24 +384,44 @@ async function loadDocuments(
   playerId: string,
   role: string,
   userId: string,
+  locale: "en" | "ar",
 ): Promise<SectionRows> {
-  const rows = await Document.findAll({
+  const docs = await Document.findAll({
     where: { entityType: "Player", entityId: playerId },
     order: [["createdAt", "DESC"]],
   });
-  return { rows: await stripAll(rows, role, "documents", userId) };
+  const plains = await stripAll(docs, role, "documents", userId);
+  const userNames = await resolveUserNames(
+    plains.map((r) => r.uploadedBy as string | null),
+    locale,
+  );
+  const rows = plains.map((r) => ({
+    ...r,
+    uploadedBy: userNames.get(r.uploadedBy as string) ?? r.uploadedBy,
+  }));
+  return { rows };
 }
 
 async function loadNotes(
   playerId: string,
   role: string,
   userId: string,
+  locale: "en" | "ar",
 ): Promise<SectionRows> {
-  const rows = await Note.findAll({
+  const notes = await Note.findAll({
     where: { ownerType: "Player", ownerId: playerId },
     order: [["createdAt", "DESC"]],
   });
-  return { rows: await stripAll(rows, role, "notes", userId) };
+  const plains = await stripAll(notes, role, "notes", userId);
+  const userNames = await resolveUserNames(
+    plains.map((r) => r.createdBy as string | null),
+    locale,
+  );
+  const rows = plains.map((r) => ({
+    ...r,
+    createdBy: userNames.get(r.createdBy as string) ?? r.createdBy,
+  }));
+  return { rows };
 }
 
 async function loadStats(

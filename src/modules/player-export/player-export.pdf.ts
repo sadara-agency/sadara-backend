@@ -3,7 +3,6 @@ import {
   fmtDate,
   makeSadaraHeader,
   renderPagesToBuffers,
-  mergeWithBrandPages,
 } from "@shared/utils/pdf";
 import type {
   AggregatedPlayerExport,
@@ -32,27 +31,33 @@ const SECTION_TITLE: Record<SectionKey, { en: string; ar: string }> = {
 
 const CSS = `
 * { box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 10px; color: #1a1a1a; margin: 0; padding: 18px 22px; }
+body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; font-size: 11px; color: #1a1a1a; margin: 0; padding: 24px 28px; }
 body.rtl { direction: rtl; }
-.hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f3460; padding-bottom: 8px; margin-bottom: 12px; }
-.hd-r .lt { font-size: 13px; font-weight: 700; color: #0f3460; }
+.hd { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0f3460; padding-bottom: 10px; margin-bottom: 14px; }
+.hd-r .lt { font-size: 14px; font-weight: 700; color: #0f3460; }
 .hd-r .ls { font-size: 9px; color: #666; letter-spacing: 1px; }
-.hd-l { font-size: 8px; color: #666; text-align: end; }
-h1 { font-size: 16px; color: #0f3460; margin: 0 0 4px 0; }
-h2 { font-size: 12px; color: #ffffff; background: #0f3460; padding: 6px 10px; margin: 16px 0 6px 0; border-radius: 3px; }
-.subtitle { font-size: 10px; color: #666; margin-bottom: 8px; }
-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 9px; }
-th { background: #e8ecf3; color: #0f3460; text-align: start; padding: 5px 6px; font-weight: 600; border-bottom: 1px solid #c9d1e0; }
-td { padding: 4px 6px; border-bottom: 1px solid #eef0f4; vertical-align: top; }
+.hd-l { font-size: 9px; color: #666; text-align: end; }
+h1 { font-size: 18px; color: #0f3460; margin: 0 0 4px 0; }
+h2 { font-size: 12px; color: #ffffff; background: #0f3460; padding: 8px 12px; margin: 18px 0 8px 0; border-radius: 4px; }
+.subtitle { font-size: 11px; color: #666; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 10px; }
+th { background: #e8ecf3; color: #0f3460; text-align: start; padding: 8px 10px; font-weight: 600; border-bottom: 2px solid #c9d1e0; }
+td { padding: 7px 10px; border-bottom: 1px solid #eef0f4; vertical-align: top; }
 tr:nth-child(even) td { background: #f8f9fb; }
-.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 16px; margin-bottom: 8px; }
-.kv .row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px dotted #e0e3ea; }
-.kv .k { color: #666; font-size: 9px; }
-.kv .v { font-weight: 600; font-size: 9px; }
-.empty { color: #999; font-style: italic; padding: 6px 0; }
-.footer { margin-top: 16px; padding-top: 6px; border-top: 1px solid #e0e3ea; color: #999; font-size: 8px; }
-.omitted { background: #fff7e6; border-inline-start: 3px solid #d4a843; padding: 6px 10px; margin: 10px 0; font-size: 9px; }
-.tag { display: inline-block; padding: 1px 6px; border-radius: 3px; background: #e8ecf3; color: #0f3460; font-size: 8px; margin-inline-end: 4px; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 0 20px; margin-bottom: 10px; }
+.kv .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px dotted #e0e3ea; }
+.kv .k { color: #666; font-size: 10px; }
+.kv .v { font-weight: 600; font-size: 10px; max-width: 55%; word-break: break-word; text-align: end; }
+.personal-header { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.avatar { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; border: 3px solid #0f3460; flex-shrink: 0; }
+.avatar-placeholder { width: 72px; height: 72px; border-radius: 50%; background: #e8ecf3; border: 3px solid #0f3460; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.avatar-placeholder svg { width: 40px; height: 40px; fill: #0f3460; opacity: 0.4; }
+.player-name { font-size: 18px; font-weight: 700; color: #0f3460; margin: 0 0 2px 0; }
+.player-meta { font-size: 10px; color: #666; }
+.empty { color: #999; font-style: italic; padding: 8px 0; }
+.footer { margin-top: 18px; padding-top: 8px; border-top: 1px solid #e0e3ea; color: #999; font-size: 9px; }
+.omitted { background: #fff7e6; border-inline-start: 3px solid #d4a843; padding: 8px 12px; margin: 12px 0; font-size: 10px; }
+.tag { display: inline-block; padding: 2px 7px; border-radius: 3px; background: #e8ecf3; color: #0f3460; font-size: 9px; margin-inline-end: 4px; }
 `;
 
 // ── Rendering ──
@@ -64,10 +69,13 @@ function t(locale: "en" | "ar", key: SectionKey): string {
 function fmt(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? "✓" : "✗";
+  if (v instanceof Date) return fmtDate(v);
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v);
   if (typeof v === "object") return escHtml(JSON.stringify(v));
   return escHtml(String(v));
 }
+
+const AVATAR_PLACEHOLDER = `<div class="avatar-placeholder"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg></div>`;
 
 function renderPersonalBlock(
   player: Record<string, unknown>,
@@ -78,8 +86,22 @@ function renderPersonalBlock(
     ? `${player.firstNameAr ?? player.firstName ?? ""} ${player.lastNameAr ?? player.lastName ?? ""}`.trim()
     : `${player.firstName ?? ""} ${player.lastName ?? ""}`.trim();
 
+  const photoUrl = player.photoUrl as string | null | undefined;
+  const avatarHtml = photoUrl
+    ? `<img class="avatar" src="${escHtml(photoUrl)}" alt="player" onerror="this.style.display='none';this.nextSibling.style.display='flex'" />${AVATAR_PLACEHOLDER.replace('style="', 'style="display:none;')}`
+    : AVATAR_PLACEHOLDER;
+
+  const position = [player.position, player.secondaryPosition]
+    .filter(Boolean)
+    .join(" · ");
+  const metaLine = [player.nationality, position, player.status]
+    .filter(Boolean)
+    .map((v) => escHtml(String(v)))
+    .join(" &nbsp;|&nbsp; ");
+
+  const header = `<div class="personal-header">${avatarHtml}<div><p class="player-name">${escHtml(displayName)}</p><p class="player-meta">${metaLine}</p></div></div>`;
+
   const fields: [string, unknown][] = [
-    [L ? "الاسم الكامل" : "Full Name", displayName],
     [L ? "تاريخ الميلاد" : "Date of Birth", player.dateOfBirth],
     [L ? "الجنسية" : "Nationality", player.nationality],
     [L ? "الرقم القومي" : "National ID", player.nationalId],
@@ -93,18 +115,17 @@ function renderPersonalBlock(
     [L ? "الباقة" : "Package", player.playerPackage],
     [L ? "القيمة السوقية" : "Market Value", player.marketValue],
     [L ? "العملة" : "Currency", player.marketValueCurrency],
-    [L ? "الحالة" : "Status", player.status],
     [L ? "البريد" : "Email", player.email],
     [L ? "الهاتف" : "Phone", player.phone],
   ];
   const rows = fields
-    .filter(([, v]) => v !== undefined)
+    .filter(([, v]) => v !== undefined && v !== null)
     .map(
       ([k, v]) =>
         `<div class="row"><span class="k">${escHtml(k)}</span><span class="v">${fmt(v)}</span></div>`,
     )
     .join("");
-  return `<div class="kv">${rows}</div>`;
+  return `${header}<div class="kv">${rows}</div>`;
 }
 
 function renderTableBlock(section: SectionRows, locale: "en" | "ar"): string {
@@ -191,13 +212,11 @@ export function renderHtmlBuffer(data: AggregatedPlayerExport): Buffer {
   return Buffer.from(renderHtml(data), "utf-8");
 }
 
-/** PDF export: Puppeteer → pdf-lib merge with cover/back brand pages. */
+/** PDF export: Puppeteer renders the HTML directly (no contract brand pages). */
 export async function renderPdfBuffer(
   data: AggregatedPlayerExport,
 ): Promise<Buffer> {
   const html = renderHtml(data);
-  // renderHtml() already emits a full <!DOCTYPE html> doc with inline CSS;
-  // Puppeteer paginates long content automatically.
   const bufs = await renderPagesToBuffers([html], {});
-  return mergeWithBrandPages(bufs);
+  return Buffer.from(bufs[0]);
 }
