@@ -7,155 +7,101 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const sq = queryInterface.sequelize;
+
   // ─── 1. transfer_windows ────────────────────────────────────────
-  await queryInterface.createTable("transfer_windows", {
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true,
-    },
-    season: { type: DataTypes.STRING(50), allowNull: false, unique: true },
-    start_date: { type: DataTypes.DATEONLY, allowNull: false },
-    end_date: { type: DataTypes.DATEONLY, allowNull: false },
-    saff_window_start: { type: DataTypes.DATEONLY, allowNull: true },
-    saff_window_end: { type: DataTypes.DATEONLY, allowNull: true },
-    shortlist_threshold: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      defaultValue: 60,
-    },
-    weights: {
-      type: DataTypes.JSONB,
-      allowNull: false,
-      defaultValue: {
-        performance: 40,
-        contractFit: 25,
-        commercial: 20,
-        culturalFit: 15,
-      },
-    },
-    tier_targets: {
-      type: DataTypes.JSONB,
-      allowNull: false,
-      defaultValue: { A: 3, B: 7, C: 5 },
-    },
-    status: {
-      type: DataTypes.STRING(20),
-      allowNull: false,
-      defaultValue: "Upcoming",
-    },
-    notes: { type: DataTypes.TEXT, allowNull: true },
-    created_at: { type: DataTypes.DATE, allowNull: false },
-    updated_at: { type: DataTypes.DATE, allowNull: false },
-  });
+  await sq.query(`
+    CREATE TABLE IF NOT EXISTS transfer_windows (
+      id               UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+      season           VARCHAR(50)  NOT NULL UNIQUE,
+      start_date       DATE         NOT NULL,
+      end_date         DATE         NOT NULL,
+      saff_window_start DATE,
+      saff_window_end   DATE,
+      shortlist_threshold INTEGER   NOT NULL DEFAULT 60,
+      weights          JSONB        NOT NULL DEFAULT '{"performance":40,"contractFit":25,"commercial":20,"culturalFit":15}',
+      tier_targets     JSONB        NOT NULL DEFAULT '{"A":3,"B":7,"C":5}',
+      status           VARCHAR(20)  NOT NULL DEFAULT 'Upcoming',
+      notes            TEXT,
+      created_at       TIMESTAMPTZ  NOT NULL,
+      updated_at       TIMESTAMPTZ  NOT NULL
+    );
+  `);
 
-  await queryInterface.addIndex("transfer_windows", ["status"]);
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS transfer_windows_status ON transfer_windows (status);`,
+  );
 
-  // ─── 2. Extend clubs ────────────────────────────────────────────
-  await queryInterface.addColumn("clubs", "budget_sar", {
-    type: DataTypes.BIGINT,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("clubs", "foreign_slots", {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("clubs", "key_contact_name", {
-    type: DataTypes.STRING(100),
-    allowNull: true,
-  });
-  await queryInterface.addColumn("clubs", "key_contact_email", {
-    type: DataTypes.STRING(150),
-    allowNull: true,
-  });
-  await queryInterface.addColumn("clubs", "key_contact_phone", {
-    type: DataTypes.STRING(30),
-    allowNull: true,
-  });
-  await queryInterface.addColumn("clubs", "last_contact_date", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("clubs", "interest_level", {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    defaultValue: "Cold",
-  });
+  // ─── 2. Extend clubs (idempotent) ───────────────────────────────
+  await sq.query(
+    `ALTER TABLE clubs ADD COLUMN IF NOT EXISTS budget_sar BIGINT;`,
+  );
+  await sq.query(
+    `ALTER TABLE clubs ADD COLUMN IF NOT EXISTS foreign_slots INTEGER;`,
+  );
+  await sq.query(
+    `ALTER TABLE clubs ADD COLUMN IF NOT EXISTS key_contact_name VARCHAR(100);`,
+  );
+  await sq.query(
+    `ALTER TABLE clubs ADD COLUMN IF NOT EXISTS key_contact_email VARCHAR(150);`,
+  );
+  await sq.query(
+    `ALTER TABLE clubs ADD COLUMN IF NOT EXISTS key_contact_phone VARCHAR(30);`,
+  );
+  await sq.query(
+    `ALTER TABLE clubs ADD COLUMN IF NOT EXISTS last_contact_date DATE;`,
+  );
+  await sq.query(`
+    ALTER TABLE clubs ADD COLUMN IF NOT EXISTS interest_level VARCHAR(20) DEFAULT 'Cold';
+  `);
 
   // ─── 3. club_needs ──────────────────────────────────────────────
-  await queryInterface.createTable("club_needs", {
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true,
-    },
-    club_id: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "clubs", key: "id" },
-      onDelete: "CASCADE",
-    },
-    window_id: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "transfer_windows", key: "id" },
-      onDelete: "CASCADE",
-    },
-    position: { type: DataTypes.STRING(30), allowNull: false },
-    positional_gap_notes: { type: DataTypes.TEXT, allowNull: true },
-    deal_preference: {
-      type: DataTypes.STRING(20),
-      allowNull: false,
-      defaultValue: "Either",
-    },
-    priority: {
-      type: DataTypes.STRING(10),
-      allowNull: false,
-      defaultValue: "Medium",
-    },
-    sadara_opportunity: { type: DataTypes.TEXT, allowNull: true },
-    match_score: { type: DataTypes.INTEGER, allowNull: true },
-    created_at: { type: DataTypes.DATE, allowNull: false },
-    updated_at: { type: DataTypes.DATE, allowNull: false },
-  });
+  await sq.query(`
+    CREATE TABLE IF NOT EXISTS club_needs (
+      id                    UUID         NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+      club_id               UUID         NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+      window_id             UUID         NOT NULL REFERENCES transfer_windows(id) ON DELETE CASCADE,
+      position              VARCHAR(30)  NOT NULL,
+      positional_gap_notes  TEXT,
+      deal_preference       VARCHAR(20)  NOT NULL DEFAULT 'Either',
+      priority              VARCHAR(10)  NOT NULL DEFAULT 'Medium',
+      sadara_opportunity    TEXT,
+      match_score           INTEGER,
+      created_at            TIMESTAMPTZ  NOT NULL,
+      updated_at            TIMESTAMPTZ  NOT NULL,
+      CONSTRAINT club_needs_club_window_position_unique UNIQUE (club_id, window_id, position)
+    );
+  `);
 
-  await queryInterface.addConstraint("club_needs", {
-    fields: ["club_id", "window_id", "position"],
-    type: "unique",
-    name: "club_needs_club_window_position_unique",
-  });
-  await queryInterface.addIndex("club_needs", ["window_id"]);
-  await queryInterface.addIndex("club_needs", ["club_id"]);
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS club_needs_window_id ON club_needs (window_id);`,
+  );
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS club_needs_club_id ON club_needs (club_id);`,
+  );
 
   // ─── 4. Seed Summer 2026 ────────────────────────────────────────
-  const now = new Date();
-  await queryInterface.bulkInsert("transfer_windows", [
-    {
-      id: SUMMER_2026_ID,
-      season: "Summer 2026",
-      start_date: "2026-05-01",
-      end_date: "2026-06-30",
-      saff_window_start: "2026-05-01",
-      saff_window_end: "2026-06-30",
-      shortlist_threshold: 60,
-      weights: JSON.stringify({
-        performance: 40,
-        contractFit: 25,
-        commercial: 20,
-        culturalFit: 15,
-      }),
-      tier_targets: JSON.stringify({ A: 3, B: 7, C: 5 }),
-      status: "Active",
-      notes:
-        "Seeded by migration 130 — Summer 2026 window (May 1 – Jun 30, 2026).",
-      created_at: now,
-      updated_at: now,
-    },
-  ]);
+  const now = new Date().toISOString();
+  await sq.query(
+    `
+    INSERT INTO transfer_windows
+      (id, season, start_date, end_date, saff_window_start, saff_window_end,
+       shortlist_threshold, weights, tier_targets, status, notes, created_at, updated_at)
+    VALUES
+      (:id, 'Summer 2026', '2026-05-01', '2026-06-30', '2026-05-01', '2026-06-30',
+       60,
+       '{"performance":40,"contractFit":25,"commercial":20,"culturalFit":15}',
+       '{"A":3,"B":7,"C":5}',
+       'Active',
+       'Seeded by migration 130 — Summer 2026 window (May 1 – Jun 30, 2026).',
+       :now, :now)
+    ON CONFLICT (season) DO NOTHING;
+    `,
+    { replacements: { id: SUMMER_2026_ID, now } },
+  );
 
-  // ─── 5. One-off Admin permissions so T1A endpoints are usable ────
-  // (proper role grants land in seed-shared.ts during T1B)
-  await queryInterface.sequelize.query(`
+  // ─── 5. Role permissions ────────────────────────────────────────
+  await sq.query(`
     INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete, created_at, updated_at)
     VALUES
       ('Admin', 'transfer-windows', true, true, true, true, NOW(), NOW()),
@@ -169,7 +115,8 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
-  await queryInterface.sequelize.query(
+  const sq = queryInterface.sequelize;
+  await sq.query(
     `DELETE FROM role_permissions WHERE module IN ('transfer-windows', 'club-needs');`,
   );
   await queryInterface.dropTable("club_needs");

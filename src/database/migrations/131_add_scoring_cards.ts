@@ -1,58 +1,42 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
-  await queryInterface.createTable("scoring_cards", {
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true,
-    },
-    watchlist_id: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "watchlists", key: "id" },
-      onDelete: "CASCADE",
-    },
-    window_id: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: { model: "transfer_windows", key: "id" },
-      onDelete: "CASCADE",
-    },
-    // Four weighted buckets — each 0–100
-    performance_score: { type: DataTypes.INTEGER, allowNull: true },
-    contract_fit_score: { type: DataTypes.INTEGER, allowNull: true },
-    commercial_score: { type: DataTypes.INTEGER, allowNull: true },
-    cultural_fit_score: { type: DataTypes.INTEGER, allowNull: true },
-    // Optional fine-grained detail per criterion (e.g. { goals: 8, assists: 7 })
-    criteria_scores: { type: DataTypes.JSONB, allowNull: true },
-    notes: { type: DataTypes.TEXT, allowNull: true },
-    // Server-computed from bucket scores × window weights
-    weighted_total: { type: DataTypes.DECIMAL(5, 2), allowNull: true },
-    is_shortlisted: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
-    scored_by: { type: DataTypes.UUID, allowNull: true },
-    scored_at: { type: DataTypes.DATE, allowNull: true },
-    created_at: { type: DataTypes.DATE, allowNull: false },
-    updated_at: { type: DataTypes.DATE, allowNull: false },
-  });
+  const sq = queryInterface.sequelize;
 
-  await queryInterface.addConstraint("scoring_cards", {
-    fields: ["watchlist_id", "window_id"],
-    type: "unique",
-    name: "scoring_cards_watchlist_window_unique",
-  });
+  await sq.query(`
+    CREATE TABLE IF NOT EXISTS scoring_cards (
+      id                  UUID          NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
+      watchlist_id        UUID          NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
+      window_id           UUID          NOT NULL REFERENCES transfer_windows(id) ON DELETE CASCADE,
+      performance_score   INTEGER,
+      contract_fit_score  INTEGER,
+      commercial_score    INTEGER,
+      cultural_fit_score  INTEGER,
+      criteria_scores     JSONB,
+      notes               TEXT,
+      weighted_total      DECIMAL(5,2),
+      is_shortlisted      BOOLEAN       NOT NULL DEFAULT false,
+      scored_by           UUID,
+      scored_at           TIMESTAMPTZ,
+      created_at          TIMESTAMPTZ   NOT NULL,
+      updated_at          TIMESTAMPTZ   NOT NULL,
+      CONSTRAINT scoring_cards_watchlist_window_unique UNIQUE (watchlist_id, window_id)
+    );
+  `);
 
-  await queryInterface.addIndex("scoring_cards", ["window_id"]);
-  await queryInterface.addIndex("scoring_cards", ["is_shortlisted"]);
-  await queryInterface.addIndex("scoring_cards", ["weighted_total"]);
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS scoring_cards_window_id ON scoring_cards (window_id);`,
+  );
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS scoring_cards_is_shortlisted ON scoring_cards (is_shortlisted);`,
+  );
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS scoring_cards_weighted_total ON scoring_cards (weighted_total);`,
+  );
 }
 
 export async function down({

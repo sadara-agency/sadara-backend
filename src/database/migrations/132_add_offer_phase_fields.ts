@@ -1,43 +1,39 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
-  await queryInterface.addColumn("offers", "phase", {
-    type: DataTypes.STRING(20),
-    allowNull: true,
-    defaultValue: null,
-  });
-  await queryInterface.addColumn("offers", "window_id", {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: { model: "transfer_windows", key: "id" },
-    onDelete: "SET NULL",
-  });
-  await queryInterface.addColumn("offers", "saff_reg_date", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("offers", "itc_filed_date", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("offers", "medical_date", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("offers", "hot_signed_date", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("offers", "blocker_notes", {
-    type: DataTypes.TEXT,
-    allowNull: true,
-  });
-  await queryInterface.addIndex("offers", ["phase"]);
-  await queryInterface.addIndex("offers", ["window_id"]);
+  const sq = queryInterface.sequelize;
+
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS phase VARCHAR(20);`,
+  );
+  await sq.query(`
+    ALTER TABLE offers ADD COLUMN IF NOT EXISTS window_id UUID
+      REFERENCES transfer_windows(id) ON DELETE SET NULL;
+  `);
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS saff_reg_date DATE;`,
+  );
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS itc_filed_date DATE;`,
+  );
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS medical_date DATE;`,
+  );
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS hot_signed_date DATE;`,
+  );
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS blocker_notes TEXT;`,
+  );
+
+  await sq.query(`CREATE INDEX IF NOT EXISTS offers_phase ON offers (phase);`);
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS offers_window_id ON offers (window_id);`,
+  );
 }
 
 export async function down({
@@ -45,8 +41,9 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
-  await queryInterface.removeIndex("offers", ["window_id"]);
-  await queryInterface.removeIndex("offers", ["phase"]);
+  const sq = queryInterface.sequelize;
+  await sq.query(`DROP INDEX IF EXISTS offers_window_id;`);
+  await sq.query(`DROP INDEX IF EXISTS offers_phase;`);
   await queryInterface.removeColumn("offers", "blocker_notes");
   await queryInterface.removeColumn("offers", "hot_signed_date");
   await queryInterface.removeColumn("offers", "medical_date");

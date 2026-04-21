@@ -1,37 +1,36 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  const sq = queryInterface.sequelize;
+
   // Player mandate fields
-  await queryInterface.addColumn("players", "mandate_status", {
-    type: DataTypes.STRING(30),
-    allowNull: true,
-    defaultValue: null,
-  });
-  await queryInterface.addColumn("players", "mandate_signed_at", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
-  await queryInterface.addColumn("players", "exclusive_until", {
-    type: DataTypes.DATEONLY,
-    allowNull: true,
-  });
+  await sq.query(
+    `ALTER TABLE players ADD COLUMN IF NOT EXISTS mandate_status VARCHAR(30);`,
+  );
+  await sq.query(
+    `ALTER TABLE players ADD COLUMN IF NOT EXISTS mandate_signed_at DATE;`,
+  );
+  await sq.query(
+    `ALTER TABLE players ADD COLUMN IF NOT EXISTS exclusive_until DATE;`,
+  );
 
   // Offer media embargo
-  await queryInterface.addColumn("offers", "media_embargo_lifted_at", {
-    type: DataTypes.DATE,
-    allowNull: true,
-  });
+  await sq.query(
+    `ALTER TABLE offers ADD COLUMN IF NOT EXISTS media_embargo_lifted_at TIMESTAMPTZ;`,
+  );
 
-  // Extend gate_number ENUM to support Gate 4
-  await queryInterface.sequelize.query(
+  // Extend gate_number type to support Gate 4 (IF NOT EXISTS is idempotent)
+  await sq.query(
     `ALTER TYPE "enum_gates_gate_number" ADD VALUE IF NOT EXISTS '4'`,
   );
 
-  await queryInterface.addIndex("players", ["mandate_status"]);
+  await sq.query(
+    `CREATE INDEX IF NOT EXISTS players_mandate_status ON players (mandate_status);`,
+  );
 }
 
 export async function down({
@@ -39,7 +38,8 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
-  await queryInterface.removeIndex("players", ["mandate_status"]);
+  const sq = queryInterface.sequelize;
+  await sq.query(`DROP INDEX IF EXISTS players_mandate_status;`);
   await queryInterface.removeColumn("offers", "media_embargo_lifted_at");
   await queryInterface.removeColumn("players", "exclusive_until");
   await queryInterface.removeColumn("players", "mandate_signed_at");
