@@ -102,17 +102,30 @@ export async function listClubs(queryParams: any, user?: AuthUser) {
     ];
   }
 
-  const { count, rows } = await Club.findAndCountAll({
-    where,
-    attributes: {
-      include: CLUB_AGGREGATES,
-    },
-    order: [[sort, order]],
-    limit,
-    offset,
-  });
+  // Strip the type filter for type-breakdown counts so they always reflect
+  // the full scope (e.g. "Club: 80, Sponsor: 6" even when type=Club is active)
+  const { type: _filteredType, ...whereWithoutType } = where;
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  const [{ count, rows }, clubTypeCount, sponsorTypeCount] = await Promise.all([
+    Club.findAndCountAll({
+      where,
+      attributes: { include: CLUB_AGGREGATES },
+      order: [[sort, order]],
+      limit,
+      offset,
+    }),
+    Club.count({ where: { ...whereWithoutType, type: "Club" } }),
+    Club.count({ where: { ...whereWithoutType, type: "Sponsor" } }),
+  ]);
+
+  return {
+    data: rows,
+    meta: {
+      ...buildMeta(count, page, limit),
+      clubCount: clubTypeCount,
+      sponsorCount: sponsorTypeCount,
+    },
+  };
 }
 
 // ────────────────────────────────────────────────────────────

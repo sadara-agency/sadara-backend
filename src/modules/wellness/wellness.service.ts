@@ -96,8 +96,7 @@ export async function getProfile(playerId: string, user?: AuthUser) {
   const ok = await checkRowAccess("wellness", { playerId }, user);
   if (!ok) throw new AppError("Wellness profile not found", 404);
   const profile = await WellnessProfile.findOne({ where: { playerId } });
-  if (!profile) throw new AppError("Wellness profile not found", 404);
-  return profile;
+  return profile ?? null;
 }
 
 export async function createProfile(body: CreateProfileInput, userId: string) {
@@ -150,6 +149,11 @@ export async function computeMacros(
   existingProfile?: WellnessProfile,
 ): Promise<MacroComputeResponse> {
   const profile = existingProfile ?? (await getProfile(playerId));
+  if (!profile)
+    throw new AppError(
+      "Wellness profile not set up — create a profile first",
+      422,
+    );
 
   const player = await Player.findByPk(playerId, {
     attributes: ["id", "heightCm", "weightKg", "dateOfBirth"],
