@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
+import { uploadSingle } from "@middleware/upload";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createOfferSchema,
   updateOfferSchema,
   updateOfferStatusSchema,
+  updateOfferPhaseSchema,
   offerQuerySchema,
 } from "@modules/offers/offer.validation";
 import * as offerController from "@modules/offers/offer.controller";
@@ -57,6 +59,13 @@ router.patch(
   asyncHandler(offerController.updateStatus),
 );
 
+router.patch(
+  "/:id/phase",
+  authorizeModule("offers", "update"),
+  validate(updateOfferPhaseSchema),
+  asyncHandler(offerController.updatePhase),
+);
+
 // ── Delete ──
 router.delete(
   "/:id",
@@ -68,6 +77,13 @@ router.post(
   "/:id/convert",
   authorizeModule("offers", "create"),
   asyncHandler(offerController.convertToContract),
+);
+
+router.post(
+  "/import",
+  authorize("Admin"),
+  uploadSingle,
+  asyncHandler(offerController.importCsv),
 );
 
 export default router;

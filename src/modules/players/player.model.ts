@@ -47,6 +47,9 @@ interface PlayerAttributes {
   guardianPhone?: string | null;
   guardianRelation?: string | null;
   overallGrade?: string | null;
+  mandateStatus?: "Signed" | "In Negotiation" | "Prospect" | null;
+  mandateSignedAt?: string | null;
+  exclusiveUntil?: string | null;
   notes?: string | null;
   photoUrl?: string | null;
   displayId?: string | null;
@@ -65,6 +68,9 @@ interface PlayerCreationAttributes extends Optional<
   | "marketValueCurrency"
   | "status"
   | "displayId"
+  | "mandateStatus"
+  | "mandateSignedAt"
+  | "exclusiveUntil"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -110,6 +116,9 @@ export class Player
   declare guardianPhone: string | null;
   declare guardianRelation: string | null;
   declare overallGrade: string | null;
+  declare mandateStatus: "Signed" | "In Negotiation" | "Prospect" | null;
+  declare mandateSignedAt: string | null;
+  declare exclusiveUntil: string | null;
   declare notes: string | null;
   declare photoUrl: string | null;
   declare displayId: string | null;
@@ -216,6 +225,21 @@ Player.init(
     overallGrade: {
       type: DataTypes.STRING(10),
       field: "overall_grade",
+    },
+    mandateStatus: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+      field: "mandate_status",
+    },
+    mandateSignedAt: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: "mandate_signed_at",
+    },
+    exclusiveUntil: {
+      type: DataTypes.DATEONLY,
+      allowNull: true,
+      field: "exclusive_until",
     },
     notes: { type: DataTypes.TEXT },
     photoUrl: { type: DataTypes.STRING },

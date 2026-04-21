@@ -24,7 +24,11 @@ import {
   generateOfferAcceptedTask,
 } from "@modules/offers/offerAutoTasks";
 import { generateDisplayId } from "@shared/utils/displayId";
-import { OfferQuery } from "@modules/offers/offer.validation";
+import {
+  OfferQuery,
+  UpdateOfferPhaseInput,
+} from "@modules/offers/offer.validation";
+import { initializeClosingGate } from "@modules/gates/gate.service";
 
 // ── List Offers ──
 
@@ -41,6 +45,8 @@ export async function listOffers(queryParams: OfferQuery, user?: AuthUser) {
   if (queryParams.playerId) where.playerId = queryParams.playerId;
   if (queryParams.fromClubId) where.fromClubId = queryParams.fromClubId;
   if (queryParams.toClubId) where.toClubId = queryParams.toClubId;
+  if (queryParams.phase) where.phase = queryParams.phase;
+  if (queryParams.windowId) where.windowId = queryParams.windowId;
 
   if (search) {
     // Search across related player name and club names via subqueries
@@ -284,6 +290,41 @@ export async function updateOfferStatus(
   }
 
   return offer;
+}
+
+// ── Update Offer Phase ──
+
+export async function updateOfferPhase(
+  id: string,
+  data: UpdateOfferPhaseInput,
+  user?: AuthUser,
+) {
+  const offer = await getOfferById(id, user);
+
+  const payload: Record<string, unknown> = {
+    phase: data.phase,
+    saffRegDate: data.saffRegDate ?? null,
+    itcFiledDate: data.itcFiledDate ?? null,
+    medicalDate: data.medicalDate ?? null,
+    hotSignedDate: data.hotSignedDate ?? null,
+    blockerNotes: data.blockerNotes ?? null,
+  };
+
+  // SAFF clearance → lift media embargo
+  if (data.saffRegDate && !offer.saffRegDate) {
+    payload.mediaEmbargoLiftedAt = new Date();
+  }
+
+  const updated = await offer.update(payload);
+
+  // Entering Close phase → auto-create Gate 4 (fire-and-forget)
+  if (data.phase === "Close" && offer.phase !== "Close" && offer.playerId) {
+    initializeClosingGate(offer.playerId, user?.id ?? "system").catch(() => {
+      // Non-blocking: gate creation failure must not fail the phase update
+    });
+  }
+
+  return updated;
 }
 
 // ── Delete Offer ──

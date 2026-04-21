@@ -34,6 +34,13 @@ interface ClubAttributes {
   espnTeamId?: number | null;
   sportmonksTeamId?: number | null;
   saffTeamId?: number | null;
+  budgetSar?: number | null;
+  foreignSlots?: number | null;
+  keyContactName?: string | null;
+  keyContactEmail?: string | null;
+  keyContactPhone?: string | null;
+  lastContactDate?: string | null;
+  interestLevel?: string | null;
 }
 
 interface ClubCreationAttributes extends Optional<
@@ -67,6 +74,13 @@ export class Club
   declare espnTeamId: number | null;
   declare sportmonksTeamId: number | null;
   declare saffTeamId: number | null;
+  declare budgetSar: number | null;
+  declare foreignSlots: number | null;
+  declare keyContactName: string | null;
+  declare keyContactEmail: string | null;
+  declare keyContactPhone: string | null;
+  declare lastContactDate: string | null;
+  declare interestLevel: string | null;
 }
 
 Club.init(
@@ -158,6 +172,20 @@ Club.init(
       type: DataTypes.BOOLEAN,
       defaultValue: true,
       field: "is_active",
+    },
+    budgetSar: { type: DataTypes.BIGINT, field: "budget_sar" },
+    foreignSlots: { type: DataTypes.INTEGER, field: "foreign_slots" },
+    keyContactName: { type: DataTypes.STRING(100), field: "key_contact_name" },
+    keyContactEmail: {
+      type: DataTypes.STRING(150),
+      field: "key_contact_email",
+    },
+    keyContactPhone: { type: DataTypes.STRING(30), field: "key_contact_phone" },
+    lastContactDate: { type: DataTypes.DATEONLY, field: "last_contact_date" },
+    interestLevel: {
+      type: DataTypes.STRING(20),
+      field: "interest_level",
+      defaultValue: "Cold",
     },
   },
   {

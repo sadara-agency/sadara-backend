@@ -754,6 +754,40 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
   ...forRoles("video", ["Player"], { canRead: true }),
+
+  ...forRoles("transfer-windows", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("transfer-windows", ["Manager", "Executive"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles(
+    "transfer-windows",
+    ["Analyst", "Scout", "Legal", "Finance", "Media"],
+    {
+      canRead: true,
+    },
+  ),
+
+  ...forRoles("club-needs", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("club-needs", ["Manager", "Executive"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("club-needs", ["Analyst", "Scout", "Legal", "Finance", "Media"], {
+    canRead: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

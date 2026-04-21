@@ -286,6 +286,80 @@ export const GATE_CHECKLIST_TEMPLATES: Record<string, ChecklistTemplate[]> = {
       verificationRule: null,
     },
   ],
+  "4": [
+    {
+      item: "ITC submitted via FIFA TMS",
+      itemAr: "تقديم ITC عبر FIFA TMS",
+      isMandatory: true,
+      sortOrder: 1,
+      verificationType: "auto_with_override" as const,
+      verificationRule: null,
+    },
+    {
+      item: "SAFF clearance confirmed",
+      itemAr: "تأكيد تصريح الاتحاد السعودي",
+      isMandatory: true,
+      sortOrder: 2,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "Medical examination completed",
+      itemAr: "إتمام الفحص الطبي",
+      isMandatory: true,
+      sortOrder: 3,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "WADA baseline test completed",
+      itemAr: "إتمام اختبار WADA الأساسي",
+      isMandatory: true,
+      sortOrder: 4,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "Iqama / residency permit initiated",
+      itemAr: "بدء إجراءات الإقامة",
+      isMandatory: true,
+      sortOrder: 5,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "Bilingual employment contract signed",
+      itemAr: "توقيع عقد العمل الثنائي اللغة",
+      isMandatory: true,
+      sortOrder: 6,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "Representation agreement signed",
+      itemAr: "توقيع اتفاقية التمثيل",
+      isMandatory: true,
+      sortOrder: 7,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "Commission letter signed",
+      itemAr: "توقيع خطاب العمولة",
+      isMandatory: true,
+      sortOrder: 8,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+    {
+      item: "Image rights letter signed",
+      itemAr: "توقيع خطاب حقوق الصورة",
+      isMandatory: true,
+      sortOrder: 9,
+      verificationType: "manual" as const,
+      verificationRule: null,
+    },
+  ],
 };
 
 // ── Helpers ──
@@ -673,4 +747,19 @@ export async function deleteChecklistItem(itemId: string) {
 
   await item.destroy();
   return { id: itemId };
+}
+
+// ── Transfer Framework Hook ──
+
+export async function initializeClosingGate(
+  playerId: string,
+  initiatedBy: string,
+): Promise<void> {
+  // Guard: don't create a duplicate Gate 4 if one already exists
+  const existing = await Gate.findOne({ where: { playerId, gateNumber: "4" } });
+  if (existing) return;
+
+  await initializeGate(playerId, "4").catch(() => {
+    // Gate ordering check may fail if Gate 3 isn't Completed — swallow silently
+  });
 }

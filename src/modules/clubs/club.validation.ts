@@ -27,6 +27,16 @@ const createClubBaseSchema = z.object({
   squadType: z
     .enum(["Senior", "U21", "U18", "U17", "U16", "U15", "Reserve"])
     .optional(),
+  budgetSar: z.number().int().min(0).optional(),
+  foreignSlots: z.number().int().min(0).max(20).optional(),
+  keyContactName: z.string().max(100).optional(),
+  keyContactEmail: z.string().email().max(150).optional().or(z.literal("")),
+  keyContactPhone: z.string().max(30).optional(),
+  lastContactDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  interestLevel: z.enum(["Hot", "Warm", "Cold"]).optional(),
 });
 
 export const createClubSchema = createClubBaseSchema.superRefine(

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 export const createGateSchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
-  gateNumber: z.enum(["0", "1", "2", "3"]),
+  gateNumber: z.enum(["0", "1", "2", "3", "4"]),
   status: z.enum(["Pending", "InProgress", "Completed"]).default("Pending"),
   notes: z.string().optional(),
 });
@@ -27,7 +27,7 @@ export const advanceGateSchema = z.object({
 
 export const initializeGateSchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
-  gateNumber: z.enum(["0", "1", "2", "3"]),
+  gateNumber: z.enum(["0", "1", "2", "3", "4"]),
   autoStart: z.boolean().default(false),
   notes: z.string().optional(),
 });
@@ -59,7 +59,7 @@ export const gateQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).default("asc"),
   search: z.string().optional(),
   status: z.enum(["Pending", "InProgress", "Completed"]).optional(),
-  gateNumber: z.enum(["0", "1", "2", "3"]).optional(),
+  gateNumber: z.enum(["0", "1", "2", "3", "4"]).optional(),
   playerId: z.string().uuid().optional(),
 });
 

@@ -190,4 +190,37 @@ router.post(
   asyncHandler(ctrl.signProspect),
 );
 
+// ── Scoring Cards (Transfer Framework T2) ──
+import {
+  upsertScoringCardSchema,
+  scoringCardQuerySchema,
+} from "@modules/scouting/scoringCard.validation";
+import * as scoringCtrl from "@modules/scouting/scoringCard.controller";
+
+router.get(
+  "/scoring-cards",
+  authorizeModule("scouting", "read"),
+  validate(scoringCardQuerySchema, "query"),
+  scoringCtrl.listScoringCards,
+);
+
+router.get(
+  "/scoring-cards/:id",
+  authorizeModule("scouting", "read"),
+  scoringCtrl.getScoringCard,
+);
+
+router.put(
+  "/scoring-cards",
+  authorizeModule("scouting", "update"),
+  validate(upsertScoringCardSchema),
+  scoringCtrl.upsertScoringCard,
+);
+
+router.delete(
+  "/scoring-cards/:id",
+  authorizeModule("scouting", "delete"),
+  scoringCtrl.deleteScoringCard,
+);
+
 export default router;

@@ -3,7 +3,7 @@ import { sequelize } from "@config/database";
 
 // ── Gate Number & Status Types ──
 
-export type GateNumber = "0" | "1" | "2" | "3";
+export type GateNumber = "0" | "1" | "2" | "3" | "4";
 export type GateStatus = "Pending" | "InProgress" | "Completed";
 export type VerificationType = "manual" | "auto" | "auto_with_override";
 
@@ -60,7 +60,7 @@ Gate.init(
       field: "player_id",
     },
     gateNumber: {
-      type: DataTypes.ENUM("0", "1", "2", "3"),
+      type: DataTypes.ENUM("0", "1", "2", "3", "4"),
       allowNull: false,
       field: "gate_number",
     },

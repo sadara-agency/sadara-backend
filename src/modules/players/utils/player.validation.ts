@@ -93,6 +93,21 @@ export const createPlayerSchema = z.object({
   jumping: z.number().int().min(0).max(100).optional(),
   // Technical attributes (position-specific JSONB)
   technicalAttributes: technicalAttributesSchema,
+  // Mandate tracking
+  mandateStatus: z
+    .enum(["Signed", "In Negotiation", "Prospect"])
+    .optional()
+    .nullable(),
+  mandateSignedAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  exclusiveUntil: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
   // Legacy (deprecated — kept for backward compat)
   speed: z.number().int().min(0).max(100).optional(),
   passing: z.number().int().min(0).max(100).optional(),

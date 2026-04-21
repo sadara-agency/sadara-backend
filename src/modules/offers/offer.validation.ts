@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+// ── Pipeline Phase ──
+
+export const OFFER_PHASES = [
+  "ID",
+  "Acquire",
+  "Map",
+  "Negotiate",
+  "Media",
+  "Close",
+] as const;
+export type OfferPhase = (typeof OFFER_PHASES)[number];
+
 // ── Create Offer ──
 
 export const createOfferSchema = z.object({
@@ -22,11 +34,43 @@ export const createOfferSchema = z.object({
     )
     .optional(),
   notes: z.string().optional(),
+  phase: z
+    .enum(["ID", "Acquire", "Map", "Negotiate", "Media", "Close"])
+    .optional(),
+  windowId: z.string().uuid().optional(),
 });
 
 // ── Update Offer ──
 
 export const updateOfferSchema = createOfferSchema.partial();
+
+// ── Update Offer Phase ──
+
+export const updateOfferPhaseSchema = z.object({
+  phase: z.enum(["ID", "Acquire", "Map", "Negotiate", "Media", "Close"]),
+  saffRegDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  itcFiledDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  medicalDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  hotSignedDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional()
+    .nullable(),
+  blockerNotes: z.string().max(2000).optional().nullable(),
+});
+export type UpdateOfferPhaseInput = z.infer<typeof updateOfferPhaseSchema>;
 
 // ── Update Offer Status ──
 
@@ -74,6 +118,10 @@ export const offerQuerySchema = z.object({
   playerId: z.string().uuid().optional(),
   fromClubId: z.string().uuid().optional(),
   toClubId: z.string().uuid().optional(),
+  phase: z
+    .enum(["ID", "Acquire", "Map", "Negotiate", "Media", "Close"])
+    .optional(),
+  windowId: z.string().uuid().optional(),
 });
 
 // ── Inferred Types ──
@@ -82,3 +130,4 @@ export type CreateOfferInput = z.infer<typeof createOfferSchema>;
 export type UpdateOfferInput = z.infer<typeof updateOfferSchema>;
 export type UpdateOfferStatusInput = z.infer<typeof updateOfferStatusSchema>;
 export type OfferQuery = z.infer<typeof offerQuerySchema>;
+// UpdateOfferPhaseInput exported above alongside its schema
