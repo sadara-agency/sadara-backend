@@ -16,6 +16,7 @@ import { scrapeChampionship } from "@modules/saff/saff.scraper";
 import { SaffTournament } from "@modules/saff/saff.model";
 import { enqueue, getQueue, QueueName } from "@modules/queues/queues";
 import { logger } from "@config/logger";
+import { env } from "@config/env";
 import type {
   TournamentQuery,
   StandingQuery,
@@ -47,6 +48,15 @@ export async function seedTournaments(req: AuthRequest, res: Response) {
 // ── Fetch (Scrape) — enqueues a BullMQ job, returns immediately ──
 
 export async function fetchFromSaff(req: AuthRequest, res: Response) {
+  if (!env.redis.url) {
+    res
+      .status(503)
+      .json({
+        success: false,
+        message: "Queue unavailable — REDIS_URL not configured",
+      });
+    return;
+  }
   const jobId = await enqueue(QueueName.SaffFetch, "scrape", {
     kind: "scrape",
     fetchRequest: req.body,
@@ -262,6 +272,15 @@ export async function triggerSync(req: AuthRequest, res: Response) {
 // ── Discover tournaments from saff.com.sa ──
 
 export async function syncTournaments(req: AuthRequest, res: Response) {
+  if (!env.redis.url) {
+    res
+      .status(503)
+      .json({
+        success: false,
+        message: "Queue unavailable — REDIS_URL not configured",
+      });
+    return;
+  }
   const season = req.body.season || getCurrentSeason();
   const jobId = await enqueue(QueueName.SaffFetch, "discover", {
     kind: "discover",
