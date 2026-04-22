@@ -12,7 +12,6 @@ import {
   WellnessWorkoutTemplate,
   WellnessTemplateExercise,
   WellnessWorkoutAssignment,
-  WellnessWorkoutLog,
 } from "./fitness.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -23,7 +22,6 @@ import type {
   UpdateTemplateInput,
   CreateAssignmentInput,
   UpdateAssignmentInput,
-  LogWorkoutInput,
 } from "./wellness.validation";
 
 // ══════════════════════════════════════════
@@ -269,51 +267,10 @@ export async function getAssignment(id: string) {
           },
         ],
       },
-      {
-        model: WellnessWorkoutLog,
-        as: "logs",
-        include: [{ model: WellnessExercise, as: "exercise" }],
-      },
     ],
   });
   if (!assignment) throw new AppError("Workout assignment not found", 404);
   return assignment;
-}
-
-/**
- * Get assignment detail with previous week's logs for progressive overload.
- */
-export async function getAssignmentDetail(id: string) {
-  const assignment = await getAssignment(id);
-  const plain = assignment.get({ plain: true }) as any;
-
-  // Look up last week's logs for same template
-  const oneWeekAgo = new Date(plain.assignedDate);
-  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-  const prevDate = oneWeekAgo.toISOString().slice(0, 10);
-
-  const prevAssignment = await WellnessWorkoutAssignment.findOne({
-    where: {
-      playerId: plain.playerId,
-      templateId: plain.templateId,
-      assignedDate: { [Op.lte]: prevDate },
-      status: "completed",
-    },
-    order: [["assigned_date", "DESC"]],
-    include: [
-      {
-        model: WellnessWorkoutLog,
-        as: "logs",
-        include: [{ model: WellnessExercise, as: "exercise" }],
-      },
-    ],
-  });
-
-  plain.previousWeekLogs = prevAssignment
-    ? (prevAssignment.get({ plain: true }) as any).logs || []
-    : [];
-
-  return plain;
 }
 
 export async function createAssignment(
@@ -349,29 +306,6 @@ export async function deleteAssignment(id: string) {
   const assignment = await WellnessWorkoutAssignment.findByPk(id);
   if (!assignment) throw new AppError("Workout assignment not found", 404);
   await assignment.destroy();
-}
-
-// ══════════════════════════════════════════
-// WORKOUT LOGGING
-// ══════════════════════════════════════════
-
-export async function logWorkout(assignmentId: string, body: LogWorkoutInput) {
-  const assignment = await WellnessWorkoutAssignment.findByPk(assignmentId);
-  if (!assignment) throw new AppError("Workout assignment not found", 404);
-
-  // Auto-set status to in_progress if pending
-  if (assignment.status === "pending") {
-    await assignment.update({ status: "in_progress" });
-  }
-
-  const logs = await WellnessWorkoutLog.bulkCreate(
-    body.sets.map((s) => ({
-      assignmentId,
-      ...s,
-    })),
-  );
-
-  return logs;
 }
 
 export async function completeAssignment(id: string) {

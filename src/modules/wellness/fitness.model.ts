@@ -357,78 +357,6 @@ WellnessWorkoutAssignment.init(
   },
 );
 
-// ── Workout Log (per-set performance) ──
-
-interface WorkoutLogAttributes {
-  id: string;
-  assignmentId: string;
-  exerciseId: string;
-  setNumber: number;
-  actualReps?: number | null;
-  actualWeightKg?: number | null;
-  rpe?: number | null;
-  notes?: string | null;
-  createdAt?: Date;
-}
-
-interface WorkoutLogCreation extends Optional<
-  WorkoutLogAttributes,
-  "id" | "createdAt"
-> {}
-
-export class WellnessWorkoutLog
-  extends Model<WorkoutLogAttributes, WorkoutLogCreation>
-  implements WorkoutLogAttributes
-{
-  declare id: string;
-  declare assignmentId: string;
-  declare exerciseId: string;
-  declare setNumber: number;
-  declare actualReps: number | null;
-  declare actualWeightKg: number | null;
-  declare rpe: number | null;
-  declare notes: string | null;
-}
-
-WellnessWorkoutLog.init(
-  {
-    id: {
-      type: DataTypes.UUID,
-      defaultValue: DataTypes.UUIDV4,
-      primaryKey: true,
-    },
-    assignmentId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      field: "assignment_id",
-    },
-    exerciseId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      field: "exercise_id",
-    },
-    setNumber: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-      field: "set_number",
-    },
-    actualReps: { type: DataTypes.INTEGER, field: "actual_reps" },
-    actualWeightKg: {
-      type: DataTypes.DECIMAL(6, 1),
-      field: "actual_weight_kg",
-    },
-    rpe: { type: DataTypes.DECIMAL(3, 1) },
-    notes: { type: DataTypes.TEXT },
-  },
-  {
-    sequelize,
-    tableName: "wellness_workout_logs",
-    underscored: true,
-    timestamps: true,
-    updatedAt: false,
-  },
-);
-
 // ── Daily Summary ──
 
 interface DailySummaryAttributes {
@@ -562,16 +490,4 @@ WellnessTemplateExercise.belongsTo(WellnessExercise, {
 WellnessWorkoutAssignment.belongsTo(WellnessWorkoutTemplate, {
   foreignKey: "template_id",
   as: "template",
-});
-WellnessWorkoutAssignment.hasMany(WellnessWorkoutLog, {
-  foreignKey: "assignment_id",
-  as: "logs",
-});
-WellnessWorkoutLog.belongsTo(WellnessWorkoutAssignment, {
-  foreignKey: "assignment_id",
-  as: "assignment",
-});
-WellnessWorkoutLog.belongsTo(WellnessExercise, {
-  foreignKey: "exercise_id",
-  as: "exercise",
 });
