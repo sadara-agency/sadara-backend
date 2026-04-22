@@ -248,24 +248,31 @@ jobs:
           path: node_modules
           key: node-modules-${{ github.run_id }}
 
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
+
+      - name: Start Cloud SQL Auth Proxy
+        run: |
+          curl -sSL https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.1/cloud-sql-proxy.linux.amd64 -o cloud-sql-proxy
+          chmod +x cloud-sql-proxy
+          ./cloud-sql-proxy --port 5432 ${{ secrets.CLOUD_SQL_INSTANCE }} &
+          sleep 3
+
       - name: Run database migrations
         run: npm run migrate
         env:
           NODE_ENV: production
-          POSTGRES_HOST: ${{ secrets.POSTGRES_HOST }}
-          POSTGRES_PORT: ${{ secrets.POSTGRES_PORT }}
+          POSTGRES_HOST: 127.0.0.1
+          POSTGRES_PORT: 5432
           POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
           POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           REDIS_URL: ${{ secrets.REDIS_URL }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-
-      - id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
-          service_account: ${{ secrets.GCP_WIF_SERVICE_ACCOUNT }}
 
       - id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
