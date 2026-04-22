@@ -52,6 +52,7 @@ import {
   WellnessWeightLog,
   WellnessMealLog,
 } from "@modules/wellness/wellness.model";
+import BodyComposition from "@modules/wellness/bodyComposition.model";
 
 import { IDS } from "./ids";
 import { seedNotionData } from "./seedNotionData";
@@ -2308,8 +2309,57 @@ async function seedAllData(tx: Transaction): Promise<void> {
     opts,
   );
 
+  await BodyComposition.bulkCreate(
+    [
+      {
+        id: IDS.seedBodyCompositions[0],
+        playerId: IDS.players[0],
+        scanDate: "2026-01-15",
+        scanDevice: "InBody 570",
+        weightKg: 78.5,
+        bodyFatPct: 12.5,
+        bodyFatMassKg: 9.8,
+        leanBodyMassKg: 68.7,
+        skeletalMuscleMassKg: 38.2,
+        measuredBmr: 1920,
+        visceralFatLevel: 4,
+        recordedBy: IDS.users.coach,
+        notes: "[TEST] Pre-season baseline scan",
+      },
+      {
+        id: IDS.seedBodyCompositions[1],
+        playerId: IDS.players[0],
+        scanDate: "2026-04-10",
+        scanDevice: "InBody 570",
+        weightKg: 77.2,
+        bodyFatPct: 11.8,
+        bodyFatMassKg: 9.1,
+        leanBodyMassKg: 68.1,
+        skeletalMuscleMassKg: 37.9,
+        measuredBmr: 1905,
+        visceralFatLevel: 3,
+        recordedBy: IDS.users.coach,
+        notes: "[TEST] Mid-season check",
+      },
+      {
+        id: IDS.seedBodyCompositions[2],
+        playerId: IDS.players[2],
+        scanDate: "2026-02-20",
+        weightKg: 82.0,
+        bodyFatPct: 15.0,
+        bodyFatMassKg: 12.3,
+        leanBodyMassKg: 69.7,
+        skeletalMuscleMassKg: 39.1,
+        measuredBmr: 1980,
+        visceralFatLevel: 7,
+        recordedBy: IDS.users.coach,
+      },
+    ],
+    opts,
+  );
+
   console.log(
-    "  ✅ Auto-task test data seeded (contracts, offers, injuries, training, approvals, documents, referrals, wellness)",
+    "  ✅ Auto-task test data seeded (contracts, offers, injuries, training, approvals, documents, referrals, wellness, body-compositions)",
   );
 }
 

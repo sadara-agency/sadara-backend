@@ -15,7 +15,8 @@ import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { SessionFeedback } from "@modules/sessions/feedback/sessionFeedback.model";
-import { MealPlan, MealPlanItem } from "@modules/wellness/mealPlan.model";
+import TrainingBlock from "@modules/wellness/trainingBlock.model";
+import { BodyComposition } from "@modules/wellness/bodyComposition.model";
 import { Journey } from "@modules/journey/journey.model";
 import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
 import {
@@ -565,10 +566,22 @@ export function setupAssociations() {
     as: "window",
   });
 
-  // Meal Plans
-  MealPlan.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  Player.hasMany(MealPlan, { foreignKey: "playerId", as: "mealPlans" });
-  MealPlan.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  // ── Training Blocks (Wellness Phase 2) ──
+  Player.hasMany(TrainingBlock, {
+    foreignKey: "playerId",
+    as: "trainingBlocks",
+  });
+  TrainingBlock.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  TrainingBlock.belongsTo(BodyComposition, {
+    foreignKey: "startScanId",
+    as: "startScan",
+  });
+  TrainingBlock.belongsTo(BodyComposition, {
+    foreignKey: "endScanId",
+    as: "endScan",
+  });
+  TrainingBlock.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  TrainingBlock.belongsTo(User, { foreignKey: "closedBy", as: "closer" });
 
   // ── Medical Reports ──
   MedicalReport.hasMany(MedicalLabResult, {
