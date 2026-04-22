@@ -141,41 +141,57 @@ describe('Wellness Helpers', () => {
   // ══════════════════════════════════════════
 
   describe('calculateRingScore', () => {
-    it('should return 100 for perfect adherence (legacy, no readiness)', () => {
-      expect(calculateRingScore(100, 100, true)).toBe(100);
+    it('should return 100 for a perfect pulse', () => {
+      expect(
+        calculateRingScore({ readinessScore: 100, sleepQuality: 5, nutritionRating: 5, trainingType: 'club_session' }),
+      ).toBe(100);
     });
 
-    it('should return 0 for zero adherence (legacy)', () => {
-      expect(calculateRingScore(0, 0, false)).toBe(0);
+    it('should return 0 for worst-case pulse', () => {
+      expect(
+        calculateRingScore({ readinessScore: 0, sleepQuality: 1, nutritionRating: 1, trainingType: 'rest' }),
+      ).toBe(0);
     });
 
-    it('should use legacy weights without readiness (40/30/30)', () => {
-      expect(calculateRingScore(100, 0, false)).toBe(40);
-      expect(calculateRingScore(0, 100, false)).toBe(30);
-      expect(calculateRingScore(0, 0, true)).toBe(30);
+    it('should return 50 when all fields are null (neutral defaults)', () => {
+      expect(calculateRingScore({})).toBe(50);
     });
 
-    it('should use new weights with readiness (30/20/20/30)', () => {
-      expect(calculateRingScore(100, 100, true, 100)).toBe(100);
-      expect(calculateRingScore(0, 0, false, 0)).toBe(0);
-      expect(calculateRingScore(100, 0, false, 0)).toBe(30);
-      expect(calculateRingScore(0, 100, false, 0)).toBe(20);
-      expect(calculateRingScore(0, 0, true, 0)).toBe(20);
-      expect(calculateRingScore(0, 0, false, 100)).toBe(30);
+    it('should weight readiness at 30%', () => {
+      // readiness=100, rest neutral (50 each) → 100*0.3 + 50*0.25 + 50*0.25 + 50*0.2 = 65
+      expect(calculateRingScore({ readinessScore: 100 })).toBe(65);
     });
 
-    it('should cap at 100 even with over-adherence', () => {
-      expect(calculateRingScore(150, 150, true)).toBe(100);
-      expect(calculateRingScore(150, 150, true, 150)).toBe(100);
+    it('should weight sleepQuality=5 at 25%', () => {
+      // sleep=100, rest neutral → 50*0.3 + 100*0.25 + 50*0.25 + 50*0.2 = 63
+      expect(calculateRingScore({ sleepQuality: 5 })).toBe(63);
     });
 
-    it('should floor at 0 for negative input', () => {
-      expect(calculateRingScore(-10, -10, false)).toBe(0);
+    it('should weight nutritionRating=5 at 25%', () => {
+      // nutrition=100, rest neutral → 50*0.3 + 50*0.25 + 100*0.25 + 50*0.2 = 63
+      expect(calculateRingScore({ nutritionRating: 5 })).toBe(63);
     });
 
-    it('should handle null readiness as legacy mode', () => {
-      expect(calculateRingScore(100, 100, true, null)).toBe(100);
-      expect(calculateRingScore(100, 0, false, null)).toBe(40);
+    it('should score rest trainingType as 0 (20% weight, others neutral)', () => {
+      // training=0, rest neutral → 50*0.3 + 50*0.25 + 50*0.25 + 0*0.2 = 40
+      expect(calculateRingScore({ trainingType: 'rest' })).toBe(40);
+    });
+
+    it('should score any non-rest trainingType as 100 at 20% weight', () => {
+      // training=100, rest neutral → 50*0.3 + 50*0.25 + 50*0.25 + 100*0.2 = 60
+      expect(calculateRingScore({ trainingType: 'program_session' })).toBe(60);
+    });
+
+    it('should cap readinessScore > 100 at 100', () => {
+      expect(
+        calculateRingScore({ readinessScore: 150, sleepQuality: 5, nutritionRating: 5, trainingType: 'club_session' }),
+      ).toBe(100);
+    });
+
+    it('should floor readinessScore < 0 at 0', () => {
+      expect(
+        calculateRingScore({ readinessScore: -50, sleepQuality: 1, nutritionRating: 1, trainingType: 'rest' }),
+      ).toBe(0);
     });
   });
 

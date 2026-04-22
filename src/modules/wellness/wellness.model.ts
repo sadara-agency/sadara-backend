@@ -370,6 +370,13 @@ WellnessMealLog.init(
 
 // ── Wellness Checkin (Daily Readiness Survey) ──
 
+// Phase 5 training type — describes what the player did the *previous* day.
+export type DailyPulseTrainingType =
+  | "rest"
+  | "club_session"
+  | "program_session"
+  | "mixed";
+
 interface WellnessCheckinAttributes {
   id: string;
   playerId: string;
@@ -384,6 +391,10 @@ interface WellnessCheckinAttributes {
   readinessScore: number | null;
   notes: string | null;
   createdBy: string | null;
+  // Phase 5 fields
+  trainingType: DailyPulseTrainingType | null;
+  nutritionRating: number | null;
+  trainingBlockId: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -401,6 +412,9 @@ interface WellnessCheckinCreation extends Optional<
   | "readinessScore"
   | "notes"
   | "createdBy"
+  | "trainingType"
+  | "nutritionRating"
+  | "trainingBlockId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -422,6 +436,9 @@ export class WellnessCheckin
   declare readinessScore: number | null;
   declare notes: string | null;
   declare createdBy: string | null;
+  declare trainingType: DailyPulseTrainingType | null;
+  declare nutritionRating: number | null;
+  declare trainingBlockId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -453,6 +470,9 @@ WellnessCheckin.init(
     readinessScore: { type: DataTypes.INTEGER, field: "readiness_score" },
     notes: { type: DataTypes.TEXT },
     createdBy: { type: DataTypes.UUID, field: "created_by" },
+    trainingType: { type: DataTypes.STRING(20), field: "training_type" },
+    nutritionRating: { type: DataTypes.SMALLINT, field: "nutrition_rating" },
+    trainingBlockId: { type: DataTypes.UUID, field: "training_block_id" },
   },
   {
     sequelize,

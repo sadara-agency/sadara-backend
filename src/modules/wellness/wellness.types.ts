@@ -193,6 +193,12 @@ export interface PlayerDashboardResponse {
     proteinAdherencePct: number | null;
     workoutCompleted: boolean;
     ringScore: number;
+    pulse: {
+      readinessScore: number | null;
+      sleepQuality: number | null;
+      nutritionRating: number | null;
+      trainingType: string | null;
+    } | null;
   };
   history: DailySummaryResponse[];
   profile: { targetCalories: number | null; targetProteinG: number | null };

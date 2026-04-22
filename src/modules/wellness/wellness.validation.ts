@@ -222,6 +222,13 @@ export type LogWorkoutInput = z.infer<typeof logWorkoutSchema>;
 
 const rating1to5 = z.coerce.number().int().min(1).max(5);
 
+export const DAILY_PULSE_TRAINING_TYPES = [
+  "rest",
+  "club_session",
+  "program_session",
+  "mixed",
+] as const;
+
 export const createCheckinSchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
   checkinDate: z
@@ -235,6 +242,10 @@ export const createCheckinSchema = z.object({
   stress: rating1to5.optional(),
   sorenessAreas: z.array(z.string().max(50)).max(20).optional(),
   notes: z.string().max(1000).optional(),
+  // Phase 5 — describe the *previous* day
+  trainingType: z.enum(DAILY_PULSE_TRAINING_TYPES).optional(),
+  nutritionRating: rating1to5.optional(),
+  trainingBlockId: z.string().uuid().optional(),
 });
 
 export const createMyCheckinSchema = createCheckinSchema.omit({

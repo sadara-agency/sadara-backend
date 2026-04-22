@@ -78,26 +78,40 @@ export function calculateBMI(weightKg: number, heightCm: number): number {
 }
 
 /**
- * Composite ring score (0-100).
- * When readiness is available:  calories 30% + protein 20% + workout 20% + readiness 30%
- * Without readiness (legacy):   calories 40% + protein 30% + workout 30%
+ * Phase 5 ring score (0–100) — computed entirely from the daily pulse checkin.
+ * No checkin submitted → returns 0 (player hasn't reported yet today).
+ *
+ * Weights:
+ *   readiness    30% — auto-computed from sleep/fatigue/soreness/mood/stress
+ *   sleep        25% — sleepQuality 1-5 scaled to 0-100; null → 50 (neutral)
+ *   nutrition    25% — nutritionRating 1-5 scaled; null → 50 (neutral)
+ *   training     20% — rest=0, any session type=100; null → 50 (neutral)
  */
-export function calculateRingScore(
-  calorieAdherencePct: number,
-  proteinAdherencePct: number,
-  workoutCompleted: boolean,
-  readinessScore?: number | null,
-): number {
-  const cal = Math.min(100, Math.max(0, calorieAdherencePct));
-  const prot = Math.min(100, Math.max(0, proteinAdherencePct));
-  const workout = workoutCompleted ? 100 : 0;
+export function calculateRingScore(pulse: {
+  readinessScore?: number | null;
+  sleepQuality?: number | null;
+  nutritionRating?: number | null;
+  trainingType?: string | null;
+}): number {
+  const readiness =
+    pulse.readinessScore != null
+      ? Math.min(100, Math.max(0, pulse.readinessScore))
+      : 50;
 
-  if (readinessScore != null) {
-    const readiness = Math.min(100, Math.max(0, readinessScore));
-    return Math.round(cal * 0.3 + prot * 0.2 + workout * 0.2 + readiness * 0.3);
-  }
-  // Legacy fallback (no checkin submitted)
-  return Math.round(cal * 0.4 + prot * 0.3 + workout * 0.3);
+  const sleep =
+    pulse.sleepQuality != null ? ((pulse.sleepQuality - 1) / 4) * 100 : 50;
+
+  const nutrition =
+    pulse.nutritionRating != null
+      ? ((pulse.nutritionRating - 1) / 4) * 100
+      : 50;
+
+  const training =
+    pulse.trainingType != null ? (pulse.trainingType === "rest" ? 0 : 100) : 50;
+
+  return Math.round(
+    readiness * 0.3 + sleep * 0.25 + nutrition * 0.25 + training * 0.2,
+  );
 }
 
 /**

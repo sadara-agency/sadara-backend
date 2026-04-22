@@ -318,7 +318,8 @@ function todayLocal(): string {
 }
 
 /**
- * Get player ring dashboard with today's stats and 7-day history.
+ * Get player ring dashboard with today's pulse-based ring score and N-day history.
+ * Phase 5: ring score is computed from today's checkin; history from wellness_checkins.
  */
 export async function getPlayerDashboard(
   playerId: string,
@@ -329,7 +330,7 @@ export async function getPlayerDashboard(
   if (!ok) throw new AppError("Not found", 404);
   const today = todayLocal();
 
-  // Get profile targets
+  // Get profile targets (kept for UI display)
   const profile = await WellnessProfile.findOne({ where: { playerId } });
   const targetCalories = profile
     ? Number(profile.targetCalories) || null
@@ -338,70 +339,83 @@ export async function getPlayerDashboard(
     ? Number(profile.targetProteinG) || null
     : null;
 
-  // Meal log totals removed in Phase 3 — nutrition tracked via prescriptions
-  const todayTotals = {
-    totalCalories: 0,
-    totalProteinG: 0,
-    calorieAdherencePct: null as number | null,
-    proteinAdherencePct: null as number | null,
-  };
+  // Today's pulse — drives ring score
+  const todayPulse = await WellnessCheckin.findOne({
+    where: { playerId, checkinDate: today },
+  });
 
-  // Check if workout completed today
-  const [workoutRow]: any = await sequelize.query(
-    `SELECT COUNT(*) AS cnt
-     FROM wellness_workout_assignments
-     WHERE player_id = :playerId AND assigned_date = :date AND status = 'completed'`,
-    { replacements: { playerId, date: today }, type: QueryTypes.SELECT },
-  );
-  const workoutCompleted = Number(workoutRow?.cnt || 0) > 0;
+  const ringScore = todayPulse
+    ? calculateRingScore({
+        readinessScore: todayPulse.readinessScore,
+        sleepQuality: todayPulse.sleepQuality,
+        nutritionRating: todayPulse.nutritionRating,
+        trainingType: todayPulse.trainingType,
+      })
+    : 0;
 
-  const ringScore = calculateRingScore(
-    todayTotals.calorieAdherencePct ?? 0,
-    todayTotals.proteinAdherencePct ?? 0,
-    workoutCompleted,
-  );
-
-  // Get history from daily summaries
+  // N-day history from checkins — one row per date
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().split("T")[0];
 
   const history: any[] = await sequelize.query(
-    `SELECT summary_date, total_calories, total_protein_g, total_carbs_g, total_fat_g,
-            calorie_adherence_pct, protein_adherence_pct, workout_completed, weight_logged, ring_score
-     FROM wellness_daily_summaries
-     WHERE player_id = :playerId AND summary_date >= :cutoff
-     ORDER BY summary_date DESC`,
+    `SELECT checkin_date,
+            readiness_score, sleep_quality, nutrition_rating, training_type,
+            sleep_hours, fatigue, muscle_soreness, mood, stress
+     FROM wellness_checkins
+     WHERE player_id = :playerId AND checkin_date >= :cutoff
+     ORDER BY checkin_date DESC`,
     { replacements: { playerId, cutoff: cutoffStr }, type: QueryTypes.SELECT },
   );
 
   return {
     today: {
-      totalCalories: todayTotals.totalCalories,
-      totalProteinG: todayTotals.totalProteinG,
-      calorieAdherencePct: todayTotals.calorieAdherencePct,
-      proteinAdherencePct: todayTotals.proteinAdherencePct,
-      workoutCompleted,
+      totalCalories: 0,
+      totalProteinG: 0,
+      calorieAdherencePct: null,
+      proteinAdherencePct: null,
+      workoutCompleted: todayPulse?.trainingType
+        ? todayPulse.trainingType !== "rest"
+        : false,
       ringScore,
+      pulse: todayPulse
+        ? {
+            readinessScore: todayPulse.readinessScore,
+            sleepQuality: todayPulse.sleepQuality,
+            nutritionRating: todayPulse.nutritionRating,
+            trainingType: todayPulse.trainingType,
+          }
+        : null,
     },
-    history: history.map((h) => ({
-      summaryDate: h.summary_date,
-      totalCalories: Number(h.total_calories),
-      totalProteinG: Number(h.total_protein_g),
-      totalCarbsG: Number(h.total_carbs_g),
-      totalFatG: Number(h.total_fat_g),
-      calorieAdherencePct:
-        h.calorie_adherence_pct != null
-          ? Number(h.calorie_adherence_pct)
-          : null,
-      proteinAdherencePct:
-        h.protein_adherence_pct != null
-          ? Number(h.protein_adherence_pct)
-          : null,
-      workoutCompleted: Boolean(h.workout_completed),
-      weightLogged: Boolean(h.weight_logged),
-      ringScore: Number(h.ring_score),
-    })),
+    history: history.map((h) => {
+      const dayScore = calculateRingScore({
+        readinessScore:
+          h.readiness_score != null ? Number(h.readiness_score) : null,
+        sleepQuality: h.sleep_quality != null ? Number(h.sleep_quality) : null,
+        nutritionRating:
+          h.nutrition_rating != null ? Number(h.nutrition_rating) : null,
+        trainingType: h.training_type ?? null,
+      });
+      return {
+        summaryDate: h.checkin_date,
+        totalCalories: 0,
+        totalProteinG: 0,
+        totalCarbsG: 0,
+        totalFatG: 0,
+        calorieAdherencePct: null,
+        proteinAdherencePct: null,
+        workoutCompleted: h.training_type ? h.training_type !== "rest" : false,
+        weightLogged: false,
+        ringScore: dayScore,
+        pulse: {
+          readinessScore:
+            h.readiness_score != null ? Number(h.readiness_score) : null,
+          nutritionRating:
+            h.nutrition_rating != null ? Number(h.nutrition_rating) : null,
+          trainingType: h.training_type ?? null,
+        },
+      };
+    }),
     profile: { targetCalories, targetProteinG },
   };
 }
@@ -463,12 +477,12 @@ export async function getCoachOverview(
       continue;
     }
 
-    // Last 3 days of summaries
-    const summaries: any[] = await sequelize.query(
-      `SELECT ring_score, workout_completed, summary_date
-       FROM wellness_daily_summaries
-       WHERE player_id = :playerId AND summary_date >= :cutoff
-       ORDER BY summary_date DESC
+    // Last 3 days of checkins — ring scores computed from pulse data (Phase 5)
+    const recentCheckins: any[] = await sequelize.query(
+      `SELECT checkin_date, readiness_score, sleep_quality, nutrition_rating, training_type
+       FROM wellness_checkins
+       WHERE player_id = :playerId AND checkin_date >= :cutoff
+       ORDER BY checkin_date DESC
        LIMIT 3`,
       {
         replacements: { playerId: p.player_id, cutoff: threeDaysStr },
@@ -489,16 +503,27 @@ export async function getCoachOverview(
       },
     );
 
+    const summaryScores = recentCheckins.map((c) =>
+      calculateRingScore({
+        readinessScore:
+          c.readiness_score != null ? Number(c.readiness_score) : null,
+        sleepQuality: c.sleep_quality != null ? Number(c.sleep_quality) : null,
+        nutritionRating:
+          c.nutrition_rating != null ? Number(c.nutrition_rating) : null,
+        trainingType: c.training_type ?? null,
+      }),
+    );
+
     const avgRingScore =
-      summaries.length > 0
+      summaryScores.length > 0
         ? Math.round(
-            summaries.reduce((s, r) => s + Number(r.ring_score), 0) /
-              summaries.length,
+            summaryScores.reduce((s, r) => s + r, 0) / summaryScores.length,
           )
         : 0;
-    const lastRingScore =
-      summaries.length > 0 ? Number(summaries[0].ring_score) : 0;
-    const missedWorkouts = summaries.filter((s) => !s.workout_completed).length;
+    const lastRingScore = summaryScores.length > 0 ? summaryScores[0] : 0;
+    const missedWorkouts = recentCheckins.filter(
+      (c) => !c.training_type || c.training_type === "rest",
+    ).length;
     const weightChange7d =
       weights.length >= 2
         ? Math.round(
@@ -569,21 +594,22 @@ export async function getHeatmapData(days = 14, user?: AuthUser) {
   startDate.setDate(startDate.getDate() - days + 1);
   const startStr = startDate.toISOString().split("T")[0];
 
+  // Phase 5: ring scores come from wellness_checkins, not the stale daily_summaries table
   const rows: any[] = await sequelize.query(
     `SELECT
        p.id AS player_id,
        p.first_name, p.last_name,
        p.first_name_ar, p.last_name_ar,
        p.photo_url,
-       ds.summary_date AS date,
-       ds.ring_score
+       wc.checkin_date AS date,
+       wc.readiness_score, wc.sleep_quality, wc.nutrition_rating, wc.training_type
      FROM players p
-     LEFT JOIN wellness_daily_summaries ds
-       ON ds.player_id = p.id
-       AND ds.summary_date >= :startDate
-       AND ds.summary_date <= :today
+     LEFT JOIN wellness_checkins wc
+       ON wc.player_id = p.id
+       AND wc.checkin_date >= :startDate
+       AND wc.checkin_date <= :today
      WHERE p.status = 'active' ${playerScope}
-     ORDER BY p.first_name, p.last_name, ds.summary_date`,
+     ORDER BY p.first_name, p.last_name, wc.checkin_date`,
     {
       replacements: { startDate: startStr, today, ...scopeReplacements },
       type: QueryTypes.SELECT,
@@ -734,8 +760,8 @@ export async function getMoodHeatmapData(days = 7, user?: AuthUser) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Create or update a daily checkin for a player (upsert by player+date).
- * Auto-calculates readinessScore from the responses.
+ * Create or update a daily pulse checkin for a player (upsert by player+date).
+ * Auto-calculates readinessScore from sleep/fatigue/soreness/mood/stress fields.
  */
 export async function createCheckin(
   body: {
@@ -749,6 +775,10 @@ export async function createCheckin(
     stress?: number;
     sorenessAreas?: string[];
     notes?: string;
+    // Phase 5
+    trainingType?: string;
+    nutritionRating?: number;
+    trainingBlockId?: string;
   },
   userId?: string,
 ) {
@@ -768,6 +798,11 @@ export async function createCheckin(
       readinessScore,
       notes: body.notes ?? null,
       createdBy: userId ?? null,
+      trainingType:
+        (body.trainingType as import("./wellness.model").DailyPulseTrainingType) ??
+        null,
+      nutritionRating: body.nutritionRating ?? null,
+      trainingBlockId: body.trainingBlockId ?? null,
     },
     { returning: true },
   );
