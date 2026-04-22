@@ -13,7 +13,6 @@ import {
   updateTemplateSchema,
   createAssignmentSchema,
   updateAssignmentSchema,
-  logWorkoutSchema,
 } from "./wellness.validation";
 import * as ctrl from "./fitness.controller";
 
@@ -28,17 +27,6 @@ router.get(
   "/my/workouts",
   authorizeModule("wellness", "read"),
   asyncHandler(ctrl.myWorkouts),
-);
-router.get(
-  "/my/workouts/:assignmentId",
-  authorizeModule("wellness", "read"),
-  asyncHandler(ctrl.myWorkoutDetail),
-);
-router.post(
-  "/my/workouts/:assignmentId/log",
-  authorizeModule("wellness", "create"),
-  validate(logWorkoutSchema),
-  asyncHandler(ctrl.myLogWorkout),
 );
 router.patch(
   "/my/workouts/:assignmentId/complete",
@@ -142,16 +130,6 @@ router.delete(
   asyncHandler(ctrl.deleteAssignment),
 );
 
-// ══════════════════════════════════════════
-// WORKOUT LOGGING (Coach view)
-// ══════════════════════════════════════════
-
-router.post(
-  "/assignments/:assignmentId/log",
-  authorizeModule("wellness", "create"),
-  validate(logWorkoutSchema),
-  asyncHandler(ctrl.logWorkout),
-);
 router.patch(
   "/assignments/:assignmentId/complete",
   authorizeModule("wellness", "update"),

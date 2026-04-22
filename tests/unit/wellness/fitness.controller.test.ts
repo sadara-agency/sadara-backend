@@ -152,31 +152,12 @@ describe('Fitness Controller', () => {
 
   describe('getAssignment', () => {
     it('should return assignment detail', async () => {
-      (fitSvc.getAssignmentDetail as jest.Mock).mockResolvedValue({
-        id: 'a1', logs: [], previousWeekLogs: [],
+      (fitSvc.getAssignment as jest.Mock).mockResolvedValue({
+        id: 'a1',
       });
       const res = mockRes();
       await controller.getAssignment(mockReq({ params: { id: 'a1' } }), res);
       expect(res.status).toHaveBeenCalledWith(200);
-    });
-  });
-
-  // ══════════════════════════════════════════
-  // WORKOUT LOGGING
-  // ══════════════════════════════════════════
-
-  describe('logWorkout', () => {
-    it('should log workout sets', async () => {
-      (fitSvc.logWorkout as jest.Mock).mockResolvedValue([{ id: 'wl1' }]);
-      const res = mockRes();
-      await controller.logWorkout(
-        mockReq({
-          params: { assignmentId: 'a1' },
-          body: { sets: [{ exerciseId: 'e1', setNumber: 1, actualReps: 10 }] },
-        }),
-        res,
-      );
-      expect(res.status).toHaveBeenCalledWith(201);
     });
   });
 
@@ -214,57 +195,6 @@ describe('Fitness Controller', () => {
         res,
       );
       expect(res.status).toHaveBeenCalledWith(200);
-    });
-  });
-
-  describe('myWorkoutDetail', () => {
-    it('should return detail for own assignment', async () => {
-      (fitSvc.getAssignmentDetail as jest.Mock).mockResolvedValue({
-        id: 'a1', playerId: 'player-001', logs: [],
-      });
-      const res = mockRes();
-      await controller.myWorkoutDetail(
-        mockReq({ params: { assignmentId: 'a1' } }),
-        res,
-      );
-      expect(res.status).toHaveBeenCalledWith(200);
-    });
-
-    it('should handle missing playerId', async () => {
-      const res = mockRes();
-      await controller.myWorkoutDetail(
-        mockReq({ user: { id: 'u1', role: 'Player', playerId: null }, params: { assignmentId: 'a1' } }),
-        res,
-      );
-      expect(res.status).toHaveBeenCalledWith(200);
-    });
-  });
-
-  describe('myLogWorkout', () => {
-    it('should log workout for own assignment', async () => {
-      (fitSvc.getAssignment as jest.Mock).mockResolvedValue({ playerId: 'player-001' });
-      (fitSvc.logWorkout as jest.Mock).mockResolvedValue([{ id: 'wl1' }]);
-      const res = mockRes();
-      await controller.myLogWorkout(
-        mockReq({
-          params: { assignmentId: 'a1' },
-          body: { sets: [{ exerciseId: 'e1', setNumber: 1 }] },
-        }),
-        res,
-      );
-      expect(res.status).toHaveBeenCalledWith(201);
-    });
-
-    it('should return 403 if no playerId', async () => {
-      const res = mockRes();
-      await controller.myLogWorkout(
-        mockReq({
-          user: { id: 'u1', role: 'Player', playerId: null },
-          params: { assignmentId: 'a1' },
-        }),
-        res,
-      );
-      expect(res.status).toHaveBeenCalledWith(403);
     });
   });
 

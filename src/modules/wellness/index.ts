@@ -13,7 +13,6 @@ export {
   WellnessWorkoutTemplate,
   WellnessTemplateExercise,
   WellnessWorkoutAssignment,
-  WellnessWorkoutLog,
   WellnessDailySummary,
 } from "./fitness.model";
 export type {

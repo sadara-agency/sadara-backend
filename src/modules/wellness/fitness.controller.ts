@@ -11,6 +11,7 @@ import {
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { AppError } from "@middleware/errorHandler";
 import * as fitSvc from "./fitness.service";
 
 const WELLNESS_CACHES = [CachePrefix.WELLNESS, CachePrefix.DASHBOARD];
@@ -107,7 +108,7 @@ export async function listAssignments(req: AuthRequest, res: Response) {
 }
 
 export async function getAssignment(req: AuthRequest, res: Response) {
-  const assignment = await fitSvc.getAssignmentDetail(req.params.id);
+  const assignment = await fitSvc.getAssignment(req.params.id);
   sendSuccess(res, assignment);
 }
 
@@ -135,16 +136,6 @@ export async function deleteAssignment(req: AuthRequest, res: Response) {
   invalidateMultiple(WELLNESS_CACHES).catch(() => {});
 }
 
-// ══════════════════════════════════════════
-// WORKOUT LOGGING
-// ══════════════════════════════════════════
-
-export async function logWorkout(req: AuthRequest, res: Response) {
-  const logs = await fitSvc.logWorkout(req.params.assignmentId, req.body);
-  sendCreated(res, logs);
-  invalidateMultiple(WELLNESS_CACHES).catch(() => {});
-}
-
 export async function completeAssignment(req: AuthRequest, res: Response) {
   const assignment = await fitSvc.completeAssignment(req.params.assignmentId);
   sendSuccess(res, assignment, "Workout completed");
@@ -165,37 +156,6 @@ export async function myWorkouts(req: AuthRequest, res: Response) {
   sendPaginated(res, result.data, result.meta);
 }
 
-export async function myWorkoutDetail(req: AuthRequest, res: Response) {
-  const playerId = (req.user as any)?.playerId;
-  if (!playerId) {
-    sendSuccess(res, null, "Player account not linked");
-    return;
-  }
-  const detail = await fitSvc.getAssignmentDetail(req.params.assignmentId);
-  if (detail.playerId !== playerId) {
-    throw new AppError("Access denied", 403);
-  }
-  sendSuccess(res, detail);
-}
-
-export async function myLogWorkout(req: AuthRequest, res: Response) {
-  const playerId = (req.user as any)?.playerId;
-  if (!playerId) {
-    res
-      .status(403)
-      .json({ success: false, message: "Player account not linked" });
-    return;
-  }
-  // Verify assignment belongs to player
-  const assignment = await fitSvc.getAssignment(req.params.assignmentId);
-  if ((assignment as any).playerId !== playerId) {
-    throw new AppError("Access denied", 403);
-  }
-  const logs = await fitSvc.logWorkout(req.params.assignmentId, req.body);
-  sendCreated(res, logs);
-  invalidateMultiple(WELLNESS_CACHES).catch(() => {});
-}
-
 export async function myCompleteWorkout(req: AuthRequest, res: Response) {
   const playerId = (req.user as any)?.playerId;
   if (!playerId) {
@@ -212,6 +172,3 @@ export async function myCompleteWorkout(req: AuthRequest, res: Response) {
   sendSuccess(res, result, "Workout completed");
   invalidateMultiple(WELLNESS_CACHES).catch(() => {});
 }
-
-// Need to import AppError for authorization checks
-import { AppError } from "@middleware/errorHandler";
