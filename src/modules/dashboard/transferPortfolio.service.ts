@@ -26,14 +26,14 @@ export async function getTransferFrameworkStats(
   const dealRows = await sequelize.query<{ count: string; fee_sum: string }>(
     `SELECT COUNT(*) AS count, COALESCE(SUM(transfer_fee), 0) AS fee_sum
      FROM offers o
-     WHERE o.status NOT IN ('Closed','Withdrawn') ${windowFilter}`,
+     WHERE o.status::text NOT IN ('Closed','Withdrawn') ${windowFilter}`,
     { type: QueryTypes.SELECT, replacements },
   );
 
   const phaseRows = await sequelize.query<{ phase: string; count: string }>(
     `SELECT COALESCE(phase,'ID') AS phase, COUNT(*) AS count
      FROM offers o
-     WHERE o.status NOT IN ('Closed','Withdrawn') ${windowFilter}
+     WHERE o.status::text NOT IN ('Closed','Withdrawn') ${windowFilter}
      GROUP BY COALESCE(phase,'ID')`,
     { type: QueryTypes.SELECT, replacements },
   );
