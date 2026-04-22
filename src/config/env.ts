@@ -100,10 +100,6 @@ const envSchema = z.object({
   GCS_CREDENTIALS_JSON: z.string().default(""), // For PaaS: JSON string of service account key
   GCS_TRAINING_BUCKET: z.string().default("sadara-training-media"),
 
-  // Nutritionix Food API (optional)
-  NUTRITIONIX_APP_ID: z.string().default(""),
-  NUTRITIONIX_API_KEY: z.string().default(""),
-
   // CSRF protection (enable enforcement after frontend is updated)
   CSRF_ENFORCE: z
     .enum(["true", "false"])
@@ -248,11 +244,6 @@ export const env = {
     credentials: validated.GOOGLE_APPLICATION_CREDENTIALS,
     credentialsJson: validated.GCS_CREDENTIALS_JSON,
     trainingBucket: validated.GCS_TRAINING_BUCKET,
-  },
-
-  nutritionix: {
-    appId: validated.NUTRITIONIX_APP_ID,
-    apiKey: validated.NUTRITIONIX_API_KEY,
   },
 
   csrf: {

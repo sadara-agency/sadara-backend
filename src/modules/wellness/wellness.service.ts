@@ -7,8 +7,6 @@ import { sequelize } from "@config/database";
 import {
   WellnessProfile,
   WellnessWeightLog,
-  WellnessFoodItem,
-  WellnessMealLog,
   WellnessCheckin,
 } from "./wellness.model";
 import { Player } from "@modules/players/player.model";
@@ -63,28 +61,18 @@ import {
   calculateBMI,
   calculateReadinessScore,
 } from "./wellness.helpers";
-import {
-  searchFood as nutritionixSearch,
-  mapToFoodItem,
-} from "./nutrition.provider";
 import type {
   CreateProfileInput,
   UpdateProfileInput,
   CreateWeightLogInput,
-  CreateFoodItemInput,
-  CreateMealLogInput,
-  UpdateMealLogInput,
-  CopyDayInput,
 } from "./wellness.validation";
 import type {
   MacroComputeResponse,
   WeightTrendResponse,
-  DailyTotalsResponse,
   PlayerDashboardResponse,
   CoachOverviewResponse,
   CoachOverviewPlayer,
   TrafficLightStatus,
-  DailySummaryResponse,
 } from "./wellness.types";
 import { calculateRingScore } from "./wellness.helpers";
 
@@ -318,234 +306,7 @@ export async function getWeightTrend(
   };
 }
 
-// ══════════════════════════════════════════
-// FOOD ITEMS
-// ══════════════════════════════════════════
-
-/**
- * Search foods via Nutritionix API, caching results in our DB.
- * Falls back to local DB text search if API is not configured.
- */
-export async function searchFoods(query: string) {
-  if (!query.trim()) return [];
-
-  try {
-    // Try Nutritionix first
-    const apiResults = await nutritionixSearch(query);
-    if (apiResults.length > 0) {
-      // Upsert results into our food_items table (fire-and-forget)
-      upsertFoodItems(apiResults.map(mapToFoodItem)).catch(() => {});
-      return apiResults.map(mapToFoodItem);
-    }
-  } catch {
-    // Nutritionix not configured or failed — fall through to DB search
-  }
-
-  // Fallback: search local DB
-  const rows = await WellnessFoodItem.findAll({
-    where: {
-      name: { [Op.iLike]: `%${query.trim()}%` },
-    },
-    limit: 30,
-    order: [
-      ["is_verified", "DESC"],
-      ["name", "ASC"],
-    ],
-  });
-
-  return rows.map((r) => r.get({ plain: true }));
-}
-
-/**
- * Bulk upsert food items from API results.
- */
-async function upsertFoodItems(items: ReturnType<typeof mapToFoodItem>[]) {
-  for (const item of items) {
-    await WellnessFoodItem.findOrCreate({
-      where: {
-        externalId: item.externalId,
-        source: item.source,
-      },
-      defaults: item as any,
-    });
-  }
-}
-
-/**
- * Create a custom food item (Admin only).
- */
-export async function createFoodItem(body: CreateFoodItemInput) {
-  return WellnessFoodItem.create({
-    ...body,
-    source: "custom",
-    isVerified: false,
-  } as any);
-}
-
-/**
- * Get a single food item by ID.
- */
-export async function getFoodItem(id: string) {
-  const item = await WellnessFoodItem.findByPk(id);
-  if (!item) throw new AppError("Food item not found", 404);
-  return item;
-}
-
-// ══════════════════════════════════════════
-// MEAL LOGS
-// ══════════════════════════════════════════
-
-export async function listMealLogs(
-  playerId: string,
-  queryParams: any,
-  user?: AuthUser,
-) {
-  const ok = await checkRowAccess("wellness", { playerId }, user);
-  if (!ok) throw new AppError("Not found", 404);
-  const where: any = { playerId };
-
-  if (queryParams.date) {
-    where.loggedDate = queryParams.date;
-  }
-  if (queryParams.mealType) {
-    where.mealType = queryParams.mealType;
-  }
-
-  const { limit, offset, page } = parsePagination(queryParams, "logged_date");
-
-  const { count, rows } = await WellnessMealLog.findAndCountAll({
-    where,
-    include: [
-      {
-        model: WellnessFoodItem,
-        as: "foodItem",
-        required: false,
-      },
-    ],
-    limit,
-    offset,
-    order: [
-      ["logged_date", "DESC"],
-      ["created_at", "DESC"],
-    ],
-  });
-
-  return { data: rows, meta: buildMeta(count, page, limit) };
-}
-
-export async function createMealLog(body: CreateMealLogInput) {
-  const log = await WellnessMealLog.create(body as any);
-  return log;
-}
-
-export async function updateMealLog(id: string, body: UpdateMealLogInput) {
-  const log = await WellnessMealLog.findByPk(id);
-  if (!log) throw new AppError("Meal log not found", 404);
-  await log.update(body);
-  return log;
-}
-
-export async function deleteMealLog(id: string) {
-  const log = await WellnessMealLog.findByPk(id);
-  if (!log) throw new AppError("Meal log not found", 404);
-  await log.destroy();
-}
-
-/**
- * Copy all meals from one day to another for a player.
- */
-export async function copyDay(body: CopyDayInput & { playerId: string }) {
-  const { playerId, fromDate, toDate } = body;
-
-  const sourceMeals = await WellnessMealLog.findAll({
-    where: { playerId, loggedDate: fromDate },
-  });
-
-  if (sourceMeals.length === 0) {
-    throw new AppError("No meals found on the source date to copy", 404);
-  }
-
-  const copied = await WellnessMealLog.bulkCreate(
-    sourceMeals.map((m) => ({
-      playerId,
-      mealType: m.mealType,
-      foodItemId: m.foodItemId,
-      customName: m.customName,
-      servings: m.servings,
-      calories: m.calories,
-      proteinG: m.proteinG,
-      carbsG: m.carbsG,
-      fatG: m.fatG,
-      loggedDate: toDate,
-      notes: m.notes,
-    })),
-  );
-
-  return copied;
-}
-
-/**
- * Get daily meal totals with adherence percentages.
- */
-export async function getDailyTotals(
-  playerId: string,
-  date: string,
-  user?: AuthUser,
-): Promise<DailyTotalsResponse> {
-  const ok = await checkRowAccess("wellness", { playerId }, user);
-  if (!ok) throw new AppError("Not found", 404);
-  const meals = await WellnessMealLog.findAll({
-    where: { playerId, loggedDate: date },
-    include: [
-      {
-        model: WellnessFoodItem,
-        as: "foodItem",
-        required: false,
-      },
-    ],
-    order: [
-      ["meal_type", "ASC"],
-      ["created_at", "ASC"],
-    ],
-  });
-
-  const totalCalories = meals.reduce((s, m) => s + Number(m.calories), 0);
-  const totalProteinG = meals.reduce((s, m) => s + Number(m.proteinG), 0);
-  const totalCarbsG = meals.reduce((s, m) => s + Number(m.carbsG), 0);
-  const totalFatG = meals.reduce((s, m) => s + Number(m.fatG), 0);
-
-  // Get profile targets for adherence
-  let calorieAdherencePct: number | null = null;
-  let proteinAdherencePct: number | null = null;
-
-  try {
-    const profile = await WellnessProfile.findOne({ where: { playerId } });
-    if (profile?.targetCalories) {
-      calorieAdherencePct = Math.round(
-        (totalCalories / Number(profile.targetCalories)) * 100,
-      );
-    }
-    if (profile?.targetProteinG) {
-      proteinAdherencePct = Math.round(
-        (totalProteinG / Number(profile.targetProteinG)) * 100,
-      );
-    }
-  } catch {
-    // No profile — adherence stays null
-  }
-
-  return {
-    date,
-    totalCalories: Math.round(totalCalories),
-    totalProteinG: Math.round(totalProteinG * 10) / 10,
-    totalCarbsG: Math.round(totalCarbsG * 10) / 10,
-    totalFatG: Math.round(totalFatG * 10) / 10,
-    mealCount: meals.length,
-    calorieAdherencePct,
-    proteinAdherencePct,
-    meals: meals.map((m) => m.get({ plain: true })) as any,
-  };
-}
+// meal log and food item functions removed in Phase 3 — data in _archive_meal_logs_20260422
 
 // ══════════════════════════════════════════
 // DASHBOARD (Phase 4)
@@ -577,8 +338,13 @@ export async function getPlayerDashboard(
     ? Number(profile.targetProteinG) || null
     : null;
 
-  // Get today's totals (reuse existing logic)
-  const todayTotals = await getDailyTotals(playerId, today);
+  // Meal log totals removed in Phase 3 — nutrition tracked via prescriptions
+  const todayTotals = {
+    totalCalories: 0,
+    totalProteinG: 0,
+    calorieAdherencePct: null as number | null,
+    proteinAdherencePct: null as number | null,
+  };
 
   // Check if workout completed today
   const [workoutRow]: any = await sequelize.query(

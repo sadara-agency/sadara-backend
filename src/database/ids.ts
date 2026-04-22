@@ -79,6 +79,7 @@ export const IDS = {
   seedWellnessProfiles: generateIds("ece00001", 3),
   seedWeightLogs: generateIds("ecf00001", 6),
   seedMealLogs: generateIds("ed000001", 4),
+  seedBodyCompositions: generateIds("ed050001", 3),
 
   // ── Notion import IDs ──
   notionPlayers: generateIds("ed100001", 18),
