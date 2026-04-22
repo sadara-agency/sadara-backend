@@ -788,6 +788,33 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("club-needs", ["Analyst", "Scout", "Legal", "Finance", "Media"], {
     canRead: true,
   }),
+
+  // Player-Coach Assignments (multi-specialty row-scope join table)
+  ...forRoles("player-coach-assignments", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("player-coach-assignments", ["Manager", "Executive"], {
+    canCreate: true,
+    canRead: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "player-coach-assignments",
+    [
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "NutritionSpecialist",
+      "GymCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+    ],
+    { canRead: true },
+  ),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

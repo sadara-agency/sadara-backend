@@ -80,6 +80,7 @@ import {
 import { Ticket } from "@modules/tickets/ticket.model";
 import TransferWindow from "@modules/transfer-windows/transferWindow.model";
 import ClubNeed from "@modules/club-needs/clubNeed.model";
+import PlayerCoachAssignment from "@modules/player-coach-assignments/playerCoachAssignment.model";
 import { ScoringCard } from "@modules/scouting/scoringCard.model";
 
 let associationsReady = false;
@@ -547,6 +548,24 @@ export function setupAssociations() {
 
   TransferWindow.hasMany(ClubNeed, { foreignKey: "windowId", as: "needs" });
   ClubNeed.belongsTo(TransferWindow, { foreignKey: "windowId", as: "window" });
+
+  // ── Player-Coach Assignments (multi-specialty) ─────────────
+  Player.hasMany(PlayerCoachAssignment, {
+    foreignKey: "playerId",
+    as: "coachAssignments",
+  });
+  PlayerCoachAssignment.belongsTo(Player, {
+    foreignKey: "playerId",
+    as: "player",
+  });
+  User.hasMany(PlayerCoachAssignment, {
+    foreignKey: "coachUserId",
+    as: "coachedPlayerAssignments",
+  });
+  PlayerCoachAssignment.belongsTo(User, {
+    foreignKey: "coachUserId",
+    as: "coachUser",
+  });
 
   // ── Scoring Cards (T2) ─────────────────────────────────────
   Watchlist.hasMany(ScoringCard, {

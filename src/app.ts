@@ -78,6 +78,7 @@ import saudiLeaguesRoutes from "@modules/saudiLeagues/saudiLeagues.routes";
 import queueRoutes from "@modules/queues/queues.routes";
 import transferWindowRoutes from "@modules/transfer-windows/transferWindow.routes";
 import clubNeedRoutes from "@modules/club-needs/clubNeed.routes";
+import playerCoachAssignmentRoutes from "@modules/player-coach-assignments/playerCoachAssignment.routes";
 import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
@@ -373,6 +374,7 @@ app.use("/api/v1/video", videoRoutes);
 app.use("/api/v1/saudi-leagues", saudiLeaguesRoutes);
 app.use("/api/v1/transfer-windows", transferWindowRoutes);
 app.use("/api/v1/club-needs", clubNeedRoutes);
+app.use("/api/v1/player-coach-assignments", playerCoachAssignmentRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(

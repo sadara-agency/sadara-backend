@@ -44,7 +44,8 @@ function buildPlayerScopeSQL(user?: AuthUser): {
     };
   if (COACH_ROLE_LIST.includes(user.role))
     return {
-      clause: "AND p.coach_id = :scopeCoachId",
+      clause:
+        "AND EXISTS (SELECT 1 FROM player_coach_assignments pca WHERE pca.player_id = p.id AND pca.coach_user_id = :scopeCoachId)",
       replacements: { scopeCoachId: user.id },
     };
   if (user.role === "Analyst")
