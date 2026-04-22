@@ -17,12 +17,12 @@ export const sessionStatusEnum = z.enum([
 
 export const createSessionSchema = z.object({
   playerId: z.string().uuid(),
-  programId: z.string().uuid().optional(),
+  programId: z.string().uuid().nullish(),
   scheduledDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
   sessionType: sessionTypeEnum,
-  notes: z.string().max(1000).optional(),
+  notes: z.string().max(1000).nullish(),
 });
 
 export const updateSessionSchema = z.object({
@@ -32,7 +32,7 @@ export const updateSessionSchema = z.object({
     .optional(),
   sessionType: sessionTypeEnum.optional(),
   status: sessionStatusEnum.optional(),
-  notes: z.string().max(1000).optional(),
+  notes: z.string().max(1000).nullish(),
 });
 
 export const completeSessionSchema = z.object({
