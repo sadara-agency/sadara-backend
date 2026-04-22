@@ -405,7 +405,11 @@ async function bootstrap(): Promise<void> {
       }
     }
 
-    logger.error("[boot] All retries exhausted — running in degraded mode");
+    logger.error("[boot] All retries exhausted — running in degraded mode", {
+      degraded: true,
+      initError,
+      phase: "initApplication",
+    });
   }
 }
 

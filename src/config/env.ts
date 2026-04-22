@@ -48,6 +48,7 @@ const envSchema = z.object({
 
   // Redis (optional)
   REDIS_URL: z.string().optional(),
+  REDIS_TLS_REJECT_UNAUTHORIZED: z.string().default("true"),
 
   // SMTP (optional)
   SMTP_HOST: z.string().default(""),
@@ -197,6 +198,7 @@ export const env = {
 
   redis: {
     url: validated.REDIS_URL,
+    tlsRejectUnauthorized: validated.REDIS_TLS_REJECT_UNAUTHORIZED !== "false",
   },
 
   smtp: {
