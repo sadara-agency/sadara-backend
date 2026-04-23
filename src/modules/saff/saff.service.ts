@@ -800,19 +800,44 @@ export async function importToSadara(input: ImportRequest) {
         });
 
         for (const tm of teamMaps) {
-          const [club, created] = await Club.findOrCreate({
-            where: { name: tm.teamNameEn },
-            defaults: {
-              name: tm.teamNameEn,
-              nameAr: tm.teamNameAr,
-              type: "Club" as const,
-              country: "Saudi Arabia",
-              city: tm.city || undefined,
-              league: tournament.name,
-              saffTeamId: tm.saffTeamId,
-            },
+          // Match priority: saffTeamId → nameAr → name. Only create when
+          // nothing matches. Matching only on English name (as the old
+          // findOrCreate did) produced duplicates whenever SAFF sent a
+          // spelling variant ("Al Okhdood" vs. seed "Al Akhdoud") for a
+          // club that already existed under its canonical Arabic name.
+          let club = await Club.findOne({
+            where: { saffTeamId: tm.saffTeamId },
             transaction: txn,
           });
+          if (!club && tm.teamNameAr) {
+            club = await Club.findOne({
+              where: { nameAr: tm.teamNameAr },
+              transaction: txn,
+            });
+          }
+          if (!club) {
+            club = await Club.findOne({
+              where: { name: tm.teamNameEn },
+              transaction: txn,
+            });
+          }
+
+          let created = false;
+          if (!club) {
+            club = await Club.create(
+              {
+                name: tm.teamNameEn,
+                nameAr: tm.teamNameAr,
+                type: "Club" as const,
+                country: "Saudi Arabia",
+                city: tm.city || undefined,
+                league: tournament.name,
+                saffTeamId: tm.saffTeamId,
+              },
+              { transaction: txn },
+            );
+            created = true;
+          }
 
           if (!created && !club.nameAr && tm.teamNameAr) {
             await club.update({ nameAr: tm.teamNameAr }, { transaction: txn });
