@@ -62,7 +62,6 @@ import bodyCompositionRoutes from "@modules/wellness/bodyComposition.routes";
 import trainingBlockRoutes from "@modules/wellness/trainingBlock.routes";
 import nutritionPrescriptionRoutes from "@modules/wellness/nutritionPrescription.routes";
 import developmentProgramRoutes from "@modules/wellness/developmentProgram.routes";
-import developmentSessionRoutes from "@modules/wellness/developmentSession.routes";
 import mediaRoutes from "@modules/media/media.routes";
 import journeyRoutes from "@modules/journey/journey.routes";
 import evolutionCycleRoutes from "@modules/evolution-cycles/evolution-cycle.routes";
@@ -345,7 +344,6 @@ app.use("/api/v1/body-compositions", bodyCompositionRoutes);
 app.use("/api/v1/training-blocks", trainingBlockRoutes);
 app.use("/api/v1/nutrition-prescriptions", nutritionPrescriptionRoutes);
 app.use("/api/v1/development-programs", developmentProgramRoutes);
-app.use("/api/v1/development-sessions", developmentSessionRoutes);
 app.use("/api/v1/media", mediaRoutes);
 
 // ── Public press release portal (no auth) ──
