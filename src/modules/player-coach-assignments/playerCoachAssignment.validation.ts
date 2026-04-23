@@ -1,12 +1,20 @@
 import { z } from "zod";
 
-export const specialtyEnum = z.enum([
+export const staffRoleEnum = z.enum([
+  "Admin",
+  "Manager",
+  "Analyst",
+  "Scout",
+  "Legal",
+  "Finance",
   "Coach",
   "SkillCoach",
   "TacticalCoach",
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
+  "Media",
+  "Executive",
   "GoalkeeperCoach",
   "MentalCoach",
 ]);
@@ -14,7 +22,7 @@ export const specialtyEnum = z.enum([
 export const createAssignmentSchema = z.object({
   playerId: z.string().uuid(),
   coachUserId: z.string().uuid(),
-  specialty: specialtyEnum,
+  specialty: staffRoleEnum,
 });
 
 export const assignmentQuerySchema = z.object({
@@ -24,8 +32,9 @@ export const assignmentQuerySchema = z.object({
   order: z.enum(["asc", "desc"]).default("desc"),
   playerId: z.string().uuid().optional(),
   coachUserId: z.string().uuid().optional(),
-  specialty: specialtyEnum.optional(),
+  specialty: staffRoleEnum.optional(),
 });
 
+export type StaffRole = z.infer<typeof staffRoleEnum>;
 export type CreateAssignmentInput = z.infer<typeof createAssignmentSchema>;
 export type AssignmentQuery = z.infer<typeof assignmentQuerySchema>;

@@ -10,17 +10,6 @@ import type {
   AssignmentQuery,
 } from "./playerCoachAssignment.validation";
 
-const COACH_ROLES = [
-  "Coach",
-  "SkillCoach",
-  "TacticalCoach",
-  "FitnessCoach",
-  "NutritionSpecialist",
-  "GymCoach",
-  "GoalkeeperCoach",
-  "MentalCoach",
-];
-
 export async function listAssignments(
   query: AssignmentQuery,
   _user?: AuthUser,
@@ -97,12 +86,9 @@ export async function createAssignment(
     User.findByPk(data.coachUserId),
   ]);
   if (!player) throw new AppError("Player not found", 404);
-  if (!coach) throw new AppError("Coach user not found", 404);
-  if (!COACH_ROLES.includes(coach.role)) {
-    throw new AppError(
-      `User role '${coach.role}' is not a coach role — cannot assign to a player`,
-      422,
-    );
+  if (!coach) throw new AppError("Staff user not found", 404);
+  if (coach.role === "Player") {
+    throw new AppError("Players cannot be added to a working group", 422);
   }
 
   try {
@@ -110,7 +96,7 @@ export async function createAssignment(
   } catch (err) {
     if (err instanceof UniqueConstraintError) {
       throw new AppError(
-        "This coach is already assigned to this player with that specialty",
+        "This person is already in this player's working group",
         409,
       );
     }

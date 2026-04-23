@@ -67,7 +67,7 @@ describe("PlayerCoachAssignment Service", () => {
       specialty: "GymCoach" as const,
     };
 
-    it("creates an assignment when player, coach exist and coach has a coach-role", async () => {
+    it("creates an assignment when player and staff user exist", async () => {
       mockPlayerFindByPk.mockResolvedValue({ id: payload.playerId });
       mockUserFindByPk.mockResolvedValue({
         id: payload.coachUserId,
@@ -79,6 +79,22 @@ describe("PlayerCoachAssignment Service", () => {
       const result = await service.createAssignment(payload, "admin-id");
 
       expect(mockCreate).toHaveBeenCalledWith(payload);
+      expect(result).toEqual(created);
+    });
+
+    it("creates an assignment for non-coach staff roles (Analyst, Scout, etc.)", async () => {
+      mockPlayerFindByPk.mockResolvedValue({ id: payload.playerId });
+      mockUserFindByPk.mockResolvedValue({
+        id: payload.coachUserId,
+        role: "Analyst",
+      });
+      const analystPayload = { ...payload, specialty: "Analyst" as const };
+      const created = { id: "new-id", ...analystPayload };
+      mockCreate.mockResolvedValue(created);
+
+      const result = await service.createAssignment(analystPayload, "admin-id");
+
+      expect(mockCreate).toHaveBeenCalledWith(analystPayload);
       expect(result).toEqual(created);
     });
 
@@ -94,7 +110,7 @@ describe("PlayerCoachAssignment Service", () => {
       ).rejects.toMatchObject({ statusCode: 404, message: "Player not found" });
     });
 
-    it("throws 404 when coach user does not exist", async () => {
+    it("throws 404 when staff user does not exist", async () => {
       mockPlayerFindByPk.mockResolvedValue({ id: payload.playerId });
       mockUserFindByPk.mockResolvedValue(null);
 
@@ -102,15 +118,15 @@ describe("PlayerCoachAssignment Service", () => {
         service.createAssignment(payload, "admin-id"),
       ).rejects.toMatchObject({
         statusCode: 404,
-        message: "Coach user not found",
+        message: "Staff user not found",
       });
     });
 
-    it("throws 422 when target user is not a coach role", async () => {
+    it("throws 422 when target user has the Player role", async () => {
       mockPlayerFindByPk.mockResolvedValue({ id: payload.playerId });
       mockUserFindByPk.mockResolvedValue({
         id: payload.coachUserId,
-        role: "Scout",
+        role: "Player",
       });
 
       await expect(
@@ -118,7 +134,7 @@ describe("PlayerCoachAssignment Service", () => {
       ).rejects.toMatchObject({ statusCode: 422 });
     });
 
-    it("throws 409 on duplicate (player, coach, specialty) combination", async () => {
+    it("throws 409 on duplicate (player, coach) combination", async () => {
       mockPlayerFindByPk.mockResolvedValue({ id: payload.playerId });
       mockUserFindByPk.mockResolvedValue({
         id: payload.coachUserId,
