@@ -30,8 +30,8 @@ interface ContractAttributes {
     | "AwaitingPlayer"
     | "Terminated";
   title: string | null;
-  startDate: string;
-  endDate: string;
+  startDate: string | null;
+  endDate: string | null;
   baseSalary: number | null;
   salaryCurrency: "SAR" | "USD" | "EUR";
   signingBonus: number;
@@ -83,6 +83,8 @@ interface ContractCreationAttributes extends Optional<
   | "playerContractType"
   | "status"
   | "title"
+  | "startDate"
+  | "endDate"
   | "baseSalary"
   | "salaryCurrency"
   | "signingBonus"
@@ -149,8 +151,8 @@ export class Contract
     | "AwaitingPlayer"
     | "Terminated";
   declare title: string | null;
-  declare startDate: string;
-  declare endDate: string;
+  declare startDate: string | null;
+  declare endDate: string | null;
   declare baseSalary: number | null;
   declare salaryCurrency: "SAR" | "USD" | "EUR";
   declare signingBonus: number;
@@ -249,12 +251,12 @@ Contract.init(
     },
     startDate: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
+      allowNull: true,
       field: "start_date",
     },
     endDate: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
+      allowNull: true,
       field: "end_date",
     },
     baseSalary: {

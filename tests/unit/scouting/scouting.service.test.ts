@@ -62,6 +62,10 @@ jest.mock('../../../src/modules/users/user.model', () => ({ User: { name: 'User'
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
 }));
+const mockCreateAgencyDraft = jest.fn();
+jest.mock('../../../src/modules/contracts/contract.service', () => ({
+  createAgencyRepresentationDraft: (...a: unknown[]) => mockCreateAgencyDraft(...a),
+}));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
@@ -355,6 +359,99 @@ describe('Scouting Service', () => {
     it('should throw 404 if not found', async () => {
       mockDecisionFindByPk.mockResolvedValue(null);
       await expect(scoutingService.getDecision('bad')).rejects.toThrow('Decision not found');
+    });
+  });
+
+  // ── SIGN PROSPECT ──
+
+  describe('signProspect', () => {
+    const baseDecision = () =>
+      mockModelInstance({ id: 'dec-001', decision: 'Approved', screeningCaseId: 'sc-001' });
+
+    const baseScreening = () => {
+      const wl = mockModelInstance({
+        id: 'wl-001',
+        prospectName: 'Ahmed',
+        prospectNameAr: 'أحمد',
+        dateOfBirth: '2000-01-01',
+        nationality: 'Saudi',
+        position: 'ST',
+        notes: null,
+        status: 'Shortlisted',
+      });
+      const sc: any = mockModelInstance({
+        id: 'sc-001',
+        caseNumber: 'SC-26-0001',
+        signedPlayerId: null,
+        idCardDocumentId: 'doc-id-1',
+        clearanceDocumentId: null,
+        hasExistingAgencyContract: false,
+        clearanceVerifiedAt: null,
+      });
+      sc.watchlist = wl;
+      return { sc, wl };
+    };
+
+    it('creates a Player and an Agency Representation draft contract inside one transaction', async () => {
+      mockDecisionFindByPk.mockResolvedValue(baseDecision());
+      const { sc } = baseScreening();
+      mockScreeningFindByPk.mockResolvedValue(sc);
+
+      const Player = require('../../../src/modules/players/player.model').Player;
+      (Player.create as jest.Mock).mockResolvedValue(mockModelInstance({ id: 'player-new' }));
+      mockCreateAgencyDraft.mockResolvedValue(mockModelInstance({ id: 'contract-new', status: 'Draft' }));
+
+      const result = await scoutingService.signProspect(
+        'dec-001',
+        { firstName: 'Ahmed', lastName: 'X', playerType: 'Pro', playerPackage: 'A' },
+        'user-001',
+      );
+
+      expect(Player.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          firstName: 'Ahmed',
+          playerType: 'Pro',
+          mandateStatus: 'In Negotiation',
+          contractType: 'Professional',
+        }),
+        expect.any(Object),
+      );
+      expect(mockCreateAgencyDraft).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playerId: 'player-new',
+          playerContractType: 'Professional',
+          createdBy: 'user-001',
+        }),
+        expect.any(Object),
+      );
+      expect(result).toEqual({ playerId: 'player-new', contractId: 'contract-new' });
+    });
+
+    it('rejects when the committee decision is not Approved', async () => {
+      mockDecisionFindByPk.mockResolvedValue(
+        mockModelInstance({ id: 'dec-001', decision: 'Rejected', screeningCaseId: 'sc-001' }),
+      );
+      await expect(
+        scoutingService.signProspect(
+          'dec-001',
+          { firstName: 'A', lastName: 'B', playerType: 'Pro', playerPackage: 'A' },
+          'user-001',
+        ),
+      ).rejects.toThrow('Prospect not approved by committee');
+    });
+
+    it('rejects when the prospect is already signed (idempotent guard)', async () => {
+      mockDecisionFindByPk.mockResolvedValue(baseDecision());
+      const { sc } = baseScreening();
+      sc.signedPlayerId = 'player-existing';
+      mockScreeningFindByPk.mockResolvedValue(sc);
+      await expect(
+        scoutingService.signProspect(
+          'dec-001',
+          { firstName: 'A', lastName: 'B', playerType: 'Pro', playerPackage: 'A' },
+          'user-001',
+        ),
+      ).rejects.toThrow('Prospect already signed');
     });
   });
 

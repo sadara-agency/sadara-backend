@@ -41,11 +41,12 @@ interface ClubAttributes {
   keyContactPhone?: string | null;
   lastContactDate?: string | null;
   interestLevel?: string | null;
+  isHomeAgency?: boolean;
 }
 
 interface ClubCreationAttributes extends Optional<
   ClubAttributes,
-  "id" | "type" | "code" | "createdAt" | "updatedAt"
+  "id" | "type" | "code" | "createdAt" | "updatedAt" | "isHomeAgency"
 > {}
 
 export class Club
@@ -81,6 +82,7 @@ export class Club
   declare keyContactPhone: string | null;
   declare lastContactDate: string | null;
   declare interestLevel: string | null;
+  declare isHomeAgency: boolean;
 }
 
 Club.init(
@@ -186,6 +188,12 @@ Club.init(
       type: DataTypes.STRING(20),
       field: "interest_level",
       defaultValue: "Cold",
+    },
+    isHomeAgency: {
+      type: DataTypes.BOOLEAN,
+      field: "is_home_agency",
+      allowNull: false,
+      defaultValue: false,
     },
   },
   {

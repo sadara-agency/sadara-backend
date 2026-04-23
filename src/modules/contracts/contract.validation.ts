@@ -42,8 +42,9 @@ export const createContractSchema = z
       .refine(
         (d) => new Date(d) >= new Date(new Date().toISOString().split("T")[0]),
         { message: "Start date cannot be in the past" },
-      ),
-    endDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD"),
+      )
+      .optional(),
+    endDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),
     baseSalary: z.number().positive("Salary must be positive").optional(),
     salaryCurrency: z.enum(CURRENCIES).default("SAR"),
     signingBonus: z.number().min(0).default(0),
@@ -71,10 +72,16 @@ export const createContractSchema = z
     outstandingAmount: z.number().min(0).optional(),
     outstandingCurrency: z.enum(CURRENCIES).optional(),
   })
-  .refine((data) => new Date(data.endDate) > new Date(data.startDate), {
-    message: "End date must be after start date",
-    path: ["endDate"],
-  });
+  .refine(
+    (data) =>
+      !data.startDate ||
+      !data.endDate ||
+      new Date(data.endDate) > new Date(data.startDate),
+    {
+      message: "End date must be after start date",
+      path: ["endDate"],
+    },
+  );
 
 // ── Update Contract (partial) ──
 export const updateContractSchema = z.object({

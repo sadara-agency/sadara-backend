@@ -453,6 +453,28 @@ async function seedAllData(tx: Transaction): Promise<void> {
   await Club.bulkCreate(SPL_CLUBS, opts);
   console.log("  ✅ Clubs seeded (18 SPL teams)");
 
+  // ── 2a. Sadara Sports Agency — home agency club (idempotent) ──
+  const existingHomeAgency = await Club.findOne({
+    where: { isHomeAgency: true },
+    transaction: tx,
+  });
+  if (!existingHomeAgency) {
+    await Club.create(
+      {
+        name: "Sadara Sports Agency",
+        nameAr: "وكالة صدارة الرياضية",
+        type: "Club",
+        country: "Saudi Arabia",
+        isHomeAgency: true,
+        isActive: true,
+      },
+      { transaction: tx },
+    );
+    console.log("  ✅ Sadara Sports Agency (home agency) seeded");
+  } else {
+    console.log("  ↪  Sadara Sports Agency (home agency) already present");
+  }
+
   // ── 2b. ClubCompetition junction — link SPL clubs to Roshn Saudi League ──
   await sequelize.query(
     `INSERT INTO club_competitions (id, club_id, competition_id, season, created_at, updated_at)
