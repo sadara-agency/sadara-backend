@@ -63,6 +63,10 @@ const CONTRACT_INCLUDES = [
 // ── Helper: compute days remaining and attach to plain object ──
 function enrichContract(contract: any) {
   const plain = contract.get ? contract.get({ plain: true }) : contract;
+  if (!plain.endDate) {
+    plain.daysRemaining = null;
+    return plain;
+  }
   const endDate = new Date(plain.endDate);
   const now = new Date();
   const diffTime = endDate.getTime() - now.getTime();
@@ -191,22 +195,25 @@ export async function createContract(
 
   const displayId = await generateDisplayId("contracts");
 
-  // Overlap check + creation in a transaction to prevent race conditions
+  // Overlap check + creation in a transaction to prevent race conditions.
+  // Date-less drafts cannot overlap — only enforce when both dates are provided.
   const contract = await sequelize.transaction(async (t) => {
-    const overlap = await Contract.findOne({
-      where: {
-        playerId: input.playerId,
-        status: { [Op.in]: ["Active", "Expiring Soon"] },
-        startDate: { [Op.lte]: input.endDate },
-        endDate: { [Op.gte]: input.startDate },
-      },
-      transaction: t,
-    });
-    if (overlap) {
-      throw new AppError(
-        "This player already has an active contract with overlapping dates. Terminate or adjust the existing contract first.",
-        409,
-      );
+    if (input.startDate && input.endDate) {
+      const overlap = await Contract.findOne({
+        where: {
+          playerId: input.playerId,
+          status: { [Op.in]: ["Active", "Expiring Soon"] },
+          startDate: { [Op.lte]: input.endDate },
+          endDate: { [Op.gte]: input.startDate },
+        },
+        transaction: t,
+      });
+      if (overlap) {
+        throw new AppError(
+          "This player already has an active contract with overlapping dates. Terminate or adjust the existing contract first.",
+          409,
+        );
+      }
     }
 
     return await Contract.create(
@@ -342,7 +349,7 @@ export async function terminateContract(
     input.terminationDate || new Date().toISOString().split("T")[0];
 
   // Validate termination date falls within contract period
-  if (new Date(termDate) < new Date(contract.startDate)) {
+  if (contract.startDate && new Date(termDate) < new Date(contract.startDate)) {
     throw new AppError(
       "Termination date cannot be before contract start date",
       400,
@@ -400,4 +407,61 @@ export async function getContractHistory(contractId: string) {
     ],
   });
   return rows;
+}
+
+// ────────────────────────────────────────────────────────────
+// Home Agency lookup + Agency Representation Draft factory
+// ────────────────────────────────────────────────────────────
+let homeAgencyIdCache: string | null = null;
+
+export async function getHomeAgencyClubId(): Promise<string> {
+  if (homeAgencyIdCache) return homeAgencyIdCache;
+  const club = await Club.findOne({
+    where: { isHomeAgency: true },
+    attributes: ["id"],
+  });
+  if (!club) {
+    throw new AppError(
+      "Home agency not configured — seed a club row with is_home_agency=true",
+      500,
+    );
+  }
+  homeAgencyIdCache = club.id;
+  return club.id;
+}
+
+// Exposed for tests
+export function __resetHomeAgencyCache() {
+  homeAgencyIdCache = null;
+}
+
+export async function createAgencyRepresentationDraft(
+  args: {
+    playerId: string;
+    playerContractType: "Professional" | "Amateur" | "Youth";
+    createdBy: string;
+  },
+  transaction?: import("sequelize").Transaction,
+) {
+  const clubId = await getHomeAgencyClubId();
+  const displayId = await generateDisplayId("contracts");
+
+  return Contract.create(
+    {
+      displayId,
+      playerId: args.playerId,
+      clubId,
+      category: "Agency",
+      contractType: "Representation",
+      playerContractType: args.playerContractType,
+      status: "Draft",
+      startDate: null,
+      endDate: null,
+      exclusivity: "Exclusive",
+      representationScope: "Both",
+      agentName: "Sadara Sports Agency",
+      createdBy: args.createdBy,
+    },
+    { transaction },
+  );
 }

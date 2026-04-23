@@ -43,10 +43,12 @@ jest.mock('../../../src/modules/players/player.model', () => ({
 }));
 
 const mockClubFindByPk = jest.fn();
+const mockClubFindOne = jest.fn();
 jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: {
     name: 'Club',
     findByPk: (...args: unknown[]) => mockClubFindByPk(...args),
+    findOne: (...args: unknown[]) => mockClubFindOne(...args),
   },
 }));
 
@@ -395,6 +397,76 @@ describe('Contract Service', () => {
       await expect(
         contractService.deleteContract('contract-001'),
       ).rejects.toThrow('Cannot delete an active contract');
+    });
+  });
+
+  // ════════════════════════════════════════════════════════
+  // AGENCY REPRESENTATION DRAFT (auto-created by Scouting)
+  // ════════════════════════════════════════════════════════
+  describe('createAgencyRepresentationDraft', () => {
+    beforeEach(() => {
+      contractService.__resetHomeAgencyCache();
+    });
+
+    it('creates a Draft Agency Representation contract with null dates', async () => {
+      mockClubFindOne.mockResolvedValue({ id: 'home-agency-id' });
+      mockCreate.mockResolvedValue(mockModelInstance(mockContract({ id: 'c-1', status: 'Draft' })));
+
+      const result = await contractService.createAgencyRepresentationDraft({
+        playerId: 'player-001',
+        playerContractType: 'Professional',
+        createdBy: 'user-001',
+      });
+
+      expect(mockClubFindOne).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { isHomeAgency: true } }),
+      );
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          playerId: 'player-001',
+          clubId: 'home-agency-id',
+          category: 'Agency',
+          contractType: 'Representation',
+          playerContractType: 'Professional',
+          status: 'Draft',
+          startDate: null,
+          endDate: null,
+          exclusivity: 'Exclusive',
+          representationScope: 'Both',
+          agentName: 'Sadara Sports Agency',
+          createdBy: 'user-001',
+        }),
+        expect.any(Object),
+      );
+      expect(result).toBeDefined();
+    });
+
+    it('throws 500 when the home agency club is not seeded', async () => {
+      mockClubFindOne.mockResolvedValue(null);
+
+      await expect(
+        contractService.createAgencyRepresentationDraft({
+          playerId: 'player-001',
+          playerContractType: 'Amateur',
+          createdBy: 'user-001',
+        }),
+      ).rejects.toThrow('Home agency not configured');
+    });
+
+    it('passes the provided transaction down to Contract.create', async () => {
+      mockClubFindOne.mockResolvedValue({ id: 'home-agency-id' });
+      mockCreate.mockResolvedValue(mockModelInstance(mockContract()));
+      const fakeTx = { __fake: true } as any;
+
+      await contractService.createAgencyRepresentationDraft(
+        { playerId: 'player-001', playerContractType: 'Youth', createdBy: 'user-001' },
+        fakeTx,
+      );
+
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.objectContaining({ transaction: fakeTx }),
+      );
     });
   });
 });

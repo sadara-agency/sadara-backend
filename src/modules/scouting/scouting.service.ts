@@ -14,6 +14,7 @@ import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { notifyByRole } from "@modules/notifications/notification.service";
+import { createAgencyRepresentationDraft } from "@modules/contracts/contract.service";
 import { logger } from "@config/logger";
 import { AuthUser, ROLES, UserRole } from "@shared/types";
 import {
@@ -1060,6 +1061,7 @@ export async function signProspect(
         contractType,
         marketValueCurrency: "SAR",
         status: "active",
+        mandateStatus: "In Negotiation",
         nationalId: input.nationalId ?? null,
         email: input.email ?? null,
         phone: input.phone ?? null,
@@ -1095,7 +1097,18 @@ export async function signProspect(
       { transaction: t },
     );
 
-    return player;
+    // Auto-create the Sadara Agency Representation contract in Draft status.
+    // Manager fills in commercial terms + dates, then submits to Review.
+    const contract = await createAgencyRepresentationDraft(
+      {
+        playerId: player.id,
+        playerContractType: contractType,
+        createdBy: userId,
+      },
+      t,
+    );
+
+    return { player, contract };
   });
 
   // Notify Admin/Manager — fire-and-forget
@@ -1105,11 +1118,11 @@ export async function signProspect(
     type: "system",
     title: `Prospect signed: ${prospectName}`,
     titleAr: `تم توقيع اللاعب: ${prospectNameAr}`,
-    body: `${prospectName} is now a Sadara player`,
-    bodyAr: `${prospectNameAr} أصبح الآن لاعبًا لدى صدارة`,
-    link: `/dashboard/players/${result.id}`,
+    body: `${prospectName} is now a Sadara player. A draft agency representation contract has been created.`,
+    bodyAr: `${prospectNameAr} أصبح الآن لاعبًا لدى صدارة. تم إنشاء عقد تمثيل مسوّدة مع وكالة صدارة.`,
+    link: `/dashboard/contracts/${result.contract.id}`,
     sourceType: "player",
-    sourceId: result.id,
+    sourceId: result.player.id,
     priority: "high",
   }).catch((err) =>
     logger.warn("Sign-prospect notification failed", {
@@ -1117,5 +1130,5 @@ export async function signProspect(
     }),
   );
 
-  return { playerId: result.id };
+  return { playerId: result.player.id, contractId: result.contract.id };
 }

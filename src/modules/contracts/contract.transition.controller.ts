@@ -112,6 +112,20 @@ export async function transitionContract(req: AuthRequest, res: Response) {
         );
       }
 
+      // ── Guard: Draft → Review requires startDate + endDate populated ──
+      if (action === "submit_review") {
+        if (
+          !locked.startDate ||
+          !locked.endDate ||
+          new Date(locked.endDate) <= new Date(locked.startDate)
+        ) {
+          throw new AppError(
+            "Start and end dates are required (with end after start) before submitting for review",
+            422,
+          );
+        }
+      }
+
       // Build update payload
       const updatePayload: Record<string, unknown> = {
         status: nxtStatus,

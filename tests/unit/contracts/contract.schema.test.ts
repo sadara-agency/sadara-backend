@@ -68,6 +68,25 @@ describe('Contract Schemas', () => {
       const result = createContractSchema.parse(validInput);
       expect(result.category).toBe('Club');
     });
+
+    it('should accept a payload with no dates (draft created by Scouting)', () => {
+      const result = createContractSchema.safeParse({
+        playerId: '550e8400-e29b-41d4-a716-446655440001',
+        clubId: '550e8400-e29b-41d4-a716-446655440002',
+        category: 'Agency',
+        contractType: 'Representation',
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it('should still reject endDate-before-startDate when both provided', () => {
+      const result = createContractSchema.safeParse({
+        ...validInput,
+        startDate: futureDate(3),
+        endDate: futureDate(1),
+      });
+      expect(result.success).toBe(false);
+    });
   });
 
   describe('updateContractSchema', () => {
