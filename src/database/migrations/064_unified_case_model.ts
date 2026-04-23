@@ -13,6 +13,11 @@ import { QueryTypes } from "sequelize";
  */
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'referrals' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // 1. Backfill: create a Medical referral for every injury without one
   await sequelize.query(`
     INSERT INTO referrals (
