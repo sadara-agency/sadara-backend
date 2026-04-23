@@ -27,11 +27,11 @@ export function createNotificationWorker(): Worker<NotificationJobData, void> {
   worker.on("failed", (job, err) =>
     logger.warn("[NotificationWorker] Failed", {
       jobId: job?.id,
-      error: err.message,
+      error: err,
     }),
   );
   worker.on("error", (err) =>
-    logger.error("[NotificationWorker] Worker error", { error: err.message }),
+    logger.error("[NotificationWorker] Worker error", { error: err }),
   );
 
   return worker;

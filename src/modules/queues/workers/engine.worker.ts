@@ -34,11 +34,11 @@ export function createEngineWorker(): Worker<EngineJobData, void> {
     logger.error("[EngineWorker] Failed", {
       jobId: job?.id,
       jobName: job?.data.jobName,
-      error: err.message,
+      error: err,
     }),
   );
   worker.on("error", (err) =>
-    logger.error("[EngineWorker] Worker error", { error: err.message }),
+    logger.error("[EngineWorker] Worker error", { error: err }),
   );
 
   return worker;

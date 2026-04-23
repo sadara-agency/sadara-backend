@@ -26,7 +26,7 @@ export function getQueueRedis(): Redis {
   if (!queueRedis) {
     queueRedis = new Redis(parseRedisUrlForIoRedis(env.redis.url));
     queueRedis.on("error", (err) =>
-      logger.error("Queue Redis error", { error: err.message }),
+      logger.error("Queue Redis error", { error: err }),
     );
     queueRedis.on("ready", () => logger.info("Queue Redis (ioredis) ready"));
   }

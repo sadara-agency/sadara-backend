@@ -103,11 +103,11 @@ export function createSaffWorker(): Worker<SaffJobData, SaffJobResult> {
   worker.on("failed", (job, err) =>
     logger.error("[SaffWorker] Job failed", {
       jobId: job?.id,
-      error: err.message,
+      error: err,
     }),
   );
   worker.on("error", (err) =>
-    logger.error("[SaffWorker] Worker error", { error: err.message }),
+    logger.error("[SaffWorker] Worker error", { error: err }),
   );
 
   return worker;
