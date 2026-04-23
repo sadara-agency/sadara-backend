@@ -406,6 +406,13 @@ async function bootstrap(): Promise<void> {
     }
 
     logger.error("[boot] All retries exhausted — running in degraded mode");
+    // Structured so GCP Cloud Logging can alert via log-based metric on
+    // severity=ERROR AND jsonPayload.degraded=true
+    logger.error("[boot] Entering degraded mode", {
+      degraded: true,
+      initError,
+      phase: "initApplication",
+    });
   }
 }
 
