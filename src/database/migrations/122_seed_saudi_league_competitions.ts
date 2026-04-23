@@ -182,6 +182,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'competitions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const now = new Date();
 
   for (const comp of COMPETITIONS) {
@@ -249,6 +253,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'competitions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const names = COMPETITIONS.map((c) => c.name);
   await queryInterface.sequelize.query(
     `DELETE FROM competitions WHERE name IN (:names) AND country = 'Saudi Arabia'`,

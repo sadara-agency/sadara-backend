@@ -5,6 +5,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'matches' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // ── video_clips ──
   await queryInterface.createTable("video_clips", {
     id: {

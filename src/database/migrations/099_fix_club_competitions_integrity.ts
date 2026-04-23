@@ -14,6 +14,10 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'club_competitions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const txn = await sequelize.transaction();
 
   try {

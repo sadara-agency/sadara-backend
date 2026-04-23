@@ -113,9 +113,9 @@ export async function aggregateDailySummaries(): Promise<{
       );
       const weightLogged = Number(weightRow?.cnt || 0) > 0;
 
-      // Readiness score from daily checkin
+      // Pulse fields from daily checkin — drives Phase 5 ring score
       const [checkinRow]: any = await sequelize.query(
-        `SELECT readiness_score
+        `SELECT readiness_score, sleep_quality, nutrition_rating, training_type
          FROM wellness_checkins
          WHERE player_id = :playerId AND checkin_date = :date`,
         {
@@ -128,13 +128,19 @@ export async function aggregateDailySummaries(): Promise<{
           ? Number(checkinRow.readiness_score)
           : null;
 
-      // Ring score (includes readiness when available)
-      const ringScore = calculateRingScore(
-        calorieAdherencePct ?? 0,
-        proteinAdherencePct ?? 0,
-        workoutCompleted,
+      // Ring score — pulse-native (Phase 5)
+      const ringScore = calculateRingScore({
         readinessScore,
-      );
+        sleepQuality:
+          checkinRow?.sleep_quality != null
+            ? Number(checkinRow.sleep_quality)
+            : null,
+        nutritionRating:
+          checkinRow?.nutrition_rating != null
+            ? Number(checkinRow.nutrition_rating)
+            : null,
+        trainingType: checkinRow?.training_type ?? null,
+      });
 
       // Upsert into daily summaries
       await sequelize.query(

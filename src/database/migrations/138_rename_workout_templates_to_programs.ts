@@ -12,6 +12,10 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'wellness_workout_templates' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // 1. Rename tables (idempotent — skip if target already exists)
   await sequelize.query(`
     DO $$ BEGIN
@@ -63,6 +67,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'wellness_workout_templates' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Reverse in opposite order
   await sequelize.query(
     `DROP INDEX IF EXISTS idx_development_programs_training_block;`,

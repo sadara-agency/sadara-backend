@@ -9,6 +9,11 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // ── 1. Re-seed module-level permissions ──
   // The seedPermissions() function uses updateOnDuplicate, so it will
   // update existing rows and insert new ones. We also need to delete
@@ -103,6 +108,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Remove the field permissions added by this migration
   await sequelize.query(`
     DELETE FROM role_field_permissions

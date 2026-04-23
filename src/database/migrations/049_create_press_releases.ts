@@ -5,6 +5,11 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  const [guard] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((guard as unknown[]).length === 0) return;
+
   const [existing] = await queryInterface.sequelize.query(
     `SELECT to_regclass('public.press_releases') AS tbl`,
   );

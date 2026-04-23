@@ -41,6 +41,12 @@ const ARABIC_MAP: Record<string, string> = {
 };
 
 export async function up() {
+  const [results] = await sequelize.query(
+    `SELECT to_regclass('public.gate_checklists') AS tbl`,
+  );
+  const row = (results as Array<{ tbl: string | null }>)[0];
+  if (!row?.tbl) return;
+
   // Add column
   await sequelize.query(
     `ALTER TABLE gate_checklists ADD COLUMN IF NOT EXISTS item_ar VARCHAR(500)`,
@@ -56,6 +62,12 @@ export async function up() {
 }
 
 export async function down() {
+  const [results] = await sequelize.query(
+    `SELECT to_regclass('public.gate_checklists') AS tbl`,
+  );
+  const row = (results as Array<{ tbl: string | null }>)[0];
+  if (!row?.tbl) return;
+
   await sequelize.query(
     `ALTER TABLE gate_checklists DROP COLUMN IF EXISTS item_ar`,
   );

@@ -45,6 +45,10 @@ const NEW_ROLES = [
 ];
 
 export async function up() {
+  const [guardRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((guardRows as unknown[]).length === 0) return;
   const rows: PermRow[] = [];
 
   // ── Modules all coach subtypes share (read-only or common) ──
@@ -115,6 +119,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [guardRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((guardRows as unknown[]).length === 0) return;
   await sequelize.query(
     `DELETE FROM role_permissions WHERE role IN ('SkillCoach', 'TacticalCoach', 'FitnessCoach', 'NutritionSpecialist')`,
   );

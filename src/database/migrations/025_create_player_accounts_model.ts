@@ -6,6 +6,11 @@ import { QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Create the table if it doesn't exist (fresh installs)
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS player_accounts (

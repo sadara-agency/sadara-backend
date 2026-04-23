@@ -6,6 +6,20 @@ import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
 
 async function createMissingTables() {
+  // Guard: this function patches an existing database. On a fresh install (CI/staging),
+  // core tables don't exist yet — they're created by later migrations. Skip and let
+  // the ordered sequence handle it.
+  const [playersExists] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
+  );
+  if (!playersExists) {
+    console.log(
+      "⚠️  Core tables not found — skipping createMissingTables() (fresh install, later migrations will create them)",
+    );
+    return;
+  }
+
   await sequelize.query(`
         CREATE TABLE IF NOT EXISTS performances (
             id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -451,6 +465,17 @@ async function createMissingTables() {
 }
 
 async function createViews() {
+  const [playersExists] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
+  );
+  if (!playersExists) {
+    console.log(
+      "⚠️  Core tables not found — skipping createViews() (fresh install, views will be created after tables exist)",
+    );
+    return;
+  }
+
   await sequelize.query(`
         CREATE OR REPLACE VIEW vw_dashboard_kpis AS
         SELECT

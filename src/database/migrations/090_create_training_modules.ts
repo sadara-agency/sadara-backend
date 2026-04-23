@@ -1,6 +1,10 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'training_courses' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS training_modules (
       id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),

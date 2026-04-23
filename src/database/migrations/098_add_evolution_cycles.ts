@@ -10,6 +10,10 @@ import { sequelize } from "@config/database";
  * columns to `player_journeys` for per-stage phase tracking.
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // 1. Create evolution_cycles table
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS evolution_cycles (
@@ -67,6 +71,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(`
     DROP INDEX IF EXISTS idx_player_journeys_phase;
   `);

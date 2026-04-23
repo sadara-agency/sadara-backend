@@ -8,6 +8,10 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Each index created independently — if one fails, others still succeed.
   // Using raw SQL with IF NOT EXISTS for full idempotency.
   await sequelize.query(
@@ -30,6 +34,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_cron_dedup`);
   await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_assignee_status`);
   await sequelize.query(`DROP INDEX IF EXISTS idx_contracts_player_status`);

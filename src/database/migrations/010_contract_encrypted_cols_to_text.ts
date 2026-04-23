@@ -14,31 +14,39 @@ import { sequelize } from "@config/database";
  *  4. Rename the temp columns
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'contracts' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await sequelize.query(`
-    -- Convert base_salary DECIMAL(15,2) → TEXT
-    ALTER TABLE contracts
-      ALTER COLUMN base_salary TYPE TEXT USING base_salary::TEXT;
-
-    -- Convert commission_pct DECIMAL(5,2) → TEXT
-    ALTER TABLE contracts
-      ALTER COLUMN commission_pct TYPE TEXT USING commission_pct::TEXT;
-
-    -- Convert total_commission DECIMAL(15,2) → TEXT
-    ALTER TABLE contracts
-      ALTER COLUMN total_commission TYPE TEXT USING total_commission::TEXT;
+    DO $$ BEGIN
+      ALTER TABLE contracts
+        ALTER COLUMN base_salary TYPE TEXT USING base_salary::TEXT;
+      ALTER TABLE contracts
+        ALTER COLUMN commission_pct TYPE TEXT USING commission_pct::TEXT;
+      ALTER TABLE contracts
+        ALTER COLUMN total_commission TYPE TEXT USING total_commission::TEXT;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
   `);
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'contracts' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await sequelize.query(`
-    -- Revert TEXT → DECIMAL (only works if values are not encrypted)
-    ALTER TABLE contracts
-      ALTER COLUMN base_salary TYPE DECIMAL(15,2) USING base_salary::NUMERIC(15,2);
-
-    ALTER TABLE contracts
-      ALTER COLUMN commission_pct TYPE DECIMAL(5,2) USING commission_pct::NUMERIC(5,2);
-
-    ALTER TABLE contracts
-      ALTER COLUMN total_commission TYPE DECIMAL(15,2) USING total_commission::NUMERIC(15,2);
+    DO $$ BEGIN
+      ALTER TABLE contracts
+        ALTER COLUMN base_salary TYPE DECIMAL(15,2) USING base_salary::NUMERIC(15,2);
+      ALTER TABLE contracts
+        ALTER COLUMN commission_pct TYPE DECIMAL(5,2) USING commission_pct::NUMERIC(5,2);
+      ALTER TABLE contracts
+        ALTER COLUMN total_commission TYPE DECIMAL(15,2) USING total_commission::NUMERIC(15,2);
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
   `);
 }

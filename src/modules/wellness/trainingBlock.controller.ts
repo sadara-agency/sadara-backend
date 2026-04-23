@@ -4,6 +4,7 @@ import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { CachePrefix } from "@shared/utils/cache";
 import type { AuthRequest } from "@shared/types";
 import * as trainingBlockService from "./trainingBlock.service";
+import * as wellnessService from "./wellness.service";
 import type {
   ListBlocksQueryDTO,
   CloseBlockDTO,
@@ -70,4 +71,12 @@ export async function close(req: AuthRequest, res: Response): Promise<void> {
     req.user!.id,
   );
   sendSuccess(res, block);
+}
+
+export async function getReport(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  const report = await wellnessService.getBlockReport(req.params.id, req.user);
+  sendSuccess(res, report);
 }

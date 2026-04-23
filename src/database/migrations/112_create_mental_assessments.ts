@@ -5,6 +5,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // ── mental_assessment_templates ──
   await queryInterface.createTable("mental_assessment_templates", {
     id: {

@@ -1,6 +1,11 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 export async function up({ context: qi }: { context: QueryInterface }) {
+  const [rows] = await qi.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'media_requests' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Guard: column may already exist from model sync
   const table = (await qi.describeTable("media_requests")) as Record<
     string,
@@ -20,5 +25,10 @@ export async function up({ context: qi }: { context: QueryInterface }) {
 }
 
 export async function down({ context: qi }: { context: QueryInterface }) {
+  const [rows] = await qi.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'media_requests' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await qi.removeColumn("media_requests", "media_contact_id");
 }

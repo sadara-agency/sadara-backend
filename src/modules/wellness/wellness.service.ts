@@ -74,6 +74,7 @@ import type {
   CoachOverviewResponse,
   CoachOverviewPlayer,
   TrafficLightStatus,
+  BlockReportResponse,
 } from "./wellness.types";
 import { calculateRingScore } from "./wellness.helpers";
 
@@ -319,7 +320,8 @@ function todayLocal(): string {
 }
 
 /**
- * Get player ring dashboard with today's stats and 7-day history.
+ * Get player ring dashboard with today's pulse-based ring score and N-day history.
+ * Phase 5: ring score is computed from today's checkin; history from wellness_checkins.
  */
 export async function getPlayerDashboard(
   playerId: string,
@@ -330,7 +332,7 @@ export async function getPlayerDashboard(
   if (!ok) throw new AppError("Not found", 404);
   const today = todayLocal();
 
-  // Get profile targets
+  // Get profile targets (kept for UI display)
   const profile = await WellnessProfile.findOne({ where: { playerId } });
   const targetCalories = profile
     ? Number(profile.targetCalories) || null
@@ -339,70 +341,83 @@ export async function getPlayerDashboard(
     ? Number(profile.targetProteinG) || null
     : null;
 
-  // Meal log totals removed in Phase 3 — nutrition tracked via prescriptions
-  const todayTotals = {
-    totalCalories: 0,
-    totalProteinG: 0,
-    calorieAdherencePct: null as number | null,
-    proteinAdherencePct: null as number | null,
-  };
+  // Today's pulse — drives ring score
+  const todayPulse = await WellnessCheckin.findOne({
+    where: { playerId, checkinDate: today },
+  });
 
-  // Check if workout completed today
-  const [workoutRow]: any = await sequelize.query(
-    `SELECT COUNT(*) AS cnt
-     FROM wellness_workout_assignments
-     WHERE player_id = :playerId AND assigned_date = :date AND status = 'completed'`,
-    { replacements: { playerId, date: today }, type: QueryTypes.SELECT },
-  );
-  const workoutCompleted = Number(workoutRow?.cnt || 0) > 0;
+  const ringScore = todayPulse
+    ? calculateRingScore({
+        readinessScore: todayPulse.readinessScore,
+        sleepQuality: todayPulse.sleepQuality,
+        nutritionRating: todayPulse.nutritionRating,
+        trainingType: todayPulse.trainingType,
+      })
+    : 0;
 
-  const ringScore = calculateRingScore(
-    todayTotals.calorieAdherencePct ?? 0,
-    todayTotals.proteinAdherencePct ?? 0,
-    workoutCompleted,
-  );
-
-  // Get history from daily summaries
+  // N-day history from checkins — one row per date
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().split("T")[0];
 
   const history: any[] = await sequelize.query(
-    `SELECT summary_date, total_calories, total_protein_g, total_carbs_g, total_fat_g,
-            calorie_adherence_pct, protein_adherence_pct, workout_completed, weight_logged, ring_score
-     FROM wellness_daily_summaries
-     WHERE player_id = :playerId AND summary_date >= :cutoff
-     ORDER BY summary_date DESC`,
+    `SELECT checkin_date,
+            readiness_score, sleep_quality, nutrition_rating, training_type,
+            sleep_hours, fatigue, muscle_soreness, mood, stress
+     FROM wellness_checkins
+     WHERE player_id = :playerId AND checkin_date >= :cutoff
+     ORDER BY checkin_date DESC`,
     { replacements: { playerId, cutoff: cutoffStr }, type: QueryTypes.SELECT },
   );
 
   return {
     today: {
-      totalCalories: todayTotals.totalCalories,
-      totalProteinG: todayTotals.totalProteinG,
-      calorieAdherencePct: todayTotals.calorieAdherencePct,
-      proteinAdherencePct: todayTotals.proteinAdherencePct,
-      workoutCompleted,
+      totalCalories: 0,
+      totalProteinG: 0,
+      calorieAdherencePct: null,
+      proteinAdherencePct: null,
+      workoutCompleted: todayPulse?.trainingType
+        ? todayPulse.trainingType !== "rest"
+        : false,
       ringScore,
+      pulse: todayPulse
+        ? {
+            readinessScore: todayPulse.readinessScore,
+            sleepQuality: todayPulse.sleepQuality,
+            nutritionRating: todayPulse.nutritionRating,
+            trainingType: todayPulse.trainingType,
+          }
+        : null,
     },
-    history: history.map((h) => ({
-      summaryDate: h.summary_date,
-      totalCalories: Number(h.total_calories),
-      totalProteinG: Number(h.total_protein_g),
-      totalCarbsG: Number(h.total_carbs_g),
-      totalFatG: Number(h.total_fat_g),
-      calorieAdherencePct:
-        h.calorie_adherence_pct != null
-          ? Number(h.calorie_adherence_pct)
-          : null,
-      proteinAdherencePct:
-        h.protein_adherence_pct != null
-          ? Number(h.protein_adherence_pct)
-          : null,
-      workoutCompleted: Boolean(h.workout_completed),
-      weightLogged: Boolean(h.weight_logged),
-      ringScore: Number(h.ring_score),
-    })),
+    history: history.map((h) => {
+      const dayScore = calculateRingScore({
+        readinessScore:
+          h.readiness_score != null ? Number(h.readiness_score) : null,
+        sleepQuality: h.sleep_quality != null ? Number(h.sleep_quality) : null,
+        nutritionRating:
+          h.nutrition_rating != null ? Number(h.nutrition_rating) : null,
+        trainingType: h.training_type ?? null,
+      });
+      return {
+        summaryDate: h.checkin_date,
+        totalCalories: 0,
+        totalProteinG: 0,
+        totalCarbsG: 0,
+        totalFatG: 0,
+        calorieAdherencePct: null,
+        proteinAdherencePct: null,
+        workoutCompleted: h.training_type ? h.training_type !== "rest" : false,
+        weightLogged: false,
+        ringScore: dayScore,
+        pulse: {
+          readinessScore:
+            h.readiness_score != null ? Number(h.readiness_score) : null,
+          nutritionRating:
+            h.nutrition_rating != null ? Number(h.nutrition_rating) : null,
+          trainingType: h.training_type ?? null,
+        },
+      };
+    }),
     profile: { targetCalories, targetProteinG },
   };
 }
@@ -464,12 +479,12 @@ export async function getCoachOverview(
       continue;
     }
 
-    // Last 3 days of summaries
-    const summaries: any[] = await sequelize.query(
-      `SELECT ring_score, workout_completed, summary_date
-       FROM wellness_daily_summaries
-       WHERE player_id = :playerId AND summary_date >= :cutoff
-       ORDER BY summary_date DESC
+    // Last 3 days of checkins — ring scores computed from pulse data (Phase 5)
+    const recentCheckins: any[] = await sequelize.query(
+      `SELECT checkin_date, readiness_score, sleep_quality, nutrition_rating, training_type
+       FROM wellness_checkins
+       WHERE player_id = :playerId AND checkin_date >= :cutoff
+       ORDER BY checkin_date DESC
        LIMIT 3`,
       {
         replacements: { playerId: p.player_id, cutoff: threeDaysStr },
@@ -490,16 +505,27 @@ export async function getCoachOverview(
       },
     );
 
+    const summaryScores = recentCheckins.map((c) =>
+      calculateRingScore({
+        readinessScore:
+          c.readiness_score != null ? Number(c.readiness_score) : null,
+        sleepQuality: c.sleep_quality != null ? Number(c.sleep_quality) : null,
+        nutritionRating:
+          c.nutrition_rating != null ? Number(c.nutrition_rating) : null,
+        trainingType: c.training_type ?? null,
+      }),
+    );
+
     const avgRingScore =
-      summaries.length > 0
+      summaryScores.length > 0
         ? Math.round(
-            summaries.reduce((s, r) => s + Number(r.ring_score), 0) /
-              summaries.length,
+            summaryScores.reduce((s, r) => s + r, 0) / summaryScores.length,
           )
         : 0;
-    const lastRingScore =
-      summaries.length > 0 ? Number(summaries[0].ring_score) : 0;
-    const missedWorkouts = summaries.filter((s) => !s.workout_completed).length;
+    const lastRingScore = summaryScores.length > 0 ? summaryScores[0] : 0;
+    const missedWorkouts = recentCheckins.filter(
+      (c) => !c.training_type || c.training_type === "rest",
+    ).length;
     const weightChange7d =
       weights.length >= 2
         ? Math.round(
@@ -570,21 +596,22 @@ export async function getHeatmapData(days = 14, user?: AuthUser) {
   startDate.setDate(startDate.getDate() - days + 1);
   const startStr = startDate.toISOString().split("T")[0];
 
+  // Phase 5: ring scores come from wellness_checkins, not the stale daily_summaries table
   const rows: any[] = await sequelize.query(
     `SELECT
        p.id AS player_id,
        p.first_name, p.last_name,
        p.first_name_ar, p.last_name_ar,
        p.photo_url,
-       ds.summary_date AS date,
-       ds.ring_score
+       wc.checkin_date AS date,
+       wc.readiness_score, wc.sleep_quality, wc.nutrition_rating, wc.training_type
      FROM players p
-     LEFT JOIN wellness_daily_summaries ds
-       ON ds.player_id = p.id
-       AND ds.summary_date >= :startDate
-       AND ds.summary_date <= :today
+     LEFT JOIN wellness_checkins wc
+       ON wc.player_id = p.id
+       AND wc.checkin_date >= :startDate
+       AND wc.checkin_date <= :today
      WHERE p.status = 'active' ${playerScope}
-     ORDER BY p.first_name, p.last_name, ds.summary_date`,
+     ORDER BY p.first_name, p.last_name, wc.checkin_date`,
     {
       replacements: { startDate: startStr, today, ...scopeReplacements },
       type: QueryTypes.SELECT,
@@ -735,8 +762,8 @@ export async function getMoodHeatmapData(days = 7, user?: AuthUser) {
 // ═══════════════════════════════════════════════════════════════
 
 /**
- * Create or update a daily checkin for a player (upsert by player+date).
- * Auto-calculates readinessScore from the responses.
+ * Create or update a daily pulse checkin for a player (upsert by player+date).
+ * Auto-calculates readinessScore from sleep/fatigue/soreness/mood/stress fields.
  */
 export async function createCheckin(
   body: {
@@ -750,10 +777,24 @@ export async function createCheckin(
     stress?: number;
     sorenessAreas?: string[];
     notes?: string;
+    // Phase 5
+    trainingType?: string;
+    nutritionRating?: number;
+    trainingBlockId?: string;
   },
   userId?: string,
 ) {
   const readinessScore = calculateReadinessScore(body);
+
+  // Auto-populate trainingBlockId from the player's active block if not supplied
+  let resolvedBlockId = body.trainingBlockId ?? null;
+  if (!resolvedBlockId) {
+    const [activeBlock]: any[] = await sequelize.query(
+      `SELECT id FROM training_blocks WHERE player_id = :playerId AND status = 'active' LIMIT 1`,
+      { replacements: { playerId: body.playerId }, type: QueryTypes.SELECT },
+    );
+    resolvedBlockId = activeBlock?.id ?? null;
+  }
 
   const [checkin] = await WellnessCheckin.upsert(
     {
@@ -769,6 +810,11 @@ export async function createCheckin(
       readinessScore,
       notes: body.notes ?? null,
       createdBy: userId ?? null,
+      trainingType:
+        (body.trainingType as import("./wellness.model").DailyPulseTrainingType) ??
+        null,
+      nutritionRating: body.nutritionRating ?? null,
+      trainingBlockId: resolvedBlockId,
     },
     { returning: true },
   );
@@ -863,5 +909,205 @@ export async function getCheckinTrend(
     checkins: checkins.map((c) => c.get({ plain: true })),
     averageReadiness: avg,
     totalCheckins: checkins.length,
+  };
+}
+
+// ══════════════════════════════════════════
+// BLOCK REPORT (Phase 6)
+// ══════════════════════════════════════════
+
+/**
+ * Aggregate a training block's performance data into a structured report.
+ * Uses checkins linked by training_block_id (Phase 5) with date-range fallback.
+ */
+export async function getBlockReport(
+  blockId: string,
+  user?: AuthUser,
+): Promise<BlockReportResponse> {
+  const [blockRow]: any[] = await sequelize.query(
+    `SELECT id, player_id, goal, status, duration_weeks,
+            started_at, planned_end_at, closed_at,
+            start_scan_id, end_scan_id
+     FROM training_blocks WHERE id = :blockId`,
+    { replacements: { blockId }, type: QueryTypes.SELECT },
+  );
+  if (!blockRow) throw new AppError("Training block not found", 404);
+
+  const ok = await checkRowAccess(
+    "wellness",
+    { playerId: blockRow.player_id },
+    user,
+  );
+  if (!ok) throw new AppError("Not found", 404);
+
+  const playerId: string = blockRow.player_id;
+  const startStr: string = blockRow.started_at;
+  const endStr: string =
+    blockRow.closed_at ?? new Date().toISOString().split("T")[0];
+
+  const actualDurationDays =
+    Math.ceil(
+      (new Date(endStr).getTime() - new Date(startStr).getTime()) /
+        (1000 * 60 * 60 * 24),
+    ) + 1;
+
+  // ── Body composition delta ──
+  let bodyComp: BlockReportResponse["bodyComp"] = null;
+  if (blockRow.start_scan_id || blockRow.end_scan_id) {
+    const scanIds = [blockRow.start_scan_id, blockRow.end_scan_id].filter(
+      Boolean,
+    );
+    const scans: any[] = await sequelize.query(
+      `SELECT id, weight_kg, body_fat_pct, lean_body_mass_kg
+       FROM body_compositions WHERE id = ANY(:scanIds::uuid[])`,
+      { replacements: { scanIds }, type: QueryTypes.SELECT },
+    );
+    const startScan =
+      scans.find((s) => s.id === blockRow.start_scan_id) ?? null;
+    const endScan = scans.find((s) => s.id === blockRow.end_scan_id) ?? null;
+
+    const sw = startScan
+      ? Math.round(Number(startScan.weight_kg) * 10) / 10
+      : null;
+    const ew = endScan ? Math.round(Number(endScan.weight_kg) * 10) / 10 : null;
+    const sbf =
+      startScan?.body_fat_pct != null
+        ? Math.round(Number(startScan.body_fat_pct) * 10) / 10
+        : null;
+    const ebf =
+      endScan?.body_fat_pct != null
+        ? Math.round(Number(endScan.body_fat_pct) * 10) / 10
+        : null;
+    const slm =
+      startScan?.lean_body_mass_kg != null
+        ? Math.round(Number(startScan.lean_body_mass_kg) * 10) / 10
+        : null;
+    const elm =
+      endScan?.lean_body_mass_kg != null
+        ? Math.round(Number(endScan.lean_body_mass_kg) * 10) / 10
+        : null;
+
+    bodyComp = {
+      startWeight: sw,
+      endWeight: ew,
+      weightDeltaKg:
+        sw != null && ew != null ? Math.round((ew - sw) * 10) / 10 : null,
+      startBodyFatPct: sbf,
+      endBodyFatPct: ebf,
+      bodyFatDeltaPct:
+        sbf != null && ebf != null ? Math.round((ebf - sbf) * 10) / 10 : null,
+      startLeanMassKg: slm,
+      endLeanMassKg: elm,
+      leanMassDeltaKg:
+        slm != null && elm != null ? Math.round((elm - slm) * 10) / 10 : null,
+    };
+  }
+
+  // ── Checkin aggregates ──
+  const [c]: any[] = await sequelize.query(
+    `SELECT
+       COUNT(*) AS total_checkins,
+       AVG(readiness_score) AS avg_readiness,
+       AVG(sleep_quality) AS avg_sleep_quality,
+       AVG(nutrition_rating) AS avg_nutrition_rating,
+       COUNT(CASE WHEN training_type = 'rest' THEN 1 END) AS rest_count,
+       COUNT(CASE WHEN training_type = 'club_session' THEN 1 END) AS club_session_count,
+       COUNT(CASE WHEN training_type = 'program_session' THEN 1 END) AS program_session_count,
+       COUNT(CASE WHEN training_type = 'mixed' THEN 1 END) AS mixed_count
+     FROM wellness_checkins
+     WHERE player_id = :playerId
+       AND (training_block_id = :blockId OR checkin_date BETWEEN :startStr AND :endStr)`,
+    {
+      replacements: { playerId, blockId, startStr, endStr },
+      type: QueryTypes.SELECT,
+    },
+  );
+
+  // ── Session stats ──
+  const [s]: any[] = await sequelize.query(
+    `SELECT
+       COUNT(*) AS total_sessions,
+       COUNT(CASE WHEN status = 'completed' THEN 1 END) AS completed_sessions,
+       AVG(CASE WHEN status = 'completed' AND overall_rpe IS NOT NULL THEN overall_rpe END) AS avg_rpe
+     FROM development_sessions
+     WHERE player_id = :playerId AND scheduled_date BETWEEN :startStr AND :endStr`,
+    { replacements: { playerId, startStr, endStr }, type: QueryTypes.SELECT },
+  );
+
+  // ── Weight log trend ──
+  const [w]: any[] = await sequelize.query(
+    `SELECT
+       COUNT(*) AS log_count,
+       (SELECT weight_kg FROM wellness_weight_logs
+        WHERE player_id = :playerId AND logged_at BETWEEN :startStr AND :endStr
+        ORDER BY logged_at ASC LIMIT 1) AS first_weight,
+       (SELECT weight_kg FROM wellness_weight_logs
+        WHERE player_id = :playerId AND logged_at BETWEEN :startStr AND :endStr
+        ORDER BY logged_at DESC LIMIT 1) AS last_weight
+     FROM wellness_weight_logs
+     WHERE player_id = :playerId AND logged_at BETWEEN :startStr AND :endStr`,
+    { replacements: { playerId, startStr, endStr }, type: QueryTypes.SELECT },
+  );
+
+  const totalCheckins = Number(c?.total_checkins || 0);
+  const totalSessions = Number(s?.total_sessions || 0);
+  const completedSessions = Number(s?.completed_sessions || 0);
+  const firstWeight =
+    w?.first_weight != null
+      ? Math.round(Number(w.first_weight) * 10) / 10
+      : null;
+  const lastWeight =
+    w?.last_weight != null ? Math.round(Number(w.last_weight) * 10) / 10 : null;
+
+  return {
+    block: {
+      id: blockRow.id,
+      goal: blockRow.goal,
+      status: blockRow.status,
+      startedAt: blockRow.started_at,
+      closedAt: blockRow.closed_at ?? null,
+      plannedEndAt: blockRow.planned_end_at,
+      durationWeeks: Number(blockRow.duration_weeks),
+      actualDurationDays,
+    },
+    bodyComp,
+    checkins: {
+      total: totalCheckins,
+      avgReadiness:
+        c?.avg_readiness != null ? Math.round(Number(c.avg_readiness)) : null,
+      avgSleepQuality:
+        c?.avg_sleep_quality != null
+          ? Math.round(Number(c.avg_sleep_quality) * 10) / 10
+          : null,
+      avgNutritionRating:
+        c?.avg_nutrition_rating != null
+          ? Math.round(Number(c.avg_nutrition_rating) * 10) / 10
+          : null,
+      trainingDistribution: {
+        rest: Number(c?.rest_count || 0),
+        club_session: Number(c?.club_session_count || 0),
+        program_session: Number(c?.program_session_count || 0),
+        mixed: Number(c?.mixed_count || 0),
+      },
+    },
+    sessions: {
+      total: totalSessions,
+      completed: completedSessions,
+      completionRate:
+        totalSessions > 0
+          ? Math.round((completedSessions / totalSessions) * 100)
+          : null,
+      avgRpe:
+        s?.avg_rpe != null ? Math.round(Number(s.avg_rpe) * 10) / 10 : null,
+    },
+    weightLogs: {
+      startWeight: firstWeight,
+      endWeight: lastWeight,
+      deltaKg:
+        firstWeight != null && lastWeight != null
+          ? Math.round((lastWeight - firstWeight) * 10) / 10
+          : null,
+      logCount: Number(w?.log_count || 0),
+    },
   };
 }

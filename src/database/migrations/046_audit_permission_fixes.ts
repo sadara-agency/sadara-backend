@@ -12,6 +12,10 @@ import { sequelize } from "@config/database";
  *    Analysts should only read scouting reports, not create/edit them.
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Fix 1: Revoke Scout access to contracts (safety net for older DBs)
   await sequelize.query(
     `UPDATE role_permissions
@@ -34,6 +38,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Restore Scout contracts read (original seed value before fix)
   await sequelize.query(
     `UPDATE role_permissions

@@ -1,6 +1,11 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.players') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     DO $$ BEGIN
       CREATE TYPE enum_expenses_category AS ENUM (

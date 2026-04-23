@@ -10,6 +10,10 @@ import { sequelize } from "@config/database";
  * Fixes: Club dropdown showing "No results" for Finance and coach sub-roles.
  */
 export async function up() {
+  const [guardRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((guardRows as unknown[]).length === 0) return;
   const roles = [
     "Finance",
     "Legal",
@@ -33,6 +37,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [guardRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((guardRows as unknown[]).length === 0) return;
   const roles = [
     "Finance",
     "Legal",

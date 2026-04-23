@@ -13,6 +13,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'calendar_events' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const table = (await queryInterface.describeTable(
     "calendar_events",
   )) as Record<string, unknown>;
@@ -30,6 +34,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'calendar_events' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const table = (await queryInterface.describeTable(
     "calendar_events",
   )) as Record<string, unknown>;

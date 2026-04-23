@@ -21,6 +21,10 @@ const ALL_ROLES = [
 ];
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // All roles can read, create, and update messages
   for (const role of ALL_ROLES) {
     await sequelize.query(
@@ -40,6 +44,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(
     `DELETE FROM role_permissions WHERE module = 'messaging'`,
   );

@@ -6,6 +6,10 @@ export async function up({
   context: QueryInterface;
 }) {
   const sq = queryInterface.sequelize;
+  const [rows] = await sq.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'watchlists' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
 
   await sq.query(`
     CREATE TABLE IF NOT EXISTS scoring_cards (

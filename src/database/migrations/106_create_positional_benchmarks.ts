@@ -5,6 +5,11 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await queryInterface.createTable("positional_benchmarks", {
     id: {
       type: DataTypes.UUID,

@@ -1,6 +1,17 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [guard] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'approval_requests' AND table_schema = 'public'`,
+  );
+  if ((guard as unknown[]).length === 0) return;
+
+  const [results] = await sequelize.query(
+    `SELECT to_regclass('public.approval_requests') AS tbl`,
+  );
+  const row = (results as Array<{ tbl: string | null }>)[0];
+  if (!row?.tbl) return;
+
   // ── Table: approval_chain_templates ──
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS approval_chain_templates (
@@ -79,6 +90,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE approval_requests ADD COLUMN current_step INTEGER NOT NULL DEFAULT 1;
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 
@@ -86,6 +98,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE approval_requests ADD COLUMN total_steps INTEGER NOT NULL DEFAULT 1;
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 
@@ -93,6 +106,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE approval_requests ADD COLUMN template_id UUID REFERENCES approval_chain_templates(id);
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 }

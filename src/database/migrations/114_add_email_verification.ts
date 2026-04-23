@@ -5,6 +5,11 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Idempotent: a partially-succeeded previous run may have added some of
   // these columns/indexes already. Check before creating.
   const table = (await queryInterface.describeTable("users")) as Record<
@@ -66,6 +71,11 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   const indexes = (await queryInterface.showIndex("users")) as Array<{
     name: string;
   }>;

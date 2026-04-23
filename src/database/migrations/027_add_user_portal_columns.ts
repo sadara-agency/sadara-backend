@@ -5,6 +5,16 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [guard] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((guard as unknown[]).length === 0) return;
+
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.users') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   const columns = [
     {
       col: "player_id",
@@ -35,6 +45,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.users') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`DROP INDEX IF EXISTS idx_users_invite_token;`);
   await sequelize.query(`DROP INDEX IF EXISTS idx_users_player_id;`);
   await sequelize.query(

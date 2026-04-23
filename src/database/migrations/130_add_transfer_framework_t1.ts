@@ -8,6 +8,10 @@ export async function up({
   context: QueryInterface;
 }): Promise<void> {
   const sq = queryInterface.sequelize;
+  const [rows] = await sq.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'clubs' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
 
   // ─── 1. transfer_windows ────────────────────────────────────────
   await sq.query(`

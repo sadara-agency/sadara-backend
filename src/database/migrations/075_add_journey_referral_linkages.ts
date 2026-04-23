@@ -1,6 +1,16 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [guard] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'referrals' AND table_schema = 'public'`,
+  );
+  if ((guard as unknown[]).length === 0) return;
+
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.player_journeys') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   // Task 5: Add referral_id to player_journeys
   await sequelize.query(`
     ALTER TABLE player_journeys
@@ -21,6 +31,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.player_journeys') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     ALTER TABLE sessions DROP COLUMN IF EXISTS journey_stage_id;
   `);

@@ -5,12 +5,16 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE users ADD COLUMN last_activity TIMESTAMPTZ;
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 }
 
 export async function down() {
   await sequelize.query(`
-    ALTER TABLE users DROP COLUMN IF EXISTS last_activity;
+    DO $$ BEGIN
+      ALTER TABLE users DROP COLUMN IF EXISTS last_activity;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
   `);
 }

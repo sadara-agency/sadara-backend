@@ -5,6 +5,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // trigger_rule_id was incorrectly created as UUID and FK'd to a legacy
   // trigger_rules table (5 seeded rows, never used by application code).
   // Auto-task rules use string identifiers (e.g. "contract_legal_review") from
@@ -32,6 +36,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Reverting to UUID will fail if any string rule IDs have been written.
   // The FK to trigger_rules is not restored (that table is legacy/unused).
   await queryInterface.sequelize.query(

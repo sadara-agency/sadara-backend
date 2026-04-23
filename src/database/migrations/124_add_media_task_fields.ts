@@ -5,6 +5,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.sequelize.query(
     `ALTER TYPE "enum_tasks_type" ADD VALUE IF NOT EXISTS 'Media'`,
   );
@@ -22,6 +26,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'tasks' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.removeColumn("tasks", "deliverables");
   await queryInterface.removeColumn("tasks", "media_platforms");
   await queryInterface.removeColumn("tasks", "media_task_type");

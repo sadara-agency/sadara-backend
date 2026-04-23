@@ -11,6 +11,10 @@ import { QueryTypes } from "sequelize";
  */
 
 export async function up() {
+  const [guardRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((guardRows as unknown[]).length === 0) return;
   // ── 1. Add new roles to enum if it exists ──
   const enumNames = ["user_role", "enum_users_role"];
   for (const name of enumNames) {
@@ -215,6 +219,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [guardRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((guardRows as unknown[]).length === 0) return;
   // Remove sessions permissions
   await sequelize.query(
     `DELETE FROM role_permissions WHERE module = 'sessions'`,

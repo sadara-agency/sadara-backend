@@ -10,6 +10,10 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'watchlists' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // ── 1. spl_competitions ──
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS spl_competitions (

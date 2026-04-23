@@ -2,6 +2,11 @@ import { sequelize } from "@config/database";
 import { initRedis, isRedisConnected, getRedisClient } from "@config/redis";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Update all Package C players to Package A
   await sequelize.query(
     "UPDATE players SET player_package = 'A' WHERE player_package = 'C' OR player_package IS NULL",
@@ -33,6 +38,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await sequelize.query(
     "ALTER TABLE players ALTER COLUMN player_package SET DEFAULT 'C'",
   );
