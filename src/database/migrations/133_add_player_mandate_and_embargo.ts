@@ -7,6 +7,11 @@ export async function up({
 }) {
   const sq = queryInterface.sequelize;
 
+  const [rows] = await sq.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Player mandate fields
   await sq.query(
     `ALTER TABLE players ADD COLUMN IF NOT EXISTS mandate_status VARCHAR(30);`,

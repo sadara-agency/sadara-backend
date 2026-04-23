@@ -100,6 +100,11 @@ const OLD_TO_NEW_MAP: Record<string, Record<string, string>> = {
 };
 
 export async function up() {
+  const [tableCheck] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((tableCheck as unknown[]).length === 0) return;
+
   // 1. Add new physical attribute columns
   await sequelize.query(
     `ALTER TABLE players
@@ -173,6 +178,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [tableCheck] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((tableCheck as unknown[]).length === 0) return;
+
   // 1. Re-add old columns
   await sequelize.query(
     `ALTER TABLE players
