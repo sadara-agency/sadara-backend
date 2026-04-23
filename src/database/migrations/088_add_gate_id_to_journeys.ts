@@ -5,6 +5,12 @@ export async function up() {
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'player_journeys' AND table_schema = 'public'`,
   );
   if ((rows as unknown[]).length === 0) return;
+
+  const [gatesRows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'gates' AND table_schema = 'public'`,
+  );
+  if ((gatesRows as unknown[]).length === 0) return;
+
   await sequelize.query(`
     ALTER TABLE player_journeys
     ADD COLUMN IF NOT EXISTS gate_id UUID

@@ -78,19 +78,27 @@ export async function up() {
     END $$;
   `);
 
-  // 5. Add new columns (idempotent)
+  // 5. Add new columns (idempotent — skip if table doesn't exist on fresh DB)
   await sequelize.query(`
-    ALTER TABLE development_sessions
-      ADD COLUMN IF NOT EXISTS session_type            VARCHAR(30) NOT NULL DEFAULT 'development_gym',
-      ADD COLUMN IF NOT EXISTS overall_rpe             DECIMAL(3,1),
-      ADD COLUMN IF NOT EXISTS actual_duration_minutes INTEGER,
-      ADD COLUMN IF NOT EXISTS session_note            TEXT;
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'development_sessions') THEN
+        ALTER TABLE development_sessions
+          ADD COLUMN IF NOT EXISTS session_type            VARCHAR(30) NOT NULL DEFAULT 'development_gym',
+          ADD COLUMN IF NOT EXISTS overall_rpe             DECIMAL(3,1),
+          ADD COLUMN IF NOT EXISTS actual_duration_minutes INTEGER,
+          ADD COLUMN IF NOT EXISTS session_note            TEXT;
+      END IF;
+    END $$;
   `);
 
-  // 6. Index for player+date lookups
+  // 6. Index for player+date lookups (idempotent)
   await sequelize.query(`
-    CREATE INDEX IF NOT EXISTS idx_development_sessions_player_date
-    ON development_sessions (player_id, scheduled_date DESC);
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'development_sessions') THEN
+        CREATE INDEX IF NOT EXISTS idx_development_sessions_player_date
+          ON development_sessions (player_id, scheduled_date DESC);
+      END IF;
+    END $$;
   `);
 
   console.log(
