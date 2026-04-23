@@ -10,18 +10,26 @@ import { sequelize } from "@config/database";
 
 export async function up() {
   await sequelize.query(`
-    ALTER TABLE contracts
-      DROP CONSTRAINT IF EXISTS contracts_player_id_fkey,
-      ADD CONSTRAINT contracts_player_id_fkey
-        FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE RESTRICT;
+    DO $$ BEGIN
+      ALTER TABLE contracts
+        DROP CONSTRAINT IF EXISTS contracts_player_id_fkey;
+      ALTER TABLE contracts
+        ADD CONSTRAINT contracts_player_id_fkey
+          FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE RESTRICT;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
   `);
 }
 
 export async function down() {
   await sequelize.query(`
-    ALTER TABLE contracts
-      DROP CONSTRAINT IF EXISTS contracts_player_id_fkey,
-      ADD CONSTRAINT contracts_player_id_fkey
-        FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE;
+    DO $$ BEGIN
+      ALTER TABLE contracts
+        DROP CONSTRAINT IF EXISTS contracts_player_id_fkey;
+      ALTER TABLE contracts
+        ADD CONSTRAINT contracts_player_id_fkey
+          FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
   `);
 }

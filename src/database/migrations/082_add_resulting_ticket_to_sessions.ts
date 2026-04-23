@@ -1,6 +1,11 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.sessions') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     ALTER TABLE sessions
     ADD COLUMN IF NOT EXISTS resulting_ticket_id UUID
@@ -14,6 +19,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.sessions') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     DROP INDEX IF EXISTS sessions_resulting_ticket_id_idx;
   `);

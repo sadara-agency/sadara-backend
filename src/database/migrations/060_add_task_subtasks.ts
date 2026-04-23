@@ -9,6 +9,11 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.tasks') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     ALTER TABLE tasks ADD COLUMN IF NOT EXISTS parent_task_id UUID REFERENCES tasks(id) ON DELETE CASCADE;
     ALTER TABLE tasks ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0;
@@ -20,6 +25,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.tasks') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`DROP INDEX IF EXISTS idx_tasks_parent`);
   await sequelize.query(`
     ALTER TABLE tasks DROP COLUMN IF EXISTS description_html;

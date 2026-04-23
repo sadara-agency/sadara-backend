@@ -8,6 +8,11 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.players') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   // ── player_journeys ──
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS player_journeys (

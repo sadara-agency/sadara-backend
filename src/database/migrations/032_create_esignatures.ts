@@ -1,6 +1,11 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.documents') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   // ── Table: signature_requests ──
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS signature_requests (

@@ -7,6 +7,11 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.referrals') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     ALTER TABLE referrals
     ADD COLUMN IF NOT EXISTS resulting_ticket_id UUID
@@ -20,6 +25,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.referrals') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     DROP INDEX IF EXISTS idx_referrals_resulting_ticket;
   `);

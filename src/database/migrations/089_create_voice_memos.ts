@@ -1,6 +1,11 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [r] = await sequelize.query(
+    `SELECT to_regclass('public.users') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS voice_memos (
       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

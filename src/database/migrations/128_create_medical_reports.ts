@@ -12,6 +12,11 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [r] = await queryInterface.sequelize.query(
+    `SELECT to_regclass('public.players') AS tbl`,
+  );
+  if (!(r as Array<{ tbl: string | null }>)[0]?.tbl) return;
+
   await queryInterface.sequelize.query(`
     CREATE TABLE IF NOT EXISTS medical_reports (
       id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
