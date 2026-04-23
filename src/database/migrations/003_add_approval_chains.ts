@@ -79,6 +79,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE approval_requests ADD COLUMN current_step INTEGER NOT NULL DEFAULT 1;
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 
@@ -86,6 +87,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE approval_requests ADD COLUMN total_steps INTEGER NOT NULL DEFAULT 1;
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 
@@ -93,6 +95,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE approval_requests ADD COLUMN template_id UUID REFERENCES approval_chain_templates(id);
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 }

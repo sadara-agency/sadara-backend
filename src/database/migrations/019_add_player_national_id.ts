@@ -8,7 +8,18 @@ import { sequelize } from "@config/database";
  */
 export async function up(): Promise<void> {
   await sequelize.query(`
-    ALTER TABLE players
-    ADD COLUMN IF NOT EXISTS national_id VARCHAR(255) DEFAULT NULL;
+    DO $$ BEGIN
+      ALTER TABLE players ADD COLUMN IF NOT EXISTS national_id VARCHAR(255) DEFAULT NULL;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
+  `);
+}
+
+export async function down(): Promise<void> {
+  await sequelize.query(`
+    DO $$ BEGIN
+      ALTER TABLE players DROP COLUMN IF EXISTS national_id;
+    EXCEPTION WHEN undefined_table THEN NULL;
+    END $$;
   `);
 }

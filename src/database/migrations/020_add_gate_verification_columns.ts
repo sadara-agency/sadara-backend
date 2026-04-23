@@ -14,6 +14,12 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [results] = await sequelize.query(
+    `SELECT to_regclass('public.gate_checklists') AS tbl`,
+  );
+  const row = (results as Array<{ tbl: string | null }>)[0];
+  if (!row?.tbl) return;
+
   await sequelize.query(`
     DO $$ BEGIN
       IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'enum_gate_checklists_verification_type') THEN
@@ -191,6 +197,12 @@ export async function up() {
 }
 
 export async function down() {
+  const [results] = await sequelize.query(
+    `SELECT to_regclass('public.gate_checklists') AS tbl`,
+  );
+  const row = (results as Array<{ tbl: string | null }>)[0];
+  if (!row?.tbl) return;
+
   await sequelize.query(`
     ALTER TABLE gate_checklists
       DROP COLUMN IF EXISTS verification_type,

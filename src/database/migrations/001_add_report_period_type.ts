@@ -15,6 +15,7 @@ export async function up() {
       ALTER TABLE technical_reports
         ADD COLUMN period_type enum_technical_reports_period_type NOT NULL DEFAULT 'Season';
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 
@@ -24,6 +25,7 @@ export async function up() {
       ALTER TABLE technical_reports
         ADD COLUMN period_params JSONB NOT NULL DEFAULT '{}';
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 
@@ -32,6 +34,7 @@ export async function up() {
     DO $$ BEGIN
       ALTER TABLE technical_reports ADD COLUMN file_path TEXT;
     EXCEPTION WHEN duplicate_column THEN NULL;
+    WHEN undefined_table THEN NULL;
     END $$;
   `);
 }
