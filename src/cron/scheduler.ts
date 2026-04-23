@@ -106,6 +106,7 @@ import {
   runYouthTier,
   runLiveTier,
 } from "./engines/saudiLeagues.engine";
+import { runCloseIdleSessions } from "@modules/staffMonitoring/staffMonitoring.cron";
 
 /**
  * Get today's date as YYYY-MM-DD in the server's local timezone.
@@ -1190,5 +1191,9 @@ export async function startCronJobs() {
   schedule("0 3 * * *", "saudi-leagues-youth-tier"); // Daily 03:00
   schedule("*/15 * * * *", "saudi-leagues-live"); // Every 15 min (fast exit if no live)
 
-  logger.info("[CRON] 69 jobs scheduled ✓");
+  // ── Staff Monitoring — idle session closer ──
+  registerJob("staff-monitoring-close-idle", runCloseIdleSessions);
+  schedule("*/10 * * * *", "staff-monitoring-close-idle"); // Every 10 min
+
+  logger.info("[CRON] 70 jobs scheduled ✓");
 }

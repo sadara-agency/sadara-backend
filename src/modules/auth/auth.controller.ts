@@ -13,6 +13,8 @@ import {
 } from "@shared/utils/cookie";
 import { uploadFile } from "@shared/utils/storage";
 import * as authService from "@modules/auth/auth.service";
+import { createSession, endAllOpenSessions } from "@modules/staffMonitoring";
+import { logger } from "@config/logger";
 
 // ── Public Register (no token returned, account inactive) ──
 export async function register(req: Request, res: Response) {
@@ -57,6 +59,16 @@ export async function login(req: Request, res: Response) {
     userRole: result.user.role as any,
     ip: req.ip,
   });
+
+  // Track session (fire-and-forget — never block login)
+  createSession({
+    userId: result.user.id,
+    userType: result.user.role === "Player" ? "player" : "user",
+    ipAddress: req.ip ?? undefined,
+    userAgent: req.headers?.["user-agent"],
+  }).catch((err: Error) =>
+    logger.warn("Failed to create user session", { error: err.message }),
+  );
 
   // Set httpOnly cookies for browser clients
   res.cookie(COOKIE_NAME, result.token, COOKIE_OPTIONS);
@@ -219,6 +231,13 @@ export async function logout(req: AuthRequest, res: Response) {
   res.clearCookie(REFRESH_COOKIE_NAME, CLEAR_REFRESH_COOKIE_OPTIONS);
 
   if (req.user) {
+    // End all open sessions for this user (fire-and-forget)
+    endAllOpenSessions(req.user.id, "logout").catch((err: Error) =>
+      logger.warn("Failed to end user sessions on logout", {
+        error: err.message,
+      }),
+    );
+
     await logAudit("LOGOUT", "users", req.user.id, {
       userId: req.user.id,
       userName: req.user.fullName,

@@ -67,6 +67,13 @@ function trackActivity(userId: string) {
         error: (err as Error).message,
       }),
     );
+
+  // Heartbeat the open session — lazy import avoids circular dependency
+  import("@modules/staffMonitoring")
+    .then(({ heartbeat }) => {
+      heartbeat(userId).catch(() => {});
+    })
+    .catch(() => {});
 }
 
 /** Extract token from cookie (browser) or Authorization header (API clients). */
