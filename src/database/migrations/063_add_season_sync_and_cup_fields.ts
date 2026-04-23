@@ -9,6 +9,10 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'saff_fixtures' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // 1. Season sync registry
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS season_syncs (
@@ -55,6 +59,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'saff_fixtures' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Matches cup fields
   await sequelize.query(`
     ALTER TABLE matches DROP COLUMN IF EXISTS is_neutral_venue;

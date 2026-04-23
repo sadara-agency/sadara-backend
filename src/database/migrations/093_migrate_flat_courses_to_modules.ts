@@ -8,6 +8,10 @@ import { sequelize } from "@config/database";
  * Idempotent — uses NOT EXISTS to skip courses that already have modules.
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'training_modules' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Create a default module for each flat course that has content
   await sequelize.query(`
     INSERT INTO training_modules (id, course_id, title, title_ar, sort_order)

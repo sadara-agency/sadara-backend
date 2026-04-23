@@ -18,6 +18,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'competitions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // 1. saffplus_slug column on competitions — idempotent
   await queryInterface.sequelize.query(`
     ALTER TABLE competitions
@@ -46,6 +50,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'competitions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.sequelize.query(
     `DROP INDEX IF EXISTS idx_matches_provider_external_unique;`,
   );

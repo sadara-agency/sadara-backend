@@ -12,12 +12,20 @@ const NEW_DEFAULT = `'{"contracts":true,"offers":true,"matches":true,"tasks":tru
 const OLD_DEFAULT = `'{"contracts":true,"offers":true,"matches":true,"tasks":true,"email":true,"push":true,"sms":true}'::jsonb`;
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(
     `ALTER TABLE users ALTER COLUMN notification_preferences SET DEFAULT ${NEW_DEFAULT}`,
   );
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(
     `ALTER TABLE users ALTER COLUMN notification_preferences SET DEFAULT ${OLD_DEFAULT}`,
   );

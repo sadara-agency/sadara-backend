@@ -31,6 +31,10 @@ const INDEXES = [
 ];
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const tx = await sequelize.transaction();
   try {
     for (const sql of INDEXES) {
@@ -45,6 +49,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const tx = await sequelize.transaction();
   try {
     await sequelize.query(

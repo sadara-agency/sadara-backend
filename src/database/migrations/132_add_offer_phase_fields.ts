@@ -6,6 +6,10 @@ export async function up({
   context: QueryInterface;
 }) {
   const sq = queryInterface.sequelize;
+  const [rows] = await sq.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'offers' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
 
   await sq.query(
     `ALTER TABLE offers ADD COLUMN IF NOT EXISTS phase VARCHAR(20);`,
@@ -42,6 +46,10 @@ export async function down({
   context: QueryInterface;
 }) {
   const sq = queryInterface.sequelize;
+  const [rows] = await sq.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'offers' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sq.query(`DROP INDEX IF EXISTS offers_window_id;`);
   await sq.query(`DROP INDEX IF EXISTS offers_phase;`);
   await queryInterface.removeColumn("offers", "blocker_notes");

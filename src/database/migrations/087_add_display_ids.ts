@@ -8,6 +8,10 @@ import { sequelize } from "@config/database";
  * Clubs use a separate `code` column (3-letter abbreviation).
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // 1. Create sequence tracking table
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS display_id_sequences (
@@ -113,6 +117,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   const tables = [
     "players",
     "contracts",

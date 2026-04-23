@@ -6,6 +6,10 @@ import { sequelize } from "@config/database";
  * and auto-completes when watched >= 90%.
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'training_enrollments' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS lesson_progress (
       id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

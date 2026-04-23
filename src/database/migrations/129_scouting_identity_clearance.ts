@@ -17,6 +17,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'screening_cases' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.sequelize.query(`
     ALTER TABLE screening_cases
       ADD COLUMN IF NOT EXISTS has_existing_agency_contract BOOLEAN,
@@ -51,6 +55,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'screening_cases' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.sequelize.query(`
     DROP INDEX IF EXISTS idx_screening_cases_clearance_doc;
     DROP INDEX IF EXISTS idx_screening_cases_id_card_doc;

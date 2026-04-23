@@ -1,6 +1,10 @@
 import { QueryInterface, DataTypes } from "sequelize";
 
 export async function up({ context: qi }: { context: QueryInterface }) {
+  const [rows] = await qi.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await qi.createTable("meal_plans", {
     id: {
       type: DataTypes.UUID,

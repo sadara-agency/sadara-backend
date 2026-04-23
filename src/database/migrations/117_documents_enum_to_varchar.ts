@@ -11,6 +11,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'documents' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.sequelize.query(`
     ALTER TABLE documents
       ALTER COLUMN entity_type TYPE VARCHAR(50) USING entity_type::text,
@@ -33,6 +37,10 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'documents' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   await queryInterface.sequelize.query(`
     CREATE TYPE "enum_documents_entity_type" AS ENUM ('Player', 'Contract', 'Match', 'Injury', 'Club', 'Offer');
     CREATE TYPE "enum_documents_type"        AS ENUM ('Contract', 'Passport', 'Medical', 'ID', 'Agreement', 'Other');

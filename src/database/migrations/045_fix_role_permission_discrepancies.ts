@@ -23,6 +23,10 @@ import { sequelize } from "@config/database";
  *  - Now uses dedicated "users" module: Admin (full CRUD), Manager (read only)
  */
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Set all CRUD flags to false for incorrectly granted permissions.
   // Using UPDATE rather than DELETE so the row stays for admin visibility.
   const fixes = [
@@ -72,6 +76,10 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'role_permissions' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
   // Restore original seed values
   const restores = [
     {
