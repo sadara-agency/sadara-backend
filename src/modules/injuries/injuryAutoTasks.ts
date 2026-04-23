@@ -49,16 +49,20 @@ export async function generateCriticalInjuryTask(
   if (injury.severity !== "Critical" && injury.severity !== "Severe") return;
 
   const player = (injury as any).player;
-  const playerName = player
-    ? `${player.firstName} ${player.lastName}`.trim()
-    : "Unknown";
-  const playerNameAr = player?.firstNameAr
+  if (!player) {
+    logger.warn("Skipping critical injury auto-task — player not loaded", {
+      injuryId,
+    });
+    return;
+  }
+  const playerName = `${player.firstName} ${player.lastName}`.trim();
+  const playerNameAr = player.firstNameAr
     ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
     : playerName;
 
   // Assign to player's coach, fallback to any Coach or Manager
   const assignee =
-    player?.coachId ??
+    player.coachId ??
     (await findUserByRole("Coach"))?.id ??
     (await findUserByRole("Manager"))?.id ??
     null;
@@ -117,15 +121,20 @@ export async function checkInjuryReturnOverdue(): Promise<{ created: number }> {
   let created = 0;
   for (const injury of overdueInjuries) {
     const player = (injury as any).player;
-    const playerName = player
-      ? `${player.firstName} ${player.lastName}`.trim()
-      : "Unknown";
-    const playerNameAr = player?.firstNameAr
+    if (!player) {
+      logger.warn(
+        "Skipping overdue injury auto-task — player not loaded (orphan row?)",
+        { injuryId: injury.id },
+      );
+      continue;
+    }
+    const playerName = `${player.firstName} ${player.lastName}`.trim();
+    const playerNameAr = player.firstNameAr
       ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
       : playerName;
 
     const assignee =
-      player?.coachId ?? (await findUserByRole("Coach"))?.id ?? null;
+      player.coachId ?? (await findUserByRole("Coach"))?.id ?? null;
 
     const task = await createAutoTaskIfNotExists(
       {
@@ -285,15 +294,20 @@ export async function checkInjuryTreatmentStale(): Promise<{
     if (recentUpdate) continue;
 
     const player = (injury as any).player;
-    const playerName = player
-      ? `${player.firstName} ${player.lastName}`.trim()
-      : "Unknown";
-    const playerNameAr = player?.firstNameAr
+    if (!player) {
+      logger.warn(
+        "Skipping stale injury auto-task — player not loaded (orphan row?)",
+        { injuryId: injury.id },
+      );
+      continue;
+    }
+    const playerName = `${player.firstName} ${player.lastName}`.trim();
+    const playerNameAr = player.firstNameAr
       ? `${player.firstNameAr} ${player.lastNameAr || ""}`.trim()
       : playerName;
 
     const assignee =
-      player?.coachId ?? (await findUserByRole("Coach"))?.id ?? null;
+      player.coachId ?? (await findUserByRole("Coach"))?.id ?? null;
 
     const task = await createAutoTaskIfNotExists(
       {
