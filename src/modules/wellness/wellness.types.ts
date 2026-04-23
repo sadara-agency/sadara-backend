@@ -230,3 +230,51 @@ export interface CoachOverviewResponse {
     total: number;
   };
 }
+
+export interface BlockReportResponse {
+  block: {
+    id: string;
+    goal: string;
+    status: string;
+    startedAt: string;
+    closedAt: string | null;
+    plannedEndAt: string;
+    durationWeeks: number;
+    actualDurationDays: number;
+  };
+  bodyComp: {
+    startWeight: number | null;
+    endWeight: number | null;
+    weightDeltaKg: number | null;
+    startBodyFatPct: number | null;
+    endBodyFatPct: number | null;
+    bodyFatDeltaPct: number | null;
+    startLeanMassKg: number | null;
+    endLeanMassKg: number | null;
+    leanMassDeltaKg: number | null;
+  } | null;
+  checkins: {
+    total: number;
+    avgReadiness: number | null;
+    avgSleepQuality: number | null;
+    avgNutritionRating: number | null;
+    trainingDistribution: {
+      rest: number;
+      club_session: number;
+      program_session: number;
+      mixed: number;
+    };
+  };
+  sessions: {
+    total: number;
+    completed: number;
+    completionRate: number | null;
+    avgRpe: number | null;
+  };
+  weightLogs: {
+    startWeight: number | null;
+    endWeight: number | null;
+    deltaKg: number | null;
+    logCount: number;
+  };
+}

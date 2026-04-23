@@ -3,7 +3,11 @@ import { QueryInterface, DataTypes } from "sequelize";
 // Phase 5 — Daily Pulse: extends wellness_checkins with training and nutrition
 // self-assessment fields, plus a soft FK to the active training block so Phase 6
 // block-progress reports can aggregate per-block pulse data.
-export async function up(queryInterface: QueryInterface): Promise<void> {
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.addColumn("wellness_checkins", "training_type", {
     type: DataTypes.STRING(20),
     allowNull: true,
@@ -26,7 +30,11 @@ export async function up(queryInterface: QueryInterface): Promise<void> {
   });
 }
 
-export async function down(queryInterface: QueryInterface): Promise<void> {
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
   await queryInterface.removeColumn("wellness_checkins", "training_block_id");
   await queryInterface.removeColumn("wellness_checkins", "nutrition_rating");
   await queryInterface.removeColumn("wellness_checkins", "training_type");

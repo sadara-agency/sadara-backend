@@ -305,4 +305,30 @@ router.post(
   asyncHandler(ctrl.close),
 );
 
+/**
+ * @swagger
+ * /training-blocks/{id}/report:
+ *   get:
+ *     tags: [TrainingBlocks]
+ *     summary: Get block progress report (Phase 6)
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Block report with body comp delta, checkin aggregates, session stats, weight trend }
+ *       401: { description: Unauthorized }
+ *       403: { description: Forbidden }
+ *       404: { description: Training block not found }
+ */
+router.get(
+  "/:id/report",
+  authorizeModule("wellness", "read"),
+  dynamicFieldAccess("wellness"),
+  cacheRoute("block-report", CacheTTL.SHORT),
+  asyncHandler(ctrl.getReport),
+);
+
 export default router;
