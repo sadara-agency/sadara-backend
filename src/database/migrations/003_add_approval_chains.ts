@@ -1,6 +1,12 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [results] = await sequelize.query(
+    `SELECT to_regclass('public.approval_requests') AS tbl`,
+  );
+  const row = (results as Array<{ tbl: string | null }>)[0];
+  if (!row?.tbl) return;
+
   // ── Table: approval_chain_templates ──
   await sequelize.query(`
     CREATE TABLE IF NOT EXISTS approval_chain_templates (
