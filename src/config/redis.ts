@@ -26,7 +26,12 @@ export async function initRedis(): Promise<RedisClientType | null> {
       url: env.redis.url,
       socket: {
         connectTimeout: 5000,
-        ...(isTLS ? { tls: true as const } : {}),
+        ...(isTLS
+          ? {
+              tls: true as const,
+              rejectUnauthorized: env.redis.tlsRejectUnauthorized,
+            }
+          : {}),
         reconnectStrategy: (retries) => {
           if (retries > 10) {
             logger.error("Redis max reconnection attempts reached");

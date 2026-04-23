@@ -102,11 +102,11 @@ export async function up({
 
   // ─── 5. Role permissions ────────────────────────────────────────
   await sq.query(`
-    INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete, created_at, updated_at)
+    INSERT INTO role_permissions (id, role, module, can_create, can_read, can_update, can_delete, created_at, updated_at)
     VALUES
-      ('Admin', 'transfer-windows', true, true, true, true, NOW(), NOW()),
-      ('Admin', 'club-needs',       true, true, true, true, NOW(), NOW())
-    ON CONFLICT DO NOTHING;
+      (gen_random_uuid(), 'Admin', 'transfer-windows', true, true, true, true, NOW(), NOW()),
+      (gen_random_uuid(), 'Admin', 'club-needs',       true, true, true, true, NOW(), NOW())
+    ON CONFLICT (role, module) DO NOTHING;
   `);
 }
 

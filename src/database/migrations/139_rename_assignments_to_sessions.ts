@@ -17,42 +17,74 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
-  // 1. Archive Phase 3 leftovers (meal_plans was never renamed in migration 136)
-  await sequelize.query(
-    `ALTER TABLE meal_plan_items RENAME TO _archive_meal_plan_items_20260422;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE meal_plans RENAME TO _archive_meal_plans_20260422;`,
-  );
+  // 1. Archive Phase 3 leftovers (idempotent — skip if source already gone)
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'meal_plan_items')
+         AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = '_archive_meal_plan_items_20260422') THEN
+        ALTER TABLE meal_plan_items RENAME TO _archive_meal_plan_items_20260422;
+      END IF;
+    END $$;
+  `);
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'meal_plans')
+         AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = '_archive_meal_plans_20260422') THEN
+        ALTER TABLE meal_plans RENAME TO _archive_meal_plans_20260422;
+      END IF;
+    END $$;
+  `);
 
-  // 2. Archive per-set workout logs
-  await sequelize.query(
-    `ALTER TABLE wellness_workout_logs RENAME TO _archive_workout_logs_20260422;`,
-  );
+  // 2. Archive per-set workout logs (idempotent)
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'wellness_workout_logs')
+         AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = '_archive_workout_logs_20260422') THEN
+        ALTER TABLE wellness_workout_logs RENAME TO _archive_workout_logs_20260422;
+      END IF;
+    END $$;
+  `);
 
-  // 3. Rename assignments → development_sessions
-  await sequelize.query(
-    `ALTER TABLE wellness_workout_assignments RENAME TO development_sessions;`,
-  );
+  // 3. Rename assignments → development_sessions (idempotent)
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'wellness_workout_assignments')
+         AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'development_sessions') THEN
+        ALTER TABLE wellness_workout_assignments RENAME TO development_sessions;
+      END IF;
+    END $$;
+  `);
 
-  // 4. Column renames
-  await sequelize.query(
-    `ALTER TABLE development_sessions RENAME COLUMN template_id TO program_id;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE development_sessions RENAME COLUMN assigned_date TO scheduled_date;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE development_sessions RENAME COLUMN assigned_by TO prescribed_by;`,
-  );
+  // 4. Column renames (idempotent — check column name before renaming)
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'development_sessions' AND column_name = 'template_id') THEN
+        ALTER TABLE development_sessions RENAME COLUMN template_id TO program_id;
+      END IF;
+    END $$;
+  `);
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'development_sessions' AND column_name = 'assigned_date') THEN
+        ALTER TABLE development_sessions RENAME COLUMN assigned_date TO scheduled_date;
+      END IF;
+    END $$;
+  `);
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'development_sessions' AND column_name = 'assigned_by') THEN
+        ALTER TABLE development_sessions RENAME COLUMN assigned_by TO prescribed_by;
+      END IF;
+    END $$;
+  `);
 
-  // 5. Add new columns
+  // 5. Add new columns (idempotent)
   await sequelize.query(`
     ALTER TABLE development_sessions
-      ADD COLUMN session_type            VARCHAR(30) NOT NULL DEFAULT 'development_gym',
-      ADD COLUMN overall_rpe             DECIMAL(3,1),
-      ADD COLUMN actual_duration_minutes INTEGER,
-      ADD COLUMN session_note            TEXT;
+      ADD COLUMN IF NOT EXISTS session_type            VARCHAR(30) NOT NULL DEFAULT 'development_gym',
+      ADD COLUMN IF NOT EXISTS overall_rpe             DECIMAL(3,1),
+      ADD COLUMN IF NOT EXISTS actual_duration_minutes INTEGER,
+      ADD COLUMN IF NOT EXISTS session_note            TEXT;
   `);
 
   // 6. Index for player+date lookups

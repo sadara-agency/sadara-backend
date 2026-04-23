@@ -12,21 +12,31 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
-  // 1. Rename tables
-  await sequelize.query(
-    `ALTER TABLE wellness_workout_templates RENAME TO development_programs;`,
-  );
-  await sequelize.query(
-    `ALTER TABLE wellness_template_exercises RENAME TO program_exercises;`,
-  );
+  // 1. Rename tables (idempotent — skip if target already exists)
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'wellness_workout_templates')
+         AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'development_programs') THEN
+        ALTER TABLE wellness_workout_templates RENAME TO development_programs;
+      END IF;
+    END $$;
+  `);
+  await sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'wellness_template_exercises')
+         AND NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'program_exercises') THEN
+        ALTER TABLE wellness_template_exercises RENAME TO program_exercises;
+      END IF;
+    END $$;
+  `);
 
-  // 2. Add new columns to development_programs
+  // 2. Add new columns to development_programs (idempotent)
   await sequelize.query(`
     ALTER TABLE development_programs
-      ADD COLUMN duration_weeks  INTEGER       NOT NULL DEFAULT 4,
-      ADD COLUMN phase           VARCHAR(30),
-      ADD COLUMN program_type    VARCHAR(30)   NOT NULL DEFAULT 'gym',
-      ADD COLUMN training_block_id UUID;
+      ADD COLUMN IF NOT EXISTS duration_weeks  INTEGER       NOT NULL DEFAULT 4,
+      ADD COLUMN IF NOT EXISTS phase           VARCHAR(30),
+      ADD COLUMN IF NOT EXISTS program_type    VARCHAR(30)   NOT NULL DEFAULT 'gym',
+      ADD COLUMN IF NOT EXISTS training_block_id UUID;
   `);
 
   // 3. Add FK constraint for training_block_id
