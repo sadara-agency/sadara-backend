@@ -1,21 +1,32 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
-export type CoachSpecialty =
+export type StaffRole =
+  | "Admin"
+  | "Manager"
+  | "Analyst"
+  | "Scout"
+  | "Legal"
+  | "Finance"
   | "Coach"
   | "SkillCoach"
   | "TacticalCoach"
   | "FitnessCoach"
   | "NutritionSpecialist"
   | "GymCoach"
+  | "Media"
+  | "Executive"
   | "GoalkeeperCoach"
   | "MentalCoach";
+
+/** @deprecated Use `StaffRole` — kept for backward compat. */
+export type CoachSpecialty = StaffRole;
 
 interface PlayerCoachAssignmentAttributes {
   id: string;
   playerId: string;
   coachUserId: string;
-  specialty: CoachSpecialty;
+  specialty: StaffRole;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -35,7 +46,7 @@ export class PlayerCoachAssignment
   declare id: string;
   declare playerId: string;
   declare coachUserId: string;
-  declare specialty: CoachSpecialty;
+  declare specialty: StaffRole;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
