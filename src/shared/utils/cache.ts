@@ -54,6 +54,7 @@ export const CachePrefix = {
   MENTAL_TEMPLATES: "mental-templates",
   VIDEO_CLIPS: "video-clips",
   VIDEO_TAGS: "video-tags",
+  STAFF_MON: "staff-mon",
 } as const;
 
 // ── Core Operations ──

@@ -1,5 +1,9 @@
 /// <reference types="jest" />
 jest.mock('../../../src/modules/auth/auth.service');
+jest.mock('../../../src/modules/staffMonitoring', () => ({
+  createSession: jest.fn().mockResolvedValue({ id: 'session-001' }),
+  endAllOpenSessions: jest.fn().mockResolvedValue(1),
+}));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
   buildAuditContext: jest.fn().mockReturnValue({ userId: 'u1', userName: 'Admin', userRole: 'Admin' }),
@@ -8,6 +12,9 @@ jest.mock('../../../src/shared/utils/cookie', () => ({
   COOKIE_NAME: 'sadara_token',
   COOKIE_OPTIONS: { httpOnly: true, path: '/' },
   CLEAR_COOKIE_OPTIONS: { httpOnly: true, path: '/' },
+}));
+jest.mock('../../../src/config/logger', () => ({
+  logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
 import * as controller from '../../../src/modules/auth/auth.controller';

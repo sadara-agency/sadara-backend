@@ -42,6 +42,7 @@ export const ALL_ROLES = [
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",
+  "SportingDirector",
 ];
 
 export function allRoles(module: string, flags: Partial<Perm>): Perm[] {
@@ -815,6 +816,32 @@ const RAW_PERMISSIONS: Perm[] = [
     ],
     { canRead: true },
   ),
+
+  // ── Staff Monitoring ──
+  // Admin bypasses all permission checks — no explicit row needed.
+  // SportingDirector: full monitoring read + task CRU
+  ...forRoles("staffMonitoring", ["SportingDirector"], {
+    canRead: true,
+  }),
+  ...forRoles("staffMonitoring", ["Manager", "Executive"], {
+    canRead: true,
+  }),
+  // SportingDirector read access to operational modules
+  ...forRoles("users", ["SportingDirector"], { canRead: true }),
+  ...forRoles("audit", ["SportingDirector"], { canRead: true }),
+  ...forRoles("players", ["SportingDirector"], { canRead: true }),
+  ...forRoles("clubs", ["SportingDirector"], { canRead: true }),
+  ...forRoles("contracts", ["SportingDirector"], { canRead: true }),
+  ...forRoles("matches", ["SportingDirector"], { canRead: true }),
+  ...forRoles("injuries", ["SportingDirector"], { canRead: true }),
+  ...forRoles("reports", ["SportingDirector"], { canRead: true }),
+  ...forRoles("dashboard", ["SportingDirector"], { canRead: true }),
+  // SportingDirector task management (CRU, no delete)
+  ...forRoles("tasks", ["SportingDirector"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

@@ -296,6 +296,7 @@ export async function forceLogout(targetId: string, adminId: string) {
   const { revokeAllUserTokens } = await import("@modules/auth/auth.service");
   const { sendCustomSSE } =
     await import("@modules/notifications/notification.sse");
+  const { endAllOpenSessions } = await import("@modules/staffMonitoring");
 
   if (targetId === adminId) {
     throw new AppError("Cannot force-logout yourself", 400);
@@ -303,8 +304,9 @@ export async function forceLogout(targetId: string, adminId: string) {
 
   const user = await findOrThrow(User, targetId, "User");
 
-  // Revoke all refresh tokens
+  // Revoke all refresh tokens + close open sessions
   await revokeAllUserTokens(targetId, "user");
+  endAllOpenSessions(targetId, "forced").catch(() => {});
 
   // Push immediate logout via SSE
   sendCustomSSE(targetId, "force_logout", {

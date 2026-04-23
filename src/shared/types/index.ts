@@ -18,7 +18,8 @@ export type UserRole =
   | "Media"
   | "Executive"
   | "GoalkeeperCoach"
-  | "MentalCoach";
+  | "MentalCoach"
+  | "SportingDirector";
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -62,6 +63,7 @@ export const ROLES = {
   EXECUTIVE: "Executive",
   GOALKEEPER_COACH: "GoalkeeperCoach",
   MENTAL_COACH: "MentalCoach",
+  SPORTING_DIRECTOR: "SportingDirector",
 } as const satisfies Record<string, UserRole>;
 
 // ── Authenticated Request (Express-specific, stays in backend) ──

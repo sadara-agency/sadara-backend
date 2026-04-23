@@ -144,6 +144,13 @@ export async function revokeAllUserTokens(
      WHERE user_id = :userId AND user_type = :userType AND revoked_at IS NULL`,
     { replacements: { userId, userType } },
   );
+
+  // Close any open sessions — lazy import avoids circular dependency
+  import("@modules/staffMonitoring")
+    .then(({ endAllOpenSessions }) => {
+      endAllOpenSessions(userId, "refresh_revoked").catch(() => {});
+    })
+    .catch(() => {});
 }
 
 // ── Public Register (default role, no role selection) ──
