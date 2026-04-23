@@ -82,6 +82,9 @@ export async function up({
     }
 
     // 1. Backfill NULL/blank columns on the keep row from the drop row.
+    //    NULLIF(col::text, '') treats both NULL and empty-string as blank
+    //    and casts numerics (founded_year, *_team_id, stadium_capacity) to
+    //    text first so the comparison is type-safe for any column.
     for (const col of MERGE_COLUMNS) {
       await sequelize.query(
         `UPDATE clubs k
@@ -89,9 +92,8 @@ export async function up({
          FROM clubs d
          WHERE k.id = :keep
            AND d.id = :drop
-           AND (k.${col} IS NULL OR k.${col} = '')
-           AND d.${col} IS NOT NULL
-           AND d.${col} <> ''`,
+           AND NULLIF(k.${col}::text, '') IS NULL
+           AND NULLIF(d.${col}::text, '') IS NOT NULL`,
         { replacements: { keep: pair.keep, drop: pair.drop } },
       );
     }
