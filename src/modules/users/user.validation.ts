@@ -59,7 +59,7 @@ export const resetPasswordSchema = z.object({
 // ── Query / List Users ──
 export const userQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(200).default(20),
   sort: z
     .enum(["created_at", "updated_at", "full_name", "email", "role"])
     .default("created_at"),

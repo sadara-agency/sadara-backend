@@ -55,15 +55,7 @@ export async function listAssignments(
       {
         model: User,
         as: "coachUser",
-        attributes: [
-          "id",
-          "firstName",
-          "lastName",
-          "firstNameAr",
-          "lastNameAr",
-          "role",
-          "email",
-        ],
+        attributes: ["id", "fullName", "fullNameAr", "role", "email"],
       },
     ],
   });
@@ -88,15 +80,7 @@ export async function getAssignmentById(id: string, _user?: AuthUser) {
       {
         model: User,
         as: "coachUser",
-        attributes: [
-          "id",
-          "firstName",
-          "lastName",
-          "firstNameAr",
-          "lastNameAr",
-          "role",
-          "email",
-        ],
+        attributes: ["id", "fullName", "fullNameAr", "role", "email"],
       },
     ],
   });
