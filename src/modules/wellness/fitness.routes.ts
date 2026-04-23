@@ -5,6 +5,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
   createExerciseSchema,
@@ -18,6 +19,7 @@ import * as ctrl from "./fitness.controller";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("wellness"));
 
 // ══════════════════════════════════════════
 // PLAYER SELF-SERVICE (must come before :id catch-all)

@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { authenticate, authorizeModule } from "@middleware/auth";
+import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
@@ -13,6 +14,7 @@ import * as ctrl from "./devReview.controller";
 
 const router = Router();
 router.use(authenticate);
+router.use(dynamicFieldAccess("dev-reviews"));
 
 // GET /api/v1/training/reviews
 router.get(
