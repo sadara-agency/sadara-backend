@@ -9,6 +9,11 @@ import { sequelize } from "@config/database";
  */
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM pg_type WHERE typname = 'enum_contracts_category'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await sequelize.query(`
     ALTER TYPE "enum_contracts_category"
     ADD VALUE IF NOT EXISTS 'Agency';
