@@ -5,6 +5,11 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [guard] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+  );
+  if ((guard as unknown[]).length === 0) return;
+
   const [r] = await sequelize.query(
     `SELECT to_regclass('public.users') AS tbl`,
   );
