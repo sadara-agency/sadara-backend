@@ -40,6 +40,7 @@ export async function up({
           ON matches (provider_source, external_match_id)
           WHERE external_match_id IS NOT NULL;
       END IF;
+    EXCEPTION WHEN undefined_table THEN NULL;
     END
     $$;
   `);
