@@ -2,6 +2,11 @@ import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'offers' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Discover the actual enum type name for offers.status
   // (Sequelize may use enum_offers_status, or pg may assign a different name)
   const [row] = await sequelize.query<{ typname: string }>(
@@ -36,6 +41,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'offers' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Revert Accepted/Rejected back to Closed
   await sequelize.query(
     `UPDATE offers SET status = 'Closed' WHERE status IN ('Accepted', 'Rejected')`,

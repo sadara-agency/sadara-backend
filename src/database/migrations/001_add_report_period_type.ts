@@ -1,6 +1,11 @@
 import { sequelize } from "@config/database";
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'technical_reports' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Create ENUM type if it doesn't exist
   await sequelize.query(`
     DO $$ BEGIN
@@ -40,6 +45,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'technical_reports' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await sequelize.query(`
     ALTER TABLE technical_reports
       DROP COLUMN IF EXISTS period_type,

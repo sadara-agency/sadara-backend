@@ -8,6 +8,11 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'wellness_checkins' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await queryInterface.addColumn("wellness_checkins", "training_type", {
     type: DataTypes.STRING(20),
     allowNull: true,
@@ -35,6 +40,11 @@ export async function down({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  const [rows] = await queryInterface.sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'wellness_checkins' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await queryInterface.removeColumn("wellness_checkins", "training_block_id");
   await queryInterface.removeColumn("wellness_checkins", "nutrition_rating");
   await queryInterface.removeColumn("wellness_checkins", "training_type");

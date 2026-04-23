@@ -12,6 +12,11 @@ import { QueryTypes } from "sequelize";
  */
 
 export async function up() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'referrals' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // ── 1. Expand referral_type enum ──
   // Discover the actual enum type name
   const [typeRow] = await sequelize.query<{ typname: string }>(
@@ -117,6 +122,11 @@ export async function up() {
 }
 
 export async function down() {
+  const [rows] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'referrals' AND table_schema = 'public'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   // Rename closed_at back to resolved_at
   const [closedCol] = await sequelize.query<{ column_name: string }>(
     `SELECT column_name FROM information_schema.columns
