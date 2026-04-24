@@ -49,12 +49,10 @@ export async function seedTournaments(req: AuthRequest, res: Response) {
 
 export async function fetchFromSaff(req: AuthRequest, res: Response) {
   if (!env.redis.url) {
-    res
-      .status(503)
-      .json({
-        success: false,
-        message: "Queue unavailable — REDIS_URL not configured",
-      });
+    res.status(503).json({
+      success: false,
+      message: "Queue unavailable — REDIS_URL not configured",
+    });
     return;
   }
   const jobId = await enqueue(QueueName.SaffFetch, "scrape", {
@@ -182,7 +180,8 @@ export async function bulkFetchMenLeagues(req: AuthRequest, res: Response) {
 // ── Stats ──
 
 export async function getStats(req: AuthRequest, res: Response) {
-  const stats = await saffService.getStats();
+  const season = req.query.season as string | undefined;
+  const stats = await saffService.getStats(season);
   sendSuccess(res, stats);
 }
 
@@ -273,12 +272,10 @@ export async function triggerSync(req: AuthRequest, res: Response) {
 
 export async function syncTournaments(req: AuthRequest, res: Response) {
   if (!env.redis.url) {
-    res
-      .status(503)
-      .json({
-        success: false,
-        message: "Queue unavailable — REDIS_URL not configured",
-      });
+    res.status(503).json({
+      success: false,
+      message: "Queue unavailable — REDIS_URL not configured",
+    });
     return;
   }
   const season = req.body.season || getCurrentSeason();

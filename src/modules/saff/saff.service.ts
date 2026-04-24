@@ -1183,14 +1183,17 @@ export async function bulkFetchMenLeagues(season: string) {
 // STATISTICS
 // ══════════════════════════════════════════
 
-export async function getStats() {
+export async function getStats(season?: string) {
+  const unmappedWhere: Record<string, unknown> = { clubId: null };
+  if (season) unmappedWhere.season = season;
+
   const [tournaments, standings, fixtures, teamMaps, unmapped] =
     await Promise.all([
       SaffTournament.count({ where: { isActive: true } }),
       SaffStanding.count(),
       SaffFixture.count(),
       SaffTeamMap.count(),
-      SaffTeamMap.count({ where: { clubId: null } }),
+      SaffTeamMap.count({ where: unmappedWhere }),
     ]);
 
   return {
