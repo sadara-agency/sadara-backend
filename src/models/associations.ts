@@ -82,6 +82,7 @@ import TransferWindow from "@modules/transfer-windows/transferWindow.model";
 import ClubNeed from "@modules/club-needs/clubNeed.model";
 import PlayerCoachAssignment from "@modules/player-coach-assignments/playerCoachAssignment.model";
 import { ScoringCard } from "@modules/scouting/scoringCard.model";
+import WatchlistVideoClip from "@modules/scouting/watchlist-video-clip.model";
 
 let associationsReady = false;
 
@@ -583,6 +584,19 @@ export function setupAssociations() {
   ScoringCard.belongsTo(TransferWindow, {
     foreignKey: "windowId",
     as: "window",
+  });
+
+  // ── Watchlist Video Clips ──
+  // Alias `videoClipsList` to avoid colliding with the scalar `videoClips`
+  // count column on Watchlist.
+  Watchlist.hasMany(WatchlistVideoClip, {
+    foreignKey: "watchlistId",
+    as: "videoClipsList",
+    onDelete: "CASCADE",
+  });
+  WatchlistVideoClip.belongsTo(Watchlist, {
+    foreignKey: "watchlistId",
+    as: "watchlist",
   });
 
   // ── Training Blocks (Wellness Phase 2) ──
