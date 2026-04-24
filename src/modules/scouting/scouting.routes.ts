@@ -190,6 +190,42 @@ router.post(
   asyncHandler(ctrl.signProspect),
 );
 
+// ── Video Clips ──
+import {
+  addVideoClipLinkSchema,
+  videoClipParamSchema,
+} from "@modules/scouting/watchlist-video-clip.validation";
+import * as videoClipCtrl from "@modules/scouting/watchlist-video-clip.controller";
+import { uploadVideo, verifyFileType } from "@middleware/upload";
+
+router.get(
+  "/watchlist/:watchlistId/video-clips",
+  authorizeModule("scouting", "read"),
+  asyncHandler(videoClipCtrl.list),
+);
+
+router.post(
+  "/watchlist/:watchlistId/video-clips/link",
+  authorizeModule("scouting", "create"),
+  validate(addVideoClipLinkSchema),
+  asyncHandler(videoClipCtrl.addLink),
+);
+
+router.post(
+  "/watchlist/:watchlistId/video-clips/upload",
+  authorizeModule("scouting", "create"),
+  uploadVideo,
+  verifyFileType,
+  asyncHandler(videoClipCtrl.upload),
+);
+
+router.delete(
+  "/watchlist/:watchlistId/video-clips/:id",
+  authorizeModule("scouting", "delete"),
+  validate(videoClipParamSchema, "params"),
+  asyncHandler(videoClipCtrl.remove),
+);
+
 // ── Scoring Cards (Transfer Framework T2) ──
 import {
   upsertScoringCardSchema,
