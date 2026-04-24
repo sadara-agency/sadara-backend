@@ -14,9 +14,13 @@ export async function up({
   );
   if ((rows as unknown[]).length === 0) return;
 
-  await queryInterface.createTable(
-    "watchlist_video_clips",
-    {
+  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
+
+  const [tableRows] = await seq.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'watchlist_video_clips'`,
+  );
+  if ((tableRows as unknown[]).length === 0) {
+    await queryInterface.createTable("watchlist_video_clips", {
       id: {
         type: DataTypes.UUID,
         defaultValue: DataTypes.UUIDV4,
@@ -69,12 +73,10 @@ export async function up({
         type: DataTypes.DATE,
         allowNull: false,
       },
-    },
-    { ifNotExists: true },
-  );
+    });
+  }
 
-  // Use raw SQL so this is idempotent if the table already existed
-  await (queryInterface as unknown as { sequelize: Sequelize }).sequelize.query(
+  await seq.query(
     `CREATE INDEX IF NOT EXISTS watchlist_video_clips_watchlist_id_idx
      ON watchlist_video_clips (watchlist_id)`,
   );
