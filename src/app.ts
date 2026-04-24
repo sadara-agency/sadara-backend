@@ -259,16 +259,28 @@ app.get(
 // The "ready" field tells callers whether the app is fully initialized.
 app.get("/api/health", async (_req, res) => {
   // Lazy import to avoid circular dependency
-  const { appReady, initError } = await import("./index");
+  const { appReady, initError, isShuttingDown } = await import("./index");
+
+  // Return 503 immediately during shutdown so load balancers stop routing here
+  if (isShuttingDown) {
+    res
+      .status(503)
+      .json({ status: "shutting_down", ready: false, service: "sadara-api" });
+    return;
+  }
 
   const checks: Record<string, "ok" | "error"> = {};
 
-  // Always attempt checks so we can diagnose startup failures
+  // Always attempt checks so we can diagnose startup failures.
+  // Guard against the ConnectionManager being closed concurrently.
   try {
     await sequelize.authenticate();
     checks.database = "ok";
-  } catch {
-    checks.database = "error";
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    checks.database = msg.includes("connection manager was closed")
+      ? "ok" // shutdown just started — was healthy a moment ago
+      : "error";
   }
 
   try {

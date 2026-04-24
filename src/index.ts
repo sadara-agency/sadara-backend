@@ -330,6 +330,8 @@ function printBanner(): void {
 export let appReady = false;
 /** Exported so the health endpoint can surface what went wrong. */
 export let initError: string | undefined;
+/** Exported so the health endpoint skips DB checks during graceful shutdown. */
+export let isShuttingDown = false;
 
 async function runInit(): Promise<void> {
   logger.info("[boot] Retrying init sequence...");
@@ -349,8 +351,12 @@ async function bootstrap(): Promise<void> {
   // These are always fatal. If they fail, throw immediately — do NOT enter
   // degraded mode. Cloud Run will restart the container and retry.
   // A missing table is not a gracefully-recoverable condition.
+  //
+  // 90s timeout: Cloud SQL Auth Proxy sidecar may take up to ~30s to accept
+  // connections after container start; with connectTimeout=5s + 5s delay per
+  // retry, 90s allows ~6 attempts before giving up.
   logger.info("[boot] Connecting to database...");
-  await withTimeout(testConnection(), 30_000, "testConnection");
+  await withTimeout(testConnection(), 90_000, "testConnection");
   logger.info("[boot] Running migrations...");
   await setMigrationTimeouts();
   await withTimeout(migrator.up(), 180_000, "migrator.up");
@@ -423,6 +429,7 @@ async function bootstrap(): Promise<void> {
 // ─────────────────────────────────────────────
 
 async function shutdown(): Promise<void> {
+  isShuttingDown = true;
   logger.info("[shutdown] Graceful shutdown started...");
   if (httpServer) {
     logger.info("[shutdown] Closing HTTP server...");
@@ -461,4 +468,9 @@ process.on("uncaughtException", (err: Error) => {
   process.exit(1);
 });
 
-bootstrap();
+bootstrap().catch((err: unknown) => {
+  logger.error("[boot] Fatal unhandled bootstrap error", {
+    error: err instanceof Error ? err.message : String(err),
+  });
+  process.exit(1);
+});
