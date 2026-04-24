@@ -271,7 +271,7 @@ function startServer(): Promise<void> {
       printBanner();
       resolve();
     });
-    server.timeout = 120000;
+    server.timeout = 600000; // 10 min — SSE uses req.socket.setTimeout(0) to exempt itself
     server.keepAliveTimeout = 65000;
 
     server.on("error", (err: NodeJS.ErrnoException) => {
