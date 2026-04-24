@@ -164,8 +164,8 @@ export async function up() {
 
   for (const perm of sportingDirectorPerms) {
     await sequelize.query(
-      `INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete)
-       VALUES ('SportingDirector', :module, :canCreate, :canRead, :canUpdate, :canDelete)
+      `INSERT INTO role_permissions (id, role, module, can_create, can_read, can_update, can_delete)
+       VALUES (gen_random_uuid(), 'SportingDirector', :module, :canCreate, :canRead, :canUpdate, :canDelete)
        ON CONFLICT (role, module) DO UPDATE
          SET can_create = EXCLUDED.can_create,
              can_read   = EXCLUDED.can_read,
@@ -187,8 +187,8 @@ export async function up() {
   // Manager + Executive: read on staffMonitoring only
   for (const role of ["Manager", "Executive"]) {
     await sequelize.query(
-      `INSERT INTO role_permissions (role, module, can_create, can_read, can_update, can_delete)
-       VALUES (:role, 'staffMonitoring', false, true, false, false)
+      `INSERT INTO role_permissions (id, role, module, can_create, can_read, can_update, can_delete)
+       VALUES (gen_random_uuid(), :role, 'staffMonitoring', false, true, false, false)
        ON CONFLICT (role, module) DO UPDATE
          SET can_read = true`,
       { replacements: { role }, type: QueryTypes.RAW },
