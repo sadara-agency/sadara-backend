@@ -285,6 +285,9 @@ export async function handleSSEConnection(
   }
 
   // ── SSE Headers ──
+  // Disable the Node.js server-level socket timeout for this connection —
+  // server.timeout (default 120s) would otherwise kill long-lived SSE sockets.
+  req.socket.setTimeout(0);
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache, no-transform",

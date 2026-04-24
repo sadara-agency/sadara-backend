@@ -40,6 +40,9 @@ const sequelizeOptions: Options = {
 
   dialectOptions: {
     useUTC: true,
+    // Fail fast if the DB socket isn't reachable (prevents server.timeout from
+    // firing a raw "Service Unavailable" before the health endpoint can respond)
+    connectTimeout: 5000,
     // Cloud SQL Auth Proxy handles encryption — no SSL needed
     // External hosts (Supabase, etc.) in production need SSL
     ...(env.nodeEnv === "production" &&
