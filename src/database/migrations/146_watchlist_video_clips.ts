@@ -1,10 +1,19 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface, DataTypes, Sequelize } from "sequelize";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  // Fresh-DB guard: watchlists is a baseline table that may not exist on a clean CI DB.
+  // All migrations that FK-reference baseline tables must guard this way.
+  const [rows] = await (
+    queryInterface as unknown as { sequelize: Sequelize }
+  ).sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'watchlists'`,
+  );
+  if ((rows as unknown[]).length === 0) return;
+
   await queryInterface.createTable("watchlist_video_clips", {
     id: {
       type: DataTypes.UUID,
