@@ -140,51 +140,49 @@ async function initApplication(): Promise<void> {
   );
 
   logger.info("[app] Loading engine configs...");
-  await withTimeout(
-    loadTaskRuleConfigFromDB(),
-    CFG_TIMEOUT,
-    "loadTaskRuleConfig",
-  );
-  await withTimeout(
-    loadPerformanceTrendConfig(),
-    CFG_TIMEOUT,
-    "loadPerformanceTrendConfig",
-  );
-  await withTimeout(
-    loadInjuryIntelConfig(),
-    CFG_TIMEOUT,
-    "loadInjuryIntelConfig",
-  );
-  await withTimeout(
-    loadContractLifecycleConfig(),
-    CFG_TIMEOUT,
-    "loadContractLifecycleConfig",
-  );
-  await withTimeout(
-    loadFinancialIntelConfig(),
-    CFG_TIMEOUT,
-    "loadFinancialIntelConfig",
-  );
-  await withTimeout(
-    loadGateOnboardingConfig(),
-    CFG_TIMEOUT,
-    "loadGateOnboardingConfig",
-  );
-  await withTimeout(
-    loadScoutingPipelineConfig(),
-    CFG_TIMEOUT,
-    "loadScoutingPipelineConfig",
-  );
-  await withTimeout(
-    loadTrainingDevConfig(),
-    CFG_TIMEOUT,
-    "loadTrainingDevConfig",
-  );
-  await withTimeout(
-    loadSystemHealthConfig(),
-    CFG_TIMEOUT,
-    "loadSystemHealthConfig",
-  );
+  const configResults = await Promise.allSettled([
+    withTimeout(loadTaskRuleConfigFromDB(), CFG_TIMEOUT, "loadTaskRuleConfig"),
+    withTimeout(
+      loadPerformanceTrendConfig(),
+      CFG_TIMEOUT,
+      "loadPerformanceTrendConfig",
+    ),
+    withTimeout(loadInjuryIntelConfig(), CFG_TIMEOUT, "loadInjuryIntelConfig"),
+    withTimeout(
+      loadContractLifecycleConfig(),
+      CFG_TIMEOUT,
+      "loadContractLifecycleConfig",
+    ),
+    withTimeout(
+      loadFinancialIntelConfig(),
+      CFG_TIMEOUT,
+      "loadFinancialIntelConfig",
+    ),
+    withTimeout(
+      loadGateOnboardingConfig(),
+      CFG_TIMEOUT,
+      "loadGateOnboardingConfig",
+    ),
+    withTimeout(
+      loadScoutingPipelineConfig(),
+      CFG_TIMEOUT,
+      "loadScoutingPipelineConfig",
+    ),
+    withTimeout(loadTrainingDevConfig(), CFG_TIMEOUT, "loadTrainingDevConfig"),
+    withTimeout(
+      loadSystemHealthConfig(),
+      CFG_TIMEOUT,
+      "loadSystemHealthConfig",
+    ),
+  ]);
+  const configFailures = configResults.filter((r) => r.status === "rejected");
+  if (configFailures.length > 0) {
+    configFailures.forEach((r) =>
+      logger.warn("[app] Engine config load failed", {
+        error: (r as PromiseRejectedResult).reason?.message,
+      }),
+    );
+  }
   logger.info("[app] All engine configs loaded");
 
   await withTimeout(
@@ -231,38 +229,8 @@ async function startSchedulers(): Promise<void> {
 // ─────────────────────────────────────────────
 
 import http from "http";
-import { execSync } from "child_process";
 
 let httpServer: http.Server | null = null;
-
-/** Kill whatever is holding `port` (Windows-only helper). */
-function killPortHolder(port: number): boolean {
-  try {
-    const out = execSync(
-      `netstat -ano | findstr ":${port}" | findstr "LISTEN"`,
-      {
-        encoding: "utf8",
-      },
-    );
-    const pids = new Set(
-      out
-        .split("\n")
-        .map((l) => l.trim().split(/\s+/).pop())
-        .filter((p): p is string => !!p && /^\d+$/.test(p)),
-    );
-    for (const pid of pids) {
-      try {
-        execSync(`taskkill /F /PID ${pid}`, { stdio: "ignore" });
-        logger.warn(`Killed stale process ${pid} on port ${port}`);
-      } catch {
-        /* already gone */
-      }
-    }
-    return pids.size > 0;
-  } catch {
-    return false;
-  }
-}
 
 function startServer(): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -275,20 +243,7 @@ function startServer(): Promise<void> {
     server.keepAliveTimeout = 65000;
 
     server.on("error", (err: NodeJS.ErrnoException) => {
-      if (err.code === "EADDRINUSE") {
-        logger.warn(
-          `Port ${env.port} in use — killing stale process and retrying…`,
-        );
-        if (killPortHolder(env.port)) {
-          setTimeout(() => {
-            server.listen(env.port);
-          }, 1000);
-        } else {
-          reject(err);
-        }
-      } else {
-        reject(err);
-      }
+      reject(err);
     });
   });
 }
@@ -431,6 +386,11 @@ async function bootstrap(): Promise<void> {
 async function shutdown(): Promise<void> {
   isShuttingDown = true;
   logger.info("[shutdown] Graceful shutdown started...");
+
+  // Close SSE connections FIRST so server.close() doesn't hang waiting for them
+  logger.info("[shutdown] Closing SSE subscriber...");
+  await closeSSESubscriber();
+
   if (httpServer) {
     logger.info("[shutdown] Closing HTTP server...");
     await new Promise<void>((res) => httpServer!.close(() => res()));
@@ -442,8 +402,6 @@ async function shutdown(): Promise<void> {
   await stopWorkers();
   await closeAllQueues();
   await closeQueueRedis();
-  logger.info("[shutdown] Closing SSE subscriber...");
-  await closeSSESubscriber();
   logger.info("[shutdown] Closing Redis...");
   await closeRedis();
   logger.info("[shutdown] Closing database...");
