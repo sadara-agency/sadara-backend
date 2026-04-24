@@ -110,16 +110,6 @@ async function initInfrastructure(): Promise<void> {
   // Register associations AFTER tables exist so FK constraints are valid
   setupAssociations();
   logger.info("[infra] Model associations registered");
-
-  // Set lock/statement timeouts so migrations fail fast instead of hanging
-  await setMigrationTimeouts();
-  logger.info("[infra] Running migrations...");
-  await withTimeout(migrator.up(), 180_000, "migrator.up");
-  logger.info("[infra] Migrations complete");
-
-  // Reset to defaults so normal app queries aren't constrained
-  await sequelize.query("RESET lock_timeout");
-  await sequelize.query("RESET statement_timeout");
 }
 
 // ─────────────────────────────────────────────
@@ -351,10 +341,25 @@ async function runInit(): Promise<void> {
 }
 
 async function bootstrap(): Promise<void> {
+  // Start HTTP server FIRST so Cloud Run sees the port open quickly
+  logger.info("[boot] Starting HTTP server...");
+  await startServer();
+
+  // ── Mandatory pre-flight: DB connection + migrations ──────────────────────
+  // These are always fatal. If they fail, throw immediately — do NOT enter
+  // degraded mode. Cloud Run will restart the container and retry.
+  // A missing table is not a gracefully-recoverable condition.
+  logger.info("[boot] Connecting to database...");
+  await withTimeout(testConnection(), 30_000, "testConnection");
+  logger.info("[boot] Running migrations...");
+  await setMigrationTimeouts();
+  await withTimeout(migrator.up(), 180_000, "migrator.up");
+  await sequelize.query("RESET lock_timeout");
+  await sequelize.query("RESET statement_timeout");
+  logger.info("[boot] Migrations complete");
+  // ──────────────────────────────────────────────────────────────────────────
+
   try {
-    // Start HTTP server FIRST so Cloud Run sees the port open quickly
-    logger.info("[boot] Starting HTTP server...");
-    await startServer();
     logger.info("[boot] Phase 1/3 — Infrastructure");
     await initInfrastructure();
     logger.info("[boot] Phase 2/3 — Application");
