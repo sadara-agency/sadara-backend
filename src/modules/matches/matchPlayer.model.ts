@@ -11,13 +11,15 @@ export interface MatchPlayerAttributes {
   positionInMatch?: string | null;
   minutesPlayed?: number | null;
   notes?: string | null;
+  // Phase 3 — links the player call-up to a specific squad (migration 150)
+  squadId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface MatchPlayerCreationAttributes extends Optional<
   MatchPlayerAttributes,
-  "id" | "availability" | "createdAt" | "updatedAt"
+  "id" | "availability" | "squadId" | "createdAt" | "updatedAt"
 > {}
 
 // ── Model Class ──
@@ -38,6 +40,7 @@ export class MatchPlayer
   declare positionInMatch: string | null;
   declare minutesPlayed: number | null;
   declare notes: string | null;
+  declare squadId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -86,6 +89,13 @@ MatchPlayer.init(
     },
     notes: {
       type: DataTypes.TEXT,
+    },
+    // Phase 3 — populated by SAFF wizard apply (migration 150 added the DB column)
+    squadId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "squad_id",
+      references: { model: "squads", key: "id" },
     },
   },
   {

@@ -66,6 +66,8 @@ export interface PreviewPayload {
     }>;
     competitions: Array<{ saffId: number; name: string }>;
     clubCompetitions: number;
+    // Phase 3 — squads auto-created from tournament context
+    squads: Array<{ clubId: string; displayName: string; ageCategory: string }>;
   };
   willUpdate: {
     clubs: Array<{ id: string; name: string; fields: string[] }>;
@@ -102,6 +104,7 @@ export interface AppliedSummary {
   competitionsCreated: number;
   playersLinked: number;
   skippedTeams: number;
+  squadsCreated: number; // Phase 3
 }
 
 interface SaffImportSessionAttributes {

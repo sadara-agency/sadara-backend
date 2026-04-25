@@ -20,6 +20,8 @@ export interface MatchAttributes {
   broadcast?: string | null;
   notes?: string | null;
   externalMatchId?: string | null;
+  /** Raw provider-side match id (e.g. SAFF+ url-suffix). See migration 158. */
+  providerMatchId?: string | null;
   homeTeamName?: string | null;
   awayTeamName?: string | null;
   providerSource?: string | null;
@@ -31,13 +33,22 @@ export interface MatchAttributes {
   penaltyAway?: number | null;
   extraTime?: boolean;
   isNeutralVenue?: boolean;
+  // Phase 3 — squad-aware matches (migration 150 added columns; Phase 3 populates them)
+  homeSquadId?: string | null;
+  awaySquadId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface MatchCreationAttributes extends Optional<
   MatchAttributes,
-  "id" | "status" | "displayId" | "createdAt" | "updatedAt"
+  | "id"
+  | "status"
+  | "displayId"
+  | "homeSquadId"
+  | "awaySquadId"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 // ── Model Class ──
@@ -62,6 +73,7 @@ export class Match
   declare broadcast: string | null;
   declare notes: string | null;
   declare externalMatchId: string | null;
+  declare providerMatchId: string | null;
   declare homeTeamName: string | null;
   declare awayTeamName: string | null;
   declare providerSource: string | null;
@@ -73,6 +85,9 @@ export class Match
   declare penaltyAway: number | null;
   declare extraTime: boolean;
   declare isNeutralVenue: boolean;
+  // Phase 3
+  declare homeSquadId: string | null;
+  declare awaySquadId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 
@@ -150,6 +165,11 @@ Match.init(
       type: DataTypes.STRING(100),
       field: "external_match_id",
     },
+    providerMatchId: {
+      type: DataTypes.STRING(120),
+      field: "provider_match_id",
+      allowNull: true,
+    },
     homeTeamName: {
       type: DataTypes.STRING(255),
       field: "home_team_name",
@@ -180,6 +200,19 @@ Match.init(
       type: DataTypes.BOOLEAN,
       defaultValue: false,
       field: "is_neutral_venue",
+    },
+    // Phase 3 — populated by SAFF wizard apply (migration 150 added the DB columns)
+    homeSquadId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "home_squad_id",
+      references: { model: "squads", key: "id" },
+    },
+    awaySquadId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "away_squad_id",
+      references: { model: "squads", key: "id" },
     },
   },
   {

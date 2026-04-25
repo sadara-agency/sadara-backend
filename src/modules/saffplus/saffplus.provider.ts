@@ -21,6 +21,7 @@ import type {
   SaffPlusStanding,
   SaffPlusMatch,
 } from "./saffplus.types";
+import type { MatchEventType } from "@modules/matches/matchEvent.model";
 
 const BASE_URL = "https://saffplus.sa";
 const TIMEOUT = 15000;
@@ -70,6 +71,588 @@ function extractRscData(html: string): string[] {
     }
   }
   return chunks;
+}
+
+// ══════════════════════════════════════════
+// WOMEN'S LEAGUE FILTER
+// ══════════════════════════════════════════
+
+// Multi-signal detection. SAFF+ exposes a `gender` field on some
+// competition payloads but not all, so we also check slug and name
+// substrings in both Arabic and English.
+const WOMEN_GENDER_VALUES = new Set([
+  "female",
+  "women",
+  "womens",
+  "w",
+  "ladies",
+  "girls",
+]);
+
+const WOMEN_SLUG_FRAGMENTS = [
+  "women",
+  "womens",
+  "ladies",
+  "girls",
+  "female",
+  "wsl",
+  "w-league",
+];
+
+// Arabic women keywords: نساء (women), سيدات (ladies), فتيات (girls),
+// بنات (girls), النسائية (the women's), السيدات (the ladies').
+const WOMEN_ARABIC_FRAGMENTS = [
+  "نساء",
+  "سيدات",
+  "فتيات",
+  "بنات",
+  "النسائية",
+  "السيدات",
+];
+
+/**
+ * Returns true when any signal (explicit gender field, URL slug, or
+ * Arabic/English name substring) indicates this is a women's competition.
+ *
+ * Used by Layer-1 of the women's filter — provider-side rejection — so
+ * we never persist women's competitions, clubs, or fixtures. The service
+ * layer adds a belt-and-suspenders check on the same signals.
+ */
+export function isWomensCompetition(input: {
+  gender?: string | null;
+  slug?: string | null;
+  name?: string | null;
+  nameAr?: string | null;
+}): boolean {
+  if (input.gender) {
+    const g = input.gender.toLowerCase().trim();
+    if (WOMEN_GENDER_VALUES.has(g)) return true;
+  }
+
+  const slug = (input.slug ?? "").toLowerCase();
+  if (slug && WOMEN_SLUG_FRAGMENTS.some((f) => slug.includes(f))) return true;
+
+  const en = (input.name ?? "").toLowerCase();
+  if (en && WOMEN_SLUG_FRAGMENTS.some((f) => en.includes(f))) return true;
+
+  const ar = input.nameAr ?? "";
+  if (ar && WOMEN_ARABIC_FRAGMENTS.some((f) => ar.includes(f))) return true;
+
+  return false;
+}
+
+// ══════════════════════════════════════════
+// ARABIC NAME NORMALIZATION (used by the player matcher)
+// ══════════════════════════════════════════
+
+/**
+ * Normalize an Arabic name so trigram similarity comparisons treat
+ * common spelling variants as equivalent. Idempotent — safe to run
+ * twice. Latin text passes through untouched (the function only
+ * targets Arabic codepoints).
+ *
+ * Transformations applied (in order):
+ *   1. Strip tashkeel diacritics (U+064B–U+065F, U+0670)
+ *   2. Strip tatweel (kashida) elongation (U+0640)
+ *   3. Alef variants → bare alef (أ إ آ → ا)
+ *   4. Alef maksura → ya (ى → ي)
+ *   5. Tah marbuta → ha (ة → ه)
+ *   6. Collapse internal whitespace, trim ends
+ */
+export function normalizeArabicName(input: string): string {
+  if (!input) return "";
+  return input
+    .replace(/[ً-ٰٟ]/g, "")
+    .replace(/ـ/g, "")
+    .replace(/[أإآ]/g, "ا")
+    .replace(/ى/g, "ي")
+    .replace(/ة/g, "ه")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Normalize an SAFF+-emitted age-category label to the canonical
+ * Sadara form used by `squads.age_category`. Tolerant of "U-18",
+ * "Under 18", "u18", "تحت 18", "Senior", "First Team".
+ *
+ * Returns `'senior'` as a safe default when nothing matches — the
+ * caller should treat that as low-confidence and confirm via the
+ * SAFF+ team URL slug if available.
+ */
+export function normalizeAgeCategory(input: string | null | undefined): string {
+  if (!input) return "senior";
+  const s = input.toLowerCase().replace(/[-_\s]/g, "");
+
+  // u17 / u-17 / under17 / under 17
+  const en = s.match(/u(?:nder)?(\d{1,2})/);
+  if (en) return `u${en[1]}`;
+
+  if (
+    s.includes("senior") ||
+    s.includes("first") ||
+    s.includes("الأول") ||
+    s.includes("الاول")
+  ) {
+    return "senior";
+  }
+
+  // Arabic: "تحت 18" / "تحت18"
+  const ar = input.match(/تحت\s*(\d{1,2})/);
+  if (ar) return `u${ar[1]}`;
+
+  // Arabic: "ناشئين" (youth, u17ish), "براعم" (cubs, u13ish), "أشبال" (cadets, u15ish)
+  if (input.includes("ناشئين")) return "u17";
+  if (input.includes("أشبال") || input.includes("اشبال")) return "u15";
+  if (input.includes("براعم")) return "u13";
+
+  return "senior";
+}
+
+// ══════════════════════════════════════════
+// CLUB SQUAD + ROSTER SCRAPING
+// ══════════════════════════════════════════
+
+export interface SaffPlusClubSquad {
+  id: string; // SAFF+ team/squad slug or numeric id
+  name: string;
+  nameAr?: string;
+  ageCategory: string; // normalized via normalizeAgeCategory
+  division: string | null;
+  parentClubSlug: string;
+  rosterPath?: string; // path to fetch the roster, when distinct from squadPath
+}
+
+export interface SaffPlusRosterEntry {
+  externalId: string | null;
+  name: string;
+  nameAr?: string | null;
+  dob: string | null; // ISO YYYY-MM-DD when available
+  nationality: string | null;
+  jerseyNumber: number | null;
+  position: string | null;
+  raw: Record<string, unknown>;
+}
+
+/**
+ * Scrape the squad list under a SAFF+ club detail page.
+ *
+ * URL strategy: SAFF+ club detail pages list age-group teams as cards
+ * or tabs. We try `/ar/clubs/{slug}` first (richest with Arabic names)
+ * then `/en/clubs/{slug}`. The RSC payload usually exposes a `teams`
+ * or `squads` array with name + age_category fields.
+ *
+ * Falls back to scanning DOM anchors that link to a per-squad page
+ * when RSC parsing yields nothing.
+ */
+export async function scrapeClubSquads(
+  clubSlug: string,
+): Promise<SaffPlusClubSquad[]> {
+  const seen = new Map<string, SaffPlusClubSquad>();
+  const paths = [`/ar/clubs/${clubSlug}`, `/en/clubs/${clubSlug}`];
+
+  for (const path of paths) {
+    let html: string;
+    try {
+      html = await fetchPage(path);
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] scrapeClubSquads: ${path} failed — ${(err as Error).message}`,
+      );
+      await sleep(1500);
+      continue;
+    }
+    await sleep(1500);
+
+    // Layer 1 — RSC. Look for objects with both name and age/category fields.
+    const rscChunks = extractRscData(html);
+    for (const chunk of rscChunks) {
+      const blocks = chunk.matchAll(
+        /\{[^{}]*?"(?:slug|id)"\s*:\s*"([^"]+)"[^{}]{0,400}?"(?:name|title)"\s*:\s*"([^"]+)"[^{}]*?\}/gs,
+      );
+      for (const block of blocks) {
+        const id = block[1];
+        const name = block[2];
+        if (!id || !name) continue;
+        if (id === clubSlug) continue; // skip the parent club itself
+
+        const text = block[0];
+        const nameAr = text.match(/"name_ar"\s*:\s*"([^"]+)"/)?.[1];
+        const rawAge =
+          text.match(/"age_category"\s*:\s*"([^"]+)"/)?.[1] ??
+          text.match(/"category"\s*:\s*"([^"]+)"/)?.[1] ??
+          text.match(/"age_group"\s*:\s*"([^"]+)"/)?.[1];
+        const division = text.match(/"division"\s*:\s*"([^"]+)"/)?.[1] ?? null;
+
+        // Heuristic: only treat as a squad if it has an age signal OR the
+        // name itself implies one (avoids picking up sponsor links etc.)
+        const looksLikeSquad =
+          rawAge != null ||
+          /u-?\d{1,2}|under\s*\d{1,2}|senior|first/i.test(name) ||
+          /تحت|الأول|الاول|ناشئين|اشبال|أشبال|براعم/i.test(name) ||
+          (nameAr != null &&
+            /تحت|الأول|الاول|ناشئين|اشبال|أشبال|براعم/.test(nameAr));
+        if (!looksLikeSquad) continue;
+
+        const ageCategory = normalizeAgeCategory(rawAge ?? nameAr ?? name);
+        seen.set(id, {
+          id,
+          name,
+          nameAr,
+          ageCategory,
+          division,
+          parentClubSlug: clubSlug,
+        });
+      }
+    }
+
+    // Layer 2 — DOM anchors, in case RSC parsing missed everything.
+    if (seen.size === 0) {
+      const $ = cheerio.load(html);
+      $(`a[href*="/clubs/${clubSlug}/"]`).each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const sub = href.replace(`/clubs/${clubSlug}/`, "").split(/[/?]/)[0];
+        if (!sub) return;
+        const name = $(el).text().trim().split("\n")[0]?.trim();
+        if (!name) return;
+        if (seen.has(sub)) return;
+        seen.set(sub, {
+          id: sub,
+          name,
+          ageCategory: normalizeAgeCategory(name),
+          division: null,
+          parentClubSlug: clubSlug,
+          rosterPath: href,
+        });
+      });
+    }
+
+    if (seen.size > 0) break;
+  }
+
+  const squads = Array.from(seen.values());
+  logger.info(`[SAFF+] scrapeClubSquads(${clubSlug}): ${squads.length} squads`);
+  return squads;
+}
+
+/**
+ * Scrape a single squad's roster from SAFF+. Tries the per-squad URL
+ * first; if that 404s, walks the parent club's combined roster page
+ * and filters to entries matching the squad slug.
+ */
+export async function scrapeSquadRoster(
+  parentClubSlug: string,
+  squadSlug: string,
+  _season?: string,
+): Promise<SaffPlusRosterEntry[]> {
+  const seen = new Map<string, SaffPlusRosterEntry>();
+  const paths = [
+    `/ar/clubs/${parentClubSlug}/${squadSlug}/players`,
+    `/ar/clubs/${parentClubSlug}/${squadSlug}/squad`,
+    `/ar/clubs/${parentClubSlug}/players`,
+    `/en/clubs/${parentClubSlug}/${squadSlug}/players`,
+  ];
+
+  for (const path of paths) {
+    let html: string;
+    try {
+      html = await fetchPage(path);
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] scrapeSquadRoster: ${path} failed — ${(err as Error).message}`,
+      );
+      await sleep(1500);
+      continue;
+    }
+    await sleep(1500);
+
+    const rscChunks = extractRscData(html);
+    for (const entry of extractRosterFromRsc(rscChunks)) {
+      const key = entry.externalId ?? `${entry.name}|${entry.dob ?? ""}`;
+      if (!seen.has(key)) seen.set(key, entry);
+    }
+    if (seen.size > 0) break;
+  }
+
+  const roster = Array.from(seen.values());
+  logger.info(
+    `[SAFF+] scrapeSquadRoster(${parentClubSlug}/${squadSlug}): ${roster.length} players`,
+  );
+  return roster;
+}
+
+// ══════════════════════════════════════════
+// MATCH EVENT TIMELINE SCRAPING (Phase 3)
+// ══════════════════════════════════════════
+
+export interface SaffPlusMatchEvent {
+  externalEventId: string | null;
+  minute: number;
+  stoppageMinute: number | null;
+  type: MatchEventType;
+  teamSide: "home" | "away";
+  /** Primary actor's display name (En/Ar best-effort) */
+  playerName: string | null;
+  playerNameAr: string | null;
+  /** Secondary actor — assist provider, sub partner, etc. */
+  relatedPlayerName: string | null;
+  relatedPlayerNameAr: string | null;
+  descriptionAr: string | null;
+  descriptionEn: string | null;
+  raw: Record<string, unknown>;
+}
+
+/**
+ * Normalize a SAFF+ event-type string (English or Arabic) to one of
+ * the canonical match_event types. Returns null if the string doesn't
+ * match any recognized event so callers can decide whether to skip
+ * the row or store it as a generic note.
+ */
+export function normalizeMatchEventType(
+  input: string | null | undefined,
+): MatchEventType | null {
+  if (!input) return null;
+  const s = input.toLowerCase().replace(/[-_\s]/g, "");
+
+  // Goals
+  if (s.includes("owngoal")) return "own_goal";
+  if (s.includes("penaltygoal") || s.includes("penaltyscored"))
+    return "penalty_goal";
+  if (s.includes("penaltymiss") || s.includes("penaltymissed"))
+    return "penalty_miss";
+  if (s === "goal" || s.endsWith("goal") || s.includes("scored")) return "goal";
+
+  // Cards
+  if (s.includes("secondyellow") || s.includes("secyellow"))
+    return "second_yellow";
+  if (s === "yellow" || s.includes("yellowcard")) return "yellow";
+  if (s === "red" || s.includes("redcard")) return "red";
+
+  // Substitutions
+  if (s.includes("subin") || s === "in") return "sub_in";
+  if (s.includes("subout") || s === "out") return "sub_out";
+  if (s === "sub" || s.includes("substitut")) return "sub_in";
+
+  // Assists / VAR
+  if (s.includes("assist")) return "assist";
+  if (s.includes("varoverturn") || s.includes("varreversal"))
+    return "var_overturn";
+  if (s.includes("varreview") || s === "var") return "var_review";
+  if (s.includes("injury")) return "injury";
+
+  // Period markers
+  if (s.includes("kickoff") || s.includes("ko")) return "kickoff";
+  if (s.includes("halftime") || s === "ht") return "halftime";
+  if (s.includes("fulltime") || s === "ft") return "fulltime";
+
+  // Arabic raw fragments (less common — most SAFF+ payloads use English keys)
+  if (input.includes("هدف")) return "goal";
+  if (input.includes("بطاقة صفراء")) return "yellow";
+  if (input.includes("بطاقة حمراء")) return "red";
+  if (input.includes("تبديل")) return "sub_in";
+  if (input.includes("ركلة جزاء")) return "penalty_goal";
+
+  return null;
+}
+
+/**
+ * Scrape the per-match event timeline page on SAFF+. URL pattern:
+ *   /ar/event/match/:providerMatchId
+ *
+ * Strategy mirrors fetchMatches: prefer RSC payload, fall back to
+ * loose DOM scraping. The caller passes the raw provider match id
+ * (stored in matches.provider_match_id by the fixtures sync).
+ */
+export async function scrapeMatchEvents(
+  providerMatchId: string,
+): Promise<SaffPlusMatchEvent[]> {
+  const seen = new Map<string, SaffPlusMatchEvent>();
+  const paths = [
+    `/ar/event/match/${providerMatchId}`,
+    `/en/event/match/${providerMatchId}`,
+  ];
+
+  for (const path of paths) {
+    let html: string;
+    try {
+      html = await fetchPage(path);
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] scrapeMatchEvents: ${path} failed — ${(err as Error).message}`,
+      );
+      await sleep(1500);
+      continue;
+    }
+    await sleep(1500);
+
+    const rscChunks = extractRscData(html);
+    for (const ev of extractEventsFromRsc(rscChunks)) {
+      const key =
+        ev.externalEventId ??
+        `${ev.minute}|${ev.type}|${ev.playerName ?? ev.playerNameAr ?? ""}`;
+      if (!seen.has(key)) seen.set(key, ev);
+    }
+
+    if (seen.size > 0) break;
+  }
+
+  const events = Array.from(seen.values()).sort(
+    (a, b) =>
+      a.minute - b.minute || (a.stoppageMinute ?? 0) - (b.stoppageMinute ?? 0),
+  );
+  logger.info(
+    `[SAFF+] scrapeMatchEvents(${providerMatchId}): ${events.length} events`,
+  );
+  return events;
+}
+
+function extractEventsFromRsc(rscChunks: string[]): SaffPlusMatchEvent[] {
+  const out: SaffPlusMatchEvent[] = [];
+
+  for (const chunk of rscChunks) {
+    // Event blocks always have a minute and a type; team is required so
+    // we know which side scored / was carded.
+    const blocks = chunk.matchAll(
+      /\{[^{}]*?"(?:minute|time|elapsed)"\s*:\s*\d+[^{}]*?"(?:type|event_type|event)"\s*:\s*"[^"]+"[^{}]*?\}/gs,
+    );
+
+    for (const block of blocks) {
+      try {
+        const text = block[0];
+        const str = (re: RegExp) => text.match(re)?.[1];
+        const num = (re: RegExp) => {
+          const m = text.match(re);
+          return m ? Number(m[1]) : null;
+        };
+
+        const minute = num(/"(?:minute|time|elapsed)"\s*:\s*(\d+)/);
+        if (minute == null) continue;
+        const stoppageMinute = num(
+          /"(?:stoppage|extra_minute|added_time|injury_time)"\s*:\s*(\d+)/,
+        );
+
+        const rawType =
+          str(/"(?:type|event_type|event)"\s*:\s*"([^"]+)"/) ?? null;
+        const type = normalizeMatchEventType(rawType);
+        if (!type) continue;
+
+        const teamSideRaw =
+          str(/"(?:team|side|team_side)"\s*:\s*"([^"]+)"/) ?? null;
+        const teamSide: "home" | "away" =
+          teamSideRaw === "away" || teamSideRaw === "guest" ? "away" : "home";
+
+        const playerName =
+          str(/"(?:player_name|player|name|scorer)"\s*:\s*"([^"]+)"/) ?? null;
+        const playerNameAr =
+          str(/"player_name_ar"\s*:\s*"([^"]+)"/) ??
+          str(/"name_ar"\s*:\s*"([^"]+)"/) ??
+          null;
+        const relatedPlayerName =
+          str(/"(?:assist|sub_partner|related_player)"\s*:\s*"([^"]+)"/) ??
+          null;
+        const relatedPlayerNameAr =
+          str(/"(?:assist_ar|related_player_ar)"\s*:\s*"([^"]+)"/) ?? null;
+        const descriptionEn =
+          str(/"description"\s*:\s*"([^"]+)"/) ??
+          str(/"text"\s*:\s*"([^"]+)"/) ??
+          null;
+        const descriptionAr =
+          str(/"description_ar"\s*:\s*"([^"]+)"/) ??
+          str(/"text_ar"\s*:\s*"([^"]+)"/) ??
+          null;
+        const externalEventId =
+          str(/"id"\s*:\s*"?([^",}]+)"?/) ??
+          str(/"event_id"\s*:\s*"([^"]+)"/) ??
+          null;
+
+        out.push({
+          externalEventId,
+          minute,
+          stoppageMinute,
+          type,
+          teamSide,
+          playerName,
+          playerNameAr,
+          relatedPlayerName,
+          relatedPlayerNameAr,
+          descriptionAr,
+          descriptionEn,
+          raw: { snippet: text.slice(0, 200), rawType: rawType ?? null },
+        });
+      } catch {
+        // skip malformed
+      }
+    }
+  }
+
+  return out;
+}
+
+function extractRosterFromRsc(rscChunks: string[]): SaffPlusRosterEntry[] {
+  const out: SaffPlusRosterEntry[] = [];
+
+  for (const chunk of rscChunks) {
+    // Roster entries always carry a name and at least one of: jersey,
+    // position, dob, nationality. Match a JSON-ish block with name + at
+    // least one of those signals.
+    const blocks = chunk.matchAll(
+      /\{[^{}]*?"(?:name|full_name|player_name)"\s*:\s*"([^"]+)"[^{}]*?"(?:jersey_number|jersey|number|position|date_of_birth|dob|nationality)"[^{}]*?\}/gs,
+    );
+
+    for (const block of blocks) {
+      try {
+        const text = block[0];
+        const str = (re: RegExp) => text.match(re)?.[1];
+        const num = (re: RegExp) => {
+          const m = text.match(re);
+          return m ? Number(m[1]) : null;
+        };
+
+        const name = block[1];
+        if (!name) continue;
+        const nameAr =
+          str(/"name_ar"\s*:\s*"([^"]+)"/) ??
+          str(/"full_name_ar"\s*:\s*"([^"]+)"/) ??
+          null;
+        const externalId =
+          str(/"id"\s*:\s*"?([^",}]+)"?/) ??
+          str(/"slug"\s*:\s*"([^"]+)"/) ??
+          null;
+        const jerseyNumber =
+          num(/"jersey_number"\s*:\s*(\d+)/) ??
+          num(/"jersey"\s*:\s*(\d+)/) ??
+          num(/"number"\s*:\s*(\d+)/);
+        const position =
+          str(/"position"\s*:\s*"([^"]+)"/) ??
+          str(/"role"\s*:\s*"([^"]+)"/) ??
+          null;
+        const dobRaw =
+          str(/"date_of_birth"\s*:\s*"([^"]+)"/) ??
+          str(/"dob"\s*:\s*"([^"]+)"/) ??
+          str(/"birth_date"\s*:\s*"([^"]+)"/);
+        const dob = dobRaw ? dobRaw.split("T")[0] : null;
+        const nationality =
+          str(/"nationality"\s*:\s*"([^"]+)"/) ??
+          str(/"country"\s*:\s*"([^"]+)"/) ??
+          null;
+
+        out.push({
+          externalId,
+          name,
+          nameAr,
+          dob,
+          nationality,
+          jerseyNumber,
+          position,
+          raw: { snippet: text.slice(0, 200) },
+        });
+      } catch {
+        // skip malformed
+      }
+    }
+  }
+
+  return out;
 }
 
 // ══════════════════════════════════════════
@@ -144,14 +727,38 @@ export function clearDiscoveryCache() {
 
 /**
  * Fetch the competitions page and extract competition data.
+ *
+ * Women's competitions are filtered at this layer (Layer 1 of the
+ * defense-in-depth women's filter) and never returned to callers.
+ * `saffplus.service.ts` runs the same check before persistence as
+ * Layer 2.
  */
 export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
   try {
     const html = await fetchPage("/competitions");
     const $ = cheerio.load(html);
     const competitions: SaffPlusCompetition[] = [];
+    const womenSkipped: string[] = [];
 
-    // SAFF+ renders competition cards with links to /competitions/{slug}
+    const tryAdd = (comp: SaffPlusCompetition) => {
+      if (
+        isWomensCompetition({
+          gender: comp.gender,
+          slug: String(comp.id),
+          name: comp.name,
+          nameAr: comp.nameAr,
+        })
+      ) {
+        womenSkipped.push(String(comp.id));
+        return;
+      }
+      if (!competitions.find((c) => c.id === comp.id)) {
+        competitions.push(comp);
+      }
+    };
+
+    // SAFF+ renders competition cards with links to /competitions/{slug}.
+    // The DOM rarely exposes gender — slug/name signals catch it.
     $('a[href*="/competitions/"]').each((_, el) => {
       const href = $(el).attr("href") || "";
       const slug = href.match(/\/competitions\/([^/]+)/)?.[1] ?? "";
@@ -161,33 +768,49 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
         $(el).find("h3, h2, [class*=title]").first().text().trim() ||
         $(el).text().trim().split("\n")[0]?.trim();
 
-      if (name && !competitions.find((c) => c.id === slug)) {
-        competitions.push({
-          id: slug,
-          name: name || slug,
-          season: "",
-          type: "league",
-        });
-      }
+      if (!name) return;
+      tryAdd({ id: slug, name, season: "", type: "league" });
     });
 
-    // Also try to extract from RSC payload
+    // RSC payload: extract slug + name + nameAr + gender + ageGroup when present
     const rscChunks = extractRscData(html);
     for (const chunk of rscChunks) {
-      // Look for competition-like objects in the serialized data
+      // Match objects that contain at least slug + name. We capture a
+      // reasonable window after the slug to scoop adjacent fields.
       const competitionMatches = chunk.matchAll(
-        /"slug"\s*:\s*"([^"]+)"[^}]*?"name"\s*:\s*"([^"]+)"/g,
+        /"slug"\s*:\s*"([^"]+)"[^{}]{0,400}?"name"\s*:\s*"([^"]+)"/g,
       );
       for (const m of competitionMatches) {
         const slug = m[1];
         const name = m[2];
-        if (!competitions.find((c) => c.id === slug)) {
-          competitions.push({ id: slug, name, season: "", type: "league" });
-        }
+        // Re-search the surrounding window for optional fields
+        const window = chunk.slice(m.index ?? 0, (m.index ?? 0) + 800);
+        const nameAr = window.match(/"name_ar"\s*:\s*"([^"]+)"/)?.[1];
+        const gender = window.match(/"gender"\s*:\s*"([^"]+)"/)?.[1];
+        const ageGroup =
+          window.match(/"age_group"\s*:\s*"([^"]+)"/)?.[1] ??
+          window.match(/"category"\s*:\s*"([^"]+)"/)?.[1];
+
+        tryAdd({
+          id: slug,
+          name,
+          nameAr,
+          season: "",
+          type: "league",
+          gender,
+          ageGroup,
+        });
       }
     }
 
-    logger.info(`[SAFF+] Found ${competitions.length} competitions`);
+    if (womenSkipped.length > 0) {
+      logger.info(
+        `[SAFF+] Women's filter skipped ${womenSkipped.length} competition(s) at provider layer: ${womenSkipped.slice(0, 5).join(", ")}${womenSkipped.length > 5 ? ", ..." : ""}`,
+      );
+    }
+    logger.info(
+      `[SAFF+] Found ${competitions.length} competitions (men's only)`,
+    );
     return competitions;
   } catch (err) {
     logger.warn(
@@ -248,14 +871,218 @@ export async function fetchTeams(): Promise<SaffPlusTeam[]> {
 }
 
 /**
- * Fetch standings — placeholder, requires competition detail page scraping.
+ * Fetch standings for a SAFF+ competition.
+ *
+ * Strategy:
+ *   1. Fetch /en/competitions/{slug}/standings (and /ar/ as a fallback).
+ *   2. Try RSC flight payload extraction first — most reliable.
+ *   3. Fall back to HTML <table> parsing for the case where the
+ *      standings page renders the table inline.
+ *   4. Rate-limit between requests via the existing 1500ms throttle.
  */
 export async function fetchStandings(
-  _competitionId: number | string,
+  competitionId: number | string,
   _season?: string,
 ): Promise<SaffPlusStanding[]> {
-  // TODO: scrape /competitions/{slug} page for standings table
-  return [];
+  const slug = String(competitionId);
+  const seen = new Map<string, SaffPlusStanding>();
+
+  const paths = [
+    `/en/competitions/${slug}/standings`,
+    `/ar/competitions/${slug}/standings`,
+    `/en/competitions/${slug}`,
+  ];
+
+  for (const path of paths) {
+    let html: string;
+    try {
+      html = await fetchPage(path);
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] fetchStandings: ${path} failed — ${(err as Error).message}`,
+      );
+      await sleep(1500);
+      continue;
+    }
+    await sleep(1500);
+
+    // Layer 1: RSC payload
+    const rscChunks = extractRscData(html);
+    for (const row of extractStandingsFromRsc(rscChunks)) {
+      const key = String(row.teamId);
+      if (!seen.has(key)) seen.set(key, row);
+    }
+
+    if (seen.size === 0) {
+      // Layer 2: HTML table fallback
+      for (const row of extractStandingsFromHtml(html)) {
+        const key = String(row.teamId);
+        if (!seen.has(key)) seen.set(key, row);
+      }
+    }
+
+    if (seen.size > 0) break; // first successful path wins
+  }
+
+  const rows = Array.from(seen.values()).sort(
+    (a, b) => (a.position || 0) - (b.position || 0),
+  );
+  logger.info(`[SAFF+] fetchStandings(${slug}): ${rows.length} rows`);
+  return rows;
+}
+
+/**
+ * Extract standing rows from RSC flight chunks. SAFF+ emits objects
+ * shaped like { team: {...}, played, won, drawn, lost, gf, ga, gd,
+ * points, position }. We tolerate variations in field naming.
+ */
+function extractStandingsFromRsc(rscChunks: string[]): SaffPlusStanding[] {
+  const rows: SaffPlusStanding[] = [];
+
+  for (const chunk of rscChunks) {
+    // Standings objects always carry "points" + "played" together.
+    // Match a JSON-ish window containing both, then extract sub-fields.
+    const blocks = chunk.matchAll(
+      /\{[^{}]*"(?:played|games_played|matches_played|p)"\s*:\s*\d+[^{}]*"(?:points|pts)"\s*:\s*\d+[^{}]*\}/gs,
+    );
+
+    for (const block of blocks) {
+      try {
+        const text = block[0];
+        const num = (re: RegExp): number => {
+          const m = text.match(re);
+          return m ? Number(m[1]) : 0;
+        };
+        const str = (re: RegExp): string | undefined => {
+          const m = text.match(re);
+          return m ? m[1] : undefined;
+        };
+
+        const teamId =
+          str(/"team_id"\s*:\s*"?([^",}]+)"?/) ??
+          str(/"id"\s*:\s*"?([^",}]+)"?/) ??
+          "";
+        if (!teamId) continue;
+
+        const teamName =
+          str(/"team_name"\s*:\s*"([^"]+)"/) ??
+          str(/"name"\s*:\s*"([^"]+)"/) ??
+          "";
+        const teamNameAr =
+          str(/"team_name_ar"\s*:\s*"([^"]+)"/) ??
+          str(/"name_ar"\s*:\s*"([^"]+)"/);
+        const teamLogo =
+          str(/"thumbnail_url"\s*:\s*"([^"]+)"/) ??
+          str(/"logo"\s*:\s*"([^"]+)"/);
+
+        const played = num(
+          /"(?:played|games_played|matches_played|p)"\s*:\s*(\d+)/,
+        );
+        const won = num(/"(?:won|wins|w)"\s*:\s*(\d+)/);
+        const drawn = num(/"(?:drawn|draws|d)"\s*:\s*(\d+)/);
+        const lost = num(/"(?:lost|losses|l)"\s*:\s*(\d+)/);
+        const goalsFor = num(/"(?:goals_for|gf|scored|sf)"\s*:\s*(\d+)/);
+        const goalsAgainst = num(
+          /"(?:goals_against|ga|conceded|sa)"\s*:\s*(\d+)/,
+        );
+        const goalDifference =
+          num(/"(?:goal_difference|gd|diff)"\s*:\s*(-?\d+)/) ||
+          goalsFor - goalsAgainst;
+        const points = num(/"(?:points|pts)"\s*:\s*(\d+)/);
+        const position = num(/"(?:position|rank|pos)"\s*:\s*(\d+)/);
+        const group = str(/"group"\s*:\s*"([^"]+)"/);
+
+        rows.push({
+          position,
+          teamId,
+          teamName,
+          teamNameAr,
+          teamLogo,
+          played,
+          won,
+          drawn,
+          lost,
+          goalsFor,
+          goalsAgainst,
+          goalDifference,
+          points,
+          group,
+        });
+      } catch {
+        // skip malformed block
+      }
+    }
+  }
+
+  return rows;
+}
+
+/**
+ * Fallback: parse a <table> rendered server-side. Heuristic — find
+ * the first table whose header row contains "P" (played) and "Pts"
+ * (points) signals. Walk rows, extract by column index.
+ */
+function extractStandingsFromHtml(html: string): SaffPlusStanding[] {
+  const $ = cheerio.load(html);
+  const rows: SaffPlusStanding[] = [];
+
+  $("table").each((_, tableEl) => {
+    if (rows.length > 0) return; // first matching table wins
+
+    const headerCells = $(tableEl)
+      .find("thead th, tr")
+      .first()
+      .find("th, td")
+      .map((_, c) => $(c).text().trim().toLowerCase())
+      .get();
+
+    // Identify column indices via header keywords (Arabic + English).
+    const idx = (...keys: string[]) =>
+      headerCells.findIndex((h) =>
+        keys.some((k) => h.includes(k.toLowerCase())),
+      );
+
+    const colTeam = idx("team", "club", "نادي", "فريق");
+    const colP = idx("p", "played", "لعب", "اللعب");
+    const colW = idx("w", "won", "wins", "فوز");
+    const colD = idx("d", "draw", "تعادل");
+    const colL = idx("l", "lost", "loss", "خسارة");
+    const colGD = idx("gd", "diff", "+/-", "فارق");
+    const colPts = idx("pts", "points", "نقاط");
+
+    if (colTeam < 0 || colPts < 0) return;
+
+    $(tableEl)
+      .find("tbody tr")
+      .each((rowIdx, rowEl) => {
+        const cells = $(rowEl)
+          .find("td")
+          .map((_, c) => $(c).text().trim())
+          .get();
+        if (cells.length === 0) return;
+
+        const teamName = cells[colTeam] ?? "";
+        if (!teamName) return;
+
+        const num = (i: number) => (i >= 0 ? Number(cells[i] ?? 0) : 0);
+
+        rows.push({
+          position: rowIdx + 1,
+          teamId: teamName, // best we can do without an ID column
+          teamName,
+          played: num(colP),
+          won: num(colW),
+          drawn: num(colD),
+          lost: 0 + num(colL),
+          goalsFor: 0,
+          goalsAgainst: 0,
+          goalDifference: num(colGD),
+          points: num(colPts),
+        });
+      });
+  });
+
+  return rows;
 }
 
 // ── Rate-limit helper ──

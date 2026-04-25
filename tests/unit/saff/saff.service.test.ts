@@ -101,6 +101,14 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/modules/squads/squad.model', () => ({
+  Squad: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn(), name: 'Squad' },
+}));
+jest.mock('../../../src/modules/squads/squad.service', () => ({
+  findOrCreateSquad: jest.fn().mockResolvedValue([{ id: 'squad-1', displayName: 'Al Hilal' }, true]),
+  getByContext: jest.fn(),
+}));
+
 import * as saffService from '../../../src/modules/saff/saff.service';
 
 describe('SAFF Service', () => {

@@ -105,6 +105,7 @@ import {
   runTopTierDaily,
   runYouthTier,
   runLiveTier,
+  runLiveEventsTier,
 } from "./engines/saudiLeagues.engine";
 import { runCloseIdleSessions } from "@modules/staffMonitoring/staffMonitoring.cron";
 
@@ -1186,10 +1187,12 @@ export async function startCronJobs() {
   registerJob("saudi-leagues-top-tier-daily", runTopTierDaily);
   registerJob("saudi-leagues-youth-tier", runYouthTier);
   registerJob("saudi-leagues-live", runLiveTier);
+  registerJob("saudi-leagues-live-events", runLiveEventsTier);
   schedule("0 */2 * * *", "saudi-leagues-top-tier"); // Every 2h (matchday-aware)
   schedule("0 4 * * *", "saudi-leagues-top-tier-daily"); // Daily 04:00 (unconditional fixture fetch)
   schedule("0 3 * * *", "saudi-leagues-youth-tier"); // Daily 03:00
-  schedule("*/15 * * * *", "saudi-leagues-live"); // Every 15 min (fast exit if no live)
+  schedule("*/15 * * * *", "saudi-leagues-live"); // Every 15 min — refresh scores
+  schedule("*/5 * * * *", "saudi-leagues-live-events"); // Every 5 min — SAFF+ event timeline ticker
 
   // ── Staff Monitoring — idle session closer ──
   registerJob("staff-monitoring-close-idle", runCloseIdleSessions);

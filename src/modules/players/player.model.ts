@@ -53,6 +53,7 @@ interface PlayerAttributes {
   notes?: string | null;
   photoUrl?: string | null;
   displayId?: string | null;
+  externalIds?: Record<string, string>;
   createdBy: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -68,6 +69,7 @@ interface PlayerCreationAttributes extends Optional<
   | "marketValueCurrency"
   | "status"
   | "displayId"
+  | "externalIds"
   | "mandateStatus"
   | "mandateSignedAt"
   | "exclusiveUntil"
@@ -122,6 +124,7 @@ export class Player
   declare notes: string | null;
   declare photoUrl: string | null;
   declare displayId: string | null;
+  declare externalIds: Record<string, string>;
   declare createdBy: string;
 
   get fullName(): string {
@@ -244,6 +247,12 @@ Player.init(
     notes: { type: DataTypes.TEXT },
     photoUrl: { type: DataTypes.STRING },
     displayId: { type: DataTypes.STRING(20), unique: true },
+    externalIds: {
+      type: DataTypes.JSONB,
+      allowNull: false,
+      defaultValue: {},
+      field: "external_ids",
+    },
     createdBy: { type: DataTypes.UUID, allowNull: false },
   },
   {

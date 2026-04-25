@@ -21,7 +21,7 @@ import {
   resolveApprovalByEntity,
   isApprovalChainResolved,
 } from "@modules/approvals/approval.service";
-import { regenerateSignedPdf } from "@modules/contracts/contract.signing.service";
+import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { generateContractTransitionTask } from "@modules/contracts/contractAutoTasks";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
@@ -179,17 +179,13 @@ export async function transitionContract(req: AuthRequest, res: Response) {
   // Invalidate cached contract data + dashboard KPIs
   await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);
 
-  // ── Regenerate signed PDF with agent signature embedded ──
+  // ── Regenerate signed PDF with agent signature embedded (async) ──
   if (action === "agent_sign_digital" || action === "agent_sign_upload") {
-    try {
-      const signedPdfUrl = await regenerateSignedPdf(id);
-      await Contract.update({ documentUrl: signedPdfUrl }, { where: { id } });
-    } catch (err: any) {
-      logger.error("Failed to generate signed PDF after agent signing", {
+    enqueueContractPdfRegen(id, req.user!.id).catch((err) =>
+      logger.error("Failed to enqueue signed PDF regen after agent signing", {
         error: err.message,
-      });
-      // Non-blocking — contract transition already succeeded
-    }
+      }),
+    );
   }
 
   // Audit log (outside transaction — non-critical)

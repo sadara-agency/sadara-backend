@@ -18,6 +18,8 @@ import { findExistingLeagueEnrollment } from "@modules/competitions/competition.
 import { Watchlist } from "@modules/scouting/scouting.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
+import { findOrCreateSquad } from "@modules/squads/squad.service";
+import type { SquadContext } from "@modules/squads/squad.service";
 import { SeasonSync } from "@modules/saff/seasonSync.model";
 import { logger } from "@config/logger";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -1945,6 +1947,20 @@ export async function runImportPlan(
   const tournament = await SaffTournament.findByPk(tournamentId);
   if (!tournament) throw new AppError("SAFF tournament not found", 404);
 
+  // Phase 3: block unsupported tournament types (women's / futsal / beach).
+  if (!tournament.isSupported) {
+    throw new AppError(
+      "This tournament type is not supported for import (women's / futsal / beach soccer)",
+      422,
+    );
+  }
+
+  // Squad context derived from tournament metadata — same for every team in this import.
+  const squadContext: SquadContext = {
+    ageCategory: tournament.ageCategory,
+    division: tournament.division,
+  };
+
   const teamResolutions = decisions.teamResolutions ?? [];
   const resolutionByTeamId = new Map<number, TeamResolution>();
   for (const r of teamResolutions) {
@@ -1960,6 +1976,7 @@ export async function runImportPlan(
       matches: [],
       competitions: [],
       clubCompetitions: 0,
+      squads: [], // Phase 3
     },
     willUpdate: { clubs: [], matches: [] },
     conflicts: [],
@@ -1975,6 +1992,7 @@ export async function runImportPlan(
     competitionsCreated: 0,
     playersLinked: 0,
     skippedTeams: 0,
+    squadsCreated: 0, // Phase 3
   };
 
   try {
@@ -2033,8 +2051,9 @@ export async function runImportPlan(
     });
     const teamMapById = new Map(teamMaps.map((tm) => [tm.saffTeamId, tm]));
 
-    // ── 3. Apply team resolutions, build effective clubId per saffTeamId ──
+    // ── 3. Apply team resolutions, build effective clubId + squadId per saffTeamId ──
     const effectiveClubByTeamId = new Map<number, string>();
+    const effectiveSquadByTeamId = new Map<number, string>(); // Phase 3
     const skippedTeams = new Set<number>();
 
     for (const saffTeamId of teamSet) {
@@ -2046,6 +2065,23 @@ export async function runImportPlan(
       // any decision (mapping is a separate, pre-import action).
       if (tm?.clubId) {
         effectiveClubByTeamId.set(saffTeamId, tm.clubId);
+        const [squad, wasCreated] = await findOrCreateSquad(
+          tm.clubId,
+          squadContext,
+          txn,
+        );
+        effectiveSquadByTeamId.set(saffTeamId, squad.id);
+        if (wasCreated) {
+          preview.willCreate.squads.push({
+            clubId: tm.clubId,
+            displayName: squad.displayName,
+            ageCategory: squad.ageCategory,
+          });
+          summary.squadsCreated++;
+        }
+        if (tm && !tm.squadId) {
+          await tm.update({ squadId: squad.id }, { transaction: txn });
+        }
         continue;
       }
 
@@ -2081,8 +2117,26 @@ export async function runImportPlan(
         }
         effectiveClubByTeamId.set(saffTeamId, club.id);
 
+        const [squad, wasCreated] = await findOrCreateSquad(
+          club.id,
+          squadContext,
+          txn,
+        );
+        effectiveSquadByTeamId.set(saffTeamId, squad.id);
+        if (wasCreated) {
+          preview.willCreate.squads.push({
+            clubId: club.id,
+            displayName: squad.displayName,
+            ageCategory: squad.ageCategory,
+          });
+          summary.squadsCreated++;
+        }
+
         if (tm) {
-          await tm.update({ clubId: club.id }, { transaction: txn });
+          await tm.update(
+            { clubId: club.id, squadId: squad.id },
+            { transaction: txn },
+          );
         }
         if (!club.saffTeamId) {
           await club.update({ saffTeamId }, { transaction: txn });
@@ -2111,8 +2165,26 @@ export async function runImportPlan(
         });
         summary.clubsCreated++;
 
+        const [squad, wasCreated] = await findOrCreateSquad(
+          newClub.id,
+          squadContext,
+          txn,
+        );
+        effectiveSquadByTeamId.set(saffTeamId, squad.id);
+        if (wasCreated) {
+          preview.willCreate.squads.push({
+            clubId: newClub.id,
+            displayName: squad.displayName,
+            ageCategory: squad.ageCategory,
+          });
+          summary.squadsCreated++;
+        }
+
         if (tm) {
-          await tm.update({ clubId: newClub.id }, { transaction: txn });
+          await tm.update(
+            { clubId: newClub.id, squadId: squad.id },
+            { transaction: txn },
+          );
         } else {
           await SaffTeamMap.create(
             {
@@ -2121,11 +2193,19 @@ export async function runImportPlan(
               teamNameEn: resolution.newClubData.name,
               teamNameAr: resolution.newClubData.nameAr,
               clubId: newClub.id,
+              squadId: squad.id,
             },
             { transaction: txn },
           );
         }
       }
+    }
+
+    // Build reverse-lookup: clubId → squadId (Phase 3, used when creating match_players)
+    const squadByClubId = new Map<string, string>();
+    for (const [tid, clubId] of effectiveClubByTeamId) {
+      const squadId = effectiveSquadByTeamId.get(tid);
+      if (squadId) squadByClubId.set(clubId, squadId);
     }
 
     // ── 4. Enroll clubs in competition for this season ──
@@ -2235,6 +2315,10 @@ export async function runImportPlan(
             {
               homeClubId,
               awayClubId,
+              homeSquadId:
+                effectiveSquadByTeamId.get(fixture.saffHomeTeamId) ?? null,
+              awaySquadId:
+                effectiveSquadByTeamId.get(fixture.saffAwayTeamId) ?? null,
               competitionId: competition.id,
               competition: tournament.name,
               season,
@@ -2350,12 +2434,14 @@ export async function runImportPlan(
             ...(playersByClub.get(fixture.awayClubId) || []),
           ];
           for (const player of players) {
+            const playerClubId = (player as any).currentClubId as string;
             const [, created] = await MatchPlayer.findOrCreate({
               where: { matchId: fixture.matchId, playerId: player.id },
               defaults: {
                 matchId: fixture.matchId,
                 playerId: player.id,
                 availability: "not_called",
+                squadId: squadByClubId.get(playerClubId) ?? null, // Phase 3
               },
               transaction: txn,
             });

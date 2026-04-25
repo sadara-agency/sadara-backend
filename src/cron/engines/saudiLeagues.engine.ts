@@ -14,7 +14,10 @@ import { Op } from "sequelize";
 import { logger } from "@config/logger";
 import { Competition } from "@modules/competitions/competition.model";
 import { Match } from "@modules/matches/match.model";
-import { syncCompetitionMatches } from "@modules/saffplus/saffplus.service";
+import {
+  syncCompetitionMatches,
+  syncMatchEvents,
+} from "@modules/saffplus/saffplus.service";
 import {
   projectFixturesToMatches,
   getCurrentSeason,
@@ -243,6 +246,71 @@ export async function runTopTierDaily(): Promise<void> {
     }
     await syncBatch(competitionIds, season, "top-tier daily");
   });
+}
+
+// ══════════════════════════════════════════
+// LIVE EVENTS TICKER — every 5 min during live windows
+//
+// Phase 3 of the SAFF+ comprehensive integration. Pulls the
+// minute-by-minute event timeline (goals, cards, subs, VAR) for
+// any matches currently in progress. Skips fast when nothing's
+// live so off-hours runs are cheap.
+//
+// Concurrency cap (3) prevents bursts when many matches are live
+// simultaneously (e.g. matchday weekends with 5–10 in-flight games).
+// ══════════════════════════════════════════
+
+const LIVE_EVENTS_CONCURRENCY = 3;
+
+export async function runLiveEventsTier(): Promise<void> {
+  // Fast path: skip the mutex acquisition if nothing's live.
+  const liveCount = await Match.count({
+    where: {
+      status: "live",
+      providerSource: "saffplus",
+      providerMatchId: { [Op.ne]: null },
+    },
+  });
+  if (liveCount === 0) return;
+
+  logger.info(
+    `[SaudiLeagues] Live events tier: ${liveCount} live SAFF+ matches — refreshing timelines`,
+  );
+
+  const liveMatches = await Match.findAll({
+    where: {
+      status: "live",
+      providerSource: "saffplus",
+      providerMatchId: { [Op.ne]: null },
+    },
+    attributes: ["id"],
+    limit: 50, // safety cap
+  });
+
+  // Simple semaphore: process LIVE_EVENTS_CONCURRENCY matches at a time.
+  let cursor = 0;
+  async function worker(): Promise<void> {
+    while (cursor < liveMatches.length) {
+      const idx = cursor++;
+      const m = liveMatches[idx];
+      try {
+        await syncMatchEvents(m.id);
+      } catch (err) {
+        logger.warn(
+          `[SaudiLeagues] Live event sync error for match ${m.id}: ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(LIVE_EVENTS_CONCURRENCY, liveMatches.length) },
+      () => worker(),
+    ),
+  );
+
+  logger.info(`[SaudiLeagues] Live events tier complete`);
 }
 
 // ══════════════════════════════════════════

@@ -466,13 +466,16 @@ interface SaffTeamMapAttributes {
   city?: string | null;
   logoUrl?: string | null;
   clubId?: string | null; // Mapped Sadara Club UUID
+  // Phase 3 — squad-aware mapping
+  tournamentId?: string | null; // NULL = legacy general mapping
+  squadId?: string | null; // Resolved squad for this tournament context
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface SaffTeamMapCreation extends Optional<
   SaffTeamMapAttributes,
-  "id" | "clubId" | "createdAt" | "updatedAt"
+  "id" | "clubId" | "tournamentId" | "squadId" | "createdAt" | "updatedAt"
 > {}
 
 export class SaffTeamMap
@@ -487,6 +490,8 @@ export class SaffTeamMap
   declare city: string | null;
   declare logoUrl: string | null;
   declare clubId: string | null;
+  declare tournamentId: string | null;
+  declare squadId: string | null;
 }
 
 SaffTeamMap.init(
@@ -519,6 +524,19 @@ SaffTeamMap.init(
       field: "club_id",
       references: { model: "clubs", key: "id" },
     },
+    // Phase 3 columns — added by migration 151
+    tournamentId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "tournament_id",
+      references: { model: "saff_tournaments", key: "id" },
+    },
+    squadId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "squad_id",
+      references: { model: "squads", key: "id" },
+    },
   },
   {
     sequelize,
@@ -526,8 +544,13 @@ SaffTeamMap.init(
     underscored: true,
     timestamps: true,
     indexes: [
-      { fields: ["saff_team_id", "season"], unique: true },
+      // Uniqueness enforced via two partial DB indexes (see migration 151):
+      //   (saff_team_id, season) WHERE tournament_id IS NULL
+      //   (saff_team_id, season, tournament_id) WHERE tournament_id IS NOT NULL
+      { fields: ["saff_team_id", "season"] },
       { fields: ["club_id"] },
+      { fields: ["squad_id"] },
+      { fields: ["tournament_id"] },
     ],
   },
 );
