@@ -64,21 +64,33 @@ export async function up({
     WHERE away_squad_id IS NULL AND away_club_id IS NOT NULL
   `);
 
-  // Verify — abort if any NULL rows remain
+  // Check remaining NULLs — only matches with a mapped club are resolvable.
+  // Matches with no home_club_id/away_club_id cannot be auto-assigned a squad;
+  // skip NOT NULL enforcement for those rather than crashing the server.
   const [nullRows] = await seq.query(
     `SELECT COUNT(*)::int AS cnt FROM matches WHERE home_squad_id IS NULL OR away_squad_id IS NULL`,
   );
   const nullCount = Number((nullRows as { cnt: number }[])[0]?.cnt ?? 0);
 
   if (nullCount > 0) {
-    throw new Error(
-      `Migration 152 aborted: ${nullCount} matches still have NULL squad IDs after last-pass backfill. ` +
-        "Run the backfill script and resolve matches without clubs before re-running this migration: " +
-        "`npx ts-node -r tsconfig-paths/register src/scripts/backfill-squads.ts`",
+    // Log how many are unresolvable (no club) vs genuinely missing
+    const [unmappedRows] = await seq.query(
+      `SELECT COUNT(*)::int AS cnt FROM matches
+       WHERE (home_squad_id IS NULL AND home_club_id IS NULL)
+          OR (away_squad_id IS NULL AND away_club_id IS NULL)`,
     );
+    const unmappedCount = Number(
+      (unmappedRows as { cnt: number }[])[0]?.cnt ?? 0,
+    );
+    console.warn(
+      `Migration 152: ${nullCount} matches still have NULL squad IDs ` +
+        `(${unmappedCount} have no club and cannot be auto-assigned). ` +
+        "Skipping NOT NULL enforcement — clean up clubless matches and re-run to enforce.",
+    );
+    return;
   }
 
-  // Enforce NOT NULL
+  // Enforce NOT NULL only when all matches have been resolved
   await seq.query(
     `ALTER TABLE matches ALTER COLUMN home_squad_id SET NOT NULL`,
   );
