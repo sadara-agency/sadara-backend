@@ -25,7 +25,6 @@ import {
   scrapeBatch,
   scrapeTeamLogos,
   scrapeTournamentList,
-  type ScrapeResult,
 } from "@modules/saff/saff.scraper";
 import type {
   TournamentQuery,
@@ -35,7 +34,14 @@ import type {
   TeamMapQuery,
   MapTeamInput,
   ImportRequest,
+  UploadPayload,
 } from "@modules/saff/saff.validation";
+import type {
+  AppliedSummary,
+  PreviewPayload,
+  SessionDecisions,
+  TeamResolution,
+} from "@modules/saff/importSession.model";
 
 // ══════════════════════════════════════════
 // HELPERS
@@ -1151,8 +1157,11 @@ export async function fetchTeamLogos(season: string, force = false) {
 const MEN_LEAGUE_SAFF_IDS = [333, 334, 335, 336, 366];
 
 /**
- * One-shot bulk fetch + import for all 5 men's pro leagues.
- * Calls fetchFromSaff() then importToSadara() for the given season.
+ * One-shot bulk fetch for all 5 men's pro leagues (stage-only).
+ *
+ * After the wizard redesign this only refreshes staging tables — clubs,
+ * matches, and competitions are never mutated here. To commit the
+ * fetched data, a human must run the wizard for each tournament.
  */
 export async function bulkFetchMenLeagues(season: string) {
   const fetchResult = await fetchFromSaff({
@@ -1161,21 +1170,10 @@ export async function bulkFetchMenLeagues(season: string) {
     dataTypes: ["standings", "fixtures", "teams"],
   });
 
-  const importResult = await importToSadara({
-    tournamentIds: MEN_LEAGUE_SAFF_IDS,
-    season,
-    importTypes: ["clubs", "matches", "standings"],
-  });
-
-  // Fetch logos after import
-  const logoResult = await fetchTeamLogos(season);
-
   return {
     season,
     leagues: MEN_LEAGUE_SAFF_IDS.length,
     fetch: fetchResult,
-    import: importResult,
-    logos: logoResult,
   };
 }
 
@@ -1606,4 +1604,679 @@ export async function projectFixturesToMatches(
   );
 
   return result;
+}
+
+// ══════════════════════════════════════════
+// WIZARD: WRITE STAGING FROM MANUAL UPLOAD
+// ══════════════════════════════════════════
+
+/**
+ * Step 2 — Upload JSON path. Persists a user-supplied payload to the
+ * staging tables exactly the way fetchFromSaff() would. The payload is
+ * already Zod-validated by the route handler.
+ */
+export async function writeStagingFromPayload(
+  payload: UploadPayload,
+): Promise<{ standings: number; fixtures: number; teams: number }> {
+  const tournament = await SaffTournament.findOne({
+    where: { saffId: payload.tournamentId },
+  });
+  if (!tournament) {
+    throw new AppError(
+      `SAFF tournament with saffId=${payload.tournamentId} not registered`,
+      404,
+    );
+  }
+
+  const summary = { standings: 0, fixtures: 0, teams: 0 };
+  const txn = await sequelize.transaction();
+
+  try {
+    if (payload.standings.length) {
+      await SaffStanding.bulkCreate(
+        payload.standings.map((s) => ({
+          tournamentId: tournament.id,
+          season: payload.season,
+          position: s.position,
+          saffTeamId: s.saffTeamId,
+          teamNameEn: s.teamNameEn,
+          teamNameAr: s.teamNameAr || "",
+          played: s.played,
+          won: s.won,
+          drawn: s.drawn,
+          lost: s.lost,
+          goalsFor: s.goalsFor,
+          goalsAgainst: s.goalsAgainst,
+          goalDifference: s.goalDifference,
+          points: s.points,
+        })),
+        {
+          transaction: txn,
+          updateOnDuplicate: [
+            "position",
+            "teamNameEn",
+            "teamNameAr",
+            "played",
+            "won",
+            "drawn",
+            "lost",
+            "goalsFor",
+            "goalsAgainst",
+            "goalDifference",
+            "points",
+            "updatedAt",
+          ],
+        },
+      );
+      summary.standings = payload.standings.length;
+    }
+
+    if (payload.fixtures.length) {
+      await SaffFixture.bulkCreate(
+        payload.fixtures.map((f) => ({
+          tournamentId: tournament.id,
+          season: payload.season,
+          matchDate: f.date,
+          matchTime: f.time,
+          saffHomeTeamId: f.saffHomeTeamId,
+          homeTeamNameEn: f.homeTeamNameEn,
+          homeTeamNameAr: f.homeTeamNameAr || "",
+          saffAwayTeamId: f.saffAwayTeamId,
+          awayTeamNameEn: f.awayTeamNameEn,
+          awayTeamNameAr: f.awayTeamNameAr || "",
+          homeScore: f.homeScore,
+          awayScore: f.awayScore,
+          stadium: f.stadium,
+          city: f.city,
+          status:
+            f.homeScore !== null
+              ? ("completed" as const)
+              : ("upcoming" as const),
+        })),
+        {
+          transaction: txn,
+          updateOnDuplicate: [
+            "matchTime",
+            "homeTeamNameEn",
+            "homeTeamNameAr",
+            "awayTeamNameEn",
+            "awayTeamNameAr",
+            "homeScore",
+            "awayScore",
+            "stadium",
+            "city",
+            "status",
+            "updatedAt",
+          ],
+        },
+      );
+      summary.fixtures = payload.fixtures.length;
+    }
+
+    if (payload.teams.length) {
+      const saffTeamIds = payload.teams.map((t) => t.saffTeamId);
+      const existingMaps = await SaffTeamMap.findAll({
+        where: {
+          saffTeamId: { [Op.in]: saffTeamIds },
+          season: payload.season,
+        },
+        transaction: txn,
+      });
+      const existingById = new Map(existingMaps.map((m) => [m.saffTeamId, m]));
+
+      const toCreate: Array<{
+        saffTeamId: number;
+        season: string;
+        teamNameEn: string;
+        teamNameAr: string;
+      }> = [];
+      for (const team of payload.teams) {
+        if (!existingById.has(team.saffTeamId)) {
+          toCreate.push({
+            saffTeamId: team.saffTeamId,
+            season: payload.season,
+            teamNameEn: team.teamNameEn,
+            teamNameAr: team.teamNameAr || "",
+          });
+        }
+      }
+      if (toCreate.length) {
+        await SaffTeamMap.bulkCreate(toCreate, { transaction: txn });
+      }
+      summary.teams = payload.teams.length;
+    }
+
+    await tournament.update({ lastSyncedAt: new Date() }, { transaction: txn });
+
+    await txn.commit();
+    return summary;
+  } catch (error) {
+    await txn.rollback();
+    throw error;
+  }
+}
+
+// ══════════════════════════════════════════
+// WIZARD: PREVIEW + APPLY ENGINE
+// ══════════════════════════════════════════
+
+interface RunImportPlanOptions {
+  tournamentId: string; // SaffTournament UUID
+  season: string;
+  decisions: SessionDecisions;
+  commit: boolean;
+}
+
+interface RunImportPlanResult {
+  preview: PreviewPayload;
+  applied: AppliedSummary | null;
+}
+
+/**
+ * Single source of truth for SAFF wizard preview + apply.
+ *
+ * - When `commit: false` runs the entire import inside a transaction
+ *   that is **always rolled back** at the end. Used by Step 4 — Review.
+ * - When `commit: true` persists everything in a single transaction.
+ *   Used by Step 5 — Apply.
+ *
+ * Decisions:
+ * - decisions.teamResolutions[] resolves each unmapped SAFF team. Every
+ *   team that appears in staging must have a matching resolution; any
+ *   missing team becomes a `blocker` in the preview and Apply refuses.
+ *
+ * The function does not write `appliedAt` on the session; that's the
+ * caller's responsibility.
+ */
+export async function runImportPlan(
+  opts: RunImportPlanOptions,
+): Promise<RunImportPlanResult> {
+  const { tournamentId, season, decisions, commit } = opts;
+
+  const tournament = await SaffTournament.findByPk(tournamentId);
+  if (!tournament) throw new AppError("SAFF tournament not found", 404);
+
+  const teamResolutions = decisions.teamResolutions ?? [];
+  const resolutionByTeamId = new Map<number, TeamResolution>();
+  for (const r of teamResolutions) {
+    resolutionByTeamId.set(r.saffTeamId, r);
+  }
+
+  const txn = await sequelize.transaction();
+
+  // Preview accumulator — populated regardless of commit flag
+  const preview: PreviewPayload = {
+    willCreate: {
+      clubs: [],
+      matches: [],
+      competitions: [],
+      clubCompetitions: 0,
+    },
+    willUpdate: { clubs: [], matches: [] },
+    conflicts: [],
+    blockers: [],
+    unchanged: { clubs: 0, matches: 0 },
+    playerLinks: { totalPlayers: 0, byClub: [] },
+  };
+  const summary: AppliedSummary = {
+    clubsCreated: 0,
+    clubsUpdated: 0,
+    matchesCreated: 0,
+    matchesUpdated: 0,
+    competitionsCreated: 0,
+    playersLinked: 0,
+    skippedTeams: 0,
+  };
+
+  try {
+    // ── 1. Resolve / create competition ──
+    let competition = await Competition.findOne({
+      where: { saffId: tournament.saffId },
+      transaction: txn,
+    });
+    let competitionCreated = false;
+
+    if (!competition) {
+      competition = await Competition.create(
+        {
+          name: tournament.name,
+          nameAr: tournament.nameAr,
+          country: "Saudi Arabia",
+          type: tournament.category === "pro" ? "league" : "cup",
+          tier: tournament.tier,
+          agencyValue: tournament.agencyValue,
+          saffId: tournament.saffId,
+          isActive: true,
+        } as any,
+        { transaction: txn },
+      );
+      competitionCreated = true;
+      preview.willCreate.competitions.push({
+        saffId: tournament.saffId,
+        name: tournament.name,
+      });
+      summary.competitionsCreated++;
+    }
+
+    // ── 2. Gather all teams referenced by this tournament's staging ──
+    const standings = await SaffStanding.findAll({
+      where: { tournamentId, season },
+      transaction: txn,
+    });
+    const fixtures = await SaffFixture.findAll({
+      where: { tournamentId, season },
+      transaction: txn,
+    });
+
+    const teamSet = new Set<number>();
+    for (const s of standings) teamSet.add(s.saffTeamId);
+    for (const f of fixtures) {
+      teamSet.add(f.saffHomeTeamId);
+      teamSet.add(f.saffAwayTeamId);
+    }
+
+    const teamMaps = await SaffTeamMap.findAll({
+      where: {
+        season,
+        ...(teamSet.size > 0 ? { saffTeamId: { [Op.in]: [...teamSet] } } : {}),
+      },
+      transaction: txn,
+    });
+    const teamMapById = new Map(teamMaps.map((tm) => [tm.saffTeamId, tm]));
+
+    // ── 3. Apply team resolutions, build effective clubId per saffTeamId ──
+    const effectiveClubByTeamId = new Map<number, string>();
+    const skippedTeams = new Set<number>();
+
+    for (const saffTeamId of teamSet) {
+      const tm = teamMapById.get(saffTeamId);
+      const teamNameEn = tm?.teamNameEn ?? `Team ${saffTeamId}`;
+      const teamNameAr = tm?.teamNameAr ?? "";
+
+      // If team is already mapped to a club, that takes precedence over
+      // any decision (mapping is a separate, pre-import action).
+      if (tm?.clubId) {
+        effectiveClubByTeamId.set(saffTeamId, tm.clubId);
+        continue;
+      }
+
+      const resolution = resolutionByTeamId.get(saffTeamId);
+      if (!resolution) {
+        preview.blockers.push({
+          type: "unmapped-team",
+          saffTeamId,
+          teamNameEn,
+          teamNameAr,
+        });
+        continue;
+      }
+
+      if (resolution.action === "skip") {
+        skippedTeams.add(saffTeamId);
+        summary.skippedTeams++;
+        continue;
+      }
+
+      if (resolution.action === "map") {
+        const club = await Club.findByPk(resolution.clubId, {
+          transaction: txn,
+        });
+        if (!club) {
+          preview.blockers.push({
+            type: "unmapped-team",
+            saffTeamId,
+            teamNameEn: `${teamNameEn} (target club not found)`,
+            teamNameAr,
+          });
+          continue;
+        }
+        effectiveClubByTeamId.set(saffTeamId, club.id);
+
+        if (tm) {
+          await tm.update({ clubId: club.id }, { transaction: txn });
+        }
+        if (!club.saffTeamId) {
+          await club.update({ saffTeamId }, { transaction: txn });
+        }
+        continue;
+      }
+
+      if (resolution.action === "create") {
+        const newClub = await Club.create(
+          {
+            name: resolution.newClubData.name,
+            nameAr: resolution.newClubData.nameAr,
+            type: "Club" as const,
+            country: "Saudi Arabia",
+            city: resolution.newClubData.city,
+            league: resolution.newClubData.league ?? tournament.name,
+            saffTeamId,
+          } as any,
+          { transaction: txn },
+        );
+        effectiveClubByTeamId.set(saffTeamId, newClub.id);
+        preview.willCreate.clubs.push({
+          saffTeamId,
+          name: resolution.newClubData.name,
+          nameAr: resolution.newClubData.nameAr,
+        });
+        summary.clubsCreated++;
+
+        if (tm) {
+          await tm.update({ clubId: newClub.id }, { transaction: txn });
+        } else {
+          await SaffTeamMap.create(
+            {
+              saffTeamId,
+              season,
+              teamNameEn: resolution.newClubData.name,
+              teamNameAr: resolution.newClubData.nameAr,
+              clubId: newClub.id,
+            },
+            { transaction: txn },
+          );
+        }
+      }
+    }
+
+    // ── 4. Enroll clubs in competition for this season ──
+    const allEffectiveClubIds = [...new Set(effectiveClubByTeamId.values())];
+
+    for (const clubId of allEffectiveClubIds) {
+      if (competition.type === "league") {
+        const existing = await findExistingLeagueEnrollment(
+          clubId,
+          season,
+          competition.format,
+          competition.gender,
+          competition.ageGroup,
+          competition.id,
+          txn,
+        );
+        if (existing) {
+          await existing.destroy({ transaction: txn });
+        }
+      }
+      const [, created] = await ClubCompetition.findOrCreate({
+        where: { clubId, competitionId: competition.id, season },
+        defaults: { clubId, competitionId: competition.id, season },
+        transaction: txn,
+      });
+      if (created) preview.willCreate.clubCompetitions++;
+    }
+
+    // ── 5. Build match plan from fixtures ──
+    if (allEffectiveClubIds.length) {
+      const existingMatches = await Match.findAll({
+        where: {
+          season,
+          homeClubId: { [Op.in]: allEffectiveClubIds },
+        },
+        attributes: [
+          "id",
+          "homeClubId",
+          "awayClubId",
+          "matchDate",
+          "homeScore",
+          "competitionId",
+        ],
+        transaction: txn,
+      });
+      const matchByDedupKey = new Map(
+        existingMatches.map((m) => [
+          `${m.homeClubId}|${m.awayClubId}|${m.matchDate}`,
+          m,
+        ]),
+      );
+
+      for (const fixture of fixtures) {
+        if (
+          skippedTeams.has(fixture.saffHomeTeamId) ||
+          skippedTeams.has(fixture.saffAwayTeamId)
+        ) {
+          continue;
+        }
+        const homeClubId = effectiveClubByTeamId.get(fixture.saffHomeTeamId);
+        const awayClubId = effectiveClubByTeamId.get(fixture.saffAwayTeamId);
+        if (!homeClubId || !awayClubId) continue;
+
+        const matchDateStr = fixture.matchDate;
+        const dedupKey = `${homeClubId}|${awayClubId}|${matchDateStr}`;
+        const existing = matchByDedupKey.get(dedupKey);
+
+        if (existing) {
+          const updates: string[] = [];
+          if (fixture.homeScore !== null && existing.homeScore === null) {
+            updates.push("homeScore", "awayScore", "status");
+            await existing.update(
+              {
+                homeScore: fixture.homeScore,
+                awayScore: fixture.awayScore,
+                status: "completed",
+              },
+              { transaction: txn },
+            );
+          }
+          if (!existing.competitionId) {
+            updates.push("competitionId");
+            await existing.update(
+              { competitionId: competition.id },
+              { transaction: txn },
+            );
+          }
+          if (updates.length) {
+            preview.willUpdate.matches.push({
+              id: existing.id,
+              fields: updates,
+            });
+            summary.matchesUpdated++;
+          } else {
+            preview.unchanged.matches++;
+          }
+          await fixture.update(
+            { matchId: existing.id, homeClubId, awayClubId },
+            { transaction: txn },
+          );
+        } else {
+          const matchDate = new Date(
+            `${matchDateStr}T${fixture.matchTime ?? "00:00"}:00Z`,
+          );
+          const externalMatchId = `saff:${tournament.saffId}:${fixture.saffHomeTeamId}-${fixture.saffAwayTeamId}:${matchDateStr}`;
+          const newMatch = await Match.create(
+            {
+              homeClubId,
+              awayClubId,
+              competitionId: competition.id,
+              competition: tournament.name,
+              season,
+              matchDate,
+              venue: fixture.stadium ?? null,
+              status: fixture.status === "completed" ? "completed" : "upcoming",
+              homeScore: fixture.homeScore ?? null,
+              awayScore: fixture.awayScore ?? null,
+              homeTeamName: fixture.homeTeamNameEn || null,
+              awayTeamName: fixture.awayTeamNameEn || null,
+              providerSource: "saff",
+              externalMatchId,
+            } as any,
+            { transaction: txn },
+          );
+          await fixture.update(
+            { matchId: newMatch.id, homeClubId, awayClubId },
+            { transaction: txn },
+          );
+          preview.willCreate.matches.push({
+            saffHomeTeamId: fixture.saffHomeTeamId,
+            saffAwayTeamId: fixture.saffAwayTeamId,
+            matchDate: matchDateStr,
+          });
+          summary.matchesCreated++;
+        }
+      }
+    }
+
+    // ── 6. Compute player linkage (counts always; persist on commit) ──
+    const today = new Date().toISOString().split("T")[0];
+    if (allEffectiveClubIds.length) {
+      const managedPlayers = await Player.findAll({
+        where: {
+          currentClubId: { [Op.in]: allEffectiveClubIds },
+          status: "active",
+        },
+        include: [
+          {
+            model: Contract,
+            as: "contracts",
+            where: {
+              status: "Active",
+              endDate: { [Op.gte]: today },
+            },
+            required: true,
+            attributes: ["id"],
+          },
+        ],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+          "currentClubId",
+        ],
+        transaction: txn,
+      });
+
+      const playersByClub = new Map<string, typeof managedPlayers>();
+      for (const p of managedPlayers) {
+        const clubId = (p as any).currentClubId as string;
+        if (!playersByClub.has(clubId)) playersByClub.set(clubId, []);
+        playersByClub.get(clubId)!.push(p);
+      }
+
+      const clubsForPanel = await Club.findAll({
+        where: { id: { [Op.in]: allEffectiveClubIds } },
+        attributes: ["id", "name", "nameAr"],
+        transaction: txn,
+      });
+      const clubLookup = new Map(clubsForPanel.map((c) => [c.id, c]));
+
+      for (const [clubId, players] of playersByClub) {
+        const club = clubLookup.get(clubId);
+        preview.playerLinks.byClub.push({
+          clubId,
+          name: club?.name ?? "Unknown",
+          playerCount: players.length,
+          players: players.map((p) => ({
+            id: p.id,
+            name: `${p.firstName} ${p.lastName}`,
+            nameAr:
+              p.firstNameAr && p.lastNameAr
+                ? `${p.firstNameAr} ${p.lastNameAr}`
+                : null,
+          })),
+        });
+        preview.playerLinks.totalPlayers += players.length;
+      }
+
+      // Persist match_players for newly imported matches
+      if (commit) {
+        const involvedFixtures = await SaffFixture.findAll({
+          where: {
+            tournamentId,
+            season,
+            matchId: { [Op.ne]: null },
+          },
+          transaction: txn,
+        });
+        for (const fixture of involvedFixtures) {
+          if (!fixture.matchId || !fixture.homeClubId || !fixture.awayClubId)
+            continue;
+          if (
+            skippedTeams.has(fixture.saffHomeTeamId) ||
+            skippedTeams.has(fixture.saffAwayTeamId)
+          )
+            continue;
+          const players = [
+            ...(playersByClub.get(fixture.homeClubId) || []),
+            ...(playersByClub.get(fixture.awayClubId) || []),
+          ];
+          for (const player of players) {
+            const [, created] = await MatchPlayer.findOrCreate({
+              where: { matchId: fixture.matchId, playerId: player.id },
+              defaults: {
+                matchId: fixture.matchId,
+                playerId: player.id,
+                availability: "not_called",
+              },
+              transaction: txn,
+            });
+            if (created) summary.playersLinked++;
+          }
+        }
+      }
+    }
+
+    if (commit) {
+      // If there are blockers, refuse to commit — caller should have caught
+      // this at the preview step.
+      if (preview.blockers.length > 0) {
+        await txn.rollback();
+        throw new AppError(
+          `Cannot apply: ${preview.blockers.length} unmapped teams`,
+          422,
+        );
+      }
+      await txn.commit();
+      return { preview, applied: summary };
+    }
+
+    // Preview path — always roll back so nothing persists
+    await txn.rollback();
+    return { preview, applied: null };
+  } catch (error) {
+    try {
+      await txn.rollback();
+    } catch {
+      /* rollback may fail if connection is dead */
+    }
+    throw error;
+  }
+}
+
+// ══════════════════════════════════════════
+// WIZARD: STAGE-ONLY SYNC (cron entrypoint)
+// ══════════════════════════════════════════
+
+/**
+ * Refreshes staging tables only — never touches clubs/matches/competitions.
+ * Wired into the cron scheduler (see saff.scheduler.ts) so the Browse views
+ * stay current. To commit data into Sadara, a human must run the wizard.
+ */
+export async function runStageOnlySync(
+  agencyValues: string[],
+  season: string = getCurrentSeason(),
+): Promise<{
+  tournaments: number;
+  standings: number;
+  fixtures: number;
+  teams: number;
+}> {
+  const tournamentsResult = await listTournaments({ limit: 50, page: 1 });
+  const targetTournaments = tournamentsResult.data.filter(
+    (t: any) => agencyValues.includes(t.agencyValue) && t.isActive,
+  );
+  if (!targetTournaments.length) {
+    return { tournaments: 0, standings: 0, fixtures: 0, teams: 0 };
+  }
+  const result = await fetchFromSaff({
+    tournamentIds: targetTournaments.map((t: any) => t.saffId),
+    season,
+    dataTypes: ["standings", "fixtures", "teams"],
+  });
+  return {
+    tournaments: result.results,
+    standings: result.standings,
+    fixtures: result.fixtures,
+    teams: result.teams,
+  };
 }

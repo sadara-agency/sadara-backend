@@ -12,6 +12,10 @@ import {
   importRequestSchema,
   jobIdParamSchema,
   syncTournamentsSchema,
+  createSessionSchema,
+  sessionIdParamSchema,
+  updateDecisionsSchema,
+  applySessionSchema,
 } from "@modules/saff/saff.validation";
 import * as saffController from "@modules/saff/saff.controller";
 
@@ -77,7 +81,7 @@ router.post(
   asyncHandler(saffController.mapTeam),
 );
 
-// ── Import to Sadara ──
+// ── Import to Sadara (legacy direct-apply path; deprecated by /import-sessions) ──
 router.post(
   "/import",
   authorizeModule("saff-data", "create"),
@@ -92,7 +96,7 @@ router.post(
   asyncHandler(saffController.fetchTeamLogos),
 );
 
-// ── Bulk Fetch Men's Leagues ──
+// ── Bulk Fetch Men's Leagues (stage-only — no production writes after redesign) ──
 router.post(
   "/bulk-fetch-men",
   authorizeModule("saff-data", "create"),
@@ -148,6 +152,67 @@ router.get(
   "/watchlist-matches",
   authorizeModule("saff-data", "read"),
   asyncHandler(saffController.getWatchlistMatches),
+);
+
+// ══════════════════════════════════════════
+// IMPORT SESSIONS (WIZARD)
+// ══════════════════════════════════════════
+
+router.get(
+  "/import-sessions/active",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.listMyActiveImportSessions),
+);
+
+router.post(
+  "/import-sessions",
+  authorizeModule("saff-data", "create"),
+  validate(createSessionSchema),
+  asyncHandler(saffController.createImportSession),
+);
+
+router.get(
+  "/import-sessions/:id",
+  authorizeModule("saff-data", "read"),
+  validate(sessionIdParamSchema, "params"),
+  asyncHandler(saffController.getImportSession),
+);
+
+router.post(
+  "/import-sessions/:id/upload",
+  authorizeModule("saff-data", "create"),
+  validate(sessionIdParamSchema, "params"),
+  asyncHandler(saffController.uploadImportSession),
+);
+
+router.patch(
+  "/import-sessions/:id/decisions",
+  authorizeModule("saff-data", "update"),
+  validate(sessionIdParamSchema, "params"),
+  validate(updateDecisionsSchema),
+  asyncHandler(saffController.updateImportSessionDecisions),
+);
+
+router.post(
+  "/import-sessions/:id/preview",
+  authorizeModule("saff-data", "create"),
+  validate(sessionIdParamSchema, "params"),
+  asyncHandler(saffController.previewImportSession),
+);
+
+router.post(
+  "/import-sessions/:id/apply",
+  authorizeModule("saff-data", "create"),
+  validate(sessionIdParamSchema, "params"),
+  validate(applySessionSchema),
+  asyncHandler(saffController.applyImportSession),
+);
+
+router.post(
+  "/import-sessions/:id/abort",
+  authorizeModule("saff-data", "update"),
+  validate(sessionIdParamSchema, "params"),
+  asyncHandler(saffController.abortImportSession),
 );
 
 export default router;
