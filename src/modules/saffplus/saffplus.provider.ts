@@ -21,7 +21,7 @@ import type {
   SaffPlusMatch,
 } from "./saffplus.types";
 import type { MatchEventType } from "@modules/matches/matchEvent.model";
-import { renderSaffPlusPage } from "./saffplus.video";
+import { renderSaffPlusPage, type RenderResult } from "./saffplus.video";
 
 // ── Page Fetching ──
 //
@@ -37,11 +37,27 @@ import { renderSaffPlusPage } from "./saffplus.video";
 // Chromium isn't installed.
 
 async function fetchPage(path: string): Promise<string> {
+  const r = await fetchPageWithJson(path);
+  return r.html;
+}
+
+/**
+ * Like fetchPage but also surfaces the JSON XHR responses captured
+ * during rendering. saffplus.sa fetches its actual data (competitions,
+ * clubs, etc.) via post-hydration JSON XHR — DOM scraping rarely
+ * succeeds, but the captured JSON usually contains exactly what we
+ * want. Callers should try JSON extraction first and fall back to
+ * HTML parsing only as a backup.
+ */
+async function fetchPageWithJson(path: string): Promise<{
+  html: string;
+  jsonResponses: RenderResult["jsonResponses"];
+}> {
   if (process.env.SAFFPLUS_RENDER_DISABLED === "true") {
     logger.info(
       `[SAFF+] Render disabled (SAFFPLUS_RENDER_DISABLED=true) — returning empty for ${path}`,
     );
-    return "";
+    return { html: "", jsonResponses: [] };
   }
 
   const result = await renderSaffPlusPage(path, {
@@ -51,9 +67,89 @@ async function fetchPage(path: string): Promise<string> {
 
   if (result.reason !== "ok") {
     logger.warn(`[SAFF+] Render failed for ${path}: ${result.reason}`);
-    return "";
+    return { html: "", jsonResponses: [] };
   }
-  return result.html;
+  return { html: result.html, jsonResponses: result.jsonResponses };
+}
+
+/**
+ * Walks an arbitrary JSON value looking for the largest array of
+ * objects where each item has a `name` field plus at least one of
+ * `id`, `slug`, or `uuid`. This heuristic targets the shape SAFF+
+ * (and most CMS-like platforms) use for competitions/clubs lists.
+ *
+ * Returns the array (or [] if no candidate found). The caller
+ * normalizes the items into the expected shape — this only locates
+ * the data, not its semantics.
+ */
+function findEntityArrayInJson(
+  jsonResponses: RenderResult["jsonResponses"],
+  options: { minItems?: number } = {},
+): { items: Record<string, unknown>[]; sourceUrl: string | null } {
+  const minItems = options.minItems ?? 2;
+  let best: { items: Record<string, unknown>[]; sourceUrl: string | null } = {
+    items: [],
+    sourceUrl: null,
+  };
+
+  function isCandidate(arr: unknown): arr is Record<string, unknown>[] {
+    if (!Array.isArray(arr) || arr.length < minItems) return false;
+    let matchingItems = 0;
+    for (const item of arr) {
+      if (item == null || typeof item !== "object" || Array.isArray(item)) {
+        continue;
+      }
+      const o = item as Record<string, unknown>;
+      const hasName = typeof o.name === "string" || typeof o.title === "string";
+      const hasIdent =
+        typeof o.id === "string" ||
+        typeof o.id === "number" ||
+        typeof o.slug === "string" ||
+        typeof o.uuid === "string";
+      if (hasName && hasIdent) matchingItems++;
+    }
+    // Require ≥75% of items to match the shape (avoids picking up a
+    // generic list that happens to contain mostly other things).
+    return matchingItems / arr.length >= 0.75;
+  }
+
+  function walk(value: unknown, sourceUrl: string): void {
+    if (value == null) return;
+    if (Array.isArray(value)) {
+      if (isCandidate(value) && value.length > best.items.length) {
+        best = {
+          items: value as Record<string, unknown>[],
+          sourceUrl,
+        };
+      }
+      for (const v of value) walk(v, sourceUrl);
+      return;
+    }
+    if (typeof value === "object") {
+      for (const v of Object.values(value)) walk(v, sourceUrl);
+    }
+  }
+
+  for (const r of jsonResponses) {
+    walk(r.data, r.url);
+  }
+  return best;
+}
+
+/**
+ * Pull a string field from a JSON-extracted entity. Returns undefined
+ * when the field is missing or not a string. Use for cherry-picking
+ * `name` / `slug` / etc. without TypeScript griping.
+ */
+function pickStr(
+  o: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const k of keys) {
+    const v = o[k];
+    if (typeof v === "string" && v.length > 0) return v;
+  }
+  return undefined;
 }
 
 /**
@@ -734,15 +830,20 @@ export function clearDiscoveryCache() {
 /**
  * Fetch the competitions page and extract competition data.
  *
+ * Strategy:
+ *   1. Render /competitions in headless Chrome (saffplus.sa is fully CSR).
+ *   2. PRIMARY: scan the captured JSON XHR responses for a competitions
+ *      array. SAFF+ uses Motto's content_grid component which fetches
+ *      its data via JSON — that's where the actual data lives.
+ *   3. FALLBACK: parse the rendered HTML for competition anchors.
+ *   4. FALLBACK: scan the RSC flight payload (legacy code path).
+ *
  * Women's competitions are filtered at this layer (Layer 1 of the
  * defense-in-depth women's filter) and never returned to callers.
- * `saffplus.service.ts` runs the same check before persistence as
- * Layer 2.
  */
 export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
   try {
-    const html = await fetchPage("/competitions");
-    const $ = cheerio.load(html);
+    const { html, jsonResponses } = await fetchPageWithJson("/competitions");
     const competitions: SaffPlusCompetition[] = [];
     const womenSkipped: string[] = [];
 
@@ -763,49 +864,69 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
       }
     };
 
-    // SAFF+ renders competition cards with links to /competitions/{slug}.
-    // The DOM rarely exposes gender — slug/name signals catch it.
-    $('a[href*="/competitions/"]').each((_, el) => {
-      const href = $(el).attr("href") || "";
-      const slug = href.match(/\/competitions\/([^/]+)/)?.[1] ?? "";
-      if (!slug || slug === "competitions") return;
-
-      const name =
-        $(el).find("h3, h2, [class*=title]").first().text().trim() ||
-        $(el).text().trim().split("\n")[0]?.trim();
-
-      if (!name) return;
-      tryAdd({ id: slug, name, season: "", type: "league" });
-    });
-
-    // RSC payload: extract slug + name + nameAr + gender + ageGroup when present
-    const rscChunks = extractRscData(html);
-    for (const chunk of rscChunks) {
-      // Match objects that contain at least slug + name. We capture a
-      // reasonable window after the slug to scoop adjacent fields.
-      const competitionMatches = chunk.matchAll(
-        /"slug"\s*:\s*"([^"]+)"[^{}]{0,400}?"name"\s*:\s*"([^"]+)"/g,
+    // ── PRIMARY: extract from captured JSON XHR responses ──
+    const jsonHit = findEntityArrayInJson(jsonResponses, { minItems: 1 });
+    if (jsonHit.items.length > 0) {
+      logger.info(
+        `[SAFF+] Competitions JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} items)`,
       );
-      for (const m of competitionMatches) {
-        const slug = m[1];
-        const name = m[2];
-        // Re-search the surrounding window for optional fields
-        const window = chunk.slice(m.index ?? 0, (m.index ?? 0) + 800);
-        const nameAr = window.match(/"name_ar"\s*:\s*"([^"]+)"/)?.[1];
-        const gender = window.match(/"gender"\s*:\s*"([^"]+)"/)?.[1];
-        const ageGroup =
-          window.match(/"age_group"\s*:\s*"([^"]+)"/)?.[1] ??
-          window.match(/"category"\s*:\s*"([^"]+)"/)?.[1];
-
+      for (const item of jsonHit.items) {
+        const id = pickStr(item, "slug", "id", "uuid") ?? String(item.id ?? "");
+        const name = pickStr(item, "name", "title");
+        if (!id || !name) continue;
         tryAdd({
-          id: slug,
+          id,
           name,
-          nameAr,
-          season: "",
-          type: "league",
-          gender,
-          ageGroup,
+          nameAr: pickStr(item, "name_ar", "nameAr", "title_ar", "titleAr"),
+          season: pickStr(item, "season") ?? "",
+          type: pickStr(item, "type", "competition_type") ?? "league",
+          gender: pickStr(item, "gender"),
+          ageGroup: pickStr(item, "age_group", "ageGroup", "category"),
         });
+      }
+    }
+
+    // ── FALLBACK 1: rendered DOM anchors ──
+    if (competitions.length === 0 && html) {
+      const $ = cheerio.load(html);
+      $('a[href*="/competitions/"]').each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const slug = href.match(/\/competitions\/([^/]+)/)?.[1] ?? "";
+        if (!slug || slug === "competitions") return;
+        const name =
+          $(el).find("h3, h2, [class*=title]").first().text().trim() ||
+          $(el).text().trim().split("\n")[0]?.trim();
+        if (!name) return;
+        tryAdd({ id: slug, name, season: "", type: "league" });
+      });
+    }
+
+    // ── FALLBACK 2: RSC flight payload (legacy) ──
+    if (competitions.length === 0 && html) {
+      const rscChunks = extractRscData(html);
+      for (const chunk of rscChunks) {
+        const competitionMatches = chunk.matchAll(
+          /"slug"\s*:\s*"([^"]+)"[^{}]{0,400}?"name"\s*:\s*"([^"]+)"/g,
+        );
+        for (const m of competitionMatches) {
+          const slug = m[1];
+          const name = m[2];
+          const window = chunk.slice(m.index ?? 0, (m.index ?? 0) + 800);
+          const nameAr = window.match(/"name_ar"\s*:\s*"([^"]+)"/)?.[1];
+          const gender = window.match(/"gender"\s*:\s*"([^"]+)"/)?.[1];
+          const ageGroup =
+            window.match(/"age_group"\s*:\s*"([^"]+)"/)?.[1] ??
+            window.match(/"category"\s*:\s*"([^"]+)"/)?.[1];
+          tryAdd({
+            id: slug,
+            name,
+            nameAr,
+            season: "",
+            type: "league",
+            gender,
+            ageGroup,
+          });
+        }
       }
     }
 
@@ -817,6 +938,16 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
     logger.info(
       `[SAFF+] Found ${competitions.length} competitions (men's only)`,
     );
+    if (competitions.length === 0 && jsonResponses.length > 0) {
+      // Log captured URLs so the operator can see what JSON we DID get,
+      // for tightening the heuristic in a follow-up.
+      logger.info(
+        `[SAFF+] No competitions extracted; captured JSON URLs: ${jsonResponses
+          .map((r) => r.url)
+          .slice(0, 8)
+          .join(" | ")}`,
+      );
+    }
     return competitions;
   } catch (err) {
     logger.warn(
@@ -828,47 +959,91 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
 
 /**
  * Fetch the clubs page and extract club data.
+ *
+ * Strategy mirrors fetchCompetitions:
+ *   1. Render /clubs in headless Chrome (saffplus.sa is fully CSR).
+ *   2. PRIMARY: scan captured JSON XHR responses for a clubs array.
+ *      The Motto content_grid loads its data this way.
+ *   3. FALLBACK: scan rendered HTML anchors.
+ *   4. FALLBACK: scan the RSC flight payload (legacy).
  */
 export async function fetchTeams(): Promise<SaffPlusTeam[]> {
   try {
-    const html = await fetchPage("/clubs");
-    const $ = cheerio.load(html);
+    const { html, jsonResponses } = await fetchPageWithJson("/clubs");
     const teams: SaffPlusTeam[] = [];
 
-    // Extract club cards
-    $('a[href*="/clubs/"]').each((_, el) => {
-      const href = $(el).attr("href") || "";
-      const slug = href.replace("/clubs/", "").split("/")[0];
-      if (!slug || slug === "clubs") return;
+    const tryAdd = (team: SaffPlusTeam) => {
+      if (!teams.find((t) => t.id === team.id)) {
+        teams.push(team);
+      }
+    };
 
-      const name =
-        $(el).find("h3, h2, span, [class*=name]").first().text().trim() ||
-        $(el).text().trim().split("\n")[0]?.trim();
-      const logo = $(el).find("img").first().attr("src");
-
-      if (name && !teams.find((t) => t.id === slug)) {
-        teams.push({
-          id: slug,
-          name: name || slug,
-          logo: logo || undefined,
+    // ── PRIMARY: extract from captured JSON XHR responses ──
+    const jsonHit = findEntityArrayInJson(jsonResponses, { minItems: 1 });
+    if (jsonHit.items.length > 0) {
+      logger.info(
+        `[SAFF+] Clubs JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} items)`,
+      );
+      for (const item of jsonHit.items) {
+        const id = pickStr(item, "slug", "id", "uuid") ?? String(item.id ?? "");
+        const name = pickStr(item, "name", "title");
+        if (!id || !name) continue;
+        tryAdd({
+          id,
+          name,
+          nameAr: pickStr(item, "name_ar", "nameAr", "title_ar", "titleAr"),
+          logo: pickStr(item, "logo", "thumbnail_url", "thumbnailUrl", "image"),
+          city: pickStr(item, "city", "location"),
+          stadium: pickStr(item, "stadium", "venue"),
         });
       }
-    });
+    }
 
-    // Also extract from RSC payload
-    const rscChunks = extractRscData(html);
-    for (const chunk of rscChunks) {
-      const teamMatches = chunk.matchAll(
-        /"slug"\s*:\s*"([^"]+)"[^}]*?"name"\s*:\s*"([^"]+)"/g,
-      );
-      for (const m of teamMatches) {
-        if (!teams.find((t) => t.id === m[1])) {
-          teams.push({ id: m[1], name: m[2] });
+    // ── FALLBACK 1: rendered DOM anchors ──
+    if (teams.length === 0 && html) {
+      const $ = cheerio.load(html);
+      $('a[href*="/clubs/"]').each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const slug = href.replace("/clubs/", "").split("/")[0];
+        if (!slug || slug === "clubs") return;
+
+        const name =
+          $(el).find("h3, h2, span, [class*=name]").first().text().trim() ||
+          $(el).text().trim().split("\n")[0]?.trim();
+        const logo = $(el).find("img").first().attr("src");
+
+        if (name) {
+          tryAdd({
+            id: slug,
+            name: name || slug,
+            logo: logo || undefined,
+          });
+        }
+      });
+    }
+
+    // ── FALLBACK 2: RSC flight payload (legacy) ──
+    if (teams.length === 0 && html) {
+      const rscChunks = extractRscData(html);
+      for (const chunk of rscChunks) {
+        const teamMatches = chunk.matchAll(
+          /"slug"\s*:\s*"([^"]+)"[^}]*?"name"\s*:\s*"([^"]+)"/g,
+        );
+        for (const m of teamMatches) {
+          tryAdd({ id: m[1], name: m[2] });
         }
       }
     }
 
     logger.info(`[SAFF+] Found ${teams.length} clubs`);
+    if (teams.length === 0 && jsonResponses.length > 0) {
+      logger.info(
+        `[SAFF+] No clubs extracted; captured JSON URLs: ${jsonResponses
+          .map((r) => r.url)
+          .slice(0, 8)
+          .join(" | ")}`,
+      );
+    }
     return teams;
   } catch (err) {
     logger.warn(`[SAFF+] Failed to fetch clubs: ${(err as Error).message}`);

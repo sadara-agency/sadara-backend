@@ -1179,6 +1179,35 @@ export async function importToSadara(input: ImportRequest) {
           // ── Track clubs already enrolled in competition ──
           const enrolledClubs = new Set<string>();
 
+          // ── Pre-resolve senior squad per club ──
+          // Match insert is gated by the matches_squad_required_when_club
+          // CHECK constraint (migration 152). Build a clubId→squadId map
+          // from the unique clubIds referenced by these fixtures so we
+          // can satisfy the constraint without per-row lookups.
+          const fixtureClubIds = new Set<string>();
+          for (const f of fixtures) {
+            const hm = teamMapById.get(f.saffHomeTeamId);
+            const am = teamMapById.get(f.saffAwayTeamId);
+            if (hm?.clubId) fixtureClubIds.add(hm.clubId);
+            if (am?.clubId) fixtureClubIds.add(am.clubId);
+          }
+          const clubToSquadId = new Map<string, string>();
+          for (const cid of fixtureClubIds) {
+            try {
+              const [squad] = await findOrCreateSquad(
+                cid,
+                { ageCategory: "senior", division: "premier" },
+                txn,
+              );
+              clubToSquadId.set(cid, squad.id);
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              logger.warn(
+                `[SAFF Import] Could not resolve senior squad for club ${cid}: ${msg}`,
+              );
+            }
+          }
+
           for (const fixture of fixtures) {
             const homeMap = teamMapById.get(fixture.saffHomeTeamId);
             const awayMap = teamMapById.get(fixture.saffAwayTeamId);
@@ -1216,9 +1245,18 @@ export async function importToSadara(input: ImportRequest) {
                 );
               }
             } else {
+              // Resolve squad IDs from the pre-built map; if a club
+              // doesn't have a resolvable squad, drop both club and
+              // squad (CHECK constraint allows orphan rows).
+              const homeSquadId = clubToSquadId.get(homeMap.clubId) ?? null;
+              const awaySquadId = clubToSquadId.get(awayMap.clubId) ?? null;
+              const safeHomeClubId = homeSquadId ? homeMap.clubId : null;
+              const safeAwayClubId = awaySquadId ? awayMap.clubId : null;
               const match = await Match.create({
-                homeClubId: homeMap.clubId,
-                awayClubId: awayMap.clubId,
+                homeClubId: safeHomeClubId,
+                awayClubId: safeAwayClubId,
+                homeSquadId,
+                awaySquadId,
                 competitionId: competition.id,
                 competition: tournament.name,
                 season,
@@ -1728,6 +1766,46 @@ export async function projectFixturesToMatches(
     where: { tournamentId, season },
   });
 
+  // ── Pre-resolve squad IDs for every referenced club ──
+  // The `matches` table has a CHECK constraint (added by migration 152):
+  //   `(home_club_id IS NULL OR home_squad_id IS NOT NULL) AND
+  //    (away_club_id IS NULL OR away_squad_id IS NOT NULL)`.
+  // Inserting a match with home_club_id set but home_squad_id NULL aborts
+  // the transaction AND poisons the pooled connection — subsequent
+  // queries on that connection get error 25P02 ("transaction is aborted")
+  // until the connection is reset, which is what we observed in
+  // production logs as the SAFF transaction-abort cascade.
+  //
+  // Fix: ensure every referenced club has a senior/premier squad (auto-
+  // create via findOrCreateSquad if missing) and set the squad_id on
+  // each match. This is the same auto-create pattern migration 152 uses,
+  // applied at write time so the constraint is always satisfied.
+  const clubIds = new Set<string>();
+  for (const f of fixtures) {
+    if (f.homeClubId) clubIds.add(f.homeClubId);
+    if (f.awayClubId) clubIds.add(f.awayClubId);
+  }
+
+  const clubToSquadId = new Map<string, string>();
+  for (const clubId of clubIds) {
+    try {
+      const [squad] = await findOrCreateSquad(clubId, {
+        ageCategory: "senior",
+        division: "premier",
+      });
+      clubToSquadId.set(clubId, squad.id);
+    } catch (err) {
+      // If a club has been deleted between the fixture write and now,
+      // findOrCreateSquad will throw "Parent club not found". Skip — the
+      // matches referencing this club will fall back to NULL home_club_id
+      // (see below) so the CHECK constraint still passes.
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        `[SAFF Bridge] Could not resolve senior squad for club ${clubId}: ${msg}`,
+      );
+    }
+  }
+
   for (const fixture of fixtures) {
     try {
       const externalMatchId = `saff:${tournament.saffId}:${fixture.saffHomeTeamId}-${fixture.saffAwayTeamId}:${fixture.matchDate}`;
@@ -1736,6 +1814,21 @@ export async function projectFixturesToMatches(
         `${fixture.matchDate}T${fixture.matchTime ?? "00:00"}:00Z`,
       );
 
+      // Resolve squad IDs from the pre-built map. If the club has no
+      // resolvable squad (e.g., dangling FK), null out BOTH the club
+      // and squad — the CHECK constraint allows NULL club + NULL squad
+      // (treats the row as an orphan, which it effectively is).
+      const homeSquadId = fixture.homeClubId
+        ? (clubToSquadId.get(fixture.homeClubId) ?? null)
+        : null;
+      const awaySquadId = fixture.awayClubId
+        ? (clubToSquadId.get(fixture.awayClubId) ?? null)
+        : null;
+      const safeHomeClubId =
+        fixture.homeClubId && homeSquadId ? fixture.homeClubId : null;
+      const safeAwayClubId =
+        fixture.awayClubId && awaySquadId ? fixture.awayClubId : null;
+
       const matchValues = {
         providerSource: "saff",
         externalMatchId,
@@ -1743,8 +1836,10 @@ export async function projectFixturesToMatches(
         competition: competition ? undefined : tournament.name,
         season,
         matchDate,
-        homeClubId: fixture.homeClubId ?? null,
-        awayClubId: fixture.awayClubId ?? null,
+        homeClubId: safeHomeClubId,
+        awayClubId: safeAwayClubId,
+        homeSquadId,
+        awaySquadId,
         homeTeamName: fixture.homeTeamNameEn || null,
         awayTeamName: fixture.awayTeamNameEn || null,
         homeScore: fixture.homeScore ?? null,
