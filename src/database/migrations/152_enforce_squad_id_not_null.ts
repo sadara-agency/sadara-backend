@@ -108,7 +108,59 @@ export async function up({
     WHERE away_squad_id IS NULL AND away_club_id IS NOT NULL
   `);
 
-  // ── 3. Sanity check: anything still NULL must be an orphan (NULL club_id) ──
+  // ── 3. Heal dangling FK refs ──
+  // If a match's home_club_id / away_club_id points to a club that no longer
+  // exists in the `clubs` table, the squad-auto-create above couldn't help
+  // because its FROM clause joined on clubs. Null out those dangling refs
+  // (matching what an ON DELETE SET NULL constraint would have done) so the
+  // CHECK constraint we add below accepts the row as a legitimate orphan.
+  //
+  // Hard-cap at 50 so a genuinely catastrophic dataset surfaces as a hard
+  // failure rather than silent mass-mutation.
+  const [danglingRows] = (await seq.query(`
+    SELECT COUNT(*)::int AS cnt
+    FROM matches m
+    WHERE
+      (m.home_squad_id IS NULL AND m.home_club_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM clubs c WHERE c.id = m.home_club_id))
+      OR
+      (m.away_squad_id IS NULL AND m.away_club_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM clubs c WHERE c.id = m.away_club_id))
+  `)) as [Array<{ cnt: number }>, unknown];
+  const danglingCount = Number(
+    Array.isArray(danglingRows)
+      ? (danglingRows[0]?.cnt ?? 0)
+      : ((danglingRows as { cnt: number } | undefined)?.cnt ?? 0),
+  );
+
+  if (danglingCount > 50) {
+    throw new Error(
+      `Migration 152 aborted: ${danglingCount} matches with dangling club references — too many to auto-heal. ` +
+        "Investigate the clubs table for missing rows before re-running.",
+    );
+  }
+
+  if (danglingCount > 0) {
+    console.log(
+      `Migration 152: healing ${danglingCount} match(es) with dangling club references — nulling orphan club ids`,
+    );
+    await seq.query(`
+      UPDATE matches m
+      SET home_club_id = NULL
+      WHERE m.home_squad_id IS NULL
+        AND m.home_club_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM clubs c WHERE c.id = m.home_club_id)
+    `);
+    await seq.query(`
+      UPDATE matches m
+      SET away_club_id = NULL
+      WHERE m.away_squad_id IS NULL
+        AND m.away_club_id IS NOT NULL
+        AND NOT EXISTS (SELECT 1 FROM clubs c WHERE c.id = m.away_club_id)
+    `);
+  }
+
+  // ── 4. Sanity check: anything still NULL must be an orphan (NULL club_id) ──
   // The CHECK constraint we're about to add tolerates orphans, but if there
   // are stranded rows where club IS set yet squad is still NULL, something
   // unexpected is happening — fail loudly with a count for diagnostics.
@@ -128,8 +180,9 @@ export async function up({
 
   if (strandedCount > 0) {
     throw new Error(
-      `Migration 152 aborted: ${strandedCount} matches still have a non-null club_id but no squad_id. ` +
-        "This indicates squad-auto-creation failed — investigate clubs referenced by these matches manually.",
+      `Migration 152 aborted: ${strandedCount} matches still have a non-null club_id but no squad_id ` +
+        "after squad auto-creation and dangling-ref healing. " +
+        "This indicates a club exists but no senior squad could be created — investigate the clubs table.",
     );
   }
 
@@ -150,7 +203,7 @@ export async function up({
     );
   }
 
-  // ── 4. Add CHECK constraint (idempotent: drop first if it exists) ──
+  // ── 5. Add CHECK constraint (idempotent: drop first if it exists) ──
   await seq.query(
     `ALTER TABLE matches DROP CONSTRAINT IF EXISTS matches_squad_required_when_club`,
   );
