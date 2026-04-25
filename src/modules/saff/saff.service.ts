@@ -555,11 +555,26 @@ export async function fetchFromSaff(input: FetchRequest) {
     const tournament = tournamentMap.get(result.tournamentId);
     if (!tournament) continue;
 
-    const txn = await sequelize.transaction();
+    // ─────────────────────────────────────────────────────────────────────
+    // Per-data-type transactions:
+    //
+    // Previously this block used a single transaction wrapping standings +
+    // fixtures + teams + tournament metadata. If ANY bulkCreate failed,
+    // Postgres aborted the whole transaction and every subsequent statement
+    // surfaced as "current transaction is aborted, commands ignored until
+    // end of transaction block" — masking the original error and dropping
+    // perfectly-valid data alongside the failing batch.
+    //
+    // Splitting into one txn per data type means a failure in standings
+    // doesn't block fixtures + teams from persisting, and the original
+    // SQL error (with `error.original?.message` and the offending SQL)
+    // gets logged so we can actually debug it.
+    // ─────────────────────────────────────────────────────────────────────
 
-    try {
-      // ── Store standings (UPSERT — preserves clubId mappings) ──
-      if (dataTypes.includes("standings") && result.standings.length) {
+    const tag = `tournament ${result.tournamentId}`;
+
+    if (dataTypes.includes("standings") && result.standings.length) {
+      await runSaffUpsert(`${tag} standings`, async (txn) => {
         await SaffStanding.bulkCreate(
           result.standings.map((s) => ({
             tournamentId: tournament.id,
@@ -596,10 +611,11 @@ export async function fetchFromSaff(input: FetchRequest) {
           },
         );
         summary.standings += result.standings.length;
-      }
+      });
+    }
 
-      // ── Store fixtures (UPSERT — preserves homeClubId, awayClubId, matchId mappings) ──
-      if (dataTypes.includes("fixtures") && result.fixtures.length) {
+    if (dataTypes.includes("fixtures") && result.fixtures.length) {
+      await runSaffUpsert(`${tag} fixtures`, async (txn) => {
         await SaffFixture.bulkCreate(
           result.fixtures.map((f) => ({
             tournamentId: tournament.id,
@@ -640,10 +656,11 @@ export async function fetchFromSaff(input: FetchRequest) {
           },
         );
         summary.fixtures += result.fixtures.length;
-      }
+      });
+    }
 
-      // ── Store team mappings (batched) ──
-      if (dataTypes.includes("teams") && result.teams.length) {
+    if (dataTypes.includes("teams") && result.teams.length) {
+      await runSaffUpsert(`${tag} teams`, async (txn) => {
         const saffTeamIds = result.teams.map((t) => t.saffTeamId);
         const existingMaps = await SaffTeamMap.findAll({
           where: { saffTeamId: { [Op.in]: saffTeamIds }, season },
@@ -685,9 +702,12 @@ export async function fetchFromSaff(input: FetchRequest) {
           );
         }
         summary.teams += result.teams.length;
-      }
+      });
+    }
 
-      // Update last synced and championship logo (only when scrape returned one)
+    // Tournament metadata is its own tiny transaction so it survives even
+    // when one of the data-type batches fails.
+    await runSaffUpsert(`${tag} metadata`, async (txn) => {
       const tournamentPatch: { lastSyncedAt: Date; logoUrl?: string } = {
         lastSyncedAt: new Date(),
       };
@@ -695,22 +715,49 @@ export async function fetchFromSaff(input: FetchRequest) {
         tournamentPatch.logoUrl = result.tournamentLogoUrl;
       }
       await tournament.update(tournamentPatch, { transaction: txn });
-
-      await txn.commit();
-    } catch (error: any) {
-      try {
-        await txn.rollback();
-      } catch {
-        /* rollback may fail if connection is dead */
-      }
-      logger.error(
-        `[SAFF Service] fetchFromSaff failed for tournament ${result.tournamentId}: ${error.message}`,
-      );
-      // Continue to next tournament instead of aborting entire batch
-    }
+    });
   }
 
   return { results: results.length, ...summary };
+}
+
+/**
+ * Run a small SAFF upsert in its own transaction. On failure, logs the
+ * original SQL error (not the cascaded "transaction is aborted"), rolls
+ * back, and returns — never throws to the caller. The caller's loop
+ * continues to the next tournament / data type without interruption.
+ */
+async function runSaffUpsert(
+  label: string,
+  body: (
+    txn: Awaited<ReturnType<typeof sequelize.transaction>>,
+  ) => Promise<void>,
+): Promise<void> {
+  const txn = await sequelize.transaction();
+  try {
+    await body(txn);
+    await txn.commit();
+  } catch (error: unknown) {
+    try {
+      await txn.rollback();
+    } catch {
+      /* connection may be dead — ignore */
+    }
+    const e = error as {
+      message?: string;
+      original?: { message?: string; code?: string };
+      sql?: string;
+      parent?: { message?: string; code?: string };
+    };
+    const originalMsg =
+      e.original?.message ?? e.parent?.message ?? e.message ?? String(error);
+    const code = e.original?.code ?? e.parent?.code;
+    const sqlSnippet = e.sql ? e.sql.slice(0, 240) : undefined;
+    logger.error(`[SAFF Service] ${label} upsert failed: ${originalMsg}`, {
+      code,
+      sql: sqlSnippet,
+    });
+  }
 }
 
 // ══════════════════════════════════════════

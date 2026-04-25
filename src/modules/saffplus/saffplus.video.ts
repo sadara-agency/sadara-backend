@@ -221,6 +221,132 @@ function scheduleClose() {
   }, BROWSER_IDLE_MS);
 }
 
+// ══════════════════════════════════════════
+// RENDERED-PAGE FETCHING (saffplus.sa is fully CSR)
+// ══════════════════════════════════════════
+
+export interface RenderResult {
+  html: string;
+  /** All JSON responses captured from the page's network calls.
+   *  Useful when the data we want lives in an XHR rather than the DOM. */
+  jsonResponses: Array<{ url: string; data: unknown }>;
+  reason: "ok" | "disabled" | "circuit_open" | "timeout" | "error";
+}
+
+/**
+ * Render a saffplus.sa page in headless Chrome and return the post-hydration
+ * HTML plus any JSON XHR responses the page made. Required because saffplus.sa
+ * bails out to client-side rendering — the SSR HTML is just an empty React
+ * shell, so axios+cheerio sees no competition/club data. We need a real
+ * browser to execute the JS that actually fetches the data.
+ *
+ * Reuses the same Puppeteer pool (and circuit breaker) as the video extractor,
+ * so we never spin up two separate Chromium instances.
+ *
+ * Gating: this function works without the SAFFPLUS_VIDEO_EXTRACTION env flag
+ * because rendering pages is the data path itself — disabling it would mean
+ * no SAFF+ data at all. Only video URL extraction is gated by the flag.
+ */
+export async function renderSaffPlusPage(
+  path: string,
+  options: {
+    /** CSS selector to wait for after page load (e.g. anchor to data we want). */
+    waitForSelector?: string;
+    /** Max time to wait for the selector before continuing anyway. */
+    selectorTimeoutMs?: number;
+    /** When true, also wait for network idle (no in-flight XHR for 500ms). */
+    waitForNetworkIdle?: boolean;
+  } = {},
+): Promise<RenderResult> {
+  if (isCircuitOpen()) {
+    logger.info(`[SAFF+ render] Circuit open — skipping render of ${path}`);
+    return {
+      html: "",
+      jsonResponses: [],
+      reason: "circuit_open",
+    };
+  }
+
+  const {
+    waitForSelector,
+    selectorTimeoutMs = PAGE_TIMEOUT_MS,
+    waitForNetworkIdle = true,
+  } = options;
+
+  let page: Page | null = null;
+  const jsonResponses: Array<{ url: string; data: unknown }> = [];
+
+  try {
+    const browser = await getBrowser();
+    page = await browser.newPage();
+    // Renders take longer than video extraction; bump timeouts.
+    const renderTimeoutMs = 20_000;
+    page.setDefaultTimeout(renderTimeoutMs);
+    page.setDefaultNavigationTimeout(renderTimeoutMs);
+
+    // Capture every JSON response while the page loads.
+    page.on("response", async (response) => {
+      try {
+        const ct = response.headers()["content-type"] ?? "";
+        if (!ct.includes("application/json")) return;
+        const url = response.url();
+        // Only capture responses from saffplus.sa or motto-cdn — skip ad/analytics.
+        if (
+          !url.includes("saffplus.sa") &&
+          !url.includes("mottocdn.com") &&
+          !url.includes("motto.")
+        ) {
+          return;
+        }
+        const data = await response.json().catch(() => null);
+        if (data != null) jsonResponses.push({ url, data });
+      } catch {
+        // tolerate per-response failures
+      }
+    });
+
+    const url = `${BASE_URL}${path}`;
+    await page.goto(url, {
+      waitUntil: waitForNetworkIdle ? "networkidle0" : "domcontentloaded",
+      timeout: renderTimeoutMs,
+    });
+
+    if (waitForSelector) {
+      await page
+        .waitForSelector(waitForSelector, { timeout: selectorTimeoutMs })
+        .catch(() => {
+          // Selector didn't appear — fall through; HTML may still be useful.
+        });
+    }
+
+    const html = await page.content();
+    recordSuccess();
+    logger.info(
+      `[SAFF+ render] ${path}: ${html.length}b html, ${jsonResponses.length} json responses`,
+    );
+    return { html, jsonResponses, reason: "ok" };
+  } catch (err) {
+    recordFailure();
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`[SAFF+ render] Failed for ${path}: ${msg}`);
+    return {
+      html: "",
+      jsonResponses,
+      reason: msg.includes("timeout") ? "timeout" : "error",
+    };
+  } finally {
+    if (page) {
+      try {
+        await page.close();
+      } catch {
+        // tolerate
+      }
+    }
+  }
+}
+
+const BASE_URL = "https://saffplus.sa";
+
 /** Force-close the singleton browser. Used by tests + graceful shutdown. */
 export async function closeVideoExtractor(): Promise<void> {
   if (browserIdleTimer) {

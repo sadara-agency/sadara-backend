@@ -12,7 +12,6 @@
  * The Motto platform key: 5O1SNE9VGH62MA16F2G088VJSV33FLF6
  */
 
-import axios from "axios";
 import * as cheerio from "cheerio";
 import { logger } from "@config/logger";
 import type {
@@ -22,32 +21,39 @@ import type {
   SaffPlusMatch,
 } from "./saffplus.types";
 import type { MatchEventType } from "@modules/matches/matchEvent.model";
-
-const BASE_URL = "https://saffplus.sa";
-const TIMEOUT = 15000;
-
-const USER_AGENT =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
+import { renderSaffPlusPage } from "./saffplus.video";
 
 // ── Page Fetching ──
+//
+// saffplus.sa is fully client-side rendered (its server returns an empty
+// React shell with `BAILOUT_TO_CLIENT_SIDE_RENDERING`). Plain HTTP fetches
+// (axios) see no competition/club data — only an empty document. We have
+// to render the page in headless Chrome and let JS hydrate before scraping.
+// renderSaffPlusPage reuses the same Puppeteer pool as the video extractor
+// so we don't spin up a second Chromium instance.
+//
+// Set SAFFPLUS_RENDER_DISABLED=true to short-circuit (returns empty string,
+// so callers see "0 competitions" gracefully). Useful for local dev where
+// Chromium isn't installed.
 
 async function fetchPage(path: string): Promise<string> {
-  const url = `${BASE_URL}${path}`;
-  try {
-    const res = await axios.get(url, {
-      timeout: TIMEOUT,
-      headers: {
-        "User-Agent": USER_AGENT,
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "en,ar;q=0.9",
-      },
-      maxRedirects: 3,
-    });
-    return typeof res.data === "string" ? res.data : JSON.stringify(res.data);
-  } catch (err) {
-    logger.warn(`[SAFF+] Failed to fetch ${url}: ${(err as Error).message}`);
-    throw err;
+  if (process.env.SAFFPLUS_RENDER_DISABLED === "true") {
+    logger.info(
+      `[SAFF+] Render disabled (SAFFPLUS_RENDER_DISABLED=true) — returning empty for ${path}`,
+    );
+    return "";
   }
+
+  const result = await renderSaffPlusPage(path, {
+    waitForNetworkIdle: true,
+    selectorTimeoutMs: 15_000,
+  });
+
+  if (result.reason !== "ok") {
+    logger.warn(`[SAFF+] Render failed for ${path}: ${result.reason}`);
+    return "";
+  }
+  return result.html;
 }
 
 /**
