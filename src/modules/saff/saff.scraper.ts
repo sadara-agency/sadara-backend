@@ -2,6 +2,21 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import * as iconv from "iconv-lite";
 import { logger } from "@config/logger";
+import {
+  scrapedStandingSchema,
+  scrapedFixtureSchema,
+  scrapedTeamSchema,
+  type ScrapedStandingInput,
+  type ScrapedFixtureInput,
+  type ScrapedTeamInput,
+} from "@modules/saff/saff.validation";
+import {
+  SELECTORS,
+  SELECTOR_VERSION,
+  STANDINGS_HEADER_LABELS,
+  URL_PATTERNS,
+  resolveStandingsColumnMap,
+} from "@modules/saff/saff.selectors";
 
 // /en/ subpath may 404 depending on SAFF server config — scrapeChampionship
 // falls back to root URL if the English page fails.
@@ -13,43 +28,39 @@ const REQUEST_DELAY = 1500; // ms between requests to be respectful
 const BROWSER_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+// ── Errors ──
+
+/**
+ * Thrown when the scraped HTML doesn't look like a SAFF tournament page.
+ * Surfaces to the wizard as a red banner so the user sees the failure
+ * instead of a silent zero-row result.
+ */
+export class ScraperShapeError extends Error {
+  public readonly tournamentId: number;
+  public readonly reason: string;
+  public readonly scraperVersion: number;
+
+  constructor(tournamentId: number, reason: string) {
+    super(
+      `[SAFF] Scraper shape error for tournament ${tournamentId}: ${reason}`,
+    );
+    this.name = "ScraperShapeError";
+    this.tournamentId = tournamentId;
+    this.reason = reason;
+    this.scraperVersion = SELECTOR_VERSION;
+  }
+}
+
 // ── Types ──
 
-export interface ScrapedStanding {
-  position: number;
-  saffTeamId: number;
-  teamNameEn: string;
-  teamNameAr: string;
-  played: number;
-  won: number;
-  drawn: number;
-  lost: number;
-  goalsFor: number;
-  goalsAgainst: number;
-  goalDifference: number;
-  points: number;
-}
+export type ScrapedStanding = ScrapedStandingInput;
+export type ScrapedFixture = ScrapedFixtureInput;
+export type ScrapedTeam = ScrapedTeamInput;
 
-export interface ScrapedFixture {
-  date: string; // YYYY-MM-DD
-  time: string; // HH:MM
-  saffHomeTeamId: number;
-  homeTeamNameEn: string;
-  homeTeamNameAr: string;
-  saffAwayTeamId: number;
-  awayTeamNameEn: string;
-  awayTeamNameAr: string;
-  homeScore: number | null;
-  awayScore: number | null;
-  stadium: string;
-  city: string;
-}
-
-export interface ScrapedTeam {
-  saffTeamId: number;
-  teamNameEn: string;
-  teamNameAr: string;
-  logoUrl?: string;
+export interface ValidationWarning {
+  entity: "standing" | "fixture" | "team";
+  reason: string;
+  raw: unknown;
 }
 
 export interface ScrapeResult {
@@ -58,6 +69,8 @@ export interface ScrapeResult {
   standings: ScrapedStanding[];
   fixtures: ScrapedFixture[];
   teams: ScrapedTeam[];
+  validationWarnings: ValidationWarning[];
+  scraperVersion: number;
   scrapedAt: Date;
 }
 
@@ -150,8 +163,9 @@ export async function scrapeChampionship(
   saffId: number,
   season: string,
 ): Promise<ScrapeResult> {
-  const urlEn = `${BASE_URL_EN}/championship.php?id=${saffId}`;
-  const urlArFallback = `${BASE_URL_AR}/championship.php?id=${saffId}`;
+  const path = URL_PATTERNS.championship(saffId);
+  const urlEn = `${BASE_URL_EN}/${path}`;
+  const urlArFallback = `${BASE_URL_AR}/${path}`;
 
   // Fetch EN page with fallback to root URL if /en/ path 404s
   let $en: cheerio.CheerioAPI;
@@ -168,37 +182,37 @@ export async function scrapeChampionship(
   const $ar = await fetchPage(urlArFallback, "ar");
 
   // Scrape English data (primary)
-  const standingsEn = scrapeStandings($en);
-  const fixturesEn = scrapeFixtures($en);
-  const teamsEn = extractTeams($en);
+  const rawStandingsEn = scrapeStandings($en);
+  const rawFixturesEn = scrapeFixtures($en);
+  const rawTeamsEn = extractTeams($en);
 
   // Scrape Arabic data for name merging
-  const standingsAr = scrapeStandings($ar);
-  const fixturesAr = scrapeFixtures($ar);
-  const teamsAr = extractTeams($ar);
+  const rawStandingsAr = scrapeStandings($ar);
+  const rawTeamsAr = extractTeams($ar);
+  const rawFixturesAr = scrapeFixtures($ar);
 
   // Build Arabic name lookup by saffTeamId
   // Note: "teamNameEn" from the AR page actually contains the Arabic text
   const arNameMap = new Map<number, string>();
-  standingsAr.forEach((s) => arNameMap.set(s.saffTeamId, s.teamNameEn));
-  teamsAr.forEach((t) => arNameMap.set(t.saffTeamId, t.teamNameEn));
+  rawStandingsAr.forEach((s) => arNameMap.set(s.saffTeamId, s.teamNameEn));
+  rawTeamsAr.forEach((t) => arNameMap.set(t.saffTeamId, t.teamNameEn));
 
   // Merge Arabic names into English standings
-  const standings = standingsEn.map((s) => ({
+  const mergedStandings = rawStandingsEn.map((s) => ({
     ...s,
     teamNameAr: arNameMap.get(s.saffTeamId) || "",
   }));
 
   // Merge Arabic names into fixtures
   const arFixtureMap = new Map<string, { home: string; away: string }>();
-  fixturesAr.forEach((f) => {
+  rawFixturesAr.forEach((f) => {
     arFixtureMap.set(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`, {
       home: f.homeTeamNameEn,
       away: f.awayTeamNameEn,
     });
   });
 
-  const fixtures = fixturesEn.map((f) => ({
+  const mergedFixtures = rawFixturesEn.map((f) => ({
     ...f,
     homeTeamNameAr:
       arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)
@@ -213,10 +227,71 @@ export async function scrapeChampionship(
   }));
 
   // Merge Arabic names into teams
-  const teams = teamsEn.map((t) => ({
+  const mergedTeams = rawTeamsEn.map((t) => ({
     ...t,
     teamNameAr: arNameMap.get(t.saffTeamId) || "",
   }));
+
+  // Validate every row with Zod and split valid/invalid
+  const validationWarnings: ValidationWarning[] = [];
+  const standings: ScrapedStanding[] = [];
+  const fixtures: ScrapedFixture[] = [];
+  const teams: ScrapedTeam[] = [];
+
+  for (const row of mergedStandings) {
+    const parsed = scrapedStandingSchema.safeParse(row);
+    if (parsed.success) {
+      standings.push(parsed.data);
+    } else {
+      validationWarnings.push({
+        entity: "standing",
+        reason: parsed.error.issues
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; "),
+        raw: row,
+      });
+    }
+  }
+
+  for (const row of mergedFixtures) {
+    const parsed = scrapedFixtureSchema.safeParse(row);
+    if (parsed.success) {
+      fixtures.push(parsed.data);
+    } else {
+      validationWarnings.push({
+        entity: "fixture",
+        reason: parsed.error.issues
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; "),
+        raw: row,
+      });
+    }
+  }
+
+  for (const row of mergedTeams) {
+    const parsed = scrapedTeamSchema.safeParse(row);
+    if (parsed.success) {
+      teams.push(parsed.data);
+    } else {
+      validationWarnings.push({
+        entity: "team",
+        reason: parsed.error.issues
+          .map((i) => `${i.path.join(".")}: ${i.message}`)
+          .join("; "),
+        raw: row,
+      });
+    }
+  }
+
+  // Shape assertion — empty result on a championship page means SAFF DOM
+  // changed or the tournament has no data published. Either way the user
+  // needs to know explicitly instead of seeing 0 rows in the wizard.
+  if (standings.length === 0 && fixtures.length === 0 && teams.length === 0) {
+    throw new ScraperShapeError(
+      saffId,
+      `No standings, fixtures, or teams parsed (${mergedStandings.length} raw standings, ${mergedFixtures.length} raw fixtures, ${mergedTeams.length} raw teams — all rejected by validation or selectors didn't match)`,
+    );
+  }
 
   return {
     tournamentId: saffId,
@@ -224,52 +299,48 @@ export async function scrapeChampionship(
     standings,
     fixtures,
     teams,
+    validationWarnings,
+    scraperVersion: SELECTOR_VERSION,
     scrapedAt: new Date(),
   };
 }
 
 // ── Scrape standings table ──
+//
+// Returns "raw" rows that may not yet pass Zod validation — merging with
+// the Arabic page happens before schema enforcement in scrapeChampionship().
+type RawStanding = Omit<ScrapedStanding, "teamNameAr"> & {
+  teamNameAr: string;
+};
 
-function scrapeStandings($: cheerio.CheerioAPI): ScrapedStanding[] {
-  const standings: ScrapedStanding[] = [];
+function scrapeStandings($: cheerio.CheerioAPI): RawStanding[] {
+  const standings: RawStanding[] = [];
 
-  // Find the standings table — it has headers: P, W, D, L, GF, GA, +/-, Pts
-  $("table").each((_, table) => {
+  $(SELECTORS.table).each((_, table) => {
     const headers = $(table)
-      .find("th")
+      .find(SELECTORS.tableHeader)
       .map((_, th) => $(th).text().trim())
       .get();
 
-    // Identify standings table by checking for "Pts" or "P" columns
-    const hasPts = headers.some((h) => h === "Pts" || h === "نقاط");
-    const hasP = headers.some((h) => h === "P" || h === "لعب");
+    const { idx, missing } = resolveStandingsColumnMap(
+      headers,
+      STANDINGS_HEADER_LABELS,
+    );
 
-    if (!hasPts || !hasP) return;
-
-    // Find column indices from headers
-    const colIdx = {
-      pts: headers.findIndex((h) => h === "Pts" || h === "نقاط"),
-      p: headers.findIndex((h) => h === "P" || h === "لعب"),
-      w: headers.findIndex((h) => h === "W" || h === "فوز"),
-      d: headers.findIndex((h) => h === "D" || h === "تعادل"),
-      l: headers.findIndex((h) => h === "L" || h === "خسارة"),
-      gf: headers.findIndex((h) => h === "GF" || h === "له"),
-      ga: headers.findIndex((h) => h === "GA" || h === "عليه"),
-      gd: headers.findIndex(
-        (h) => h === "+/-" || h === "الفارق" || h === "فرق",
-      ),
-    };
+    // If the table is missing the two anchor columns (P + Pts) it's not a
+    // standings table — skip silently so other tables on the page can be
+    // examined.
+    if (missing.includes("p") || missing.includes("pts")) return;
 
     let rowNum = 0;
 
     $(table)
-      .find("tbody tr")
+      .find(SELECTORS.tableBodyRow)
       .each((_, row) => {
-        const cells = $(row).find("td");
+        const cells = $(row).find(SELECTORS.tableCell);
         if (cells.length < 8) return;
 
-        // Find team link
-        const teamLink = $(row).find('a[href*="team.php"]');
+        const teamLink = $(row).find(SELECTORS.teamLink);
         if (!teamLink.length) return;
 
         const saffTeamId = extractTeamId(teamLink.attr("href"));
@@ -278,38 +349,33 @@ function scrapeStandings($: cheerio.CheerioAPI): ScrapedStanding[] {
 
         rowNum++;
 
-        // Helper: parse a cell's text as integer (handles +46, -7, etc.)
-        const cellInt = (idx: number): number => {
-          if (idx < 0 || idx >= cells.length) return 0;
-          const text = $(cells[idx]).text().trim().replace(/\+/, "");
+        const cellInt = (i: number): number => {
+          if (i < 0 || i >= cells.length) return 0;
+          const text = $(cells[i]).text().trim().replace(/\+/, "");
           const n = parseInt(text, 10);
           return isNaN(n) ? 0 : n;
         };
 
-        // Try to get position from first cell, fall back to row number
         const firstCellText = $(cells[0]).text().trim().replace(/[^\d]/g, "");
         const position = parseInt(firstCellText, 10) || rowNum;
 
-        // Parse stats by column index (most reliable method)
-        const played = cellInt(colIdx.p);
-        const won = cellInt(colIdx.w);
-        const drawn = cellInt(colIdx.d);
-        const lost = cellInt(colIdx.l);
-        const goalsFor = cellInt(colIdx.gf);
-        const goalsAgainst = cellInt(colIdx.ga);
-        const points = cellInt(colIdx.pts);
+        const played = cellInt(idx.p);
+        const won = cellInt(idx.w);
+        const drawn = cellInt(idx.d);
+        const lost = cellInt(idx.l);
+        const goalsFor = cellInt(idx.gf);
+        const goalsAgainst = cellInt(idx.ga);
+        const points = cellInt(idx.pts);
 
-        // Goal difference: parse from column if available, otherwise compute
         let goalDifference = 0;
-        if (colIdx.gd >= 0) {
-          const gdText = $(cells[colIdx.gd]).text().trim();
+        if (idx.gd >= 0) {
+          const gdText = $(cells[idx.gd]).text().trim();
           goalDifference = parseInt(gdText.replace(/\+/, ""), 10);
           if (isNaN(goalDifference)) goalDifference = goalsFor - goalsAgainst;
         } else {
           goalDifference = goalsFor - goalsAgainst;
         }
 
-        // Validate: at least played > 0 or points > 0 to avoid junk rows
         if (played > 0 || points > 0) {
           standings.push({
             position,
@@ -329,34 +395,32 @@ function scrapeStandings($: cheerio.CheerioAPI): ScrapedStanding[] {
       });
   });
 
-  // Sort by position
   return standings.sort((a, b) => a.position - b.position);
 }
 
 // ── Scrape fixtures ──
 
-function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
-  const fixtures: ScrapedFixture[] = [];
+type RawFixture = ScrapedFixture;
 
-  // Find fixture tables — they have team links and time/score columns
-  $("table").each((_, table) => {
+function scrapeFixtures($: cheerio.CheerioAPI): RawFixture[] {
+  const fixtures: RawFixture[] = [];
+
+  $(SELECTORS.table).each((_, table) => {
     const rows = $(table).find("tr");
 
     let currentDate = "";
 
     rows.each((_, row) => {
-      const cells = $(row).find("td");
+      const cells = $(row).find(SELECTORS.tableCell);
 
-      // Date row — contains a calendar link
-      const dateLink = $(row).find('a[href*="calendar_date"]');
+      const dateLink = $(row).find(SELECTORS.fixtureDateLink);
       if (dateLink.length) {
         const href = dateLink.attr("href") || "";
         const dateMatch = href.match(/calendar_date=(\d{4}-\d{2}-\d{2})/);
         if (dateMatch) currentDate = dateMatch[1];
       }
 
-      // Match row — has two team links
-      const teamLinks = $(row).find('a[href*="team.php"]');
+      const teamLinks = $(row).find(SELECTORS.teamLink);
       if (teamLinks.length >= 2 && currentDate) {
         const homeLink = teamLinks.eq(0);
         const awayLink = teamLinks.eq(1);
@@ -366,31 +430,24 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
         const homeName = homeLink.text().trim();
         const awayName = awayLink.text().trim();
 
-        // Find time and score
         let time = "";
         let homeScore: number | null = null;
         let awayScore: number | null = null;
 
         cells.each((_, cell) => {
           const text = $(cell).text().trim();
-
-          // Time pattern: HH:MM
           if (/^\d{1,2}:\d{2}$/.test(text)) {
             time = text;
           }
-
-          // Score pattern: "N - N"
           if (/^\d+\s*-\s*\d+$/.test(text)) {
             [homeScore, awayScore] = parseScore(text);
           }
         });
 
-        // Stadium — usually the last text cell
         let stadium = "";
         let city = "";
         const lastCell = cells.last().text().trim();
         if (lastCell && !lastCell.match(/^\d/) && lastCell !== "-") {
-          // Parse "Stadium Name (City)"
           const stadiumMatch = lastCell.match(/^(.+?)\s*\((.+?)\)\s*$/);
           if (stadiumMatch) {
             stadium = stadiumMatch[1].trim();
@@ -406,10 +463,10 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
             time,
             saffHomeTeamId: homeId,
             homeTeamNameEn: homeName,
-            homeTeamNameAr: "", // filled by merge in scrapeChampionship
+            homeTeamNameAr: "",
             saffAwayTeamId: awayId,
             awayTeamNameEn: awayName,
-            awayTeamNameAr: "", // filled by merge in scrapeChampionship
+            awayTeamNameAr: "",
             homeScore,
             awayScore,
             stadium,
@@ -435,7 +492,7 @@ function scrapeFixtures($: cheerio.CheerioAPI): ScrapedFixture[] {
 function extractTeams($: cheerio.CheerioAPI): ScrapedTeam[] {
   const teamMap = new Map<number, string>();
 
-  $('a[href*="team.php"]').each((_, el) => {
+  $(SELECTORS.teamLink).each((_, el) => {
     const href = $(el).attr("href") || "";
     const id = extractTeamId(href);
     const name = $(el).text().trim();
@@ -447,7 +504,7 @@ function extractTeams($: cheerio.CheerioAPI): ScrapedTeam[] {
   return Array.from(teamMap.entries()).map(([saffTeamId, teamNameEn]) => ({
     saffTeamId,
     teamNameEn,
-    teamNameAr: "", // filled by merge in scrapeChampionship
+    teamNameAr: "",
   }));
 }
 
@@ -459,24 +516,17 @@ export async function scrapeTeamLogo(
   saffTeamId: number,
 ): Promise<string | null> {
   try {
-    const url = `${BASE_URL_EN}/team.php?id=${saffTeamId}`;
+    const url = `${BASE_URL_EN}/${URL_PATTERNS.team(saffTeamId)}`;
     const $ = await fetchPage(url, "en");
 
-    // SAFF team logos live in /uploadcenter/ with filenames like
-    // saffteamlarge75SGm1747742996.png or saffteamsmall1661266882.png
-    // Prefer the large variant; fall back to small.
-    let logoImg = $('img[src*="saffteamlarge"]').first();
-    if (!logoImg.length) logoImg = $('img[src*="saffteamsmall"]').first();
-    // Broader fallback: any image from uploadcenter that isn't news/article
-    if (!logoImg.length)
-      logoImg = $('img[src*="uploadcenter/saffteam"]').first();
+    let logoImg = $(SELECTORS.logoLarge).first();
+    if (!logoImg.length) logoImg = $(SELECTORS.logoSmall).first();
+    if (!logoImg.length) logoImg = $(SELECTORS.logoFallback).first();
 
     let src = logoImg.attr("src");
     if (!src) return null;
 
-    // Make absolute URL — src is typically "../uploadcenter/filename.png"
     if (!src.startsWith("http")) {
-      // Strip leading ../ segments and build absolute URL
       const cleanPath = src.replace(/^(\.\.\/)+/, "");
       src = `https://www.saff.com.sa/${cleanPath}`;
     }
@@ -492,7 +542,7 @@ export async function scrapeTeamLogos(
   saffTeamIds: number[],
 ): Promise<Map<number, string>> {
   const logos = new Map<number, string>();
-  const BATCH_SIZE = 5; // parallel requests per batch
+  const BATCH_SIZE = 5;
 
   for (let i = 0; i < saffTeamIds.length; i += BATCH_SIZE) {
     const batch = saffTeamIds.slice(i, i + BATCH_SIZE);
@@ -513,7 +563,6 @@ export async function scrapeTeamLogos(
       }
     }
 
-    // Respectful delay between batches
     if (i + BATCH_SIZE < saffTeamIds.length) {
       await delay(800);
     }
@@ -523,7 +572,7 @@ export async function scrapeTeamLogos(
 }
 
 // ══════════════════════════════════════════
-// SCRAPE SPECIFIC WEEK
+// SCRAPE SPECIFIC WEEK (placeholder)
 // ══════════════════════════════════════════
 
 export async function scrapeWeek(
@@ -531,26 +580,15 @@ export async function scrapeWeek(
   season: string,
   _week: number,
 ): Promise<ScrapedFixture[]> {
-  // The SAFF site uses JavaScript to switch weeks via dropdown
-  // For server-side scraping, we'd need to find if there's a
-  // query parameter or POST body for week selection.
-  // For now, we scrape the default (current/latest) week.
-  // Future: investigate AJAX endpoints used by the dropdown.
   const result = await scrapeChampionship(saffId, season);
   return result.fixtures;
 }
-
-// ══════════════════════════════════════════
-// SCRAPE ALL WEEKS (iterate 1-34)
-// ══════════════════════════════════════════
 
 export async function scrapeAllWeeks(
   saffId: number,
   season: string,
   totalWeeks: number = 34,
 ): Promise<ScrapedFixture[]> {
-  // This would require understanding the SAFF site's week
-  // switching mechanism. Placeholder for phased implementation.
   logger.info(
     `[SAFF Scraper] Scraping all ${totalWeeks} weeks for championship ${saffId}`,
   );
@@ -571,10 +609,12 @@ export interface ScrapedTournamentMeta {
 export async function scrapeTournamentList(): Promise<ScrapedTournamentMeta[]> {
   const results = new Map<number, ScrapedTournamentMeta>();
 
-  // EN pass — pick up English names + IDs
   try {
-    const $en = await fetchPage(`${BASE_URL_EN}/championships.php`, "en");
-    $en('a[href*="championship.php?id="]').each((_, el) => {
+    const $en = await fetchPage(
+      `${BASE_URL_EN}/${URL_PATTERNS.championships}`,
+      "en",
+    );
+    $en(SELECTORS.tournamentLink).each((_, el) => {
       const href = $en(el).attr("href") || "";
       const match = href.match(/championship\.php\?id=(\d+)/);
       const id = match ? parseInt(match[1], 10) : 0;
@@ -591,11 +631,13 @@ export async function scrapeTournamentList(): Promise<ScrapedTournamentMeta[]> {
     logger.warn(`[SAFF Scraper] EN tournament list failed: ${msg}`);
   }
 
-  // AR pass — fill in Arabic names
   try {
     await delay(REQUEST_DELAY);
-    const $ar = await fetchPage(`${BASE_URL_AR}/championships.php`, "ar");
-    $ar('a[href*="championship.php?id="]').each((_, el) => {
+    const $ar = await fetchPage(
+      `${BASE_URL_AR}/${URL_PATTERNS.championships}`,
+      "ar",
+    );
+    $ar(SELECTORS.tournamentLink).each((_, el) => {
       const href = $ar(el).attr("href") || "";
       const match = href.match(/championship\.php\?id=(\d+)/);
       const id = match ? parseInt(match[1], 10) : 0;
@@ -639,7 +681,8 @@ export async function scrapeBatch(
 
       logger.info(
         `[SAFF Scraper] ✓ #${saffId}: ${result.standings.length} standings, ` +
-          `${result.fixtures.length} fixtures, ${result.teams.length} teams`,
+          `${result.fixtures.length} fixtures, ${result.teams.length} teams ` +
+          `(v${result.scraperVersion}, ${result.validationWarnings.length} warnings)`,
       );
     } catch (error: any) {
       logger.error(`[SAFF Scraper] ✗ #${saffId}: ${error.message}`);
@@ -649,11 +692,18 @@ export async function scrapeBatch(
         standings: [],
         fixtures: [],
         teams: [],
+        validationWarnings: [
+          {
+            entity: "standing",
+            reason: error.message,
+            raw: { saffId },
+          },
+        ],
+        scraperVersion: SELECTOR_VERSION,
         scrapedAt: new Date(),
       });
     }
 
-    // Respectful delay between requests
     if (i < saffIds.length - 1) {
       await delay(REQUEST_DELAY);
     }

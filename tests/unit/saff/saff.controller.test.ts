@@ -17,6 +17,20 @@ jest.mock('../../../src/modules/saff/saff.model', () => ({
   SaffFixture: { findAll: jest.fn(), name: 'SaffFixture' },
   SaffTeamMap: { findAll: jest.fn(), findOne: jest.fn(), upsert: jest.fn(), name: 'SaffTeamMap' },
 }));
+jest.mock('../../../src/modules/saff/importSession.model', () => ({
+  SaffImportSession: { findOne: jest.fn(), findByPk: jest.fn(), findAll: jest.fn(), create: jest.fn(), destroy: jest.fn(), name: 'SaffImportSession' },
+}));
+jest.mock('../../../src/modules/saff/importSession.service', () => ({
+  createSession: jest.fn(),
+  getSession: jest.fn(),
+  listActiveSessionsForUser: jest.fn(),
+  uploadStaging: jest.fn(),
+  updateDecisions: jest.fn(),
+  previewSession: jest.fn(),
+  applySession: jest.fn(),
+  abortSession: jest.fn(),
+  reapExpiredSessions: jest.fn(),
+}));
 jest.mock('../../../src/modules/saff/saff.scheduler', () => ({
   getSyncStatus: jest.fn().mockReturnValue({}),
   runSync: jest.fn().mockResolvedValue(undefined),

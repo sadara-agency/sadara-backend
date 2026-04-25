@@ -2,6 +2,7 @@ import cron, { ScheduledTask } from "node-cron";
 import { logger } from "@config/logger";
 import * as saffService from "@modules/saff/saff.service";
 import { getCurrentSeason } from "@modules/saff/saff.service";
+import { reapExpiredSessions } from "@modules/saff/importSession.service";
 
 // ══════════════════════════════════════════
 // SCHEDULE CONFIG
@@ -206,16 +207,24 @@ export async function runSync(
 }
 
 // ══════════════════════════════════════════
+// SESSION REAPER — every hour
+// ══════════════════════════════════════════
+
+const SESSION_REAPER_CRON = "0 * * * *";
+
+// ══════════════════════════════════════════
 // START ALL CRON JOBS
 // ══════════════════════════════════════════
 
 const cronJobs: ScheduledTask[] = [];
 
 export function startSaffScheduler(): void {
-  // Re-enabled 2026-04-14: saff.com.sa verified alive. Acts as secondary source;
-  // SAFF+ and the Saudi Leagues cron engine are primary.
-  // runSync() handles 404 responses gracefully — warns and returns without throwing.
-  logger.info("[SAFF Scheduler] Starting SAFF sync scheduler...");
+  // After the wizard redesign: the cron schedules below only refresh
+  // staging tables (saff_standings, saff_fixtures, saff_team_maps) so the
+  // Browse views stay current. Production tables (clubs, matches,
+  // competitions, match_players) are only mutated when a human runs the
+  // wizard and clicks Apply.
+  logger.info("[SAFF Scheduler] Starting SAFF stage-only scheduler...");
 
   for (const schedule of SCHEDULES) {
     const job = cron.schedule(schedule.cron, () => {
@@ -231,9 +240,22 @@ export function startSaffScheduler(): void {
     });
     cronJobs.push(job);
     logger.info(
-      `[SAFF Scheduler] Scheduled: ${schedule.name} (${schedule.cron})`,
+      `[SAFF Scheduler] Scheduled (stage-only): ${schedule.name} (${schedule.cron})`,
     );
   }
+
+  // Wizard session reaper — deletes expired in-flight sessions every hour
+  const reaperJob = cron.schedule(SESSION_REAPER_CRON, () => {
+    reapExpiredSessions().catch((err) =>
+      logger.error(
+        `[SAFF Scheduler] Session reaper failed: ${(err as Error).message}`,
+      ),
+    );
+  });
+  cronJobs.push(reaperJob);
+  logger.info(
+    `[SAFF Scheduler] Scheduled: Wizard session reaper (${SESSION_REAPER_CRON})`,
+  );
 
   logger.info(`[SAFF Scheduler] ${cronJobs.length} cron jobs active ✓`);
 }

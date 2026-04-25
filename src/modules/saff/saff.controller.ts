@@ -7,6 +7,7 @@ import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AuthRequest } from "@shared/types";
 import * as saffService from "@modules/saff/saff.service";
+import * as sessionService from "@modules/saff/importSession.service";
 import { getCurrentSeason } from "@modules/saff/saff.service";
 import {
   getSyncStatus as getSchedulerStatus,
@@ -158,7 +159,7 @@ export async function fetchTeamLogos(req: AuthRequest, res: Response) {
   sendSuccess(res, result, `Fetched ${result.fetched} logos`);
 }
 
-// ── Bulk Fetch Men's Leagues ──
+// ── Bulk Fetch Men's Leagues (stage-only) ──
 
 export async function bulkFetchMenLeagues(req: AuthRequest, res: Response) {
   const season = req.body.season || getCurrentSeason();
@@ -168,12 +169,12 @@ export async function bulkFetchMenLeagues(req: AuthRequest, res: Response) {
     "saff_tournaments",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Bulk fetch ${result.leagues} men's leagues for ${season}: ${result.fetch.results} tournaments, ${result.import.matches} matches`,
+    `Bulk stage-only fetch for ${result.leagues} men's leagues for ${season}: ${result.fetch.results} tournaments, ${result.fetch.standings} standings, ${result.fetch.fixtures} fixtures`,
   );
   sendSuccess(
     res,
     result,
-    `Bulk fetch completed for ${result.leagues} leagues`,
+    `Staged ${result.leagues} leagues — run the wizard to apply`,
   );
 }
 
@@ -321,4 +322,110 @@ export async function getWatchlistMatches(req: AuthRequest, res: Response) {
   const limit = parseInt(req.query.limit as string, 10) || 20;
   const result = await saffService.getWatchlistMatches(season, limit);
   sendSuccess(res, result);
+}
+
+// ══════════════════════════════════════════
+// IMPORT SESSION (WIZARD) HANDLERS
+// ══════════════════════════════════════════
+
+export async function createImportSession(req: AuthRequest, res: Response) {
+  const session = await sessionService.createSession(req.body, req.user!.id);
+  await logAudit(
+    "CREATE",
+    "saff_import_sessions",
+    session.id,
+    buildAuditContext(req.user!, req.ip),
+    `Started SAFF import session for tournament ${session.saffId} ${session.season}`,
+  );
+  res.status(201).json({ success: true, data: session });
+}
+
+export async function getImportSession(req: AuthRequest, res: Response) {
+  const session = await sessionService.getSession(req.params.id, req.user!.id);
+  sendSuccess(res, session);
+}
+
+export async function listMyActiveImportSessions(
+  req: AuthRequest,
+  res: Response,
+) {
+  const sessions = await sessionService.listActiveSessionsForUser(req.user!.id);
+  sendSuccess(res, sessions);
+}
+
+export async function uploadImportSession(req: AuthRequest, res: Response) {
+  // The upload route accepts a JSON body (no multipart) — the file is
+  // provided as a base64 or stringified payload, OR the user pastes the
+  // JSON directly. The wizard's ManualUploadDropzone reads the file
+  // client-side and POSTs the parsed JSON.
+  const { payload, filename } = req.body;
+  const session = await sessionService.uploadStaging(
+    req.params.id,
+    req.user!.id,
+    payload,
+    filename || "manual-upload.json",
+  );
+  await logAudit(
+    "UPDATE",
+    "saff_import_sessions",
+    session.id,
+    buildAuditContext(req.user!, req.ip),
+    `Uploaded manual SAFF data for session ${session.id} (${session.snapshot?.validCounts?.standings ?? 0} standings, ${session.snapshot?.validCounts?.fixtures ?? 0} fixtures)`,
+  );
+  sendSuccess(res, session, "Upload accepted");
+}
+
+export async function updateImportSessionDecisions(
+  req: AuthRequest,
+  res: Response,
+) {
+  const session = await sessionService.updateDecisions(
+    req.params.id,
+    req.user!.id,
+    req.body,
+  );
+  sendSuccess(res, session, "Decisions updated");
+}
+
+export async function previewImportSession(req: AuthRequest, res: Response) {
+  const result = await sessionService.previewSession(
+    req.params.id,
+    req.user!.id,
+  );
+  sendSuccess(res, {
+    session: result.session,
+    preview: result.preview,
+    digest: result.digest,
+  });
+}
+
+export async function applyImportSession(req: AuthRequest, res: Response) {
+  const result = await sessionService.applySession(
+    req.params.id,
+    req.user!.id,
+    req.body,
+  );
+  await logAudit(
+    "CREATE",
+    "saff_import_sessions",
+    result.session.id,
+    buildAuditContext(req.user!, req.ip),
+    `Applied SAFF import session ${result.session.id}: ${result.applied.clubsCreated} clubs, ${result.applied.matchesCreated} matches, ${result.applied.playersLinked} players linked`,
+  );
+  sendSuccess(res, result, "Import applied");
+}
+
+export async function abortImportSession(req: AuthRequest, res: Response) {
+  const session = await sessionService.abortSession(
+    req.params.id,
+    req.user!.id,
+  );
+  await logAudit(
+    "UPDATE",
+    "saff_import_sessions",
+    session.id,
+    buildAuditContext(req.user!, req.ip),
+    `Aborted SAFF import session ${session.id}`,
+  );
+  sendSuccess(res, session, "Session aborted");
 }
