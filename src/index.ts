@@ -6,7 +6,12 @@ import { testConnection, sequelize } from "@config/database";
 import { initRedis, closeRedis } from "@config/redis";
 import { seedDatabase } from "./database/seed";
 import { seedProduction } from "./database/production.seed";
-import { migrator, setMigrationTimeouts } from "@config/migrator";
+// NOTE: migrations are run by CI's pre-deploy step (`.github/workflows/ci-cd.yml`),
+// NOT here. The container assumes the schema is already correct. A schema-version
+// check below logs a WARN (not a crash) if the DB lags behind the code's expected
+// migration. See plan: stop-cloudrun-crashloops.
+import fs from "fs/promises";
+import path from "path";
 import { startSaffScheduler } from "@modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "@modules/matches/matchAutoTasks";
@@ -41,6 +46,62 @@ if (env.sentry?.dsn) {
     tracesSampleRate: env.nodeEnv === "production" ? 0.1 : 1.0,
   });
   logger.info("Sentry error tracking initialized");
+}
+
+// ─────────────────────────────────────────────
+// Schema-version sanity check (advisory)
+// ─────────────────────────────────────────────
+
+/**
+ * Compare the DB's last-applied migration (from `sequelize_meta`) to the
+ * highest-numbered migration file shipped with this build. Logs a WARN on
+ * mismatch but never throws — migration-running has been delegated to CI
+ * (`.github/workflows/ci-cd.yml`'s pre-deploy step), so a mismatch here
+ * means CI was skipped or its migrate step failed silently. Either way,
+ * crashing the container wouldn't help — the operator needs visibility,
+ * not a crashloop.
+ */
+async function checkSchemaVersion(): Promise<void> {
+  try {
+    // Filesystem expectation: highest-numbered migration file in src/database/migrations
+    // (resolved relative to this compiled file: dist/index.js → dist/database/migrations,
+    //  src/index.ts → src/database/migrations).
+    const migrationsDir = path.join(__dirname, "database", "migrations");
+    const files = await fs.readdir(migrationsDir);
+    const expected = files
+      .filter((f) => /^\d{3}_.*\.(ts|js)$/.test(f))
+      .sort()
+      .pop();
+
+    // DB state: latest applied migration from sequelize_meta (created by Umzug).
+    const [rows] = await sequelize.query(
+      `SELECT name FROM sequelize_meta ORDER BY name DESC LIMIT 1`,
+    );
+    const applied = (rows as Array<{ name: string }>)[0]?.name;
+
+    if (!applied) {
+      logger.warn(
+        "[boot] Schema check: no migrations applied yet — DB may be empty",
+      );
+      return;
+    }
+
+    // Compare ignoring extension (sequelize_meta stores `.js` in CI, `.ts` in dev).
+    const stripExt = (s: string) => s.replace(/\.(ts|js)$/, "");
+    if (expected && stripExt(applied) !== stripExt(expected)) {
+      logger.warn(
+        `[boot] Schema mismatch: code expects ${expected} but DB is at ${applied}. ` +
+          `CI's migrate step may have been skipped — verify before relying on new features.`,
+      );
+      return;
+    }
+    logger.info(`[boot] Schema OK: at ${applied}`);
+  } catch (err) {
+    // Never fatal — a missing sequelize_meta table on a brand-new DB, a
+    // permissions hiccup, or filesystem oddity shouldn't crashloop production.
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.warn(`[boot] Schema check skipped: ${msg}`);
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -302,22 +363,24 @@ async function bootstrap(): Promise<void> {
   logger.info("[boot] Starting HTTP server...");
   await startServer();
 
-  // ── Mandatory pre-flight: DB connection + migrations ──────────────────────
-  // These are always fatal. If they fail, throw immediately — do NOT enter
-  // degraded mode. Cloud Run will restart the container and retry.
-  // A missing table is not a gracefully-recoverable condition.
+  // ── Mandatory pre-flight: DB connection ───────────────────────────────────
+  // DB connection is still fatal (no point starting an API that can't read
+  // its own data). Migrations are NOT run here — CI's pre-deploy step is the
+  // single source of truth. See plan: stop-cloudrun-crashloops.
   //
   // 90s timeout: Cloud SQL Auth Proxy sidecar may take up to ~30s to accept
   // connections after container start; with connectTimeout=5s + 5s delay per
   // retry, 90s allows ~6 attempts before giving up.
   logger.info("[boot] Connecting to database...");
   await withTimeout(testConnection(), 90_000, "testConnection");
-  logger.info("[boot] Running migrations...");
-  await setMigrationTimeouts();
-  await withTimeout(migrator.up(), 180_000, "migrator.up");
-  await sequelize.query("RESET lock_timeout");
-  await sequelize.query("RESET statement_timeout");
-  logger.info("[boot] Migrations complete");
+
+  // ── Schema-version sanity check (advisory, never fatal) ───────────────────
+  // Compares the latest applied migration in `sequelize_meta` to the highest-
+  // numbered migration file shipped with this build. A mismatch means CI's
+  // migrate step was skipped or partially applied — log loudly so the operator
+  // can investigate, but DO NOT crash the container (which would defeat the
+  // whole point of decoupling migrations from boot).
+  await checkSchemaVersion();
   // ──────────────────────────────────────────────────────────────────────────
 
   try {
