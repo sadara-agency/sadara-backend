@@ -21,29 +21,18 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
-  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
-
   // Fresh-DB guard: depends on squads (149) + players (000_baseline).
-  const [parentRows] = await seq.query(
-    `SELECT table_name FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name IN ('squads', 'players')`,
-  );
-  const present = new Set(
-    (parentRows as { table_name: string }[]).map((r) => r.table_name),
-  );
-  if (!present.has("squads") || !present.has("players")) {
-    console.log(
-      "Migration 156: parent tables missing — skipping (fresh DB guard)",
-    );
+  if (!(await tableExists(queryInterface, "squads"))) {
+    console.log("Migration 156: squads missing — skipping (fresh DB guard)");
+    return;
+  }
+  if (!(await tableExists(queryInterface, "players"))) {
+    console.log("Migration 156: players missing — skipping (fresh DB guard)");
     return;
   }
 
   // Idempotency
-  const [existsRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'squad_memberships'`,
-  );
-  if ((existsRows as unknown[]).length > 0) {
+  if (await tableExists(queryInterface, "squad_memberships")) {
     console.log("Migration 156: squad_memberships already exists, skipping");
     return;
   }
@@ -99,6 +88,7 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
+  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
   await seq.query(
     `CREATE UNIQUE INDEX IF NOT EXISTS squad_memberships_squad_player_season_uniq
      ON squad_memberships (squad_id, player_id, season)`,
@@ -137,4 +127,22 @@ export async function down({
   }
   await queryInterface.dropTable("squad_memberships");
   console.log("Migration 156: rolled back");
+}
+
+// ── Helper ──
+
+async function tableExists(qi: QueryInterface, name: string): Promise<boolean> {
+  try {
+    await qi.describeTable(name);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }

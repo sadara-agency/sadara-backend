@@ -23,24 +23,27 @@ export async function up({
 }) {
   const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
 
-  // Fresh-DB guard
-  const [tableRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'players'`,
-  );
-  if ((tableRows as unknown[]).length === 0) {
-    console.log(
-      "Migration 155: players table missing — skipping (fresh DB guard)",
-    );
-    return;
+  // Fresh-DB guard via describeTable
+  let columns: Record<string, unknown>;
+  try {
+    columns = (await queryInterface.describeTable("players")) as Record<
+      string,
+      unknown
+    >;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      console.log("Migration 155: players missing — skipping (fresh DB guard)");
+      return;
+    }
+    throw err;
   }
 
-  // Idempotency: check if column already exists
-  const [colRows] = await seq.query(
-    `SELECT 1 FROM information_schema.columns
-     WHERE table_schema = 'public' AND table_name = 'players' AND column_name = 'external_ids'`,
-  );
-  if ((colRows as unknown[]).length === 0) {
+  // Idempotency: only add the column if it doesn't already exist.
+  if (!("external_ids" in columns)) {
     await queryInterface.addColumn("players", "external_ids", {
       type: DataTypes.JSONB,
       allowNull: false,

@@ -23,26 +23,14 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
-  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
-
   // Fresh-DB guard
-  const [parentRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'matches'`,
-  );
-  if ((parentRows as unknown[]).length === 0) {
-    console.log(
-      "Migration 154: matches table missing — skipping (fresh DB guard)",
-    );
+  if (!(await tableExists(queryInterface, "matches"))) {
+    console.log("Migration 154: matches missing — skipping (fresh DB guard)");
     return;
   }
 
   // Idempotency
-  const [existsRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'match_media'`,
-  );
-  if ((existsRows as unknown[]).length > 0) {
+  if (await tableExists(queryInterface, "match_media")) {
     console.log("Migration 154: match_media already exists, skipping");
     return;
   }
@@ -119,6 +107,7 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
+  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
   await seq.query(
     `CREATE INDEX IF NOT EXISTS match_media_match_id_idx
      ON match_media (match_id)`,
@@ -149,4 +138,22 @@ export async function down({
   await seq.query(`DROP INDEX IF EXISTS match_media_match_id_idx`);
   await queryInterface.dropTable("match_media");
   console.log("Migration 154: rolled back");
+}
+
+// ── Helper ──
+
+async function tableExists(qi: QueryInterface, name: string): Promise<boolean> {
+  try {
+    await qi.describeTable(name);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }

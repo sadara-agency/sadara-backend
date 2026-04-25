@@ -30,32 +30,16 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
-  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
-
   // Fresh-DB guard: depends on squads, players, users.
-  const [parentRows] = await seq.query(
-    `SELECT table_name FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name IN ('squads', 'players', 'users')`,
-  );
-  const present = new Set(
-    (parentRows as { table_name: string }[]).map((r) => r.table_name),
-  );
-  if (
-    !present.has("squads") ||
-    !present.has("players") ||
-    !present.has("users")
-  ) {
-    console.log(
-      "Migration 157: parent tables missing — skipping (fresh DB guard)",
-    );
-    return;
+  for (const t of ["squads", "players", "users"] as const) {
+    if (!(await tableExists(queryInterface, t))) {
+      console.log(`Migration 157: ${t} missing — skipping (fresh DB guard)`);
+      return;
+    }
   }
 
-  const [existsRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'player_match_review'`,
-  );
-  if ((existsRows as unknown[]).length > 0) {
+  // Idempotency
+  if (await tableExists(queryInterface, "player_match_review")) {
     console.log("Migration 157: player_match_review already exists, skipping");
     return;
   }
@@ -145,6 +129,7 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
+  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
   await seq.query(
     `CREATE INDEX IF NOT EXISTS player_match_review_status_created_idx
      ON player_match_review (status, created_at DESC)`,
@@ -179,4 +164,22 @@ export async function down({
   }
   await queryInterface.dropTable("player_match_review");
   console.log("Migration 157: rolled back");
+}
+
+// ── Helper ──
+
+async function tableExists(qi: QueryInterface, name: string): Promise<boolean> {
+  try {
+    await qi.describeTable(name);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }

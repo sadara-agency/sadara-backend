@@ -27,24 +27,27 @@ export async function up({
 }) {
   const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
 
-  // Fresh-DB guard
-  const [tableRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'matches'`,
-  );
-  if ((tableRows as unknown[]).length === 0) {
-    console.log("Migration 158: matches missing — skipping (fresh DB guard)");
-    return;
+  // Fresh-DB guard via describeTable
+  let columns: Record<string, unknown>;
+  try {
+    columns = (await queryInterface.describeTable("matches")) as Record<
+      string,
+      unknown
+    >;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      console.log("Migration 158: matches missing — skipping (fresh DB guard)");
+      return;
+    }
+    throw err;
   }
 
-  // Idempotency
-  const [colRows] = await seq.query(
-    `SELECT 1 FROM information_schema.columns
-     WHERE table_schema = 'public'
-       AND table_name = 'matches'
-       AND column_name = 'provider_match_id'`,
-  );
-  if ((colRows as unknown[]).length === 0) {
+  // Idempotency: only add the column if it doesn't already exist.
+  if (!("provider_match_id" in columns)) {
     await queryInterface.addColumn("matches", "provider_match_id", {
       type: DataTypes.STRING(120),
       allowNull: true,

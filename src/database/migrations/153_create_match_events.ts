@@ -15,6 +15,11 @@
 //     repeated scrapes during a live match upsert idempotently.
 //   • `raw_payload` JSONB preserves the full provider object for
 //     debugging when normalization misses a field.
+//
+// Idempotency uses queryInterface.describeTable() rather than raw
+// information_schema queries — Sequelize's seq.query() return shape
+// varies (sometimes `[rows, metadata]`, sometimes just `rows`),
+// which made earlier raw-SQL bulk pre-checks brittle.
 // ═══════════════════════════════════════════════════════════════
 
 import { QueryInterface, DataTypes, Sequelize } from "sequelize";
@@ -24,29 +29,18 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
-  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
-
   // Fresh-DB guard: matches and players tables come from 000_baseline.
-  const [parentRows] = await seq.query(
-    `SELECT table_name FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name IN ('matches', 'players')`,
-  );
-  const present = new Set(
-    (parentRows as { table_name: string }[]).map((r) => r.table_name),
-  );
-  if (!present.has("matches") || !present.has("players")) {
-    console.log(
-      "Migration 153: parent tables missing — skipping (fresh DB guard)",
-    );
+  if (!(await tableExists(queryInterface, "matches"))) {
+    console.log("Migration 153: matches missing — skipping (fresh DB guard)");
+    return;
+  }
+  if (!(await tableExists(queryInterface, "players"))) {
+    console.log("Migration 153: players missing — skipping (fresh DB guard)");
     return;
   }
 
-  // Idempotency
-  const [existsRows] = await seq.query(
-    `SELECT 1 FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name = 'match_events'`,
-  );
-  if ((existsRows as unknown[]).length > 0) {
+  // Idempotency: skip if table already exists from a partial earlier run.
+  if (await tableExists(queryInterface, "match_events")) {
     console.log("Migration 153: match_events already exists, skipping");
     return;
   }
@@ -124,6 +118,7 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
+  const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
   await seq.query(
     `CREATE INDEX IF NOT EXISTS match_events_match_minute_idx
      ON match_events (match_id, minute)`,
@@ -153,4 +148,22 @@ export async function down({
   await seq.query(`DROP INDEX IF EXISTS match_events_match_minute_idx`);
   await queryInterface.dropTable("match_events");
   console.log("Migration 153: rolled back");
+}
+
+// ── Helper ──
+
+async function tableExists(qi: QueryInterface, name: string): Promise<boolean> {
+  try {
+    await qi.describeTable(name);
+    return true;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      return false;
+    }
+    throw err;
+  }
 }
