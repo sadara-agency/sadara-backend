@@ -327,26 +327,40 @@ jobs:
           REDIS_URL: ${{ secrets.REDIS_URL }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
 
+      # ── Blue-green deploy ────────────────────────────────────────────────
+      # 1. Deploy new revision with `no_traffic: true` and a SHA-based tag.
+      #    The new revision boots WITHOUT receiving any production traffic;
+      #    the previous revision continues to serve everything.
+      # 2. Smoke-test the new revision via its tag URL (no traffic shifted yet).
+      # 3. Promote traffic to the new revision only if smoke test passes.
+      # 4. If anything fails, the new revision lingers without traffic and
+      #    the previous revision keeps serving — zero-downtime rollback.
       - id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
           service: api-sadara
           region: europe-west1
           image: europe-west1-docker.pkg.dev/sadara-490200/sadara-backend/api:${{ github.sha }}
+          tag: sha-${{ github.sha }}
+          no_traffic: true
 
-      - name: Show deployed URL
-        run: echo "Deployed to ${{ steps.deploy.outputs.url }}"
-
-      - name: Post-deploy health probe
+      - name: Show deployed revision
         run: |
-          url="${{ steps.deploy.outputs.url }}/api/health"
-          echo "Probing $url"
+          echo "Revision: ${{ steps.deploy.outputs.revision }}"
+          echo "Tagged URL (no traffic yet): https://sha-${{ github.sha }}---api-sadara-332682391494.europe-west1.run.app"
+
+      - name: Smoke test new revision (pre-promotion)
+        id: smoke
+        run: |
+          # Cloud Run tag URLs follow: https://<tag>---<service>-<projectnum>.<region>.run.app
+          url="https://sha-${{ github.sha }}---api-sadara-332682391494.europe-west1.run.app/api/health"
+          echo "Smoke testing $url (revision NOT yet receiving traffic)"
           for i in 1 2 3 4 5 6; do
             response=$(curl -sS --max-time 10 "$url" || echo '{}')
             ready=$(echo "$response" | jq -r '.ready // false')
             init_error=$(echo "$response" | jq -r '.initError // empty')
             if [ "$ready" = "true" ] && [ -z "$init_error" ]; then
-              echo "✓ Deploy healthy on attempt $i"
+              echo "✓ Smoke passed on attempt $i"
               echo "$response" | jq .
               exit 0
             fi
@@ -354,7 +368,15 @@ jobs:
             sleep 10
           done
           echo ""
-          echo "::error::Deploy unhealthy after 6 attempts (~60s). Previous revision continues serving."
+          echo "::error::New revision unhealthy after 6 attempts (~60s). NOT promoting traffic — previous revision continues serving."
           echo "Last response:"
           echo "$response" | jq . || echo "$response"
           exit 1
+
+      - name: Promote traffic to new revision
+        if: success()
+        run: |
+          gcloud run services update-traffic api-sadara \
+            --region=europe-west1 \
+            --to-latest
+          echo "✓ Traffic promoted to revision ${{ steps.deploy.outputs.revision }}"
