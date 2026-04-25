@@ -19,5 +19,27 @@ export const competitionIdSchema = z.object({
   competitionId: z.coerce.number().int().positive(),
 });
 
+// ── Phase 2: club-squad sync ──
+
+export const clubIdParamSchema = z.object({
+  clubId: z.string().uuid(),
+});
+
+export const syncClubSquadsBodySchema = z.object({
+  /** SAFF+ club slug — required because we don't store it on the Club model. */
+  clubSlug: z.string().min(1).max(120),
+  season: z
+    .string()
+    .regex(/^\d{4}-\d{4}$/, "Season must be YYYY-YYYY format")
+    .optional(),
+});
+
 export type SyncLeaguesInput = z.infer<typeof syncLeaguesSchema>;
 export type CompetitionQuery = z.infer<typeof competitionQuerySchema>;
+export type SyncClubSquadsInput = z.infer<typeof syncClubSquadsBodySchema>;
+
+// ── Phase 3: match events + media ──
+
+export const matchIdParamSchema = z.object({
+  matchId: z.string().uuid(),
+});

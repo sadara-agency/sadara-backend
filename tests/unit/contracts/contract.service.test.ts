@@ -84,6 +84,14 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+const mockSquadFindOne = jest.fn();
+jest.mock('../../../src/modules/squads/squad.model', () => ({
+  Squad: {
+    findOne: (...a: unknown[]) => mockSquadFindOne(...a),
+    name: 'Squad',
+  },
+}));
+
 import * as contractService from '../../../src/modules/contracts/contract.service';
 import * as rowScope from '../../../src/shared/utils/rowScope';
 

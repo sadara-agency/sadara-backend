@@ -18,6 +18,8 @@ import { findExistingLeagueEnrollment } from "@modules/competitions/competition.
 import { Watchlist } from "@modules/scouting/scouting.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
+import { findOrCreateSquad } from "@modules/squads/squad.service";
+import type { SquadContext } from "@modules/squads/squad.service";
 import { SeasonSync } from "@modules/saff/seasonSync.model";
 import { logger } from "@config/logger";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -42,6 +44,12 @@ import type {
   SessionDecisions,
   TeamResolution,
 } from "@modules/saff/importSession.model";
+import type {
+  SaffAgeCategory,
+  SaffDivision,
+  SaffCompetitionType,
+} from "@modules/saff/saff.model";
+import tournamentContextRaw from "@modules/saff/saff.tournament-context.json";
 
 // ══════════════════════════════════════════
 // HELPERS
@@ -305,16 +313,151 @@ const TOURNAMENT_SEED = [
   },
 ];
 
+// ── Tournament context resolution ──
+//
+// Phase 1 of the Club/Squad refactor. Each tournament resolves to a squad
+// context: ageCategory × division × competitionType. The curated JSON is
+// authoritative; for unknown saffIds we infer from the tournament title
+// (regex fallback) so unseen championships still get sensible defaults
+// instead of silently sliding into the senior squad.
+
+interface RawTournamentContext {
+  ageCategory: SaffAgeCategory;
+  division: SaffDivision;
+  competitionType: SaffCompetitionType;
+  isSupported: boolean;
+}
+
+const TOURNAMENT_CONTEXT_MAP: Record<string, RawTournamentContext> =
+  Object.fromEntries(
+    Object.entries(tournamentContextRaw as Record<string, unknown>).filter(
+      ([k]) => /^\d+$/.test(k),
+    ),
+  ) as Record<string, RawTournamentContext>;
+
+/**
+ * Infer squad context from a tournament title. Used when the saffId is
+ * not yet in the curated JSON. Defaults to senior/premier/league but
+ * marks women's, futsal, and beach soccer as unsupported.
+ */
+export function inferTournamentContext(
+  name: string,
+  nameAr = "",
+): RawTournamentContext {
+  const haystack = `${name} ${nameAr}`.toLowerCase();
+
+  // Out-of-scope formats — wizard refuses to import these.
+  const isUnsupported =
+    /\bwomen|female|girls?|نساء|سيدات|بنات\b/.test(haystack) ||
+    /\bfutsal|صالات\b/.test(haystack) ||
+    /\bbeach|شاطئية|شاطئي\b/.test(haystack);
+
+  // Age category — match U-XX patterns; "youth" alone defaults to senior.
+  let ageCategory: SaffAgeCategory = "senior";
+  const ageMatch = haystack.match(/u-?(\d{2})|تحت\s*(\d{2})/);
+  if (ageMatch) {
+    const n = parseInt(ageMatch[1] ?? ageMatch[2], 10);
+    if (n >= 11 && n <= 23) {
+      ageCategory = `u${n}` as SaffAgeCategory;
+    }
+  }
+
+  // Division — match "Nth Division" / "Div.N" / "الدرجة Nth".
+  let division: SaffDivision = null;
+  if (/\b1st\s*division|div\.?\s*1|الدرجة\s*الأولى\b/.test(haystack)) {
+    division = "1st-division";
+  } else if (/\b2nd\s*division|div\.?\s*2|الدرجة\s*الثانية\b/.test(haystack)) {
+    division = "2nd-division";
+  } else if (/\b3rd\s*division|div\.?\s*3|الدرجة\s*الثالثة\b/.test(haystack)) {
+    division = "3rd-division";
+  } else if (/\b4th\s*division|div\.?\s*4|الدرجة\s*الرابعة\b/.test(haystack)) {
+    division = "4th-division";
+  } else if (/\bpremier|elite|ممتاز|نخبة\b/.test(haystack)) {
+    division = "premier";
+  }
+
+  // Competition type — cup/super-cup/tournament keywords; default league.
+  let competitionType: SaffCompetitionType = "league";
+  if (/\bsuper\s*cup|سوبر\b/.test(haystack)) {
+    competitionType = "super-cup";
+  } else if (/\bcup|كأس\b/.test(haystack)) {
+    competitionType = "cup";
+    division = null;
+  } else if (/\btournament|بطولة\b/.test(haystack)) {
+    competitionType = "tournament";
+    division = null;
+  }
+
+  return {
+    ageCategory,
+    division,
+    competitionType,
+    isSupported: !isUnsupported,
+  };
+}
+
+/**
+ * Resolve squad context for a saffId. Curated JSON wins; falls back to
+ * inferTournamentContext using the tournament name when the saffId is
+ * not yet curated.
+ */
+export function resolveTournamentContext(
+  saffId: number,
+  name = "",
+  nameAr = "",
+): RawTournamentContext {
+  const curated = TOURNAMENT_CONTEXT_MAP[String(saffId)];
+  if (curated) return curated;
+  return inferTournamentContext(name, nameAr);
+}
+
 // ── Seed tournaments ──
 
 export async function seedTournaments(): Promise<number> {
   let count = 0;
   for (const t of TOURNAMENT_SEED) {
-    const [, created] = await SaffTournament.findOrCreate({
+    const ctx = resolveTournamentContext(t.saffId, t.name, t.nameAr);
+    const [existing, created] = await SaffTournament.findOrCreate({
       where: { saffId: t.saffId },
-      defaults: t as any,
+      defaults: {
+        ...t,
+        ageCategory: ctx.ageCategory,
+        division: ctx.division,
+        competitionType: ctx.competitionType,
+        isSupported: ctx.isSupported,
+      } as any,
     });
-    if (created) count++;
+    if (created) {
+      count++;
+    } else {
+      // Backfill metadata onto rows that pre-date Migration 148. Only
+      // overwrite when the existing value matches the column default
+      // ("senior" / "league") so manual corrections aren't clobbered.
+      const patch: Partial<{
+        ageCategory: SaffAgeCategory;
+        division: SaffDivision;
+        competitionType: SaffCompetitionType;
+        isSupported: boolean;
+      }> = {};
+      if (existing.ageCategory === "senior" && ctx.ageCategory !== "senior") {
+        patch.ageCategory = ctx.ageCategory;
+      }
+      if (existing.division == null && ctx.division != null) {
+        patch.division = ctx.division;
+      }
+      if (
+        existing.competitionType === "league" &&
+        ctx.competitionType !== "league"
+      ) {
+        patch.competitionType = ctx.competitionType;
+      }
+      if (existing.isSupported && !ctx.isSupported) {
+        patch.isSupported = false;
+      }
+      if (Object.keys(patch).length > 0) {
+        await existing.update(patch);
+      }
+    }
   }
   return count;
 }
@@ -328,6 +471,7 @@ export async function syncTournamentsFromSaff(
   let created = 0;
 
   for (const t of scraped) {
+    const ctx = resolveTournamentContext(t.saffId, t.name, t.nameAr);
     const [existing, wasCreated] = await SaffTournament.findOrCreate({
       where: { saffId: t.saffId },
       defaults: {
@@ -338,6 +482,10 @@ export async function syncTournamentsFromSaff(
         tier: 2,
         agencyValue: "Low",
         isActive: true,
+        ageCategory: ctx.ageCategory,
+        division: ctx.division,
+        competitionType: ctx.competitionType,
+        isSupported: ctx.isSupported,
       } as any,
     });
     if (wasCreated) {
@@ -539,11 +687,14 @@ export async function fetchFromSaff(input: FetchRequest) {
         summary.teams += result.teams.length;
       }
 
-      // Update last synced
-      await tournament.update(
-        { lastSyncedAt: new Date() },
-        { transaction: txn },
-      );
+      // Update last synced and championship logo (only when scrape returned one)
+      const tournamentPatch: { lastSyncedAt: Date; logoUrl?: string } = {
+        lastSyncedAt: new Date(),
+      };
+      if (result.tournamentLogoUrl) {
+        tournamentPatch.logoUrl = result.tournamentLogoUrl;
+      }
+      await tournament.update(tournamentPatch, { transaction: txn });
 
       await txn.commit();
     } catch (error: any) {
@@ -1796,6 +1947,20 @@ export async function runImportPlan(
   const tournament = await SaffTournament.findByPk(tournamentId);
   if (!tournament) throw new AppError("SAFF tournament not found", 404);
 
+  // Phase 3: block unsupported tournament types (women's / futsal / beach).
+  if (!tournament.isSupported) {
+    throw new AppError(
+      "This tournament type is not supported for import (women's / futsal / beach soccer)",
+      422,
+    );
+  }
+
+  // Squad context derived from tournament metadata — same for every team in this import.
+  const squadContext: SquadContext = {
+    ageCategory: tournament.ageCategory,
+    division: tournament.division,
+  };
+
   const teamResolutions = decisions.teamResolutions ?? [];
   const resolutionByTeamId = new Map<number, TeamResolution>();
   for (const r of teamResolutions) {
@@ -1811,6 +1976,7 @@ export async function runImportPlan(
       matches: [],
       competitions: [],
       clubCompetitions: 0,
+      squads: [], // Phase 3
     },
     willUpdate: { clubs: [], matches: [] },
     conflicts: [],
@@ -1826,6 +1992,7 @@ export async function runImportPlan(
     competitionsCreated: 0,
     playersLinked: 0,
     skippedTeams: 0,
+    squadsCreated: 0, // Phase 3
   };
 
   try {
@@ -1884,8 +2051,9 @@ export async function runImportPlan(
     });
     const teamMapById = new Map(teamMaps.map((tm) => [tm.saffTeamId, tm]));
 
-    // ── 3. Apply team resolutions, build effective clubId per saffTeamId ──
+    // ── 3. Apply team resolutions, build effective clubId + squadId per saffTeamId ──
     const effectiveClubByTeamId = new Map<number, string>();
+    const effectiveSquadByTeamId = new Map<number, string>(); // Phase 3
     const skippedTeams = new Set<number>();
 
     for (const saffTeamId of teamSet) {
@@ -1897,6 +2065,23 @@ export async function runImportPlan(
       // any decision (mapping is a separate, pre-import action).
       if (tm?.clubId) {
         effectiveClubByTeamId.set(saffTeamId, tm.clubId);
+        const [squad, wasCreated] = await findOrCreateSquad(
+          tm.clubId,
+          squadContext,
+          txn,
+        );
+        effectiveSquadByTeamId.set(saffTeamId, squad.id);
+        if (wasCreated) {
+          preview.willCreate.squads.push({
+            clubId: tm.clubId,
+            displayName: squad.displayName,
+            ageCategory: squad.ageCategory,
+          });
+          summary.squadsCreated++;
+        }
+        if (tm && !tm.squadId) {
+          await tm.update({ squadId: squad.id }, { transaction: txn });
+        }
         continue;
       }
 
@@ -1932,8 +2117,26 @@ export async function runImportPlan(
         }
         effectiveClubByTeamId.set(saffTeamId, club.id);
 
+        const [squad, wasCreated] = await findOrCreateSquad(
+          club.id,
+          squadContext,
+          txn,
+        );
+        effectiveSquadByTeamId.set(saffTeamId, squad.id);
+        if (wasCreated) {
+          preview.willCreate.squads.push({
+            clubId: club.id,
+            displayName: squad.displayName,
+            ageCategory: squad.ageCategory,
+          });
+          summary.squadsCreated++;
+        }
+
         if (tm) {
-          await tm.update({ clubId: club.id }, { transaction: txn });
+          await tm.update(
+            { clubId: club.id, squadId: squad.id },
+            { transaction: txn },
+          );
         }
         if (!club.saffTeamId) {
           await club.update({ saffTeamId }, { transaction: txn });
@@ -1962,8 +2165,26 @@ export async function runImportPlan(
         });
         summary.clubsCreated++;
 
+        const [squad, wasCreated] = await findOrCreateSquad(
+          newClub.id,
+          squadContext,
+          txn,
+        );
+        effectiveSquadByTeamId.set(saffTeamId, squad.id);
+        if (wasCreated) {
+          preview.willCreate.squads.push({
+            clubId: newClub.id,
+            displayName: squad.displayName,
+            ageCategory: squad.ageCategory,
+          });
+          summary.squadsCreated++;
+        }
+
         if (tm) {
-          await tm.update({ clubId: newClub.id }, { transaction: txn });
+          await tm.update(
+            { clubId: newClub.id, squadId: squad.id },
+            { transaction: txn },
+          );
         } else {
           await SaffTeamMap.create(
             {
@@ -1972,11 +2193,19 @@ export async function runImportPlan(
               teamNameEn: resolution.newClubData.name,
               teamNameAr: resolution.newClubData.nameAr,
               clubId: newClub.id,
+              squadId: squad.id,
             },
             { transaction: txn },
           );
         }
       }
+    }
+
+    // Build reverse-lookup: clubId → squadId (Phase 3, used when creating match_players)
+    const squadByClubId = new Map<string, string>();
+    for (const [tid, clubId] of effectiveClubByTeamId) {
+      const squadId = effectiveSquadByTeamId.get(tid);
+      if (squadId) squadByClubId.set(clubId, squadId);
     }
 
     // ── 4. Enroll clubs in competition for this season ──
@@ -2086,6 +2315,10 @@ export async function runImportPlan(
             {
               homeClubId,
               awayClubId,
+              homeSquadId:
+                effectiveSquadByTeamId.get(fixture.saffHomeTeamId) ?? null,
+              awaySquadId:
+                effectiveSquadByTeamId.get(fixture.saffAwayTeamId) ?? null,
               competitionId: competition.id,
               competition: tournament.name,
               season,
@@ -2201,12 +2434,14 @@ export async function runImportPlan(
             ...(playersByClub.get(fixture.awayClubId) || []),
           ];
           for (const player of players) {
+            const playerClubId = (player as any).currentClubId as string;
             const [, created] = await MatchPlayer.findOrCreate({
               where: { matchId: fixture.matchId, playerId: player.id },
               defaults: {
                 matchId: fixture.matchId,
                 playerId: player.id,
                 availability: "not_called",
+                squadId: squadByClubId.get(playerClubId) ?? null, // Phase 3
               },
               transaction: txn,
             });

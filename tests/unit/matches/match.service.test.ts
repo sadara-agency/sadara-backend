@@ -107,6 +107,14 @@ jest.mock('../../../src/modules/matches/matchAutoTasks', () => ({
   getTaskRuleConfig: jest.fn().mockReturnValue({}),
 }));
 
+const mockSquadFindOne = jest.fn();
+jest.mock('../../../src/modules/squads/squad.model', () => ({
+  Squad: {
+    findOne: (...a: unknown[]) => mockSquadFindOne(...a),
+    name: 'Squad',
+  },
+}));
+
 import * as matchService from '../../../src/modules/matches/match.service';
 
 describe('Match Service', () => {

@@ -67,6 +67,7 @@ interface ContractAttributes {
   noClaimsDeclaration: boolean;
   declarationText: string | null;
   parentContractId: string | null;
+  squadId?: string | null; // Phase 4 — which squad this contract is scoped to
   // Meta
   notes: string | null;
   createdBy: string | null;
@@ -115,6 +116,7 @@ interface ContractCreationAttributes extends Optional<
   | "noClaimsDeclaration"
   | "declarationText"
   | "parentContractId"
+  | "squadId"
   | "notes"
   | "createdBy"
   | "displayId"
@@ -183,6 +185,7 @@ export class Contract
   declare noClaimsDeclaration: boolean;
   declare declarationText: string | null;
   declare parentContractId: string | null;
+  declare squadId: string | null;
   declare notes: string | null;
   declare createdBy: string | null;
   declare displayId: string | null;
@@ -393,6 +396,13 @@ Contract.init(
       type: DataTypes.UUID,
       field: "parent_contract_id",
       references: { model: "contracts", key: "id" },
+    },
+    squadId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "squad_id",
+      references: { model: "squads", key: "id" },
+      onDelete: "SET NULL",
     },
     notes: {
       type: DataTypes.TEXT,

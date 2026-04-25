@@ -11,6 +11,8 @@ import { Offer } from "@modules/offers/offer.model";
 import { Match } from "@modules/matches/match.model";
 import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
+import { MatchEvent } from "@modules/matches/matchEvent.model";
+import { MatchMedia } from "@modules/matches/matchMedia.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
@@ -83,6 +85,9 @@ import ClubNeed from "@modules/club-needs/clubNeed.model";
 import PlayerCoachAssignment from "@modules/player-coach-assignments/playerCoachAssignment.model";
 import { ScoringCard } from "@modules/scouting/scoringCard.model";
 import WatchlistVideoClip from "@modules/scouting/watchlist-video-clip.model";
+import { Squad } from "@modules/squads/squad.model";
+import { SquadMembership } from "@modules/squads/squadMembership.model";
+import { PlayerMatchReview } from "@modules/saffplus/playerReview.model";
 
 let associationsReady = false;
 
@@ -135,6 +140,59 @@ export function setupAssociations() {
   Match.belongsTo(Club, { foreignKey: "awayClubId", as: "awayClub" });
   Club.hasMany(Match, { foreignKey: "homeClubId", as: "homeMatches" });
   Club.hasMany(Match, { foreignKey: "awayClubId", as: "awayMatches" });
+
+  // Match ↔ MatchEvent (SAFF+ event timeline — Phase 1 schema, Phase 3 ingest)
+  MatchEvent.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  Match.hasMany(MatchEvent, { foreignKey: "matchId", as: "events" });
+  MatchEvent.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  MatchEvent.belongsTo(Player, {
+    foreignKey: "relatedPlayerId",
+    as: "relatedPlayer",
+  });
+
+  // Match ↔ MatchMedia (SAFF+ video URLs — Phase 1 schema, Phase 3 ingest)
+  MatchMedia.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  Match.hasMany(MatchMedia, { foreignKey: "matchId", as: "media" });
+
+  // Squad ↔ Club
+  Squad.belongsTo(Club, { foreignKey: "clubId", as: "club" });
+  Club.hasMany(Squad, { foreignKey: "clubId", as: "squads" });
+
+  // Squad ↔ Match (Phase 4 of SAFF Club/Squad refactor)
+  Match.belongsTo(Squad, { foreignKey: "homeSquadId", as: "homeSquad" });
+  Match.belongsTo(Squad, { foreignKey: "awaySquadId", as: "awaySquad" });
+  Squad.hasMany(Match, { foreignKey: "homeSquadId", as: "homeMatches" });
+  Squad.hasMany(Match, { foreignKey: "awaySquadId", as: "awayMatches" });
+
+  // Squad ↔ Contract (Phase 4)
+  Contract.belongsTo(Squad, { foreignKey: "squadId", as: "squad" });
+  Squad.hasMany(Contract, { foreignKey: "squadId", as: "contracts" });
+
+  // Squad ↔ MatchPlayer (Phase 4)
+  MatchPlayer.belongsTo(Squad, { foreignKey: "squadId", as: "squad" });
+
+  // Squad ↔ SquadMembership (SAFF+ Phase 2 — historical roster)
+  SquadMembership.belongsTo(Squad, { foreignKey: "squadId", as: "squad" });
+  SquadMembership.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Squad.hasMany(SquadMembership, {
+    foreignKey: "squadId",
+    as: "memberships",
+  });
+  Player.hasMany(SquadMembership, {
+    foreignKey: "playerId",
+    as: "squadMemberships",
+  });
+
+  // PlayerMatchReview (SAFF+ Phase 2 — unmatched roster triage queue)
+  PlayerMatchReview.belongsTo(Squad, { foreignKey: "squadId", as: "squad" });
+  PlayerMatchReview.belongsTo(Player, {
+    foreignKey: "linkedPlayerId",
+    as: "linkedPlayer",
+  });
+  PlayerMatchReview.belongsTo(User, {
+    foreignKey: "reviewedBy",
+    as: "reviewer",
+  });
 
   // Match ↔ Competition
   Match.belongsTo(Competition, {

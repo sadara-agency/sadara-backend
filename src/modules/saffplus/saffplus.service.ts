@@ -9,6 +9,21 @@
 import { Op } from "sequelize";
 import { logger } from "@config/logger";
 import * as provider from "./saffplus.provider";
+import {
+  isWomensCompetition,
+  normalizeArabicName,
+  type SaffPlusRosterEntry,
+} from "./saffplus.provider";
+import { Player } from "@modules/players/player.model";
+import { Squad } from "@modules/squads/squad.model";
+import { SquadMembership } from "@modules/squads/squadMembership.model";
+import { findOrCreateSquad } from "@modules/squads/squad.service";
+import { upsertPendingReview } from "./playerReview.service";
+import type { PlayerReviewSuggestion } from "./playerReview.model";
+import { MatchEvent } from "@modules/matches/matchEvent.model";
+import { MatchMedia } from "@modules/matches/matchMedia.model";
+import { extractMatchVideoUrl } from "./saffplus.video";
+import type { SaffPlusMatchEvent } from "./saffplus.provider";
 import type {
   SaffPlusCompetition,
   SaffPlusTeam,
@@ -213,6 +228,284 @@ export async function syncMenLeagues(season: string) {
 }
 
 // ══════════════════════════════════════════
+// PLAYER MATCHER (Phase 2)
+// ══════════════════════════════════════════
+
+const PLAYER_MATCH_AUTO_THRESHOLD = 0.85;
+const PLAYER_MATCH_SUGGESTION_THRESHOLD = 0.5;
+const PLAYER_MATCH_SUGGESTION_LIMIT = 5;
+
+export interface PlayerMatchResult {
+  playerId: string | null;
+  /** When playerId is null, suggestions for the review queue. */
+  suggestions: PlayerReviewSuggestion[];
+}
+
+/**
+ * Resolve a SAFF+ scraped roster entry to a Sadara player.
+ *
+ * Reconciliation order (per the approved plan):
+ *   1. Exact match on `players.external_ids.saffplus`.
+ *   2. Fuzzy similarity (pg_trgm) on the Arabic-normalized name with
+ *      a DOB + nationality boost when those fields are present.
+ *   3. Below the auto-link threshold → null + top-N suggestions for
+ *      the review queue.
+ *
+ * Auto-link threshold is conservative (0.85) to honor the user's
+ * "match-only, no auto-create" decision: we'd rather queue something
+ * for human review than incorrectly merge two players.
+ */
+export async function matchPlayer(
+  scraped: SaffPlusRosterEntry,
+  providerSource = "saffplus",
+): Promise<PlayerMatchResult> {
+  // ── Layer 1: external id ──
+  if (scraped.externalId) {
+    const [direct] = (await sequelize.query(
+      `SELECT id FROM players
+       WHERE external_ids @> jsonb_build_object(:provider, :ext)
+       LIMIT 1`,
+      {
+        replacements: {
+          provider: providerSource,
+          ext: scraped.externalId,
+        },
+      },
+    )) as [Array<{ id: string }>, unknown];
+    if (direct.length > 0) {
+      return { playerId: direct[0].id, suggestions: [] };
+    }
+  }
+
+  // ── Layer 2: fuzzy match ──
+  // Use the Arabic-normalized name when available; otherwise the English
+  // name. pg_trgm is case-insensitive on text already; we lower-case as
+  // a defense-in-depth measure.
+  const arNorm = scraped.nameAr ? normalizeArabicName(scraped.nameAr) : null;
+  const enNorm = scraped.name ? scraped.name.toLowerCase() : null;
+  const probe = arNorm ?? enNorm;
+  if (!probe) {
+    return { playerId: null, suggestions: [] };
+  }
+
+  const [rows] = (await sequelize.query(
+    `WITH candidates AS (
+       SELECT p.id,
+              GREATEST(
+                similarity(
+                  COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, ''),
+                  :probeAr
+                ),
+                similarity(
+                  LOWER(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')),
+                  :probeEn
+                )
+              ) AS name_score,
+              p.date_of_birth,
+              p.nationality
+       FROM players p
+       WHERE
+         (
+           similarity(
+             COALESCE(p.first_name_ar, '') || ' ' || COALESCE(p.last_name_ar, ''),
+             :probeAr
+           ) > 0.3
+           OR similarity(
+             LOWER(COALESCE(p.first_name, '') || ' ' || COALESCE(p.last_name, '')),
+             :probeEn
+           ) > 0.3
+         )
+       ORDER BY name_score DESC
+       LIMIT 20
+     )
+     SELECT id,
+            name_score,
+            -- Boost when DOB matches (or is unknown on either side)
+            CASE
+              WHEN :dob IS NULL OR date_of_birth IS NULL THEN 0
+              WHEN date_of_birth = :dob THEN 0.10
+              ELSE -0.10
+            END
+            +
+            -- Smaller boost for nationality match
+            CASE
+              WHEN :nat IS NULL OR nationality IS NULL THEN 0
+              WHEN nationality = :nat THEN 0.05
+              ELSE 0
+            END
+            AS boost,
+            name_score AS base_score
+     FROM candidates
+     ORDER BY name_score DESC
+     LIMIT :limit`,
+    {
+      replacements: {
+        probeAr: arNorm ?? "",
+        probeEn: enNorm ?? "",
+        dob: scraped.dob,
+        nat: scraped.nationality,
+        limit: PLAYER_MATCH_SUGGESTION_LIMIT,
+      },
+    },
+  )) as [
+    Array<{
+      id: string;
+      name_score: number;
+      boost: number;
+      base_score: number;
+    }>,
+    unknown,
+  ];
+
+  const ranked = rows
+    .map((r) => ({
+      playerId: r.id,
+      score: Math.min(1, Number(r.name_score) + Number(r.boost)),
+      reason: `fuzzy_name${scraped.dob ? "+dob" : ""}${
+        scraped.nationality ? "+nat" : ""
+      }`,
+    }))
+    .sort((a, b) => b.score - a.score);
+
+  const top = ranked[0];
+  if (top && top.score >= PLAYER_MATCH_AUTO_THRESHOLD) {
+    return { playerId: top.playerId, suggestions: [] };
+  }
+
+  const suggestions = ranked.filter(
+    (r) => r.score >= PLAYER_MATCH_SUGGESTION_THRESHOLD,
+  );
+  return { playerId: null, suggestions };
+}
+
+// ══════════════════════════════════════════
+// SYNC SQUAD ROSTERS (Phase 2)
+// ══════════════════════════════════════════
+
+/**
+ * Sync a single SAFF+ club's squads + their season rosters into
+ * Sadara. Honors the "match-only, no auto-create" rule:
+ *
+ *   • Squads that don't yet exist as a Sadara `squads` row are
+ *     created via `findOrCreateSquad` (parent club must already
+ *     exist; we do NOT auto-create clubs from SAFF+).
+ *   • Roster entries that match an existing Sadara player at
+ *     similarity ≥ 0.85 → upsert squad_memberships.
+ *   • Roster entries that don't match → row in player_match_review.
+ *
+ * Returns counters for each outcome so callers can audit.
+ */
+export async function syncClubSquadsAndRosters(
+  clubId: string,
+  clubSlug: string,
+  season: string = getCurrentSeason(),
+): Promise<{
+  squadsCreated: number;
+  squadsExisting: number;
+  membershipsUpserted: number;
+  reviewQueued: number;
+  unparented: number;
+  errors: string[];
+}> {
+  const result = {
+    squadsCreated: 0,
+    squadsExisting: 0,
+    membershipsUpserted: 0,
+    reviewQueued: 0,
+    unparented: 0,
+    errors: [] as string[],
+  };
+
+  const squads = await provider.scrapeClubSquads(clubSlug);
+  if (squads.length === 0) {
+    logger.warn(`[SAFF+] No squads scraped for club ${clubSlug}`);
+    return result;
+  }
+
+  for (const sq of squads) {
+    try {
+      const [squad, wasCreated] = await findOrCreateSquad(clubId, {
+        ageCategory: sq.ageCategory,
+        division: sq.division,
+      });
+      if (wasCreated) result.squadsCreated++;
+      else result.squadsExisting++;
+
+      const roster = await provider.scrapeSquadRoster(clubSlug, sq.id, season);
+      for (const entry of roster) {
+        try {
+          const match = await matchPlayer(entry);
+          if (match.playerId) {
+            // Upsert squad_membership (idempotent on (squad,player,season))
+            await SquadMembership.findOrCreate({
+              where: {
+                squadId: squad.id,
+                playerId: match.playerId,
+                season,
+              },
+              defaults: {
+                squadId: squad.id,
+                playerId: match.playerId,
+                season,
+                jerseyNumber: entry.jerseyNumber,
+                position: entry.position,
+                externalMembershipId: entry.externalId,
+                providerSource: "saffplus",
+                joinedAt: null,
+                leftAt: null,
+              },
+            });
+            result.membershipsUpserted++;
+          } else {
+            await upsertPendingReview({
+              scrapedNameAr: entry.nameAr ?? null,
+              scrapedNameEn: entry.name,
+              scrapedDob: entry.dob,
+              scrapedNationality: entry.nationality,
+              scrapedJerseyNumber: entry.jerseyNumber,
+              scrapedPosition: entry.position,
+              squadId: squad.id,
+              season,
+              suggestedPlayerIds: match.suggestions,
+              externalPlayerId: entry.externalId,
+              providerSource: "saffplus",
+              rawPayload: entry.raw,
+            });
+            result.reviewQueued++;
+          }
+        } catch (rosterErr) {
+          const msg =
+            rosterErr instanceof Error ? rosterErr.message : String(rosterErr);
+          logger.warn(`[SAFF+] Roster row failed (${entry.name}): ${msg}`);
+          result.errors.push(msg);
+        }
+      }
+    } catch (squadErr) {
+      const msg =
+        squadErr instanceof Error ? squadErr.message : String(squadErr);
+      logger.warn(`[SAFF+] Squad ${sq.id} failed: ${msg}`);
+      if (msg.includes("Parent club not found")) {
+        result.unparented++;
+      } else {
+        result.errors.push(msg);
+      }
+    }
+  }
+
+  logger.info(
+    `[SAFF+] syncClubSquadsAndRosters(${clubSlug}, ${season}): ` +
+      `${result.squadsCreated} new squads, ${result.squadsExisting} existing, ` +
+      `${result.membershipsUpserted} memberships, ${result.reviewQueued} queued, ` +
+      `${result.unparented} unparented, ${result.errors.length} errors`,
+  );
+
+  return result;
+}
+
+// Suppress unused-import warnings — Squad is used transitively via findOrCreateSquad
+void Squad;
+
+// ══════════════════════════════════════════
 // SYNC COMPETITION MATCHES → SADARA MATCHES TABLE
 // ══════════════════════════════════════════
 
@@ -289,6 +582,44 @@ export async function syncCompetitionMatches(
   const competition = await Competition.findByPk(competitionId);
   if (!competition) {
     throw new Error(`Competition ${competitionId} not found`);
+  }
+
+  // ── Layer-2 women's filter ──
+  // The provider already drops women's competitions at scrape time.
+  // This is the belt-and-suspenders check at persistence time: if the
+  // Sadara `Competition` row has gender=women OR name/slug signals it,
+  // skip and emit an audit row so the omission is visible.
+  const compGender = (
+    (competition as unknown as { gender?: string }).gender ?? ""
+  )
+    .toLowerCase()
+    .trim();
+  const womenSignal =
+    compGender === "women" ||
+    compGender === "female" ||
+    isWomensCompetition({
+      name: competition.name,
+      nameAr: (competition as unknown as { nameAr?: string }).nameAr,
+      slug: competition.saffplusSlug ?? null,
+    });
+
+  if (womenSignal) {
+    logger.info(
+      `[SAFF+] Skipping women's competition '${competition.name}' (id=${competitionId}) — out of scope`,
+    );
+    await SeasonSync.upsert({
+      source: "saff",
+      competition: competition.name,
+      competitionId,
+      season,
+      dataType: "fixtures",
+      status: "completed",
+      syncedAt: new Date(),
+      recordCount: 0,
+      errorMessage: null,
+      metadata: { skipReason: "women_league", layer: "service" },
+    } as any);
+    return result;
   }
 
   // Discover slug if missing — try matching by competition name against SAFF+ list
@@ -417,6 +748,9 @@ export async function syncCompetitionMatches(
       const matchValues = {
         providerSource: "saffplus",
         externalMatchId,
+        // Phase 3: store the raw SAFF+ match id so the events scraper can
+        // hit /ar/event/match/:providerMatchId without re-derivation.
+        providerMatchId: String(fixture.id),
         competitionId,
         season,
         matchDate,
@@ -470,4 +804,260 @@ export async function syncCompetitionMatches(
   );
 
   return result;
+}
+
+// ══════════════════════════════════════════
+// MATCH EVENTS + MEDIA (Phase 3)
+// ══════════════════════════════════════════
+
+/**
+ * Resolve a scraped event's player to a Sadara player.id when possible,
+ * using the same matcher as roster sync. Returns null when the player
+ * isn't tracked in Sadara — events still persist, just without a
+ * player FK. We do NOT queue review rows from event scraping; the
+ * roster sync is the canonical source of player creation prompts.
+ */
+async function resolveEventPlayerId(
+  name: string | null,
+  nameAr: string | null,
+): Promise<string | null> {
+  if (!name && !nameAr) return null;
+  const result = await matchPlayer({
+    externalId: null,
+    name: name ?? "",
+    nameAr,
+    dob: null,
+    nationality: null,
+    jerseyNumber: null,
+    position: null,
+    raw: {},
+  });
+  return result.playerId;
+}
+
+/**
+ * Sync the minute-by-minute event timeline for a single match.
+ * Idempotent: re-running on the same match upserts each event by
+ * its (match_id, provider_source, external_event_id) key.
+ */
+export async function syncMatchEvents(matchId: string): Promise<{
+  matchId: string;
+  upserted: number;
+  unmappedPlayers: number;
+  errors: string[];
+}> {
+  const result = {
+    matchId,
+    upserted: 0,
+    unmappedPlayers: 0,
+    errors: [] as string[],
+  };
+
+  const match = await Match.findByPk(matchId);
+  if (!match) throw new Error(`Match ${matchId} not found`);
+  if (match.providerSource !== "saffplus") {
+    throw new Error(
+      `Match ${matchId} is not from SAFF+ (provider=${match.providerSource})`,
+    );
+  }
+  if (!match.providerMatchId) {
+    throw new Error(
+      `Match ${matchId} has no provider_match_id — re-sync the parent competition first`,
+    );
+  }
+
+  const scraped: SaffPlusMatchEvent[] = await provider.scrapeMatchEvents(
+    match.providerMatchId,
+  );
+  if (scraped.length === 0) {
+    logger.info(
+      `[SAFF+] syncMatchEvents(${matchId}): 0 events scraped — page may not have a timeline yet`,
+    );
+    return result;
+  }
+
+  for (const ev of scraped) {
+    try {
+      const playerId = await resolveEventPlayerId(
+        ev.playerName,
+        ev.playerNameAr,
+      );
+      if (!playerId && (ev.playerName || ev.playerNameAr)) {
+        result.unmappedPlayers++;
+      }
+      const relatedPlayerId = await resolveEventPlayerId(
+        ev.relatedPlayerName,
+        ev.relatedPlayerNameAr,
+      );
+
+      const where: Record<string, unknown> = {
+        matchId: match.id,
+        providerSource: "saffplus",
+      };
+      if (ev.externalEventId) where.externalEventId = ev.externalEventId;
+      else {
+        // No stable external id — fall back to (minute,type,playerId) for upsert
+        where.minute = ev.minute;
+        where.type = ev.type;
+        where.playerId = playerId;
+      }
+
+      const existing = await MatchEvent.findOne({ where });
+      if (existing) {
+        await existing.update({
+          minute: ev.minute,
+          stoppageMinute: ev.stoppageMinute,
+          type: ev.type,
+          teamSide: ev.teamSide,
+          playerId,
+          relatedPlayerId,
+          descriptionAr: ev.descriptionAr,
+          descriptionEn: ev.descriptionEn,
+          rawPayload: ev.raw,
+        });
+      } else {
+        await MatchEvent.create({
+          matchId: match.id,
+          minute: ev.minute,
+          stoppageMinute: ev.stoppageMinute,
+          type: ev.type,
+          teamSide: ev.teamSide,
+          playerId,
+          relatedPlayerId,
+          descriptionAr: ev.descriptionAr,
+          descriptionEn: ev.descriptionEn,
+          externalEventId: ev.externalEventId,
+          providerSource: "saffplus",
+          rawPayload: ev.raw,
+        });
+      }
+      result.upserted++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(`[SAFF+] Event upsert failed: ${msg}`);
+      result.errors.push(msg);
+    }
+  }
+
+  logger.info(
+    `[SAFF+] syncMatchEvents(${matchId}): ${result.upserted} upserted, ` +
+      `${result.unmappedPlayers} unmapped players, ${result.errors.length} errors`,
+  );
+
+  return result;
+}
+
+/**
+ * Run Puppeteer to extract video URLs for a single match and persist
+ * them to match_media. No-op (returns reason='disabled') when the
+ * SAFFPLUS_VIDEO_EXTRACTION env flag is off, so dev runs don't try
+ * to spawn Chromium.
+ */
+export async function syncMatchMedia(matchId: string): Promise<{
+  matchId: string;
+  upserted: number;
+  reason: "ok" | "disabled" | "circuit_open" | "no_player_found" | "error";
+  errors: string[];
+}> {
+  const result = {
+    matchId,
+    upserted: 0,
+    reason: "ok" as
+      | "ok"
+      | "disabled"
+      | "circuit_open"
+      | "no_player_found"
+      | "error",
+    errors: [] as string[],
+  };
+
+  const match = await Match.findByPk(matchId);
+  if (!match) throw new Error(`Match ${matchId} not found`);
+  if (!match.providerMatchId) {
+    throw new Error(
+      `Match ${matchId} has no provider_match_id — re-sync parent competition first`,
+    );
+  }
+
+  const extracted = await extractMatchVideoUrl(match.providerMatchId);
+  result.reason = extracted.reason;
+
+  for (const v of extracted.videos) {
+    try {
+      // Heuristic: if the match is currently live, mark this as a live
+      // stream; otherwise it's a VOD replay. The frontend uses media_type
+      // to pick the right player chrome.
+      const mediaType: "live_stream" | "vod_full" =
+        match.status === "live" ? "live_stream" : "vod_full";
+
+      const where: Record<string, unknown> = {
+        matchId: match.id,
+        providerSource: "saffplus",
+        url: v.url,
+      };
+      const existing = await MatchMedia.findOne({ where });
+      if (existing) {
+        await existing.update({
+          mediaType,
+          streamProtocol: v.streamProtocol,
+          cdnProvider: v.cdnProvider,
+          embedOnly: v.embedOnly,
+          expiresAt: v.expiresAt,
+        });
+      } else {
+        await MatchMedia.create({
+          matchId: match.id,
+          mediaType,
+          streamProtocol: v.streamProtocol,
+          url: v.url,
+          posterUrl: null,
+          durationSeconds: null,
+          language: "ar",
+          requiresAuth: false,
+          embedOnly: v.embedOnly,
+          cdnProvider: v.cdnProvider,
+          expiresAt: v.expiresAt,
+          externalMediaId: null,
+          providerSource: "saffplus",
+        });
+      }
+      result.upserted++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(`[SAFF+] Media upsert failed: ${msg}`);
+      result.errors.push(msg);
+    }
+  }
+
+  logger.info(
+    `[SAFF+] syncMatchMedia(${matchId}): ${result.upserted} upserted (reason=${result.reason})`,
+  );
+  return result;
+}
+
+// ── Read endpoints ──
+
+export async function getMatchEvents(matchId: string) {
+  const match = await Match.findByPk(matchId, { attributes: ["id"] });
+  if (!match) throw new Error(`Match ${matchId} not found`);
+  return MatchEvent.findAll({
+    where: { matchId },
+    order: [
+      ["minute", "ASC"],
+      ["stoppageMinute", "ASC"],
+    ],
+    include: [
+      { model: Player, as: "player", required: false },
+      { model: Player, as: "relatedPlayer", required: false },
+    ],
+  });
+}
+
+export async function getMatchMedia(matchId: string) {
+  const match = await Match.findByPk(matchId, { attributes: ["id"] });
+  if (!match) throw new Error(`Match ${matchId} not found`);
+  return MatchMedia.findAll({
+    where: { matchId },
+    order: [["createdAt", "DESC"]],
+  });
 }

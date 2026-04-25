@@ -4,6 +4,7 @@ import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
 import { MatchAnalysis } from "@modules/matches/matchAnalysis.model";
 import { Club } from "@modules/clubs/club.model";
+import { Squad } from "@modules/squads/squad.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
@@ -13,6 +14,13 @@ import { generateDisplayId } from "@shared/utils/displayId";
 import { generateMatchCoverTask } from "@modules/matches/matchAutoTasks";
 
 const CLUB_ATTRS = ["id", "name", "nameAr", "logoUrl"] as const;
+const SQUAD_ATTRS = [
+  "id",
+  "displayName",
+  "displayNameAr",
+  "ageCategory",
+  "division",
+] as const;
 const PLAYER_ATTRS = [
   "id",
   "firstName",
@@ -43,6 +51,13 @@ export async function listMatches(queryParams: any) {
     where[Op.or] = [
       { homeClubId: queryParams.clubId },
       { awayClubId: queryParams.clubId },
+    ];
+  }
+
+  if (queryParams.squadId) {
+    where[Op.or] = [
+      { homeSquadId: queryParams.squadId },
+      { awaySquadId: queryParams.squadId },
     ];
   }
 
@@ -142,6 +157,8 @@ export async function getMatchById(id: string) {
     include: [
       { model: Club, as: "homeClub", attributes: [...CLUB_ATTRS] },
       { model: Club, as: "awayClub", attributes: [...CLUB_ATTRS] },
+      { model: Squad, as: "homeSquad", attributes: [...SQUAD_ATTRS] },
+      { model: Squad, as: "awaySquad", attributes: [...SQUAD_ATTRS] },
       {
         model: MatchPlayer,
         as: "matchPlayers",
@@ -207,6 +224,25 @@ export async function createMatch(input: any) {
   await findOrThrow(Club, input.homeClubId, "Home club");
   await findOrThrow(Club, input.awayClubId, "Away club");
 
+  // Auto-resolve squad IDs to senior squad when not explicitly provided.
+  let { homeSquadId, awaySquadId } = input;
+  if (!homeSquadId && input.homeClubId) {
+    const sq = await Squad.findOne({
+      where: { clubId: input.homeClubId, ageCategory: "senior" },
+      attributes: ["id"],
+      order: [["createdAt", "ASC"]],
+    });
+    homeSquadId = sq?.id ?? null;
+  }
+  if (!awaySquadId && input.awayClubId) {
+    const sq = await Squad.findOne({
+      where: { clubId: input.awayClubId, ageCategory: "senior" },
+      attributes: ["id"],
+      order: [["createdAt", "ASC"]],
+    });
+    awaySquadId = sq?.id ?? null;
+  }
+
   // Enforce minimum 3-day gap between matches for each club
   const matchDate = new Date(input.matchDate);
   const threeDaysBefore = new Date(matchDate.getTime() - 3 * 86_400_000);
@@ -235,7 +271,12 @@ export async function createMatch(input: any) {
   }
 
   const displayId = await generateDisplayId("matches");
-  const match = await Match.create({ ...input, displayId });
+  const match = await Match.create({
+    ...input,
+    displayId,
+    homeSquadId,
+    awaySquadId,
+  });
   const createdMatch = await getMatchById(match.id);
 
   // Fire-and-forget: auto-create media cover task

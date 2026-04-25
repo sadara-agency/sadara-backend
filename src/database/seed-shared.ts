@@ -464,6 +464,10 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
 
+  // Squads — read-only API; writes happen via the SAFF wizard (Phase 3).
+  // Mirrors the clubs read distribution since squads are a refinement of clubs.
+  ...allRoles("squads", { canRead: true }),
+
   ...forRoles("sportmonks", ["Admin"], {
     canCreate: true,
     canRead: true,

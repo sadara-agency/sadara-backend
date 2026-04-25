@@ -1,0 +1,36 @@
+{
+  "_comment": "Manually curated tournament context for the saff.com.sa championships we ingest. Each saffId maps to (ageCategory, division, competitionType, isSupported). Out-of-scope tournaments (women's, futsal, beach) get isSupported=false and the wizard refuses to import them. Used by saff.service.ts seedTournaments() and syncTournamentsFromSaff() to backfill saff_tournaments.age_category / .division / .competition_type / .is_supported. Update this file when SAFF adds a new championship.",
+
+  "333": { "ageCategory": "senior", "division": "premier",       "competitionType": "league",     "isSupported": true },
+  "342": { "ageCategory": "senior", "division": null,            "competitionType": "cup",        "isSupported": true },
+  "329": { "ageCategory": "senior", "division": null,            "competitionType": "super-cup",  "isSupported": true },
+  "334": { "ageCategory": "senior", "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+  "335": { "ageCategory": "senior", "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
+  "336": { "ageCategory": "senior", "division": "3rd-division",  "competitionType": "league",     "isSupported": true },
+  "366": { "ageCategory": "senior", "division": "4th-division",  "competitionType": "league",     "isSupported": true },
+
+  "350": { "ageCategory": "u21",    "division": "premier",       "competitionType": "league",     "isSupported": true },
+  "351": { "ageCategory": "u18",    "division": "premier",       "competitionType": "league",     "isSupported": true },
+  "352": { "ageCategory": "u17",    "division": "premier",       "competitionType": "league",     "isSupported": true },
+  "353": { "ageCategory": "u16",    "division": "premier",       "competitionType": "league",     "isSupported": true },
+  "354": { "ageCategory": "u15",    "division": "premier",       "competitionType": "league",     "isSupported": true },
+
+  "371": { "ageCategory": "u21",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+  "355": { "ageCategory": "u18",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+  "356": { "ageCategory": "u17",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+  "357": { "ageCategory": "u16",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+  "358": { "ageCategory": "u15",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+
+  "367": { "ageCategory": "u18",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
+  "368": { "ageCategory": "u17",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
+  "369": { "ageCategory": "u16",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
+  "370": { "ageCategory": "u15",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
+
+  "341": { "ageCategory": "u14",    "division": null,            "competitionType": "tournament", "isSupported": true },
+  "331": { "ageCategory": "u13",    "division": null,            "competitionType": "tournament", "isSupported": true },
+
+  "386": { "ageCategory": "u14",    "division": null,            "competitionType": "league",     "isSupported": true },
+  "387": { "ageCategory": "u13",    "division": null,            "competitionType": "league",     "isSupported": true },
+  "388": { "ageCategory": "u12",    "division": null,            "competitionType": "league",     "isSupported": true },
+  "389": { "ageCategory": "u11",    "division": null,            "competitionType": "league",     "isSupported": true }
+}

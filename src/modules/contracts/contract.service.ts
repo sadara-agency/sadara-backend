@@ -9,6 +9,7 @@ import {
 import { Contract } from "@modules/contracts/contract.model";
 import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
+import { Squad } from "@modules/squads/squad.model";
 import { User } from "@modules/users/user.model";
 import { AuditLog } from "@modules/audit/AuditLog.model";
 import { sequelize } from "@config/database";
@@ -195,6 +196,18 @@ export async function createContract(
 
   const displayId = await generateDisplayId("contracts");
 
+  // Auto-resolve squadId to the senior squad of the club when not explicitly provided.
+  // squadId is not yet in the Zod schema; accepted as a passthrough from trusted callers.
+  let squadId: string | null = (input as any).squadId ?? null;
+  if (!squadId && input.clubId) {
+    const seniorSquad = await Squad.findOne({
+      where: { clubId: input.clubId, ageCategory: "senior" },
+      attributes: ["id"],
+      order: [["createdAt", "ASC"]],
+    });
+    squadId = seniorSquad?.id ?? null;
+  }
+
   // Overlap check + creation in a transaction to prevent race conditions.
   // Date-less drafts cannot overlap — only enforce when both dates are provided.
   const contract = await sequelize.transaction(async (t) => {
@@ -240,6 +253,7 @@ export async function createContract(
         agentLicense: input.agentLicense,
         notes: input.notes,
         createdBy,
+        squadId,
       },
       { transaction: t },
     );

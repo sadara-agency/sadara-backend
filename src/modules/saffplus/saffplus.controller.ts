@@ -3,6 +3,7 @@ import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AuthRequest } from "@shared/types";
 import * as saffPlusService from "./saffplus.service";
+import * as playerReviewService from "./playerReview.service";
 import { getCurrentSeason } from "@modules/saff/saff.service";
 
 // ── Discovery ──
@@ -65,4 +66,142 @@ export async function syncLeagues(req: AuthRequest, res: Response) {
     `SAFF+ sync (${result.source}): ${season}`,
   );
   sendSuccess(res, result, `Synced via ${result.source}`);
+}
+
+// ── Phase 2: Club squads + rosters sync ──
+
+export async function syncClubSquads(req: AuthRequest, res: Response) {
+  const { clubId } = req.params;
+  const { clubSlug, season } = req.body as {
+    clubSlug: string;
+    season?: string;
+  };
+  const result = await saffPlusService.syncClubSquadsAndRosters(
+    clubId,
+    clubSlug,
+    season || getCurrentSeason(),
+  );
+
+  await logAudit(
+    "CREATE",
+    "squad_memberships",
+    clubId,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ squad/roster sync for club ${clubId} (${clubSlug})`,
+  );
+  sendSuccess(
+    res,
+    result,
+    `Squads: ${result.squadsCreated} new / ${result.squadsExisting} existing; ` +
+      `${result.membershipsUpserted} memberships, ${result.reviewQueued} queued`,
+  );
+}
+
+// ── Phase 2: Player review queue ──
+
+export async function listPlayerReview(req: AuthRequest, res: Response) {
+  const result = await playerReviewService.listReview(req.query as never);
+  sendSuccess(res, result);
+}
+
+export async function getPlayerReviewSummary(_req: AuthRequest, res: Response) {
+  const summary = await playerReviewService.getReviewSummary();
+  sendSuccess(res, summary);
+}
+
+export async function getPlayerReviewById(req: AuthRequest, res: Response) {
+  const row = await playerReviewService.getReviewById(req.params.id);
+  sendSuccess(res, row);
+}
+
+export async function linkPlayerReview(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const { playerId } = req.body as { playerId: string };
+  const row = await playerReviewService.linkReviewToPlayer(
+    id,
+    playerId,
+    req.user!.id,
+  );
+  await logAudit(
+    "UPDATE",
+    "player_match_review",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Linked SAFF+ review ${id} → player ${playerId}`,
+  );
+  sendSuccess(res, row, "Linked");
+}
+
+export async function rejectPlayerReview(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const reason = (req.body as { reason?: string } | undefined)?.reason;
+  const row = await playerReviewService.rejectReview(id, req.user!.id, reason);
+  await logAudit(
+    "UPDATE",
+    "player_match_review",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Rejected SAFF+ review ${id}${reason ? `: ${reason}` : ""}`,
+  );
+  sendSuccess(res, row, "Rejected");
+}
+
+export async function markPlayerReviewDuplicate(
+  req: AuthRequest,
+  res: Response,
+) {
+  const { id } = req.params;
+  const row = await playerReviewService.markDuplicate(id, req.user!.id);
+  await logAudit(
+    "UPDATE",
+    "player_match_review",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Marked SAFF+ review ${id} as duplicate`,
+  );
+  sendSuccess(res, row, "Marked duplicate");
+}
+
+// ── Phase 3: Match events + media ──
+
+export async function listMatchEvents(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  const events = await saffPlusService.getMatchEvents(matchId);
+  sendSuccess(res, events);
+}
+
+export async function listMatchMedia(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  const media = await saffPlusService.getMatchMedia(matchId);
+  sendSuccess(res, media);
+}
+
+export async function syncMatchEventsCtrl(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  const result = await saffPlusService.syncMatchEvents(matchId);
+  await logAudit(
+    "CREATE",
+    "match_events",
+    matchId,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ event sync for match ${matchId}: ${result.upserted} events`,
+  );
+  sendSuccess(
+    res,
+    result,
+    `${result.upserted} events upserted, ${result.unmappedPlayers} unmapped`,
+  );
+}
+
+export async function syncMatchMediaCtrl(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  const result = await saffPlusService.syncMatchMedia(matchId);
+  await logAudit(
+    "CREATE",
+    "match_media",
+    matchId,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ media sync for match ${matchId}: ${result.upserted} URLs (reason=${result.reason})`,
+  );
+  sendSuccess(res, result, `${result.upserted} media rows (${result.reason})`);
 }

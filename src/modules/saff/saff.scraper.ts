@@ -69,6 +69,10 @@ export interface ScrapeResult {
   standings: ScrapedStanding[];
   fixtures: ScrapedFixture[];
   teams: ScrapedTeam[];
+  /** Championship logo URL scraped from the page header. null if no
+   * recognisable image was found — the scraper does not throw for this
+   * since not every page has a logo. */
+  tournamentLogoUrl: string | null;
   validationWarnings: ValidationWarning[];
   scraperVersion: number;
   scrapedAt: Date;
@@ -293,16 +297,41 @@ export async function scrapeChampionship(
     );
   }
 
+  // Extract tournament/championship logo from the EN page header.
+  // Best-effort — null if no recognisable image is found.
+  const tournamentLogoUrl = extractTournamentLogo($en);
+
   return {
     tournamentId: saffId,
     season,
     standings,
     fixtures,
     teams,
+    tournamentLogoUrl,
     validationWarnings,
     scraperVersion: SELECTOR_VERSION,
     scrapedAt: new Date(),
   };
+}
+
+// ── Extract tournament/championship logo from the page ──
+//
+// SAFF's championship pages don't use a stable CSS class for the header
+// image, so we walk a list of selectors in order of specificity and pick
+// the first one that resolves to an http(s) URL. Returns null when nothing
+// matches — calling code treats that as "logo unknown" and never fails.
+function extractTournamentLogo($: cheerio.CheerioAPI): string | null {
+  const candidates = $(SELECTORS.tournamentLogo);
+  for (let i = 0; i < candidates.length; i++) {
+    const src = $(candidates[i]).attr("src");
+    if (!src) continue;
+    // Skip team logos masquerading as headers — they live under team URLs.
+    if (src.includes("saffteam")) continue;
+    if (src.startsWith("http")) return src;
+    const cleanPath = src.replace(/^(\.\.\/)+/, "").replace(/^\/+/, "");
+    return `https://www.saff.com.sa/${cleanPath}`;
+  }
+  return null;
 }
 
 // ── Scrape standings table ──
@@ -692,6 +721,7 @@ export async function scrapeBatch(
         standings: [],
         fixtures: [],
         teams: [],
+        tournamentLogoUrl: null,
         validationWarnings: [
           {
             entity: "standing",

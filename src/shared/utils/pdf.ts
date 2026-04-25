@@ -225,7 +225,7 @@ export async function mergeWithBrandPages(
   return Buffer.from(await merged.save());
 }
 
-// ── Async enqueue helper ──
+// ── Async enqueue helpers ──
 
 export async function enqueueReportPdf(
   input: Record<string, unknown>,
@@ -238,5 +238,18 @@ export async function enqueueReportPdf(
     input,
     requestedBy,
   });
+  return { jobId };
+}
+
+export async function enqueueContractPdfRegen(
+  contractId: string,
+  requestedBy: string,
+): Promise<{ jobId: string }> {
+  const { enqueue, QueueName } = await import("@modules/queues/queues");
+  const jobId = await enqueue(
+    QueueName.PdfGeneration,
+    `contract-regen-${contractId}`,
+    { kind: "contract-regen", input: { contractId }, requestedBy },
+  );
   return { jobId };
 }
