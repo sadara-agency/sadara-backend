@@ -1198,5 +1198,5 @@ export async function startCronJobs() {
   registerJob("staff-monitoring-close-idle", runCloseIdleSessions);
   schedule("*/10 * * * *", "staff-monitoring-close-idle"); // Every 10 min
 
-  logger.info("[CRON] 70 jobs scheduled ✓");
+  logger.info("[CRON] 68 jobs scheduled ✓");
 }
