@@ -1,3 +1,20 @@
+// ═══════════════════════════════════════════════════════════════
+// Migration 151: Rescope saff_team_maps to (team, season, tournament)
+//
+// Phase 3 of the SAFF Club/Squad refactor. Replaces the global
+// (saff_team_id, season) unique constraint with two partial unique
+// indexes that distinguish legacy general mappings from
+// tournament-specific ones, and adds tournament_id + squad_id FKs.
+//
+// Idempotency notes:
+//  - Each addColumn is guarded by describeTable so a partial earlier
+//    run that added one column but not the other doesn't crash.
+//  - Constraint drop uses `IF EXISTS`.
+//  - Index creates use `CREATE UNIQUE INDEX IF NOT EXISTS`.
+//  - addIndex calls are wrapped in try/catch since Sequelize doesn't
+//    support `IF NOT EXISTS` directly through queryInterface.addIndex.
+// ═══════════════════════════════════════════════════════════════
+
 import { QueryInterface, DataTypes } from "sequelize";
 
 export async function up({
@@ -6,28 +23,48 @@ export async function up({
   context: QueryInterface;
 }) {
   // Fresh-DB guard: saff_team_maps may not exist on a blank test database.
-  const [tables] = await queryInterface.sequelize.query(`
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'saff_team_maps'
-  `);
-  if ((tables as unknown[]).length === 0) return;
+  let columns: Record<string, unknown>;
+  try {
+    columns = (await queryInterface.describeTable("saff_team_maps")) as Record<
+      string,
+      unknown
+    >;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      console.log(
+        "Migration 151: saff_team_maps missing — skipping (fresh DB guard)",
+      );
+      return;
+    }
+    throw err;
+  }
 
   // 1. Add tournament_id — nullable FK to saff_tournaments.
   //    Existing rows keep NULL (legacy general mapping).
-  await queryInterface.addColumn("saff_team_maps", "tournament_id", {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: { model: "saff_tournaments", key: "id" },
-    onDelete: "SET NULL",
-  });
+  if (!("tournament_id" in columns)) {
+    await queryInterface.addColumn("saff_team_maps", "tournament_id", {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: "saff_tournaments", key: "id" },
+      onDelete: "SET NULL",
+    });
+  }
 
   // 2. Add squad_id — nullable FK to squads (backfilled by Phase 3 apply).
-  await queryInterface.addColumn("saff_team_maps", "squad_id", {
-    type: DataTypes.UUID,
-    allowNull: true,
-    references: { model: "squads", key: "id" },
-    onDelete: "SET NULL",
-  });
+  //    May already have been added by migration 150's safeAddColumn pass;
+  //    describeTable check makes this idempotent either way.
+  if (!("squad_id" in columns)) {
+    await queryInterface.addColumn("saff_team_maps", "squad_id", {
+      type: DataTypes.UUID,
+      allowNull: true,
+      references: { model: "squads", key: "id" },
+      onDelete: "SET NULL",
+    });
+  }
 
   // 3. Drop the old UNIQUE (saff_team_id, season) constraint.
   //    PostgreSQL generates this name automatically from the index definition.
@@ -52,15 +89,25 @@ export async function up({
     WHERE tournament_id IS NOT NULL
   `);
 
-  // 6. Index on squad_id for FK lookups.
-  await queryInterface.addIndex("saff_team_maps", ["squad_id"], {
-    name: "idx_saff_team_maps_squad_id",
-  });
+  // 6. Index on squad_id for FK lookups. Idempotent via try/catch.
+  try {
+    await queryInterface.addIndex("saff_team_maps", ["squad_id"], {
+      name: "idx_saff_team_maps_squad_id",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.includes("already exists")) throw err;
+  }
 
-  // 7. Index on tournament_id for FK lookups.
-  await queryInterface.addIndex("saff_team_maps", ["tournament_id"], {
-    name: "idx_saff_team_maps_tournament_id",
-  });
+  // 7. Index on tournament_id for FK lookups. Idempotent via try/catch.
+  try {
+    await queryInterface.addIndex("saff_team_maps", ["tournament_id"], {
+      name: "idx_saff_team_maps_tournament_id",
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!msg.includes("already exists")) throw err;
+  }
 }
 
 export async function down({
@@ -68,11 +115,19 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
-  const [tables] = await queryInterface.sequelize.query(`
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'saff_team_maps'
-  `);
-  if ((tables as unknown[]).length === 0) return;
+  // Fresh-DB guard via describeTable
+  try {
+    await queryInterface.describeTable("saff_team_maps");
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      return;
+    }
+    throw err;
+  }
 
   await queryInterface.sequelize.query(
     `DROP INDEX IF EXISTS saff_team_maps_team_season_null_uniq`,

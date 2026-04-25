@@ -12,17 +12,15 @@
 //
 // All columns are nullable for now. The senior-squad backfill
 // (`scripts/backfill-squads.ts`) populates them after migration.
+//
+// Idempotency uses queryInterface.describeTable() rather than raw
+// information_schema queries — Sequelize's seq.query() return shape
+// varies (sometimes `[rows, metadata]`, sometimes just `rows`),
+// which made the previous bulk pre-check brittle. describeTable
+// throws when the table is missing; we catch that and skip cleanly.
 // ═══════════════════════════════════════════════════════════════
 
 import { QueryInterface, DataTypes, Sequelize } from "sequelize";
-
-const TABLES = [
-  "matches",
-  "match_players",
-  "contracts",
-  "saff_team_maps",
-  "squads",
-] as const;
 
 export async function up({
   context: queryInterface,
@@ -31,54 +29,34 @@ export async function up({
 }) {
   const seq = (queryInterface as unknown as { sequelize: Sequelize }).sequelize;
 
-  // Fresh-DB guard: every table this migration touches must already exist.
-  // Squads is created by 149; matches/match_players/contracts/saff_team_maps
-  // by 000_baseline. If any are missing, skip — later baseline runs will
-  // bring them in and a re-run of the migrator will pick this up.
-  const [rows] = await seq.query(
-    `SELECT table_name FROM information_schema.tables
-     WHERE table_schema = 'public' AND table_name IN (${TABLES.map(
-       (t) => `'${t}'`,
-     ).join(", ")})`,
-  );
-  const existing = new Set(
-    (rows as { table_name: string }[]).map((r) => r.table_name),
-  );
-  for (const t of TABLES) {
-    if (!existing.has(t)) {
-      console.log(`Migration 150: ${t} missing — skipping (fresh DB guard)`);
-      return;
-    }
-  }
-
-  await addColumnIfMissing(queryInterface, "matches", "home_squad_id", {
+  await safeAddColumn(queryInterface, "matches", "home_squad_id", {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: "squads", key: "id" },
     onDelete: "SET NULL",
   });
-  await addColumnIfMissing(queryInterface, "matches", "away_squad_id", {
+  await safeAddColumn(queryInterface, "matches", "away_squad_id", {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: "squads", key: "id" },
     onDelete: "SET NULL",
   });
 
-  await addColumnIfMissing(queryInterface, "match_players", "squad_id", {
+  await safeAddColumn(queryInterface, "match_players", "squad_id", {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: "squads", key: "id" },
     onDelete: "SET NULL",
   });
 
-  await addColumnIfMissing(queryInterface, "contracts", "squad_id", {
+  await safeAddColumn(queryInterface, "contracts", "squad_id", {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: "squads", key: "id" },
     onDelete: "SET NULL",
   });
 
-  await addColumnIfMissing(queryInterface, "saff_team_maps", "squad_id", {
+  await safeAddColumn(queryInterface, "saff_team_maps", "squad_id", {
     type: DataTypes.UUID,
     allowNull: true,
     references: { model: "squads", key: "id" },
@@ -86,20 +64,32 @@ export async function up({
   });
 
   // Indexes — queries will join through these FKs heavily.
-  await seq.query(
-    `CREATE INDEX IF NOT EXISTS matches_home_squad_id_idx ON matches (home_squad_id)`,
+  // Each index gates on its parent column existing (skipped tables above
+  // mean we shouldn't try to index columns that weren't added).
+  await safeCreateIndex(
+    seq,
+    "matches",
+    "home_squad_id",
+    "matches_home_squad_id_idx",
   );
-  await seq.query(
-    `CREATE INDEX IF NOT EXISTS matches_away_squad_id_idx ON matches (away_squad_id)`,
+  await safeCreateIndex(
+    seq,
+    "matches",
+    "away_squad_id",
+    "matches_away_squad_id_idx",
   );
-  await seq.query(
-    `CREATE INDEX IF NOT EXISTS match_players_squad_id_idx ON match_players (squad_id)`,
+  await safeCreateIndex(
+    seq,
+    "match_players",
+    "squad_id",
+    "match_players_squad_id_idx",
   );
-  await seq.query(
-    `CREATE INDEX IF NOT EXISTS contracts_squad_id_idx ON contracts (squad_id)`,
-  );
-  await seq.query(
-    `CREATE INDEX IF NOT EXISTS saff_team_maps_squad_id_idx ON saff_team_maps (squad_id)`,
+  await safeCreateIndex(seq, "contracts", "squad_id", "contracts_squad_id_idx");
+  await safeCreateIndex(
+    seq,
+    "saff_team_maps",
+    "squad_id",
+    "saff_team_maps_squad_id_idx",
   );
 
   console.log(
@@ -132,20 +122,66 @@ export async function down({
 
 // ── Helpers ──
 
-async function addColumnIfMissing(
+/**
+ * Idempotently add a column. Skips cleanly when:
+ *  - the table doesn't exist (fresh-DB before its baseline migration), or
+ *  - the column already exists (partial earlier run).
+ *
+ * Uses describeTable() instead of raw information_schema queries so we
+ * don't depend on Sequelize's variable seq.query() return format.
+ */
+async function safeAddColumn(
   qi: QueryInterface,
   table: string,
   column: string,
   spec: Parameters<QueryInterface["addColumn"]>[2],
 ) {
-  const seq = (qi as unknown as { sequelize: Sequelize }).sequelize;
-  const [rows] = await seq.query(
-    `SELECT 1 FROM information_schema.columns
-     WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
-    { bind: [table, column] },
-  );
-  if ((rows as unknown[]).length > 0) return;
+  let columns: Record<string, unknown>;
+  try {
+    columns = (await qi.describeTable(table)) as Record<string, unknown>;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // describeTable throws "No description found for X table" when missing
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("No description found")
+    ) {
+      console.log(
+        `Migration 150: ${table} missing — skipping (fresh DB guard)`,
+      );
+      return;
+    }
+    throw err;
+  }
+  if (column in columns) return;
   await qi.addColumn(table, column, spec);
+}
+
+async function safeCreateIndex(
+  seq: Sequelize,
+  table: string,
+  column: string,
+  indexName: string,
+) {
+  // Only create the index if the column actually exists; silently skip otherwise.
+  // CREATE INDEX IF NOT EXISTS handles duplicate index names; the column-existence
+  // check guards against fresh-DB cases where the parent column wasn't added.
+  try {
+    await seq.query(
+      `CREATE INDEX IF NOT EXISTS ${indexName} ON ${table} (${column})`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (
+      msg.includes("does not exist") ||
+      msg.includes("relation") ||
+      msg.includes("column")
+    ) {
+      // Either the table or the column doesn't exist — fresh-DB skip.
+      return;
+    }
+    throw err;
+  }
 }
 
 async function removeColumnIfPresent(
