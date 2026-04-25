@@ -42,6 +42,12 @@ import type {
   SessionDecisions,
   TeamResolution,
 } from "@modules/saff/importSession.model";
+import type {
+  SaffAgeCategory,
+  SaffDivision,
+  SaffCompetitionType,
+} from "@modules/saff/saff.model";
+import tournamentContextRaw from "@modules/saff/saff.tournament-context.json";
 
 // ══════════════════════════════════════════
 // HELPERS
@@ -305,16 +311,151 @@ const TOURNAMENT_SEED = [
   },
 ];
 
+// ── Tournament context resolution ──
+//
+// Phase 1 of the Club/Squad refactor. Each tournament resolves to a squad
+// context: ageCategory × division × competitionType. The curated JSON is
+// authoritative; for unknown saffIds we infer from the tournament title
+// (regex fallback) so unseen championships still get sensible defaults
+// instead of silently sliding into the senior squad.
+
+interface RawTournamentContext {
+  ageCategory: SaffAgeCategory;
+  division: SaffDivision;
+  competitionType: SaffCompetitionType;
+  isSupported: boolean;
+}
+
+const TOURNAMENT_CONTEXT_MAP: Record<string, RawTournamentContext> =
+  Object.fromEntries(
+    Object.entries(tournamentContextRaw as Record<string, unknown>).filter(
+      ([k]) => /^\d+$/.test(k),
+    ),
+  ) as Record<string, RawTournamentContext>;
+
+/**
+ * Infer squad context from a tournament title. Used when the saffId is
+ * not yet in the curated JSON. Defaults to senior/premier/league but
+ * marks women's, futsal, and beach soccer as unsupported.
+ */
+export function inferTournamentContext(
+  name: string,
+  nameAr = "",
+): RawTournamentContext {
+  const haystack = `${name} ${nameAr}`.toLowerCase();
+
+  // Out-of-scope formats — wizard refuses to import these.
+  const isUnsupported =
+    /\bwomen|female|girls?|نساء|سيدات|بنات\b/.test(haystack) ||
+    /\bfutsal|صالات\b/.test(haystack) ||
+    /\bbeach|شاطئية|شاطئي\b/.test(haystack);
+
+  // Age category — match U-XX patterns; "youth" alone defaults to senior.
+  let ageCategory: SaffAgeCategory = "senior";
+  const ageMatch = haystack.match(/u-?(\d{2})|تحت\s*(\d{2})/);
+  if (ageMatch) {
+    const n = parseInt(ageMatch[1] ?? ageMatch[2], 10);
+    if (n >= 11 && n <= 23) {
+      ageCategory = `u${n}` as SaffAgeCategory;
+    }
+  }
+
+  // Division — match "Nth Division" / "Div.N" / "الدرجة Nth".
+  let division: SaffDivision = null;
+  if (/\b1st\s*division|div\.?\s*1|الدرجة\s*الأولى\b/.test(haystack)) {
+    division = "1st-division";
+  } else if (/\b2nd\s*division|div\.?\s*2|الدرجة\s*الثانية\b/.test(haystack)) {
+    division = "2nd-division";
+  } else if (/\b3rd\s*division|div\.?\s*3|الدرجة\s*الثالثة\b/.test(haystack)) {
+    division = "3rd-division";
+  } else if (/\b4th\s*division|div\.?\s*4|الدرجة\s*الرابعة\b/.test(haystack)) {
+    division = "4th-division";
+  } else if (/\bpremier|elite|ممتاز|نخبة\b/.test(haystack)) {
+    division = "premier";
+  }
+
+  // Competition type — cup/super-cup/tournament keywords; default league.
+  let competitionType: SaffCompetitionType = "league";
+  if (/\bsuper\s*cup|سوبر\b/.test(haystack)) {
+    competitionType = "super-cup";
+  } else if (/\bcup|كأس\b/.test(haystack)) {
+    competitionType = "cup";
+    division = null;
+  } else if (/\btournament|بطولة\b/.test(haystack)) {
+    competitionType = "tournament";
+    division = null;
+  }
+
+  return {
+    ageCategory,
+    division,
+    competitionType,
+    isSupported: !isUnsupported,
+  };
+}
+
+/**
+ * Resolve squad context for a saffId. Curated JSON wins; falls back to
+ * inferTournamentContext using the tournament name when the saffId is
+ * not yet curated.
+ */
+export function resolveTournamentContext(
+  saffId: number,
+  name = "",
+  nameAr = "",
+): RawTournamentContext {
+  const curated = TOURNAMENT_CONTEXT_MAP[String(saffId)];
+  if (curated) return curated;
+  return inferTournamentContext(name, nameAr);
+}
+
 // ── Seed tournaments ──
 
 export async function seedTournaments(): Promise<number> {
   let count = 0;
   for (const t of TOURNAMENT_SEED) {
-    const [, created] = await SaffTournament.findOrCreate({
+    const ctx = resolveTournamentContext(t.saffId, t.name, t.nameAr);
+    const [existing, created] = await SaffTournament.findOrCreate({
       where: { saffId: t.saffId },
-      defaults: t as any,
+      defaults: {
+        ...t,
+        ageCategory: ctx.ageCategory,
+        division: ctx.division,
+        competitionType: ctx.competitionType,
+        isSupported: ctx.isSupported,
+      } as any,
     });
-    if (created) count++;
+    if (created) {
+      count++;
+    } else {
+      // Backfill metadata onto rows that pre-date Migration 148. Only
+      // overwrite when the existing value matches the column default
+      // ("senior" / "league") so manual corrections aren't clobbered.
+      const patch: Partial<{
+        ageCategory: SaffAgeCategory;
+        division: SaffDivision;
+        competitionType: SaffCompetitionType;
+        isSupported: boolean;
+      }> = {};
+      if (existing.ageCategory === "senior" && ctx.ageCategory !== "senior") {
+        patch.ageCategory = ctx.ageCategory;
+      }
+      if (existing.division == null && ctx.division != null) {
+        patch.division = ctx.division;
+      }
+      if (
+        existing.competitionType === "league" &&
+        ctx.competitionType !== "league"
+      ) {
+        patch.competitionType = ctx.competitionType;
+      }
+      if (existing.isSupported && !ctx.isSupported) {
+        patch.isSupported = false;
+      }
+      if (Object.keys(patch).length > 0) {
+        await existing.update(patch);
+      }
+    }
   }
   return count;
 }
@@ -328,6 +469,7 @@ export async function syncTournamentsFromSaff(
   let created = 0;
 
   for (const t of scraped) {
+    const ctx = resolveTournamentContext(t.saffId, t.name, t.nameAr);
     const [existing, wasCreated] = await SaffTournament.findOrCreate({
       where: { saffId: t.saffId },
       defaults: {
@@ -338,6 +480,10 @@ export async function syncTournamentsFromSaff(
         tier: 2,
         agencyValue: "Low",
         isActive: true,
+        ageCategory: ctx.ageCategory,
+        division: ctx.division,
+        competitionType: ctx.competitionType,
+        isSupported: ctx.isSupported,
       } as any,
     });
     if (wasCreated) {
@@ -539,11 +685,14 @@ export async function fetchFromSaff(input: FetchRequest) {
         summary.teams += result.teams.length;
       }
 
-      // Update last synced
-      await tournament.update(
-        { lastSyncedAt: new Date() },
-        { transaction: txn },
-      );
+      // Update last synced and championship logo (only when scrape returned one)
+      const tournamentPatch: { lastSyncedAt: Date; logoUrl?: string } = {
+        lastSyncedAt: new Date(),
+      };
+      if (result.tournamentLogoUrl) {
+        tournamentPatch.logoUrl = result.tournamentLogoUrl;
+      }
+      await tournament.update(tournamentPatch, { transaction: txn });
 
       await txn.commit();
     } catch (error: any) {

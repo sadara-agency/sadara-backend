@@ -8,7 +8,7 @@
 // Bump `SELECTOR_VERSION` whenever this file is meaningfully edited.
 // ═══════════════════════════════════════════════════════════════
 
-export const SELECTOR_VERSION = 1;
+export const SELECTOR_VERSION = 2;
 
 export interface ColumnHeaderLabels {
   /** Played */
@@ -56,6 +56,20 @@ export const SELECTORS = {
   logoLarge: 'img[src*="saffteamlarge"]',
   logoSmall: 'img[src*="saffteamsmall"]',
   logoFallback: 'img[src*="uploadcenter/saffteam"]',
+  /**
+   * Tournament/championship logo on championship.php?id=X.
+   * Multiple selectors are tried in order — SAFF's championship pages don't
+   * use a stable CSS class for the header crest, so we look for the most
+   * specific patterns first and fall back to generic championship imagery.
+   */
+  tournamentLogo: [
+    'img[src*="champion"]',
+    'img[src*="tournament"]',
+    'img[src*="uploadcenter/champ"]',
+    ".championship-logo img",
+    ".tournament-header img",
+    "header img",
+  ].join(", "),
 } as const;
 
 export const URL_PATTERNS = {

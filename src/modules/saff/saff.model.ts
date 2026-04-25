@@ -5,6 +5,36 @@ import { sequelize } from "@config/database";
 // SAFF TOURNAMENT
 // ══════════════════════════════════════════
 
+// Squad context — added in Phase 1 of the Club/Squad refactor.
+// Drives the wizard's apply step: each tournament resolves to a specific
+// (ageCategory, division) combination so a U-17 import lands in U-17 squads
+// instead of senior. is_supported=false explicitly excludes women's, futsal,
+// and beach soccer tournaments from import.
+export type SaffAgeCategory =
+  | "senior"
+  | "u23"
+  | "u21"
+  | "u20"
+  | "u19"
+  | "u18"
+  | "u17"
+  | "u16"
+  | "u15"
+  | "u14"
+  | "u13"
+  | "u12"
+  | "u11";
+
+export type SaffDivision =
+  | "premier"
+  | "1st-division"
+  | "2nd-division"
+  | "3rd-division"
+  | "4th-division"
+  | null;
+
+export type SaffCompetitionType = "league" | "cup" | "super-cup" | "tournament";
+
 interface SaffTournamentAttributes {
   id: string;
   saffId: number; // championship.php?id=XXX
@@ -17,13 +47,27 @@ interface SaffTournamentAttributes {
   icon?: string | null;
   isActive: boolean;
   lastSyncedAt?: Date | null;
+  // Squad context (Phase 1)
+  ageCategory: SaffAgeCategory;
+  division: SaffDivision;
+  competitionType: SaffCompetitionType;
+  logoUrl?: string | null; // Scraped from championship.php?id=X header
+  isSupported: boolean; // false → women's / futsal / beach (wizard rejects)
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface SaffTournamentCreation extends Optional<
   SaffTournamentAttributes,
-  "id" | "isActive" | "createdAt" | "updatedAt"
+  | "id"
+  | "isActive"
+  | "ageCategory"
+  | "division"
+  | "competitionType"
+  | "logoUrl"
+  | "isSupported"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 export class SaffTournament
@@ -41,6 +85,11 @@ export class SaffTournament
   declare icon: string | null;
   declare isActive: boolean;
   declare lastSyncedAt: Date | null;
+  declare ageCategory: SaffAgeCategory;
+  declare division: SaffDivision;
+  declare competitionType: SaffCompetitionType;
+  declare logoUrl: string | null;
+  declare isSupported: boolean;
 }
 
 SaffTournament.init(
@@ -73,6 +122,33 @@ SaffTournament.init(
       field: "is_active",
     },
     lastSyncedAt: { type: DataTypes.DATE, field: "last_synced_at" },
+    ageCategory: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "senior",
+      field: "age_category",
+    },
+    division: {
+      type: DataTypes.STRING(40),
+      allowNull: true,
+    },
+    competitionType: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "league",
+      field: "competition_type",
+    },
+    logoUrl: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: "logo_url",
+    },
+    isSupported: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+      field: "is_supported",
+    },
   },
   {
     sequelize,

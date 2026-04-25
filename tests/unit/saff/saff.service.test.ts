@@ -114,7 +114,15 @@ describe('SAFF Service', () => {
     });
 
     it('should skip existing tournaments', async () => {
-      mockTournamentFindOrCreate.mockResolvedValue([{}, false]);
+      // Existing-row update path was added in Phase 1 of the Club/Squad
+      // refactor (backfills age_category/division/competition_type when the
+      // curated JSON has stricter values than the column defaults). The mock
+      // therefore needs `update`; defaults set to neutrals so the patch is
+      // empty for most rows but valid for the few where curated values differ.
+      mockTournamentFindOrCreate.mockResolvedValue([
+        { ageCategory: 'senior', division: null, competitionType: 'league', isSupported: true, update: jest.fn() },
+        false,
+      ]);
       const count = await saffService.seedTournaments();
       expect(count).toBe(0);
     });
