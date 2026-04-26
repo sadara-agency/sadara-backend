@@ -80,7 +80,7 @@ export const updateEvolutionCycleSchema = z.object({
 // ── Query ──
 export const evolutionCycleQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(50),
+  limit: z.coerce.number().min(1).max(500).default(50),
   playerId: z.string().uuid().optional(),
   status: z.enum(CYCLE_STATUSES).optional(),
   tier: z.enum(EVOLUTION_TIERS).optional(),

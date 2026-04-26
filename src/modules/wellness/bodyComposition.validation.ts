@@ -44,7 +44,7 @@ export const updateScanSchema = createScanSchema
 
 export const listScansQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(500).default(20),
   from: z.string().regex(DATE_RE, "from must be YYYY-MM-DD").optional(),
   to: z.string().regex(DATE_RE, "to must be YYYY-MM-DD").optional(),
 });

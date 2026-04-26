@@ -52,7 +52,7 @@ export const updateDocumentSchema = z.object({
 
 export const documentQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["created_at", "updated_at", "name", "type", "status", "expiry_date"])
     .default("created_at"),

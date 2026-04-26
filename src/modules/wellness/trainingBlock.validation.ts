@@ -33,7 +33,7 @@ export const resumeBlockSchema = z.object({});
 
 export const listBlocksQuerySchema = z.object({
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(500).default(20),
   playerId: z.string().uuid().optional(),
   status: z.enum(["active", "paused", "closed"]).optional(),
   from: dateStr.optional(),

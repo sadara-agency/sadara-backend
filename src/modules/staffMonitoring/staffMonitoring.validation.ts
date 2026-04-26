@@ -12,7 +12,7 @@ export const userIdParamSchema = z.object({
 export const rankingsQuerySchema = z.object({
   range: z.enum(["7d", "30d", "90d"]).optional().default("30d"),
   role: z.string().optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional().default(50),
+  limit: z.coerce.number().int().min(1).max(500).optional().default(50),
 });
 
 export type RangeQuery = z.infer<typeof rangeQuerySchema>;

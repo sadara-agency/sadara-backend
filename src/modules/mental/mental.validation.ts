@@ -95,7 +95,7 @@ export const listAssessmentsSchema = z.object({
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
   page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().max(100).optional(),
+  limit: z.coerce.number().int().positive().max(500).optional(),
 });
 
 export type CreateTemplateDTO = z.infer<typeof createTemplateSchema>;

@@ -12,7 +12,7 @@ export const playerReviewQuerySchema = z.object({
     .regex(/^\d{4}-\d{4}$/, "Season must be YYYY-YYYY format")
     .optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(500).default(20),
 });
 
 // ── Path params ──

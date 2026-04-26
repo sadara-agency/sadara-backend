@@ -227,10 +227,10 @@ describe("TrainingBlock Schemas", () => {
       ).toBe(false);
     });
 
-    it("rejects limit > 100", () => {
+    it("accepts limit > 100 (max is 500)", () => {
       expect(
         listBlocksQuerySchema.safeParse({ limit: "101" }).success,
-      ).toBe(false);
+      ).toBe(true);
     });
   });
 

@@ -38,7 +38,7 @@ export const updateInvoiceStatusSchema = z.object({
 
 export const invoiceQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum([
       "created_at",
@@ -79,7 +79,7 @@ export const updatePaymentStatusSchema = z.object({
 
 export const paymentQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum([
       "due_date",
@@ -112,7 +112,7 @@ export const createLedgerEntrySchema = z.object({
 
 export const ledgerQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["posted_at", "created_at", "amount", "side", "account"])
     .default("posted_at"),
@@ -138,7 +138,7 @@ export const createValuationSchema = z.object({
 
 export const valuationQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["valued_at", "created_at", "value", "trend"])
     .default("valued_at"),
@@ -176,7 +176,7 @@ export const updateExpenseSchema = z.object({
 
 export const expenseQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z.enum(["date", "created_at", "amount", "category"]).default("date"),
   order: z.enum(["asc", "desc"]).default("desc"),
   category: z.enum(expenseCategories).optional(),

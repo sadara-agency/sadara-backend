@@ -35,7 +35,7 @@ export const listClipsSchema = z.object({
   playerId: z.string().uuid().optional(),
   status: z.enum(["processing", "ready", "failed"]).optional(),
   page: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().positive().max(100).optional(),
+  limit: z.coerce.number().int().positive().max(500).optional(),
 });
 
 export const createTagSchema = z.object({
