@@ -1135,13 +1135,20 @@ export async function fetchStandings(
     await sleep(1500);
 
     // ── PRIMARY: JSON XHR responses ──
-    // Motto standings items carry numeric stats: points, played, won, drawn, lost.
+    // Motto CDA entities: stats may be top-level OR nested under entity.fields.
     const jsonHit = findArrayInJson(
       jsonResponses,
-      (o) =>
-        typeof o.points === "number" ||
-        typeof o.pts === "number" ||
-        (typeof o.played === "number" && typeof o.won === "number"),
+      (o) => {
+        const f = (o.fields as Record<string, unknown> | undefined) ?? {};
+        return (
+          typeof o.points === "number" ||
+          typeof o.pts === "number" ||
+          (typeof o.played === "number" && typeof o.won === "number") ||
+          typeof f.points === "number" ||
+          typeof f.pts === "number" ||
+          (typeof f.played === "number" && typeof f.won === "number")
+        );
+      },
       { minItems: 1 },
     );
     if (jsonHit.items.length > 0) {
@@ -1149,17 +1156,22 @@ export async function fetchStandings(
         `[SAFF+] Standings JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} rows)`,
       );
       jsonHit.items.forEach((o, idx) => {
+        // Motto CDA wraps custom fields under entity.fields — merge into a flat lookup.
+        const f = (o.fields as Record<string, unknown> | undefined) ?? {};
+        const merged: Record<string, unknown> = { ...f, ...o };
+
         const club =
-          (o.club as Record<string, unknown> | undefined) ??
-          (o.team as Record<string, unknown> | undefined) ??
+          (merged.club as Record<string, unknown> | undefined) ??
+          (merged.team as Record<string, unknown> | undefined) ??
+          (merged.entity as Record<string, unknown> | undefined) ??
           {};
         const teamId =
           pickStr(club, "id", "slug", "uuid") ??
-          pickStr(o, "team_id", "club_id", "id") ??
+          pickStr(merged, "team_id", "club_id", "id") ??
           String(idx);
         if (seen.has(teamId)) return;
         const num = (k: string): number =>
-          typeof o[k] === "number" ? (o[k] as number) : 0;
+          typeof merged[k] === "number" ? (merged[k] as number) : 0;
         const goalsFor =
           num("goals_for") || num("gf") || num("scored") || num("sf");
         const goalsAgainst =
@@ -1169,11 +1181,11 @@ export async function fetchStandings(
           teamId,
           teamName:
             pickStr(club, "name", "title") ??
-            pickStr(o, "team_name", "club_name") ??
+            pickStr(merged, "team_name", "club_name") ??
             "",
           teamNameAr:
             pickStr(club, "name_ar", "nameAr", "title_ar") ??
-            pickStr(o, "team_name_ar", "club_name_ar"),
+            pickStr(merged, "team_name_ar", "club_name_ar"),
           teamLogo: pickStr(club, "thumbnail_url", "logo", "image"),
           played: num("played") || num("games_played") || num("p"),
           won: num("won") || num("wins") || num("w"),
@@ -1184,9 +1196,20 @@ export async function fetchStandings(
           goalDifference:
             num("goal_difference") || num("gd") || goalsFor - goalsAgainst,
           points: num("points") || num("pts"),
-          group: pickStr(o, "group", "group_name"),
+          group: pickStr(merged, "group", "group_name"),
         });
       });
+    } else if (jsonResponses.length > 0) {
+      logger.info(
+        `[SAFF+] Standings: no JSON match from ${jsonResponses.length} responses. URLs: ${jsonResponses
+          .map((r) => r.url)
+          .slice(0, 5)
+          .join(" | ")}`,
+      );
+      if (jsonResponses[0]?.data) {
+        const sample = JSON.stringify(jsonResponses[0].data).slice(0, 300);
+        logger.info(`[SAFF+] Standings: first response preview: ${sample}`);
+      }
     }
 
     // ── FALLBACK 1: RSC payload ──
@@ -1552,17 +1575,22 @@ export async function fetchMatches(
       await sleep(1500);
 
       // ── PRIMARY: JSON XHR responses ──
-      // Motto fixture items always have home_club + away_club nested objects.
+      // Motto CDA: fixture fields may be top-level or nested under entity.fields.
       const jsonHit = findArrayInJson(
         jsonResponses,
         (o) => {
           const isObj = (v: unknown) =>
             v != null && typeof v === "object" && !Array.isArray(v);
+          const f = (o.fields as Record<string, unknown> | undefined) ?? {};
           return (
             isObj(o.home_club) ||
             isObj(o.away_club) ||
             isObj(o.home_team) ||
-            isObj(o.away_team)
+            isObj(o.away_team) ||
+            isObj(f.home_club) ||
+            isObj(f.away_club) ||
+            isObj(f.home_team) ||
+            isObj(f.away_team)
           );
         },
         { minItems: 1 },
@@ -1573,39 +1601,46 @@ export async function fetchMatches(
           `[SAFF+] Matches JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} items) from ${path}`,
         );
         for (const o of jsonHit.items) {
+          // Merge entity.fields into a flat object so all lookups work uniformly.
+          const f = (o.fields as Record<string, unknown> | undefined) ?? {};
+          const merged: Record<string, unknown> = { ...f, ...o };
+
           const id = String(
-            o.id ?? o.uuid ?? o.slug ?? `${o.home_club}-${o.away_club}`,
+            merged.id ??
+              merged.uuid ??
+              merged.slug ??
+              `${merged.home_club}-${merged.away_club}`,
           );
           if (seen.has(id)) continue;
           seen.add(id);
 
           const home =
-            (o.home_club as Record<string, unknown> | undefined) ??
-            (o.home_team as Record<string, unknown> | undefined) ??
+            (merged.home_club as Record<string, unknown> | undefined) ??
+            (merged.home_team as Record<string, unknown> | undefined) ??
             {};
           const away =
-            (o.away_club as Record<string, unknown> | undefined) ??
-            (o.away_team as Record<string, unknown> | undefined) ??
+            (merged.away_club as Record<string, unknown> | undefined) ??
+            (merged.away_team as Record<string, unknown> | undefined) ??
             {};
 
           const homeScore =
-            typeof o.home_score === "number"
-              ? o.home_score
-              : (((o.fields as Record<string, unknown> | undefined)
-                  ?.home_score as number | undefined) ?? null);
+            typeof merged.home_score === "number"
+              ? merged.home_score
+              : ((merged.home_score as number | undefined) ?? null);
           const awayScore =
-            typeof o.away_score === "number"
-              ? o.away_score
-              : (((o.fields as Record<string, unknown> | undefined)
-                  ?.away_score as number | undefined) ?? null);
+            typeof merged.away_score === "number"
+              ? merged.away_score
+              : ((merged.away_score as number | undefined) ?? null);
 
           allMatches.push({
             id,
             competitionId: slug,
-            date: String(o.date ?? o.match_date ?? o.start_date ?? ""),
+            date: String(
+              merged.date ?? merged.match_date ?? merged.start_date ?? "",
+            ),
             time:
-              typeof o.time === "string" || typeof o.time === "number"
-                ? String(o.time)
+              typeof merged.time === "string" || typeof merged.time === "number"
+                ? String(merged.time)
                 : undefined,
             homeTeamId:
               pickStr(home, "id", "slug") ??
@@ -1622,16 +1657,27 @@ export async function fetchMatches(
             homeScore,
             awayScore,
             status: String(
-              o.status ?? (homeScore != null ? "finished" : "scheduled"),
+              merged.status ?? (homeScore != null ? "finished" : "scheduled"),
             ),
-            stadium: pickStr(o, "stadium", "venue"),
+            stadium: pickStr(merged, "stadium", "venue"),
             week:
-              o.week != null
-                ? Number(o.week) || undefined
-                : o.round != null
-                  ? Number(o.round) || undefined
+              merged.week != null
+                ? Number(merged.week) || undefined
+                : merged.round != null
+                  ? Number(merged.round) || undefined
                   : undefined,
           });
+        }
+      } else if (jsonResponses.length > 0) {
+        logger.info(
+          `[SAFF+] Matches: no JSON match from ${jsonResponses.length} responses on ${path}. URLs: ${jsonResponses
+            .map((r) => r.url)
+            .slice(0, 5)
+            .join(" | ")}`,
+        );
+        if (jsonResponses[0]?.data) {
+          const sample = JSON.stringify(jsonResponses[0].data).slice(0, 300);
+          logger.info(`[SAFF+] Matches: first response preview: ${sample}`);
         }
       }
 
