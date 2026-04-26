@@ -64,6 +64,30 @@ const CLUB_AGGREGATES = [
   ],
 ] as [ReturnType<typeof Sequelize.literal>, string][];
 
+// Picks ONE league competition per club row so the frontend can auto-fill
+// the League dropdown when a club is selected first. If the list is already
+// filtered by a competitionId, that competition wins; otherwise the
+// highest-tier active league the club is enrolled in.
+function buildLeagueAggregates(competitionIdHint?: string) {
+  const safeId = competitionIdHint ? competitionIdHint.replace(/'/g, "") : null;
+  const preferClause = safeId ? `(cc.competition_id = '${safeId}') DESC,` : "";
+  const leagueSubquery = (selectExpr: string) => `(
+    SELECT ${selectExpr}
+    FROM club_competitions cc
+    JOIN competitions c ON c.id = cc.competition_id
+    WHERE cc.club_id = "Club".id
+      AND c.type = 'league'
+      AND c.is_active = true
+    ORDER BY ${preferClause} c.tier ASC NULLS LAST
+    LIMIT 1
+  )`;
+  return [
+    [Sequelize.literal(leagueSubquery("c.id")), "leagueCompetitionId"],
+    [Sequelize.literal(leagueSubquery("c.name")), "leagueName"],
+    [Sequelize.literal(leagueSubquery("c.name_ar")), "leagueNameAr"],
+  ] as [ReturnType<typeof Sequelize.literal>, string][];
+}
+
 // ────────────────────────────────────────────────────────────
 // List Clubs (with aggregated financial data)
 // ────────────────────────────────────────────────────────────
@@ -109,7 +133,12 @@ export async function listClubs(queryParams: any, user?: AuthUser) {
   const [{ count, rows }, clubTypeCount, sponsorTypeCount] = await Promise.all([
     Club.findAndCountAll({
       where,
-      attributes: { include: CLUB_AGGREGATES },
+      attributes: {
+        include: [
+          ...CLUB_AGGREGATES,
+          ...buildLeagueAggregates(queryParams.competitionId),
+        ],
+      },
       order: [[sort, order]],
       limit,
       offset,
