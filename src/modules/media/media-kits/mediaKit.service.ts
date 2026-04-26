@@ -14,6 +14,7 @@ import {
   renderPagesToBuffers,
   mergeWithBrandPages,
 } from "@shared/utils/pdf";
+import { renderCoverPageBuffer, type CoverOpts } from "@shared/utils/pdfCover";
 import { uploadFile } from "@shared/utils/storage";
 import { resolveFileUrl } from "@shared/utils/storage";
 
@@ -256,9 +257,14 @@ function buildSquadRosterPage(
 
 async function generatePdf(
   htmlPages: string[],
+  cover: Omit<CoverOpts, "kind"> & { kind?: CoverOpts["kind"] },
 ): Promise<{ buffer: Buffer; size: number }> {
+  const coverBuffer = await renderCoverPageBuffer({
+    kind: cover.kind ?? "mediakit",
+    ...cover,
+  });
   const contentBuffers = await renderPagesToBuffers(htmlPages);
-  const merged = await mergeWithBrandPages(contentBuffers);
+  const merged = await mergeWithBrandPages(contentBuffers, { coverBuffer });
   return { buffer: merged, size: merged.length };
 }
 
@@ -297,7 +303,27 @@ export async function generatePlayerKit(
   }
 
   // Render PDF
-  const { buffer, size } = await generatePdf(pages);
+  const playerNameAr =
+    player.firstNameAr && player.lastNameAr
+      ? `${player.firstNameAr} ${player.lastNameAr}`
+      : "";
+  const playerNameEn =
+    `${player.firstName ?? ""} ${player.lastName ?? ""}`.trim();
+  const club = (
+    player as unknown as { club?: { name?: string; nameAr?: string } }
+  ).club;
+  const { buffer, size } = await generatePdf(pages, {
+    kind: "mediakit",
+    titleAr: "ملف اللاعب الإعلامي",
+    titleEn: "Player Media Kit",
+    subjectAr: playerNameAr || undefined,
+    subjectEn: playerNameEn || undefined,
+    subtitleAr: club?.nameAr || undefined,
+    subtitleEn: club?.name || undefined,
+    meta: [
+      { label: "Generated", value: new Date().toISOString().split("T")[0] },
+    ],
+  });
 
   // Upload to storage
   const nameSlug = `${player.firstName}_${player.lastName}`
@@ -379,7 +405,17 @@ export async function generateSquadKit(
   if (language === "ar" || language === "both") buildLangPages("ar");
 
   // Render PDF
-  const { buffer, size } = await generatePdf(pages);
+  const { buffer, size } = await generatePdf(pages, {
+    kind: "mediakit",
+    titleAr: "كشف الفريق",
+    titleEn: "Squad Roster",
+    subjectAr: club.nameAr || undefined,
+    subjectEn: club.name || undefined,
+    meta: [
+      { label: "Generated", value: new Date().toISOString().split("T")[0] },
+      { label: "Players", value: String(players.length) },
+    ],
+  });
 
   // Upload to storage
   const clubSlug = club.name.replace(/\s+/g, "_").toLowerCase();

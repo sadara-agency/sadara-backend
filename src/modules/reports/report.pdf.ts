@@ -10,6 +10,7 @@ import {
   renderPagesToBuffers,
   mergeWithBrandPages,
 } from "@shared/utils/pdf";
+import { renderCoverPageBuffer } from "@shared/utils/pdfCover";
 
 const TMP = path.resolve(process.cwd(), "tmp");
 if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
@@ -187,8 +188,35 @@ export async function generateReportPdf(
     wrapHtml(buildInjuryPage(data.injuries), CSS),
   ];
 
+  const profile = data.profile ?? {};
+  const subjectAr =
+    profile.first_name_ar && profile.last_name_ar
+      ? `${profile.first_name_ar} ${profile.last_name_ar}`
+      : "";
+  const subjectEn =
+    `${profile.first_name ?? player?.first_name ?? ""} ${profile.last_name ?? player?.last_name ?? ""}`.trim();
+  const clubAr = profile.club_name_ar || profile.club_name || "";
+  const clubEn = profile.club_name || "";
+  const season = profile.season || profile.report_season || "";
+  const subtitleAr = [clubAr, season].filter(Boolean).join(" — ") || undefined;
+  const subtitleEn = [clubEn, season].filter(Boolean).join(" — ") || undefined;
+
+  const coverBuffer = await renderCoverPageBuffer({
+    kind: "report",
+    titleAr: "تقرير أداء اللاعب",
+    titleEn: "Player Performance Report",
+    subjectAr: subjectAr || undefined,
+    subjectEn: subjectEn || undefined,
+    subtitleAr,
+    subtitleEn,
+    meta: [
+      { label: "Generated", value: new Date().toISOString().split("T")[0] },
+      { label: "Report ID", value: reportId },
+    ],
+  });
+
   const contentBuffers = await renderPagesToBuffers(pages);
-  const merged = await mergeWithBrandPages(contentBuffers);
+  const merged = await mergeWithBrandPages(contentBuffers, { coverBuffer });
 
   const fileName = `report_${reportId}.pdf`;
   const filePath = path.join(TMP, fileName);

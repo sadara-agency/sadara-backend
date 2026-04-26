@@ -7,6 +7,7 @@ import {
   renderPagesToBuffers,
   mergeWithBrandPages,
 } from "@shared/utils/pdf";
+import { renderCoverPageBuffer } from "@shared/utils/pdfCover";
 
 // ── Translation Maps ──
 
@@ -310,8 +311,28 @@ export async function generateScoutingPackPdf(
     wrapHtml(buildScreeningPage(screening, watchlist), CSS),
   ];
 
+  const playerName: string =
+    watchlist?.player_name || watchlist?.playerName || "";
+  const playerNameAr: string =
+    watchlist?.player_name_ar || watchlist?.playerNameAr || "";
+  const club: string = watchlist?.club_name || watchlist?.clubName || "";
+  const clubAr: string = watchlist?.club_name_ar || watchlist?.clubNameAr || "";
+
+  const coverBuffer = await renderCoverPageBuffer({
+    kind: "scouting",
+    titleAr: "حزمة الكشافة",
+    titleEn: "Scouting Pack",
+    subjectAr: playerNameAr || undefined,
+    subjectEn: playerName || undefined,
+    subtitleAr: clubAr || undefined,
+    subtitleEn: club || undefined,
+    meta: [
+      { label: "Generated", value: new Date().toISOString().split("T")[0] },
+    ],
+  });
+
   const contentBuffers = await renderPagesToBuffers(pages, {
     extraArgs: ["--font-render-hinting=none"],
   });
-  return mergeWithBrandPages(contentBuffers);
+  return mergeWithBrandPages(contentBuffers, { coverBuffer });
 }
