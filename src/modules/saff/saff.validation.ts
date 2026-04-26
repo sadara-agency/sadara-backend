@@ -28,7 +28,7 @@ export const fetchRequestSchema = z.object({
 
 export const standingQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   tournamentId: z.string().uuid().optional(),
   saffTournamentId: z.coerce.number().int().optional(),
   season: z.string().optional(),
@@ -39,7 +39,7 @@ export const standingQuerySchema = z.object({
 
 export const fixtureQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(1000).default(20),
   tournamentId: z.string().uuid().optional(),
   saffTournamentId: z.coerce.number().int().optional(),
   season: z.string().optional(),
@@ -54,7 +54,7 @@ export const fixtureQuerySchema = z.object({
 
 export const teamMapQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(200).default(50),
+  limit: z.coerce.number().min(1).max(500).default(50),
   season: z.string().optional(),
   unmappedOnly: z.coerce.boolean().optional(),
 });
