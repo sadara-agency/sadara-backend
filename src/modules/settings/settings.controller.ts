@@ -177,31 +177,42 @@ export async function testMatchAnalysisConnection(
 
 // ── Sidebar ──
 
-export async function getSidebarConfig(_req: AuthRequest, res: Response) {
-  const config = await settingsService.getSidebarConfig();
+export async function getSidebarConfig(req: AuthRequest, res: Response) {
+  const requestedRole = req.query.role as string | undefined;
+  // Admin can fetch any role's config; others always get their own
+  const role =
+    requestedRole && req.user!.role === "Admin"
+      ? requestedRole
+      : req.user!.role;
+  const config = await settingsService.getSidebarConfig(role);
   sendSuccess(res, config);
 }
 
 export async function updateSidebarConfig(req: AuthRequest, res: Response) {
-  const config = await settingsService.updateSidebarConfig(req.body);
+  const { role, config } = req.body as {
+    role: string;
+    config: Record<string, unknown>;
+  };
+  const saved = await settingsService.updateSidebarConfig(role, config);
   await logAudit(
     "UPDATE",
     "settings",
     null,
     buildAuditContext(req.user!, req.ip),
-    "Updated sidebar navigation configuration",
+    `Updated sidebar navigation for role: ${role}`,
   );
-  sendSuccess(res, config, "Sidebar configuration updated");
+  sendSuccess(res, saved, "Sidebar configuration updated");
 }
 
 export async function resetSidebarConfig(req: AuthRequest, res: Response) {
-  const config = await settingsService.resetSidebarConfig();
+  const role = (req.body as { role?: string } | undefined)?.role;
+  const config = await settingsService.resetSidebarConfig(role);
   await logAudit(
     "UPDATE",
     "settings",
     null,
     buildAuditContext(req.user!, req.ip),
-    "Reset sidebar navigation to defaults",
+    `Reset sidebar navigation for role: ${role ?? "all"}`,
   );
   sendSuccess(res, config, "Sidebar reset to defaults");
 }
