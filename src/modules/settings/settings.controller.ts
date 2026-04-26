@@ -177,42 +177,65 @@ export async function testMatchAnalysisConnection(
 
 // ── Sidebar ──
 
+// Mirror of frontend ROLE_PORTAL_PATH but keyed by portal id (no leading slash).
+// Non-admin callers fetch their own portal's sidebar config.
+const ROLE_PORTAL: Record<string, string> = {
+  Admin: "dashboard",
+  Manager: "dashboard",
+  SportingDirector: "dashboard",
+  Executive: "executive",
+  Coach: "coaching",
+  SkillCoach: "coaching",
+  TacticalCoach: "coaching",
+  FitnessCoach: "coaching",
+  GoalkeeperCoach: "coaching",
+  MentalCoach: "coaching",
+  NutritionSpecialist: "coaching",
+  GymCoach: "coaching",
+  Scout: "scouting",
+  Analyst: "analyst",
+  Legal: "legal",
+  Finance: "finance",
+  Media: "media-hub",
+  Player: "player",
+};
+
 export async function getSidebarConfig(req: AuthRequest, res: Response) {
-  const requestedRole = req.query.role as string | undefined;
-  // Admin can fetch any role's config; others always get their own
-  const role =
-    requestedRole && req.user!.role === "Admin"
-      ? requestedRole
-      : req.user!.role;
-  const config = await settingsService.getSidebarConfig(role);
+  const requested = req.query.portalId as string | undefined;
+  // Admin can fetch any portal's config; others always get their own.
+  const portalId =
+    requested && req.user!.role === "Admin"
+      ? requested
+      : (ROLE_PORTAL[req.user!.role] ?? "dashboard");
+  const config = await settingsService.getSidebarConfig(portalId);
   sendSuccess(res, config);
 }
 
 export async function updateSidebarConfig(req: AuthRequest, res: Response) {
-  const { role, config } = req.body as {
-    role: string;
+  const { portalId, config } = req.body as {
+    portalId: string;
     config: Record<string, unknown>;
   };
-  const saved = await settingsService.updateSidebarConfig(role, config);
+  const saved = await settingsService.updateSidebarConfig(portalId, config);
   await logAudit(
     "UPDATE",
     "settings",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Updated sidebar navigation for role: ${role}`,
+    `Updated sidebar navigation for portal: ${portalId}`,
   );
   sendSuccess(res, saved, "Sidebar configuration updated");
 }
 
 export async function resetSidebarConfig(req: AuthRequest, res: Response) {
-  const role = (req.body as { role?: string } | undefined)?.role;
-  const config = await settingsService.resetSidebarConfig(role);
+  const portalId = (req.body as { portalId?: string } | undefined)?.portalId;
+  const config = await settingsService.resetSidebarConfig(portalId);
   await logAudit(
     "UPDATE",
     "settings",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Reset sidebar navigation for role: ${role ?? "all"}`,
+    `Reset sidebar navigation for portal: ${portalId ?? "all"}`,
   );
   sendSuccess(res, config, "Sidebar reset to defaults");
 }

@@ -15,7 +15,7 @@ import {
   smtpSettingsSchema,
   matchAnalysisSettingsSchema,
   testConnectionSchema,
-  sidebarUpdateByRoleSchema,
+  sidebarUpdateByPortalSchema,
   sidebarResetSchema,
 } from "./settings.validation";
 
@@ -185,7 +185,7 @@ router.get(
 router.patch(
   "/sidebar",
   authorizeModule("settings", "update"),
-  validate(sidebarUpdateByRoleSchema),
+  validate(sidebarUpdateByPortalSchema),
   asyncHandler(settingsController.updateSidebarConfig),
 );
 

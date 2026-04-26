@@ -129,37 +129,28 @@ export const sidebarConfigSchema = z.object({
     .optional(),
 });
 
-export const SIDEBAR_ROLES = [
+export const SIDEBAR_PORTALS = [
   "default",
-  "Admin",
-  "Manager",
-  "Analyst",
-  "Scout",
-  "Player",
-  "Legal",
-  "Finance",
-  "Coach",
-  "SkillCoach",
-  "TacticalCoach",
-  "FitnessCoach",
-  "NutritionSpecialist",
-  "GymCoach",
-  "Media",
-  "Executive",
-  "GoalkeeperCoach",
-  "MentalCoach",
-  "SportingDirector",
+  "dashboard",
+  "analyst",
+  "scouting",
+  "coaching",
+  "legal",
+  "finance",
+  "media-hub",
+  "executive",
+  "player",
 ] as const;
 
-export type SidebarRole = (typeof SIDEBAR_ROLES)[number];
+export type SidebarPortalId = (typeof SIDEBAR_PORTALS)[number];
 
-export const sidebarUpdateByRoleSchema = z.object({
-  role: z.enum(SIDEBAR_ROLES),
+export const sidebarUpdateByPortalSchema = z.object({
+  portalId: z.enum(SIDEBAR_PORTALS),
   config: sidebarConfigSchema,
 });
 
 export const sidebarResetSchema = z.object({
-  role: z.enum([...SIDEBAR_ROLES, "all"]).optional(),
+  portalId: z.enum([...SIDEBAR_PORTALS, "all"]).optional(),
 });
 
 // ── Inferred Types ──
@@ -174,7 +165,7 @@ export type MatchAnalysisSettingsInput = z.infer<
   typeof matchAnalysisSettingsSchema
 >;
 export type SidebarConfigInput = z.infer<typeof sidebarConfigSchema>;
-export type SidebarUpdateByRoleInput = z.infer<
-  typeof sidebarUpdateByRoleSchema
+export type SidebarUpdateByPortalInput = z.infer<
+  typeof sidebarUpdateByPortalSchema
 >;
 export type SidebarResetInput = z.infer<typeof sidebarResetSchema>;

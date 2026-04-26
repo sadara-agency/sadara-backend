@@ -340,61 +340,68 @@ export async function testMatchAnalysisConnection() {
 }
 
 // ══════════════════════════════════════════
-// SIDEBAR CONFIG (v3 — per-role)
+// SIDEBAR CONFIG (v3 — per-portal)
 // ══════════════════════════════════════════
 
 interface SidebarV3 {
   version: 3;
   default: Record<string, unknown>;
-  byRole: Record<string, Record<string, unknown>>;
+  byPortal: Record<string, Record<string, unknown>>;
 }
 
 const V3_KEY = "sidebar_config_v3";
 const V2_KEY = "sidebar_config";
 
 async function loadSidebarV3(): Promise<SidebarV3> {
-  const v3 = await getAppSetting(V3_KEY);
-  if (v3?.version === 3) return v3 as SidebarV3;
-  // Migrate v2 → v3: treat existing global config as "default"
+  const stored = await getAppSetting(V3_KEY);
+  if (stored?.version === 3) {
+    // Tolerate older v3 envelopes that used `byRole` (now ignored).
+    return {
+      version: 3,
+      default: stored.default ?? { hiddenItems: [] },
+      byPortal: stored.byPortal ?? {},
+    };
+  }
+  // First read: migrate v2 → v3 (existing global config becomes default)
   const v2 = (await getAppSetting(V2_KEY)) ?? { hiddenItems: [] };
-  const migrated: SidebarV3 = { version: 3, default: v2, byRole: {} };
+  const migrated: SidebarV3 = { version: 3, default: v2, byPortal: {} };
   await setAppSetting(V3_KEY, migrated);
   return migrated;
 }
 
-export async function getSidebarConfig(role?: string) {
+export async function getSidebarConfig(portalId?: string) {
   const v3 = await loadSidebarV3();
-  if (role === "default") return v3.default;
-  if (role && v3.byRole[role]) return v3.byRole[role];
-  // Role has no override yet → return default as a template
+  if (portalId === "default") return v3.default;
+  if (portalId && v3.byPortal[portalId]) return v3.byPortal[portalId];
+  // No override for this portal yet → return default as a template
   return v3.default;
 }
 
 export async function updateSidebarConfig(
-  role: string,
+  portalId: string,
   config: Record<string, unknown>,
 ) {
   const v3 = await loadSidebarV3();
-  if (role === "default") {
+  if (portalId === "default") {
     v3.default = config;
   } else {
-    v3.byRole[role] = config;
+    v3.byPortal[portalId] = config;
   }
   await setAppSetting(V3_KEY, v3);
   return config;
 }
 
-export async function resetSidebarConfig(role?: string) {
+export async function resetSidebarConfig(portalId?: string) {
   const empty = { hiddenItems: [] };
-  if (!role || role === "all") {
-    await setAppSetting(V3_KEY, { version: 3, default: empty, byRole: {} });
+  if (!portalId || portalId === "all") {
+    await setAppSetting(V3_KEY, { version: 3, default: empty, byPortal: {} });
     return empty;
   }
   const v3 = await loadSidebarV3();
-  if (role === "default") {
+  if (portalId === "default") {
     v3.default = empty;
   } else {
-    delete v3.byRole[role];
+    delete v3.byPortal[portalId];
   }
   await setAppSetting(V3_KEY, v3);
   return empty;
