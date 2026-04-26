@@ -36,9 +36,9 @@ describe('Session Schemas', () => {
       const { playerId, ...rest } = valid;
       expect(createSessionSchema.safeParse(rest).success).toBe(false);
     });
-    it('should reject missing referralId', () => {
+    it('should accept missing referralId (optional)', () => {
       const { referralId, ...rest } = valid;
-      expect(createSessionSchema.safeParse(rest).success).toBe(false);
+      expect(createSessionSchema.safeParse(rest).success).toBe(true);
     });
     it('should accept optional notes', () => {
       expect(createSessionSchema.safeParse({ ...valid, notes: 'test notes' }).success).toBe(true);
