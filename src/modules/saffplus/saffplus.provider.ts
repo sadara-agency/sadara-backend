@@ -228,17 +228,20 @@ async function listMottoCdaEntities(
       signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) {
-      logger.debug(`[SAFF+ CDA] ${filter} → HTTP ${res.status}`);
+      logger.info(`[SAFF+ CDA] ${filter} → HTTP ${res.status}`);
       return [];
     }
     const data = (await res.json()) as Record<string, unknown>;
-    logger.debug(
-      `[SAFF+ CDA] ${filter} → keys: ${Object.keys(data).join(", ")}`,
-    );
+    const keys = Object.keys(data).join(", ");
     const list = data.entities ?? data.items ?? data.results ?? data.data;
+    const count = Array.isArray(list) ? list.length : 0;
+    logger.info(
+      `[SAFF+ CDA] ${filter} → keys: [${keys}] count: ${count}` +
+        (count === 0 ? ` raw: ${JSON.stringify(data).slice(0, 400)}` : ""),
+    );
     return Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
   } catch (err) {
-    logger.debug(`[SAFF+ CDA] ${filter} → error: ${(err as Error).message}`);
+    logger.info(`[SAFF+ CDA] ${filter} → error: ${(err as Error).message}`);
     return [];
   }
 }
