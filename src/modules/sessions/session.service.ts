@@ -140,11 +140,15 @@ export async function getSessionById(id: string, user?: AuthUser) {
 
 export async function createSession(body: CreateSessionInput, userId: string) {
   await findOrThrow(Player, body.playerId, "Player");
-  const referral = await findOrThrow(Referral, body.referralId, "Referral");
 
-  // Ensure referral belongs to the same player
-  if ((referral as any).playerId !== body.playerId) {
-    throw new AppError("Session player does not match referral player", 400);
+  let referral: Referral | null = null;
+  if (body.referralId) {
+    referral = await findOrThrow(Referral, body.referralId, "Referral");
+
+    // Ensure referral belongs to the same player
+    if ((referral as any).playerId !== body.playerId) {
+      throw new AppError("Session player does not match referral player", 400);
+    }
   }
 
   // Validate journey stage belongs to same player if provided
@@ -170,8 +174,10 @@ export async function createSession(body: CreateSessionInput, userId: string) {
     createdBy: userId,
   });
 
-  // Increment sessionCount on the referral
-  await referral.increment("sessionCount");
+  // Increment sessionCount on the referral, when one was provided
+  if (referral) {
+    await referral.increment("sessionCount");
+  }
 
   return Session.findByPk(session.id, { include: sessionIncludes() });
 }
@@ -192,10 +198,12 @@ export async function deleteSession(id: string) {
   const session = await Session.findByPk(id);
   if (!session) throw new AppError("Session not found", 404);
 
-  // Decrement sessionCount on the referral
-  const referral = await Referral.findByPk(session.referralId);
-  if (referral && referral.sessionCount > 0) {
-    await referral.decrement("sessionCount");
+  // Decrement sessionCount on the referral, when one was linked
+  if (session.referralId) {
+    const referral = await Referral.findByPk(session.referralId);
+    if (referral && referral.sessionCount > 0) {
+      await referral.decrement("sessionCount");
+    }
   }
 
   await session.destroy();
