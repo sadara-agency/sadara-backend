@@ -191,6 +191,58 @@ function findArrayInJson(
   return best;
 }
 
+// ══════════════════════════════════════════
+// DIRECT MOTTO CDA API — bypasses Puppeteer
+// ══════════════════════════════════════════
+//
+// saffplus.sa is a server-rendered Next.js app. Competition-specific data
+// (standings, matches) is fetched SERVER-SIDE by the Next.js server and
+// embedded in the RSC stream — the browser never makes an XHR for it.
+// Puppeteer can only intercept browser XHR; it cannot see server-side calls.
+//
+// Solution: call the Motto CDA ListEntities API directly from our Node.js
+// backend, the same way the saffplus.sa Next.js server does. This is far
+// faster (no Puppeteer spin-up) and more reliable.
+
+const MOTTO_CDA_LIST =
+  "https://cda.mottostreaming.com/motto.cda.cms.entity.v1.EntityService/ListEntities";
+
+/**
+ * Call the Motto CDA ListEntities endpoint directly. Returns the `entities`
+ * array from the response, or [] on error. Does not throw — callers should
+ * try multiple filters and fall back gracefully.
+ */
+async function listMottoCdaEntities(
+  filter: string,
+  options: { locale?: string; pageSize?: number } = {},
+): Promise<Record<string, unknown>[]> {
+  const message = JSON.stringify({
+    pageSize: String(options.pageSize ?? 200),
+    filter,
+    locale: options.locale ?? "en",
+  });
+  const url = `${MOTTO_CDA_LIST}?encoding=json&message=${encodeURIComponent(message)}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      logger.debug(`[SAFF+ CDA] ${filter} → HTTP ${res.status}`);
+      return [];
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    logger.debug(
+      `[SAFF+ CDA] ${filter} → keys: ${Object.keys(data).join(", ")}`,
+    );
+    const list = data.entities ?? data.items ?? data.results ?? data.data;
+    return Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
+  } catch (err) {
+    logger.debug(`[SAFF+ CDA] ${filter} → error: ${(err as Error).message}`);
+    return [];
+  }
+}
+
 /**
  * Pull a string field from a JSON-extracted entity. Returns undefined
  * when the field is missing or not a string. Use for cherry-picking
@@ -1110,11 +1162,12 @@ export async function fetchTeams(): Promise<SaffPlusTeam[]> {
  * Fetch standings for a SAFF+ competition.
  *
  * Strategy:
- *   1. Render the standings page in headless Chrome (saffplus.sa is CSR).
- *   2. PRIMARY: scan captured JSON XHR responses for a standings array.
- *      Motto fetches standings via post-hydration JSON, not RSC.
- *   3. FALLBACK: RSC flight payload extraction.
- *   4. FALLBACK: HTML <table> parsing.
+ *   1. PRIMARY: call Motto CDA ListEntities directly (no Puppeteer).
+ *      The saffplus.sa Next.js server fetches this data server-side and
+ *      embeds it in the RSC stream — the browser never issues a client XHR
+ *      for it, so Puppeteer cannot intercept it. We replicate the server call.
+ *   2. FALLBACK: Puppeteer render + RSC payload extraction.
+ *   3. FALLBACK: HTML <table> parsing.
  */
 export async function fetchStandings(
   competitionId: number | string,
@@ -1123,6 +1176,75 @@ export async function fetchStandings(
   const slug = String(competitionId);
   const seen = new Map<string, SaffPlusStanding>();
 
+  // ── PRIMARY: Direct Motto CDA API ──
+  // Try candidate entity type IDs; the first that returns rows wins.
+  const standingFilters = [
+    `type_id:standing AND fields.season_id:${slug}`,
+    `type_id:standing AND fields.competition_id:${slug}`,
+    `type_id:group_standing AND fields.season_id:${slug}`,
+    `type_id:season_standing AND fields.season_id:${slug}`,
+    `type_id:standing_row AND fields.season_id:${slug}`,
+  ];
+  for (const filter of standingFilters) {
+    const entities = await listMottoCdaEntities(filter, { locale: "en" });
+    if (entities.length > 0) {
+      logger.info(
+        `[SAFF+] Standings via direct CDA API: "${filter}" (${entities.length} rows)`,
+      );
+      entities.forEach((o, idx) => {
+        const f = (o.fields as Record<string, unknown> | undefined) ?? {};
+        const merged: Record<string, unknown> = { ...f, ...o };
+        const club =
+          (merged.club as Record<string, unknown> | undefined) ??
+          (merged.team as Record<string, unknown> | undefined) ??
+          (merged.entity as Record<string, unknown> | undefined) ??
+          {};
+        const teamId =
+          pickStr(club, "id", "slug", "uuid") ??
+          pickStr(merged, "team_id", "club_id", "id") ??
+          String(idx);
+        if (seen.has(teamId)) return;
+        const num = (k: string): number =>
+          typeof merged[k] === "number" ? (merged[k] as number) : 0;
+        const gf = num("goals_for") || num("gf") || num("scored") || num("sf");
+        const ga =
+          num("goals_against") || num("ga") || num("conceded") || num("sa");
+        seen.set(teamId, {
+          position: num("position") || num("rank") || num("pos") || idx + 1,
+          teamId,
+          teamName:
+            pickStr(club, "name", "title") ??
+            pickStr(merged, "team_name", "club_name") ??
+            "",
+          teamNameAr:
+            pickStr(club, "name_ar", "nameAr", "title_ar") ??
+            pickStr(merged, "team_name_ar", "club_name_ar"),
+          teamLogo: pickStr(club, "thumbnail_url", "logo", "image"),
+          played: num("played") || num("games_played") || num("p"),
+          won: num("won") || num("wins") || num("w"),
+          drawn: num("drawn") || num("draws") || num("d"),
+          lost: num("lost") || num("losses") || num("l"),
+          goalsFor: gf,
+          goalsAgainst: ga,
+          goalDifference: num("goal_difference") || num("gd") || gf - ga,
+          points: num("points") || num("pts"),
+          group: pickStr(merged, "group", "group_name"),
+        });
+      });
+      break;
+    }
+  }
+  if (seen.size > 0) {
+    const rows = Array.from(seen.values()).sort(
+      (a, b) => (a.position || 0) - (b.position || 0),
+    );
+    logger.info(
+      `[SAFF+] fetchStandings(${slug}): ${rows.length} rows (direct API)`,
+    );
+    return rows;
+  }
+
+  // ── FALLBACK: Puppeteer render ──
   const paths = [
     `/en/competitions/${slug}/standings`,
     `/ar/competitions/${slug}/standings`,
@@ -1564,11 +1686,9 @@ function extractMatchesFromHtml(html: string, slug: string): SaffPlusMatch[] {
  * Fetch matches for a competition from SAFF+.
  *
  * Strategy:
- * 1. Render the page in headless Chrome (saffplus.sa is CSR).
- * 2. PRIMARY: scan captured JSON XHR responses for a fixtures array.
- * 3. FALLBACK: RSC flight payload extraction.
- * 4. FALLBACK: HTML table scraping.
- * 5. Rate-limit: 1500 ms between requests.
+ * 1. PRIMARY: call Motto CDA ListEntities directly (no Puppeteer).
+ * 2. FALLBACK: Puppeteer render + RSC payload extraction.
+ * 3. FALLBACK: HTML table scraping.
  */
 export async function fetchMatches(
   competitionSlug: number | string,
@@ -1578,6 +1698,91 @@ export async function fetchMatches(
   const allMatches: SaffPlusMatch[] = [];
   const seen = new Set<string>();
 
+  // ── PRIMARY: Direct Motto CDA API ──
+  const matchFilters = [
+    `type_id:match AND fields.season_id:${slug}`,
+    `type_id:match AND fields.competition_id:${slug}`,
+    `type_id:game AND fields.season_id:${slug}`,
+    `type_id:fixture AND fields.season_id:${slug}`,
+    `type_id:event AND fields.season_id:${slug}`,
+    `type_id:match_event AND fields.season_id:${slug}`,
+  ];
+  for (const filter of matchFilters) {
+    const entities = await listMottoCdaEntities(filter, {
+      locale: "en",
+      pageSize: 500,
+    });
+    if (entities.length > 0) {
+      logger.info(
+        `[SAFF+] Matches via direct CDA API: "${filter}" (${entities.length} items)`,
+      );
+      for (const o of entities) {
+        const f = (o.fields as Record<string, unknown> | undefined) ?? {};
+        const merged: Record<string, unknown> = { ...f, ...o };
+        const id = String(
+          merged.id ?? merged.uuid ?? merged.slug ?? Math.random(),
+        );
+        if (seen.has(id)) continue;
+        seen.add(id);
+        const home =
+          (merged.home_club as Record<string, unknown> | undefined) ??
+          (merged.home_team as Record<string, unknown> | undefined) ??
+          {};
+        const away =
+          (merged.away_club as Record<string, unknown> | undefined) ??
+          (merged.away_team as Record<string, unknown> | undefined) ??
+          {};
+        const homeScore =
+          typeof merged.home_score === "number" ? merged.home_score : null;
+        const awayScore =
+          typeof merged.away_score === "number" ? merged.away_score : null;
+        allMatches.push({
+          id,
+          competitionId: slug,
+          date: String(
+            merged.date ?? merged.match_date ?? merged.start_date ?? "",
+          ),
+          time:
+            typeof merged.time === "string" || typeof merged.time === "number"
+              ? String(merged.time)
+              : undefined,
+          homeTeamId:
+            pickStr(home, "id", "slug") ??
+            (typeof home.id === "number" ? home.id : 0),
+          homeTeamName: pickStr(home, "name", "title") ?? "",
+          homeTeamNameAr: pickStr(home, "name_ar", "nameAr", "title_ar"),
+          homeTeamLogo: pickStr(home, "thumbnail_url", "logo", "image"),
+          awayTeamId:
+            pickStr(away, "id", "slug") ??
+            (typeof away.id === "number" ? away.id : 0),
+          awayTeamName: pickStr(away, "name", "title") ?? "",
+          awayTeamNameAr: pickStr(away, "name_ar", "nameAr", "title_ar"),
+          awayTeamLogo: pickStr(away, "thumbnail_url", "logo", "image"),
+          homeScore,
+          awayScore,
+          status: String(
+            merged.status ?? (homeScore != null ? "finished" : "scheduled"),
+          ),
+          stadium: pickStr(merged, "stadium", "venue"),
+          week:
+            merged.week != null
+              ? Number(merged.week) || undefined
+              : merged.round != null
+                ? Number(merged.round) || undefined
+                : undefined,
+        });
+      }
+      break;
+    }
+  }
+  if (allMatches.length > 0) {
+    logger.info(
+      `[SAFF+] fetchMatches(${slug}): ${allMatches.length} fixtures found (direct API)`,
+    );
+    return allMatches;
+  }
+
+  // ── FALLBACK: Puppeteer render ──
   const paths = [
     `/en/competitions/${slug}/fixtures`,
     `/en/competitions/${slug}/results`,
