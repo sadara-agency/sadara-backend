@@ -57,6 +57,21 @@ const MODULES = [
   "journey",
   "tickets",
   "messaging",
+  "session-feedback",
+  "notes",
+  "meal-plans",
+  "rtp",
+  "tactical",
+  "match-analytics",
+  "injury-financials",
+  "training-plans",
+  "dev-reviews",
+  "mental",
+  "video",
+  "transfer-windows",
+  "club-needs",
+  "player-coach-assignments",
+  "staffMonitoring",
 ] as const;
 
 export const updatePermissionsSchema = z.object({
@@ -73,7 +88,7 @@ export const updatePermissionsSchema = z.object({
         }),
       )
       .min(1)
-      .max(500), // 11 roles × up to ~25 modules
+      .max(1000), // 17 roles × 51 modules
   }),
 });
 
