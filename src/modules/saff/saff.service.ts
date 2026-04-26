@@ -2393,9 +2393,13 @@ export async function runImportPlan(
         ],
         transaction: txn,
       });
+      const toDateOnly = (d: Date | string): string => {
+        if (d instanceof Date) return d.toISOString().split("T")[0];
+        return String(d).split("T")[0];
+      };
       const matchByDedupKey = new Map(
         existingMatches.map((m) => [
-          `${m.homeClubId}|${m.awayClubId}|${m.matchDate}`,
+          `${m.homeClubId}|${m.awayClubId}|${toDateOnly(m.matchDate)}`,
           m,
         ]),
       );
