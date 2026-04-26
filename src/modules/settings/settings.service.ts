@@ -27,7 +27,6 @@ import type {
   NotificationPrefsInput,
   SmtpSettingsInput,
   MatchAnalysisSettingsInput,
-  SidebarConfigInput,
 } from "./settings.validation";
 
 // ── Constants ──
@@ -341,23 +340,64 @@ export async function testMatchAnalysisConnection() {
 }
 
 // ══════════════════════════════════════════
-// SIDEBAR CONFIG
+// SIDEBAR CONFIG (v3 — per-role)
 // ══════════════════════════════════════════
 
-export async function getSidebarConfig() {
-  const config = await getAppSetting("sidebar_config");
-  return config ?? { hiddenItems: [] };
+interface SidebarV3 {
+  version: 3;
+  default: Record<string, unknown>;
+  byRole: Record<string, Record<string, unknown>>;
 }
 
-export async function updateSidebarConfig(data: SidebarConfigInput) {
-  await setAppSetting("sidebar_config", data);
-  return data;
+const V3_KEY = "sidebar_config_v3";
+const V2_KEY = "sidebar_config";
+
+async function loadSidebarV3(): Promise<SidebarV3> {
+  const v3 = await getAppSetting(V3_KEY);
+  if (v3?.version === 3) return v3 as SidebarV3;
+  // Migrate v2 → v3: treat existing global config as "default"
+  const v2 = (await getAppSetting(V2_KEY)) ?? { hiddenItems: [] };
+  const migrated: SidebarV3 = { version: 3, default: v2, byRole: {} };
+  await setAppSetting(V3_KEY, migrated);
+  return migrated;
 }
 
-export async function resetSidebarConfig() {
-  const defaultConfig = { hiddenItems: [] };
-  await setAppSetting("sidebar_config", defaultConfig);
-  return defaultConfig;
+export async function getSidebarConfig(role?: string) {
+  const v3 = await loadSidebarV3();
+  if (role === "default") return v3.default;
+  if (role && v3.byRole[role]) return v3.byRole[role];
+  // Role has no override yet → return default as a template
+  return v3.default;
+}
+
+export async function updateSidebarConfig(
+  role: string,
+  config: Record<string, unknown>,
+) {
+  const v3 = await loadSidebarV3();
+  if (role === "default") {
+    v3.default = config;
+  } else {
+    v3.byRole[role] = config;
+  }
+  await setAppSetting(V3_KEY, v3);
+  return config;
+}
+
+export async function resetSidebarConfig(role?: string) {
+  const empty = { hiddenItems: [] };
+  if (!role || role === "all") {
+    await setAppSetting(V3_KEY, { version: 3, default: empty, byRole: {} });
+    return empty;
+  }
+  const v3 = await loadSidebarV3();
+  if (role === "default") {
+    v3.default = empty;
+  } else {
+    delete v3.byRole[role];
+  }
+  await setAppSetting(V3_KEY, v3);
+  return empty;
 }
 
 // ══════════════════════════════════════════
