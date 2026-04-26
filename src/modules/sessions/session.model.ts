@@ -33,7 +33,7 @@ export type SessionCompletionStatus =
 export interface SessionAttributes {
   id: string;
   playerId: string;
-  referralId: string;
+  referralId: string | null;
   sessionType: SessionType;
   programOwner: ProgramOwner;
   responsibleId: string | null;
@@ -56,6 +56,7 @@ export interface SessionAttributes {
 interface SessionCreationAttributes extends Optional<
   SessionAttributes,
   | "id"
+  | "referralId"
   | "responsibleId"
   | "title"
   | "titleAr"
@@ -80,7 +81,7 @@ export class Session
 {
   declare id: string;
   declare playerId: string;
-  declare referralId: string;
+  declare referralId: string | null;
   declare sessionType: SessionType;
   declare programOwner: ProgramOwner;
   declare responsibleId: string | null;
@@ -116,7 +117,7 @@ Session.init(
     },
     referralId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       field: "referral_id",
     },
     sessionType: {

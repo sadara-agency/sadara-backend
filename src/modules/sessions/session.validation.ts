@@ -32,7 +32,7 @@ const COMPLETION_STATUSES = [
 
 export const createSessionSchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
-  referralId: z.string().uuid("Invalid referral ID"),
+  referralId: z.string().uuid("Invalid referral ID").optional(),
   sessionType: z.enum(SESSION_TYPES),
   programOwner: z.enum(PROGRAM_OWNERS),
   responsibleId: z.string().uuid("Invalid user ID").optional(),
