@@ -84,6 +84,16 @@ describe('Session Service', () => {
       expect(call.where.sessionType).toBe('Mental');
       expect(call.where.programOwner).toBe('MentalCoach');
     });
+
+    it('should filter by matchId', async () => {
+      mockSessionFindAndCountAll.mockResolvedValue({ rows: [], count: 0 });
+      await sessionService.listSessions({
+        page: 1, limit: 10, sort: 'session_date', order: 'desc',
+        matchId: 'match-001',
+      } as any);
+      const call = mockSessionFindAndCountAll.mock.calls[0][0];
+      expect(call.where.matchId).toBe('match-001');
+    });
   });
 
   describe('getSessionById', () => {
