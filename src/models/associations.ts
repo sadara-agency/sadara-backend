@@ -289,6 +289,8 @@ export function setupAssociations() {
     as: "journeyStage",
   });
   Journey.hasMany(Session, { foreignKey: "journeyStageId", as: "sessions" });
+  Session.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  Match.hasMany(Session, { foreignKey: "matchId", as: "sessions" });
 
   // Session Feedback
   SessionFeedback.belongsTo(Session, {

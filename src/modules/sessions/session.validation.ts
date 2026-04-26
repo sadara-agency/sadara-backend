@@ -28,11 +28,19 @@ const COMPLETION_STATUSES = [
   "NoShow",
 ] as const;
 
+const videoTimestampSchema = z.object({
+  label: z.string().min(1).max(200),
+  labelAr: z.string().max(200).nullable().optional(),
+  timecode: z.string().min(1).max(20),
+  url: z.string().url().nullable().optional(),
+});
+
 // ── Create Session ──
 
 export const createSessionSchema = z.object({
   playerId: z.string().uuid("Invalid player ID"),
   referralId: z.string().uuid("Invalid referral ID").optional(),
+  matchId: z.string().uuid("Invalid match ID").nullable().optional(),
   sessionType: z.enum(SESSION_TYPES),
   programOwner: z.enum(PROGRAM_OWNERS),
   responsibleId: z.string().uuid("Invalid user ID").optional(),
@@ -47,6 +55,8 @@ export const createSessionSchema = z.object({
   notes: z.string().optional(),
   notesAr: z.string().optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).default("Scheduled"),
+  rating: z.number().int().min(1).max(10).nullable().optional(),
+  videoTimestamps: z.array(videoTimestampSchema).nullable().optional(),
   resultingTicketId: z.string().uuid("Invalid ticket ID").nullable().optional(),
 });
 
@@ -56,6 +66,7 @@ export const updateSessionSchema = z.object({
   sessionType: z.enum(SESSION_TYPES).optional(),
   programOwner: z.enum(PROGRAM_OWNERS).optional(),
   responsibleId: z.string().uuid().nullable().optional(),
+  matchId: z.string().uuid().nullable().optional(),
   journeyStageId: z.string().uuid().nullable().optional(),
   sessionDate: z
     .string()
@@ -68,6 +79,8 @@ export const updateSessionSchema = z.object({
   notes: z.string().nullable().optional(),
   notesAr: z.string().nullable().optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).optional(),
+  rating: z.number().int().min(1).max(10).nullable().optional(),
+  videoTimestamps: z.array(videoTimestampSchema).nullable().optional(),
   resultingTicketId: z.string().uuid().nullable().optional(),
 });
 
@@ -91,6 +104,7 @@ export const sessionQuerySchema = z.object({
   search: z.string().optional(),
   playerId: z.string().uuid().optional(),
   referralId: z.string().uuid().optional(),
+  matchId: z.string().uuid().optional(),
   sessionType: z.enum(SESSION_TYPES).optional(),
   programOwner: z.enum(PROGRAM_OWNERS).optional(),
   completionStatus: z.enum(COMPLETION_STATUSES).optional(),

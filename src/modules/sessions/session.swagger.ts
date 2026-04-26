@@ -33,6 +33,10 @@
  *         name: referralId
  *         schema: { type: string, format: uuid }
  *       - in: query
+ *         name: matchId
+ *         schema: { type: string, format: uuid }
+ *         description: Filter sessions linked to a specific match
+ *       - in: query
  *         name: sessionType
  *         schema: { type: string, enum: [Physical, Skill, Tactical, Mental, Nutrition, PerformanceAssessment, Goalkeeper] }
  *       - in: query
@@ -63,10 +67,11 @@
  *         application/json:
  *           schema:
  *             type: object
- *             required: [playerId, referralId, sessionType, programOwner, sessionDate]
+ *             required: [playerId, sessionType, programOwner, sessionDate]
  *             properties:
  *               playerId: { type: string, format: uuid }
  *               referralId: { type: string, format: uuid }
+ *               matchId: { type: string, format: uuid, nullable: true, description: "Link to a match for performance-review sessions" }
  *               sessionType: { type: string, enum: [Physical, Skill, Tactical, Mental, Nutrition, PerformanceAssessment, Goalkeeper] }
  *               programOwner: { type: string, enum: [FitnessCoach, Coach, SkillCoach, TacticalCoach, GoalkeeperCoach, Analyst, NutritionSpecialist, MentalCoach] }
  *               responsibleId: { type: string, format: uuid }
@@ -78,6 +83,8 @@
  *               notes: { type: string }
  *               notesAr: { type: string }
  *               completionStatus: { type: string, enum: [Scheduled, Completed, Cancelled, NoShow], default: Scheduled }
+ *               rating: { type: integer, minimum: 1, maximum: 10, nullable: true, description: "Analyst rating 1–10" }
+ *               videoTimestamps: { type: array, nullable: true, items: { type: object, properties: { label: { type: string }, labelAr: { type: string, nullable: true }, timecode: { type: string }, url: { type: string, nullable: true } } } }
  *     responses:
  *       201: { description: Session created }
  *
@@ -146,6 +153,7 @@
  *               sessionType: { type: string, enum: [Physical, Skill, Tactical, Mental, Nutrition, PerformanceAssessment, Goalkeeper] }
  *               programOwner: { type: string, enum: [FitnessCoach, Coach, SkillCoach, TacticalCoach, GoalkeeperCoach, Analyst, NutritionSpecialist, MentalCoach] }
  *               responsibleId: { type: string, format: uuid, nullable: true }
+ *               matchId: { type: string, format: uuid, nullable: true }
  *               sessionDate: { type: string, format: date }
  *               title: { type: string, maxLength: 255, nullable: true }
  *               titleAr: { type: string, maxLength: 255, nullable: true }
@@ -154,6 +162,8 @@
  *               notes: { type: string, nullable: true }
  *               notesAr: { type: string, nullable: true }
  *               completionStatus: { type: string, enum: [Scheduled, Completed, Cancelled, NoShow] }
+ *               rating: { type: integer, minimum: 1, maximum: 10, nullable: true }
+ *               videoTimestamps: { type: array, nullable: true, items: { type: object } }
  *     responses:
  *       200: { description: Session updated }
  *       404: { description: Session not found }

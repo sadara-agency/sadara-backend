@@ -30,10 +30,18 @@ export type SessionCompletionStatus =
 
 // ── Attribute Interfaces ──
 
+export interface VideoTimestamp {
+  label: string;
+  labelAr?: string | null;
+  timecode: string;
+  url?: string | null;
+}
+
 export interface SessionAttributes {
   id: string;
   playerId: string;
   referralId: string | null;
+  matchId: string | null;
   sessionType: SessionType;
   programOwner: ProgramOwner;
   responsibleId: string | null;
@@ -45,6 +53,8 @@ export interface SessionAttributes {
   notes: string | null;
   notesAr: string | null;
   completionStatus: SessionCompletionStatus;
+  rating: number | null;
+  videoTimestamps: VideoTimestamp[] | null;
   resultingTicketId: string | null;
   journeyStageId: string | null;
   displayId?: string | null;
@@ -58,6 +68,7 @@ interface SessionCreationAttributes extends Optional<
   SessionAttributes,
   | "id"
   | "referralId"
+  | "matchId"
   | "responsibleId"
   | "title"
   | "titleAr"
@@ -66,6 +77,8 @@ interface SessionCreationAttributes extends Optional<
   | "notes"
   | "notesAr"
   | "completionStatus"
+  | "rating"
+  | "videoTimestamps"
   | "resultingTicketId"
   | "journeyStageId"
   | "displayId"
@@ -84,6 +97,7 @@ export class Session
   declare id: string;
   declare playerId: string;
   declare referralId: string | null;
+  declare matchId: string | null;
   declare sessionType: SessionType;
   declare programOwner: ProgramOwner;
   declare responsibleId: string | null;
@@ -95,6 +109,8 @@ export class Session
   declare notes: string | null;
   declare notesAr: string | null;
   declare completionStatus: SessionCompletionStatus;
+  declare rating: number | null;
+  declare videoTimestamps: VideoTimestamp[] | null;
   declare resultingTicketId: string | null;
   declare journeyStageId: string | null;
   declare displayId: string | null;
@@ -122,6 +138,11 @@ Session.init(
       type: DataTypes.UUID,
       allowNull: true,
       field: "referral_id",
+    },
+    matchId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "match_id",
     },
     sessionType: {
       type: DataTypes.STRING(50),
@@ -167,6 +188,15 @@ Session.init(
       type: DataTypes.STRING(50),
       defaultValue: "Scheduled",
       field: "completion_status",
+    },
+    rating: {
+      type: DataTypes.SMALLINT,
+      allowNull: true,
+    },
+    videoTimestamps: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: "video_timestamps",
     },
     resultingTicketId: {
       type: DataTypes.UUID,

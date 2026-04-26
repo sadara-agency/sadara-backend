@@ -87,6 +87,13 @@ router.post(
 );
 
 router.get(
+  "/:id/overview",
+  authorizeModule("players", "read"),
+  cacheRoute("player-overview", CacheTTL.SHORT),
+  asyncHandler(playerController.getPlayerOverview),
+);
+
+router.get(
   "/:id/timeline",
   authorizeModule("players", "read"),
   asyncHandler(playerController.getTimeline),
