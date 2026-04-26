@@ -252,8 +252,10 @@ export async function syncDebug(req: AuthRequest, res: Response) {
 }
 
 export async function triggerSync(req: AuthRequest, res: Response) {
-  const { agencyValues = ["Critical", "High"], season = getCurrentSeason() } =
-    req.body;
+  const {
+    agencyValues = ["Critical", "High", "Medium", "Scouting", "Low"],
+    season = getCurrentSeason(),
+  } = req.body;
 
   const currentStatus = getSchedulerStatus();
   if (currentStatus.isRunning) {
