@@ -137,6 +137,52 @@ function findEntityArrayInJson(
 }
 
 /**
+ * Generic array finder — like findEntityArrayInJson but accepts a
+ * caller-supplied validator so callers can target shapes other than
+ * the simple {name, id} list (e.g. standings rows, fixture objects).
+ */
+function findArrayInJson(
+  jsonResponses: RenderResult["jsonResponses"],
+  itemValidator: (o: Record<string, unknown>) => boolean,
+  options: { minItems?: number; minFraction?: number } = {},
+): { items: Record<string, unknown>[]; sourceUrl: string | null } {
+  const minItems = options.minItems ?? 1;
+  const minFraction = options.minFraction ?? 0.6;
+  let best: { items: Record<string, unknown>[]; sourceUrl: string | null } = {
+    items: [],
+    sourceUrl: null,
+  };
+
+  function isCandidate(arr: unknown): arr is Record<string, unknown>[] {
+    if (!Array.isArray(arr) || arr.length < minItems) return false;
+    let hits = 0;
+    for (const item of arr) {
+      if (item != null && typeof item === "object" && !Array.isArray(item)) {
+        if (itemValidator(item as Record<string, unknown>)) hits++;
+      }
+    }
+    return hits / arr.length >= minFraction;
+  }
+
+  function walk(value: unknown, sourceUrl: string): void {
+    if (value == null) return;
+    if (Array.isArray(value)) {
+      if (isCandidate(value) && value.length > best.items.length) {
+        best = { items: value as Record<string, unknown>[], sourceUrl };
+      }
+      for (const v of value) walk(v, sourceUrl);
+      return;
+    }
+    if (typeof value === "object") {
+      for (const v of Object.values(value as object)) walk(v, sourceUrl);
+    }
+  }
+
+  for (const r of jsonResponses) walk(r.data, r.url);
+  return best;
+}
+
+/**
  * Pull a string field from a JSON-extracted entity. Returns undefined
  * when the field is missing or not a string. Use for cherry-picking
  * `name` / `slug` / etc. without TypeScript griping.
@@ -1055,11 +1101,11 @@ export async function fetchTeams(): Promise<SaffPlusTeam[]> {
  * Fetch standings for a SAFF+ competition.
  *
  * Strategy:
- *   1. Fetch /en/competitions/{slug}/standings (and /ar/ as a fallback).
- *   2. Try RSC flight payload extraction first — most reliable.
- *   3. Fall back to HTML <table> parsing for the case where the
- *      standings page renders the table inline.
- *   4. Rate-limit between requests via the existing 1500ms throttle.
+ *   1. Render the standings page in headless Chrome (saffplus.sa is CSR).
+ *   2. PRIMARY: scan captured JSON XHR responses for a standings array.
+ *      Motto fetches standings via post-hydration JSON, not RSC.
+ *   3. FALLBACK: RSC flight payload extraction.
+ *   4. FALLBACK: HTML <table> parsing.
  */
 export async function fetchStandings(
   competitionId: number | string,
@@ -1076,8 +1122,9 @@ export async function fetchStandings(
 
   for (const path of paths) {
     let html: string;
+    let jsonResponses: RenderResult["jsonResponses"];
     try {
-      html = await fetchPage(path);
+      ({ html, jsonResponses } = await fetchPageWithJson(path));
     } catch (err) {
       logger.warn(
         `[SAFF+] fetchStandings: ${path} failed — ${(err as Error).message}`,
@@ -1087,22 +1134,79 @@ export async function fetchStandings(
     }
     await sleep(1500);
 
-    // Layer 1: RSC payload
-    const rscChunks = extractRscData(html);
-    for (const row of extractStandingsFromRsc(rscChunks)) {
-      const key = String(row.teamId);
-      if (!seen.has(key)) seen.set(key, row);
+    // ── PRIMARY: JSON XHR responses ──
+    // Motto standings items carry numeric stats: points, played, won, drawn, lost.
+    const jsonHit = findArrayInJson(
+      jsonResponses,
+      (o) =>
+        typeof o.points === "number" ||
+        typeof o.pts === "number" ||
+        (typeof o.played === "number" && typeof o.won === "number"),
+      { minItems: 1 },
+    );
+    if (jsonHit.items.length > 0) {
+      logger.info(
+        `[SAFF+] Standings JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} rows)`,
+      );
+      jsonHit.items.forEach((o, idx) => {
+        const club =
+          (o.club as Record<string, unknown> | undefined) ??
+          (o.team as Record<string, unknown> | undefined) ??
+          {};
+        const teamId =
+          pickStr(club, "id", "slug", "uuid") ??
+          pickStr(o, "team_id", "club_id", "id") ??
+          String(idx);
+        if (seen.has(teamId)) return;
+        const num = (k: string): number =>
+          typeof o[k] === "number" ? (o[k] as number) : 0;
+        const goalsFor =
+          num("goals_for") || num("gf") || num("scored") || num("sf");
+        const goalsAgainst =
+          num("goals_against") || num("ga") || num("conceded") || num("sa");
+        seen.set(teamId, {
+          position: num("position") || num("rank") || num("pos") || idx + 1,
+          teamId,
+          teamName:
+            pickStr(club, "name", "title") ??
+            pickStr(o, "team_name", "club_name") ??
+            "",
+          teamNameAr:
+            pickStr(club, "name_ar", "nameAr", "title_ar") ??
+            pickStr(o, "team_name_ar", "club_name_ar"),
+          teamLogo: pickStr(club, "thumbnail_url", "logo", "image"),
+          played: num("played") || num("games_played") || num("p"),
+          won: num("won") || num("wins") || num("w"),
+          drawn: num("drawn") || num("draws") || num("d"),
+          lost: num("lost") || num("losses") || num("l"),
+          goalsFor,
+          goalsAgainst,
+          goalDifference:
+            num("goal_difference") || num("gd") || goalsFor - goalsAgainst,
+          points: num("points") || num("pts"),
+          group: pickStr(o, "group", "group_name"),
+        });
+      });
     }
 
+    // ── FALLBACK 1: RSC payload ──
     if (seen.size === 0) {
-      // Layer 2: HTML table fallback
+      const rscChunks = extractRscData(html);
+      for (const row of extractStandingsFromRsc(rscChunks)) {
+        const key = String(row.teamId);
+        if (!seen.has(key)) seen.set(key, row);
+      }
+    }
+
+    // ── FALLBACK 2: HTML table ──
+    if (seen.size === 0) {
       for (const row of extractStandingsFromHtml(html)) {
         const key = String(row.teamId);
         if (!seen.has(key)) seen.set(key, row);
       }
     }
 
-    if (seen.size > 0) break; // first successful path wins
+    if (seen.size > 0) break;
   }
 
   const rows = Array.from(seen.values()).sort(
@@ -1422,10 +1526,11 @@ function extractMatchesFromHtml(html: string, slug: string): SaffPlusMatch[] {
  * Fetch matches for a competition from SAFF+.
  *
  * Strategy:
- * 1. Fetch /competitions/{slug}/fixtures (upcoming) and /competitions/{slug}/results (completed).
- * 2. Try RSC flight payload extraction first.
- * 3. Fall back to HTML table scraping.
- * 4. Rate-limit: 1500 ms between requests.
+ * 1. Render the page in headless Chrome (saffplus.sa is CSR).
+ * 2. PRIMARY: scan captured JSON XHR responses for a fixtures array.
+ * 3. FALLBACK: RSC flight payload extraction.
+ * 4. FALLBACK: HTML table scraping.
+ * 5. Rate-limit: 1500 ms between requests.
  */
 export async function fetchMatches(
   competitionSlug: number | string,
@@ -1443,23 +1548,107 @@ export async function fetchMatches(
 
   for (const path of paths) {
     try {
-      const html = await fetchPage(path);
+      const { html, jsonResponses } = await fetchPageWithJson(path);
       await sleep(1500);
 
-      const rscChunks = extractRscData(html);
-      const fromRsc = extractMatchesFromRsc(rscChunks);
+      // ── PRIMARY: JSON XHR responses ──
+      // Motto fixture items always have home_club + away_club nested objects.
+      const jsonHit = findArrayInJson(
+        jsonResponses,
+        (o) => {
+          const isObj = (v: unknown) =>
+            v != null && typeof v === "object" && !Array.isArray(v);
+          return (
+            isObj(o.home_club) ||
+            isObj(o.away_club) ||
+            isObj(o.home_team) ||
+            isObj(o.away_team)
+          );
+        },
+        { minItems: 1 },
+      );
 
-      if (fromRsc.length > 0) {
-        for (const m of fromRsc) {
+      if (jsonHit.items.length > 0) {
+        logger.info(
+          `[SAFF+] Matches JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} items) from ${path}`,
+        );
+        for (const o of jsonHit.items) {
+          const id = String(
+            o.id ?? o.uuid ?? o.slug ?? `${o.home_club}-${o.away_club}`,
+          );
+          if (seen.has(id)) continue;
+          seen.add(id);
+
+          const home =
+            (o.home_club as Record<string, unknown> | undefined) ??
+            (o.home_team as Record<string, unknown> | undefined) ??
+            {};
+          const away =
+            (o.away_club as Record<string, unknown> | undefined) ??
+            (o.away_team as Record<string, unknown> | undefined) ??
+            {};
+
+          const homeScore =
+            typeof o.home_score === "number"
+              ? o.home_score
+              : (((o.fields as Record<string, unknown> | undefined)
+                  ?.home_score as number | undefined) ?? null);
+          const awayScore =
+            typeof o.away_score === "number"
+              ? o.away_score
+              : (((o.fields as Record<string, unknown> | undefined)
+                  ?.away_score as number | undefined) ?? null);
+
+          allMatches.push({
+            id,
+            competitionId: slug,
+            date: String(o.date ?? o.match_date ?? o.start_date ?? ""),
+            time:
+              typeof o.time === "string" || typeof o.time === "number"
+                ? String(o.time)
+                : undefined,
+            homeTeamId:
+              pickStr(home, "id", "slug") ??
+              (typeof home.id === "number" ? home.id : 0),
+            homeTeamName: pickStr(home, "name", "title") ?? "",
+            homeTeamNameAr: pickStr(home, "name_ar", "nameAr", "title_ar"),
+            homeTeamLogo: pickStr(home, "thumbnail_url", "logo", "image"),
+            awayTeamId:
+              pickStr(away, "id", "slug") ??
+              (typeof away.id === "number" ? away.id : 0),
+            awayTeamName: pickStr(away, "name", "title") ?? "",
+            awayTeamNameAr: pickStr(away, "name_ar", "nameAr", "title_ar"),
+            awayTeamLogo: pickStr(away, "thumbnail_url", "logo", "image"),
+            homeScore,
+            awayScore,
+            status: String(
+              o.status ?? (homeScore != null ? "finished" : "scheduled"),
+            ),
+            stadium: pickStr(o, "stadium", "venue"),
+            week:
+              o.week != null
+                ? Number(o.week) || undefined
+                : o.round != null
+                  ? Number(o.round) || undefined
+                  : undefined,
+          });
+        }
+      }
+
+      // ── FALLBACK 1: RSC payload ──
+      if (allMatches.length === 0 || jsonHit.items.length === 0) {
+        const rscChunks = extractRscData(html);
+        for (const m of extractMatchesFromRsc(rscChunks)) {
           if (!seen.has(String(m.id))) {
             seen.add(String(m.id));
             allMatches.push(m);
           }
         }
-      } else {
-        // RSC yielded nothing — try HTML table fallback
-        const fromHtml = extractMatchesFromHtml(html, slug);
-        for (const m of fromHtml) {
+      }
+
+      // ── FALLBACK 2: HTML table ──
+      if (allMatches.length === 0) {
+        for (const m of extractMatchesFromHtml(html, slug)) {
           const key = `${m.homeTeamName}-${m.awayTeamName}-${m.date}`;
           if (!seen.has(key)) {
             seen.add(key);
@@ -1471,7 +1660,6 @@ export async function fetchMatches(
       logger.warn(
         `[SAFF+] fetchMatches failed for ${path}: ${(err as Error).message}`,
       );
-      // Throttle between retried paths
       await sleep(1500);
     }
   }
