@@ -47,7 +47,7 @@ export const trainingPlanQuerySchema = z.object({
   status: z.enum(PLAN_STATUSES).optional(),
   periodType: z.enum(PERIOD_TYPES).optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(500).default(20),
 });
 
 export const upsertWeekSchema = z.object({

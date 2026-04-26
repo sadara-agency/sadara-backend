@@ -38,7 +38,7 @@ export const addParticipantsSchema = z.object({
 
 export const conversationQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   archived: z.coerce.boolean().default(false),
 });
 
@@ -46,7 +46,7 @@ export const conversationQuerySchema = z.object({
 
 export const messageQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(50),
+  limit: z.coerce.number().min(1).max(500).default(50),
   before: z.string().optional(), // ISO timestamp cursor
 });
 
@@ -55,7 +55,7 @@ export const messageQuerySchema = z.object({
 export const searchMessagesSchema = z.object({
   q: z.string().min(1).max(200),
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(50).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
 });
 
 // ── Inferred Types ──

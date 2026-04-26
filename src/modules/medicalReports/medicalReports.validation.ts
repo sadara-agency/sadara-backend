@@ -6,7 +6,7 @@ export const idParamSchema = z.object({
 
 export const listQuerySchema = z.object({
   playerId: z.string().uuid().optional(),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(500).default(20),
   page: z.coerce.number().int().min(1).default(1),
 });
 

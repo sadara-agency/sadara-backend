@@ -12,7 +12,7 @@ export const createReportSchema = z.object({
 
 export const reportQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   playerId: z.string().uuid().optional(),
   status: z.enum(["Draft", "Generating", "Generated", "Failed"]).optional(),
 });

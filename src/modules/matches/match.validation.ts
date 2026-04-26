@@ -60,7 +60,7 @@ export const updateMatchStatusSchema = z.object({
 
 export const matchQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["match_date", "created_at", "updated_at", "status", "competition"])
     .default("match_date"),
@@ -158,7 +158,7 @@ export const playerShotMapQuerySchema = z.object({
 
 export const playerMatchesQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   status: z.enum(["upcoming", "live", "completed", "cancelled"]).optional(),
   competition: z.string().optional(),
   from: z.string().optional(),
@@ -173,7 +173,7 @@ export const leaderboardQuerySchema = z.object({
   competition: z.string().optional(),
   clubId: z.string().uuid().optional(),
   season: z.string().optional(),
-  limit: z.coerce.number().min(1).max(50).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
 });
 
 export type LeaderboardQuery = z.infer<typeof leaderboardQuerySchema>;

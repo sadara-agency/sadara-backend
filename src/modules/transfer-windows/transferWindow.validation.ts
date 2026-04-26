@@ -41,7 +41,7 @@ export const updateTransferWindowSchema = createTransferWindowSchema.partial();
 
 export const transferWindowQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["season", "start_date", "end_date", "status", "created_at"])
     .default("start_date"),

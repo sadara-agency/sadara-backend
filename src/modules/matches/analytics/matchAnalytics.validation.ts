@@ -52,7 +52,7 @@ export const benchmarkQuerySchema = z.object({
   league: z.string().max(50).optional(),
   season: z.string().max(20).optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
 });
 
 export type KpiDashboardQuery = z.infer<typeof kpiDashboardQuerySchema>;

@@ -44,7 +44,7 @@ export const updatePressReleaseStatusSchema = z.object({
 
 export const pressReleaseQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   sort: z
     .enum(["created_at", "updated_at", "published_at", "title", "status"])
     .default("created_at"),

@@ -50,7 +50,7 @@ export const devReviewQuerySchema = z.object({
   status: z.enum(REVIEW_STATUSES).optional(),
   quarterLabel: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(20),
+  limit: z.coerce.number().int().positive().max(500).default(20),
 });
 
 export const generateTemplateSchema = z.object({

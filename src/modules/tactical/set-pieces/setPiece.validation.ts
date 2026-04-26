@@ -40,7 +40,7 @@ export const setPieceQuerySchema = z.object({
   side: z.enum(["attacking", "defending"]).optional(),
   takerId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(500).default(50),
 });
 
 export type CreateSetPieceInput = z.infer<typeof createSetPieceSchema>;

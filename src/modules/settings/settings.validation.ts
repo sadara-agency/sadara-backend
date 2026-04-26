@@ -17,7 +17,7 @@ export const changePasswordSchema = z.object({
 
 export const teamQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(50).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   search: z.string().optional(),
   role: z.string().optional(),
   isActive: z.coerce.boolean().optional(),

@@ -22,7 +22,7 @@ export const updateNoteSchema = z.object({
 
 export const noteQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
-  limit: z.coerce.number().min(1).max(100).default(20),
+  limit: z.coerce.number().min(1).max(500).default(20),
   ownerType: z.enum(OWNER_TYPES).optional(),
   ownerId: z.string().uuid().optional(),
 });

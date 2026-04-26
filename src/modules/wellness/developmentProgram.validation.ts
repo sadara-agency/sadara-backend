@@ -54,7 +54,7 @@ export const reorderExercisesSchema = z.object({
 
 export const listProgramsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(500).default(20),
   trainingBlockId: z.string().uuid().optional(),
   programType: programTypeEnum.optional(),
   isActive: z.coerce.boolean().optional(),
