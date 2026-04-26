@@ -61,6 +61,7 @@ interface JourneyAttributes {
   targetKpi: string | null;
   notes: string | null;
   notesAr: string | null;
+  externalRef?: string | null;
   createdBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -88,6 +89,7 @@ interface JourneyCreationAttributes extends Optional<
   | "targetKpi"
   | "notes"
   | "notesAr"
+  | "externalRef"
   | "createdBy"
   | "createdAt"
   | "updatedAt"
@@ -120,6 +122,7 @@ export class Journey
   declare targetKpi: string | null;
   declare notes: string | null;
   declare notesAr: string | null;
+  declare externalRef: string | null;
   declare createdBy: string | null;
 
   // Virtual — populated by service
@@ -223,6 +226,11 @@ Journey.init(
     },
     notes: { type: DataTypes.TEXT },
     notesAr: { type: DataTypes.TEXT, field: "notes_ar" },
+    externalRef: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "external_ref",
+    },
     createdBy: { type: DataTypes.UUID, field: "created_by" },
   },
   {

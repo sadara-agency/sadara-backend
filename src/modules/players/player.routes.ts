@@ -55,7 +55,7 @@ router.get(
     if (!player) {
       return sendSuccess(res, { package: "C", access: getFullAccessMap("C") });
     }
-    const pkg = player.playerPackage as PlayerPackage;
+    const pkg = (player.playerPackage.replace("+", "") as PlayerPackage) || "C";
     sendSuccess(res, { package: pkg, access: getFullAccessMap(pkg) });
   }),
 );

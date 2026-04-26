@@ -48,6 +48,7 @@ export interface SessionAttributes {
   resultingTicketId: string | null;
   journeyStageId: string | null;
   displayId?: string | null;
+  externalRef?: string | null;
   createdBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -68,6 +69,7 @@ interface SessionCreationAttributes extends Optional<
   | "resultingTicketId"
   | "journeyStageId"
   | "displayId"
+  | "externalRef"
   | "createdBy"
   | "createdAt"
   | "updatedAt"
@@ -96,6 +98,7 @@ export class Session
   declare resultingTicketId: string | null;
   declare journeyStageId: string | null;
   declare displayId: string | null;
+  declare externalRef: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -181,6 +184,11 @@ Session.init(
     createdBy: {
       type: DataTypes.UUID,
       field: "created_by",
+    },
+    externalRef: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "external_ref",
     },
   },
   {

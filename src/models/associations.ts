@@ -88,6 +88,7 @@ import WatchlistVideoClip from "@modules/scouting/watchlist-video-clip.model";
 import { Squad } from "@modules/squads/squad.model";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
 import { PlayerMatchReview } from "@modules/saffplus/playerReview.model";
+import { CaseAssignee } from "@modules/referrals/caseAssignee.model";
 
 let associationsReady = false;
 
@@ -262,6 +263,15 @@ export function setupAssociations() {
     foreignKey: "resultingTicketId",
     as: "resultingTicket",
   });
+  Referral.hasMany(CaseAssignee, {
+    foreignKey: "referralId",
+    as: "coAssignees",
+  });
+  CaseAssignee.belongsTo(Referral, {
+    foreignKey: "referralId",
+    as: "referral",
+  });
+  CaseAssignee.belongsTo(User, { foreignKey: "userId", as: "user" });
 
   // Sessions
   Session.belongsTo(Player, { foreignKey: "playerId", as: "player" });
