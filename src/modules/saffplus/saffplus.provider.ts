@@ -48,8 +48,16 @@ async function fetchPage(path: string): Promise<string> {
  * succeeds, but the captured JSON usually contains exactly what we
  * want. Callers should try JSON extraction first and fall back to
  * HTML parsing only as a backup.
+ *
+ * @param waitForSelector - CSS selector to wait for after initial page load.
+ *   Use this for pages where content loads in a second render pass (e.g.
+ *   React Suspense / deferred XHR after networkidle0). Puppeteer will wait
+ *   up to selectorTimeoutMs for the element before capturing HTML.
  */
-async function fetchPageWithJson(path: string): Promise<{
+async function fetchPageWithJson(
+  path: string,
+  waitForSelector?: string,
+): Promise<{
   html: string;
   jsonResponses: RenderResult["jsonResponses"];
 }> {
@@ -63,6 +71,7 @@ async function fetchPageWithJson(path: string): Promise<{
   const result = await renderSaffPlusPage(path, {
     waitForNetworkIdle: true,
     selectorTimeoutMs: 15_000,
+    waitForSelector,
   });
 
   if (result.reason !== "ok") {
@@ -1124,7 +1133,13 @@ export async function fetchStandings(
     let html: string;
     let jsonResponses: RenderResult["jsonResponses"];
     try {
-      ({ html, jsonResponses } = await fetchPageWithJson(path));
+      ({ html, jsonResponses } = await fetchPageWithJson(
+        path,
+        // Wait for a standings row or table cell to appear — this ensures any
+        // deferred XHR that fires after networkidle0 has completed before we
+        // capture. Falls through silently if the selector never appears.
+        "table tr:nth-child(2), [class*=standing] [class*=row], [class*=standing] tr",
+      ));
     } catch (err) {
       logger.warn(
         `[SAFF+] fetchStandings: ${path} failed — ${(err as Error).message}`,
@@ -1571,7 +1586,12 @@ export async function fetchMatches(
 
   for (const path of paths) {
     try {
-      const { html, jsonResponses } = await fetchPageWithJson(path);
+      const { html, jsonResponses } = await fetchPageWithJson(
+        path,
+        // Wait for a fixture/match card to appear — ensures deferred XHR has
+        // fired before we capture. Falls through silently on timeout.
+        "[class*=fixture], [class*=match-card], [class*=game-row], [class*=event-row]",
+      );
       await sleep(1500);
 
       // ── PRIMARY: JSON XHR responses ──

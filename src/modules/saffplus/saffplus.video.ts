@@ -284,20 +284,38 @@ export async function renderSaffPlusPage(
     page.setDefaultTimeout(renderTimeoutMs);
     page.setDefaultNavigationTimeout(renderTimeoutMs);
 
-    // Capture every JSON response while the page loads.
+    // Log ALL request URLs from Motto/saffplus domains (diagnostic — helps identify
+    // endpoints that return non-JSON data like protobuf that our response filter missed).
+    page.on("request", (request) => {
+      const url = request.url();
+      if (
+        url.includes("saffplus.sa") ||
+        url.includes("mottostreaming.com") ||
+        url.includes("mottocdn.com")
+      ) {
+        logger.debug(`[SAFF+ req] ${request.method()} ${url.slice(0, 300)}`);
+      }
+    });
+
+    // Capture responses from Motto/saffplus domains.
+    // Domain filter runs first; content-type check is skipped so protobuf-JSON
+    // bridge responses (which sometimes arrive as application/grpc or text/plain)
+    // are still attempted. response.json() will throw on true binary — we catch it.
     page.on("response", async (response) => {
       try {
-        const ct = response.headers()["content-type"] ?? "";
-        if (!ct.includes("application/json")) return;
         const url = response.url();
-        // Only capture responses from saffplus.sa or motto-cdn — skip ad/analytics.
+        // Only capture responses from saffplus.sa or Motto CDN/streaming — skip
+        // ad networks, analytics, cookie-consent, etc.
         if (
           !url.includes("saffplus.sa") &&
           !url.includes("mottocdn.com") &&
+          !url.includes("mottostreaming.com") &&
           !url.includes("motto.")
         ) {
           return;
         }
+        // Try JSON parse regardless of declared content-type.
+        // Motto's protobuf-JSON bridge may return application/grpc or no content-type.
         const data = await response.json().catch(() => null);
         if (data != null) jsonResponses.push({ url, data });
       } catch {
