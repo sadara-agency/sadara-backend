@@ -207,9 +207,9 @@ describe('E-Signature Schemas', () => {
       expect(result.success).toBe(false);
     });
 
-    it('should reject limit over 100', () => {
+    it('should accept limit over 100 (max is 500)', () => {
       const result = signatureRequestQuerySchema.safeParse({ limit: 101 });
-      expect(result.success).toBe(false);
+      expect(result.success).toBe(true);
     });
 
     it('should accept valid sort fields', () => {

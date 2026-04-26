@@ -215,10 +215,10 @@ describe("BodyComposition Schemas", () => {
       expect(result.success).toBe(true);
     });
 
-    it("rejects limit > 100", () => {
+    it("accepts limit > 100 (max is 500)", () => {
       expect(
         listScansQuerySchema.safeParse({ limit: "101" }).success,
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it("rejects invalid from date format", () => {
