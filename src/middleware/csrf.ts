@@ -23,6 +23,11 @@ const EXEMPT_PATHS = new Set([
   "/api/v1/auth/register",
   "/api/v1/auth/refresh",
   "/api/v1/auth/forgot-password",
+  // Email-link endpoints: the one-time token in the URL is itself the proof of intent,
+  // and recipients click these from a fresh browser context that has no CSRF cookie yet.
+  "/api/v1/auth/verify-email",
+  "/api/v1/auth/resend-verification",
+  "/api/v1/auth/reset-password",
   "/api/health",
 ]);
 
