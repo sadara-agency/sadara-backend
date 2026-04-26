@@ -113,6 +113,8 @@ export {
   mergeWithBrandPages,
 } from "./pdf";
 export type { RenderOptions, MergeOptions } from "./pdf";
+export { renderCoverPageBuffer } from "./pdfCover";
+export type { CoverKind, CoverOpts } from "./pdfCover";
 
 // Row scope
 export { buildRowScope, mergeScope, checkRowAccess } from "./rowScope";

@@ -5,6 +5,7 @@ import {
   renderPagesToBuffers,
   mergeWithBrandPages,
 } from "@shared/utils/pdf";
+import { renderCoverPageBuffer } from "@shared/utils/pdfCover";
 
 // ── CSS (reuses same styling as technical reports) ──
 const CSS = `
@@ -124,6 +125,15 @@ export async function generatePredefinedReportPdf(
     );
   }
 
+  const coverBuffer = await renderCoverPageBuffer({
+    kind: "predefined",
+    titleAr: "تقرير صدارة",
+    titleEn: options.reportTitle,
+    meta: [
+      { label: "Generated", value: new Date().toISOString().split("T")[0] },
+    ],
+  });
+
   const contentBuffers = await renderPagesToBuffers(pages);
-  return mergeWithBrandPages(contentBuffers);
+  return mergeWithBrandPages(contentBuffers, { coverBuffer });
 }

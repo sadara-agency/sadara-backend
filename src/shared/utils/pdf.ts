@@ -186,6 +186,13 @@ export async function renderPagesToBuffers(
 
 export interface MergeOptions {
   coverPath?: string;
+  /**
+   * In-memory cover PDF buffer (e.g. produced by `renderCoverPageBuffer`).
+   * When supplied, overrides `coverPath` so callers can build dynamic covers
+   * without writing a temp file. Falls back to `coverPath` (then `COVER_PDF_PATH`)
+   * if not provided.
+   */
+  coverBuffer?: Uint8Array;
   backPath?: string;
   requireBrandPages?: boolean;
 }
@@ -200,7 +207,11 @@ export async function mergeWithBrandPages(
 
   const merged = await PDFDocument.create();
 
-  if (fs.existsSync(coverPath)) {
+  if (opts?.coverBuffer) {
+    const coverDoc = await PDFDocument.load(opts.coverBuffer);
+    const [coverPage] = await merged.copyPages(coverDoc, [0]);
+    merged.addPage(coverPage);
+  } else if (fs.existsSync(coverPath)) {
     const coverDoc = await PDFDocument.load(fs.readFileSync(coverPath));
     const [coverPage] = await merged.copyPages(coverDoc, [0]);
     merged.addPage(coverPage);
