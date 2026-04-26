@@ -28,12 +28,23 @@ const referralTargets = [
   "Manager",
 ] as const;
 
+const receivingParties = [
+  "AgencyManagement",
+  "MentalSpecialist",
+  "PhysicalSpecialist",
+  "ExternalCoach",
+  "Legal",
+  "Finance",
+  "PerformanceAnalyst",
+] as const;
+
 // ── Create Referral ──
 
 export const createReferralSchema = z.object({
   referralType: z.enum(referralTypes),
   playerId: z.string().uuid("Invalid player ID"),
   referralTarget: z.enum(referralTargets).optional(),
+  receivingParty: z.enum(receivingParties).optional().nullable(),
   triggerDesc: z.string().optional(),
   priority: z.enum(referralPriorities).default("Medium"),
   assignedTo: z.string().uuid("Invalid assigned user ID"),
@@ -48,6 +59,7 @@ export const createReferralSchema = z.object({
 export const updateReferralSchema = z.object({
   referralType: z.enum(referralTypes).optional(),
   referralTarget: z.enum(referralTargets).nullable().optional(),
+  receivingParty: z.enum(receivingParties).nullable().optional(),
   priority: z.enum(referralPriorities).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   dueDate: z.string().nullable().optional(),
@@ -116,6 +128,7 @@ export const referralQuerySchema = z.object({
     .pipe(z.array(z.enum(referralStatuses)).optional()),
   referralType: z.enum(referralTypes).optional(),
   referralTarget: z.enum(referralTargets).optional(),
+  receivingParty: z.enum(receivingParties).optional(),
   priority: z.enum(referralPriorities).optional(),
   playerId: z.string().uuid().optional(),
   assignedTo: z.string().uuid().optional(),

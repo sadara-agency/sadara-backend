@@ -7,6 +7,7 @@ import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { Journey } from "@modules/journey/journey.model";
 import { Ticket } from "@modules/tickets/ticket.model";
+import { Match } from "@modules/matches/match.model";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { generateDisplayId } from "@shared/utils/displayId";
@@ -61,6 +62,21 @@ function sessionIncludes() {
       attributes: ["id", "title", "titleAr", "status", "ticketType"],
       required: false,
     },
+    {
+      model: Match,
+      as: "match",
+      attributes: [
+        "id",
+        "matchDate",
+        "homeTeamName",
+        "awayTeamName",
+        "homeScore",
+        "awayScore",
+        "status",
+        "competition",
+      ],
+      required: false,
+    },
   ];
 }
 
@@ -69,6 +85,7 @@ function buildWhere(query: SessionQuery): WhereOptions {
 
   if (query.playerId) where.playerId = query.playerId;
   if (query.referralId) where.referralId = query.referralId;
+  if (query.matchId) where.matchId = query.matchId;
   if (query.sessionType) where.sessionType = query.sessionType;
   if (query.programOwner) where.programOwner = query.programOwner;
   if (query.completionStatus) where.completionStatus = query.completionStatus;

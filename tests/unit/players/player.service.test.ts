@@ -57,6 +57,15 @@ jest.mock('../../../src/modules/players/externalProvider.model', () => ({
   },
 }));
 
+jest.mock('../../../src/modules/referrals/referral.model', () => ({
+  Referral: { findByPk: jest.fn(), findAll: jest.fn(), name: 'Referral' },
+}));
+jest.mock('../../../src/modules/sessions/session.model', () => ({
+  Session: { findAndCountAll: jest.fn(), findByPk: jest.fn(), name: 'Session' },
+}));
+jest.mock('../../../src/modules/journey/journey.model', () => ({
+  Journey: { findAll: jest.fn(), findByPk: jest.fn(), name: 'Journey' },
+}));
 jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(undefined),
 }));

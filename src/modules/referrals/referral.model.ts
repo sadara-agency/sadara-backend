@@ -29,6 +29,15 @@ export type ReferralTarget =
   | "MentalCoach"
   | "Manager";
 
+export type ReceivingParty =
+  | "AgencyManagement"
+  | "MentalSpecialist"
+  | "PhysicalSpecialist"
+  | "ExternalCoach"
+  | "Legal"
+  | "Finance"
+  | "PerformanceAnalyst";
+
 // ── Attribute Interfaces ──
 
 export interface ReferralAttributes {
@@ -54,6 +63,8 @@ export interface ReferralAttributes {
   isRestricted: boolean;
   resultingTicketId?: string | null;
   restrictedTo?: string[] | null;
+  receivingParty?: ReceivingParty | null;
+  externalRef?: string | null;
   createdBy?: string | null;
   displayId?: string | null;
   createdAt?: Date;
@@ -71,6 +82,8 @@ interface ReferralCreationAttributes extends Optional<
   | "resultingTicketId"
   | "isRestricted"
   | "referralTarget"
+  | "receivingParty"
+  | "externalRef"
   | "closureNotes"
   | "closedAt"
   | "displayId"
@@ -106,6 +119,8 @@ export class Referral
   declare isRestricted: boolean;
   declare resultingTicketId: string | null;
   declare restrictedTo: string[] | null;
+  declare receivingParty: ReceivingParty | null;
+  declare externalRef: string | null;
   declare createdBy: string | null;
   declare displayId: string | null;
   declare createdAt: Date;
@@ -220,6 +235,16 @@ Referral.init(
     createdBy: {
       type: DataTypes.UUID,
       field: "created_by",
+    },
+    receivingParty: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: "receiving_party",
+    },
+    externalRef: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "external_ref",
     },
   },
   {

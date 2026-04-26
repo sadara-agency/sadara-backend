@@ -147,3 +147,8 @@ export async function refreshStats(req: AuthRequest, res: Response) {
   await invalidateMultiple([...PLAYER_CACHE, CachePrefix.MATCHES]);
   sendSuccess(res, result);
 }
+
+export async function getPlayerOverview(req: AuthRequest, res: Response) {
+  const overview = await playerService.getPlayerOverview(req.params.id);
+  sendSuccess(res, overview);
+}

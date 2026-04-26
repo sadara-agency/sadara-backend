@@ -8,6 +8,9 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { sequelize } from "@config/database";
 import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
 import { PlayerClubHistory } from "@modules/players/playerClubHistory.model";
+import { Referral } from "@modules/referrals/referral.model";
+import { Session } from "@modules/sessions/session.model";
+import { Journey } from "@modules/journey/journey.model";
 import {
   getPositionGroup,
   createEmptyTechnicalAttributes,
@@ -737,5 +740,68 @@ export async function validateProviderMapping(
     providerName,
     externalPlayerId,
     error: `Validation not available for ${providerName}. Supported: Sportmonks.`,
+  };
+}
+
+export async function getPlayerOverview(id: string) {
+  const player = await Player.findByPk(id, {
+    attributes: [
+      "id",
+      "firstName",
+      "lastName",
+      "firstNameAr",
+      "lastNameAr",
+      "position",
+      "photoUrl",
+      "playerPackage",
+      "mandateStatus",
+    ],
+    include: [
+      { model: Club, as: "club", attributes: ["id", "name", "logoUrl"] },
+    ],
+  });
+  if (!player) throw new AppError("Player not found", 404);
+
+  const [openCases, recentSessions, journeyCount] = await Promise.all([
+    Referral.findAll({
+      where: {
+        playerId: id,
+        status: { [Op.in]: ["Open", "InProgress", "Waiting"] },
+      },
+      attributes: [
+        "id",
+        "displayId",
+        "referralType",
+        "status",
+        "priority",
+        "triggerDesc",
+        "dueDate",
+        "createdAt",
+      ],
+      order: [["createdAt", "DESC"]],
+      limit: 10,
+    }),
+    Session.findAll({
+      where: { playerId: id },
+      attributes: [
+        "id",
+        "title",
+        "titleAr",
+        "sessionType",
+        "completionStatus",
+        "sessionDate",
+      ],
+      order: [["sessionDate", "DESC"]],
+      limit: 5,
+    }),
+    Journey.count({ where: { playerId: id } }),
+  ]);
+
+  return {
+    player,
+    openCases,
+    recentSessions,
+    journeyCount,
+    openCaseCount: openCases.length,
   };
 }

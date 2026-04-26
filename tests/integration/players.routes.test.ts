@@ -81,6 +81,18 @@ jest.mock('../../src/modules/clubs/club.model', () => ({
 jest.mock('../../src/modules/users/user.model', () => ({
   User: { findByPk: jest.fn(), findOne: jest.fn() },
 }));
+jest.mock('../../src/modules/referrals/referral.model', () => ({
+  Referral: { findByPk: jest.fn(), findAll: jest.fn(), name: 'Referral' },
+}));
+jest.mock('../../src/modules/sessions/session.model', () => ({
+  Session: { findAndCountAll: jest.fn(), findByPk: jest.fn(), name: 'Session' },
+}));
+jest.mock('../../src/modules/journey/journey.model', () => ({
+  Journey: { findAll: jest.fn(), findByPk: jest.fn(), name: 'Journey' },
+}));
+jest.mock('../../src/modules/matches/match.model', () => ({
+  Match: { findByPk: jest.fn(), name: 'Match' },
+}));
 
 // ── Deferred imports ──
 import request from 'supertest';

@@ -55,7 +55,7 @@ router.get(
     if (!player) {
       return sendSuccess(res, { package: "C", access: getFullAccessMap("C") });
     }
-    const pkg = player.playerPackage as PlayerPackage;
+    const pkg = (player.playerPackage.replace("+", "") as PlayerPackage) || "C";
     sendSuccess(res, { package: pkg, access: getFullAccessMap(pkg) });
   }),
 );
@@ -84,6 +84,13 @@ router.post(
   uploadSingle,
   verifyFileType,
   asyncHandler(playerController.uploadPhoto),
+);
+
+router.get(
+  "/:id/overview",
+  authorizeModule("players", "read"),
+  cacheRoute("player-overview", CacheTTL.SHORT),
+  asyncHandler(playerController.getPlayerOverview),
 );
 
 router.get(

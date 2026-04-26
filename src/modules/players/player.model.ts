@@ -19,7 +19,7 @@ interface PlayerAttributes {
   nationality?: string | null;
   secondaryNationality?: string | null;
   playerType: "Pro" | "Youth" | "Amateur";
-  playerPackage: "A" | "B" | "C";
+  playerPackage: string;
   contractType: "Professional" | "Amateur" | "Youth";
   position?: string | null;
   secondaryPosition?: string | null;
@@ -54,6 +54,7 @@ interface PlayerAttributes {
   photoUrl?: string | null;
   displayId?: string | null;
   externalIds?: Record<string, string>;
+  externalRef?: string | null;
   createdBy: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -70,6 +71,7 @@ interface PlayerCreationAttributes extends Optional<
   | "status"
   | "displayId"
   | "externalIds"
+  | "externalRef"
   | "mandateStatus"
   | "mandateSignedAt"
   | "exclusiveUntil"
@@ -90,7 +92,7 @@ export class Player
   declare nationality: string | null;
   declare secondaryNationality: string | null;
   declare playerType: "Pro" | "Youth" | "Amateur";
-  declare playerPackage: "A" | "B" | "C";
+  declare playerPackage: string;
   declare contractType: "Professional" | "Amateur" | "Youth";
   declare position: string | null;
   declare secondaryPosition: string | null;
@@ -125,6 +127,7 @@ export class Player
   declare photoUrl: string | null;
   declare displayId: string | null;
   declare externalIds: Record<string, string>;
+  declare externalRef: string | null;
   declare createdBy: string;
 
   get fullName(): string {
@@ -254,6 +257,11 @@ Player.init(
       field: "external_ids",
     },
     createdBy: { type: DataTypes.UUID, allowNull: false },
+    externalRef: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "external_ref",
+    },
   },
   {
     sequelize,

@@ -39,6 +39,9 @@ jest.mock('../../../src/modules/journey/journey.model', () => ({
 jest.mock('../../../src/modules/tickets/ticket.model', () => ({
   Ticket: { findByPk: jest.fn(), name: 'Ticket' },
 }));
+jest.mock('../../../src/modules/matches/match.model', () => ({
+  Match: { findByPk: jest.fn(), name: 'Match' },
+}));
 
 import * as sessionService from '../../../src/modules/sessions/session.service';
 
@@ -80,6 +83,16 @@ describe('Session Service', () => {
       expect(call.where.playerId).toBe('p1');
       expect(call.where.sessionType).toBe('Mental');
       expect(call.where.programOwner).toBe('MentalCoach');
+    });
+
+    it('should filter by matchId', async () => {
+      mockSessionFindAndCountAll.mockResolvedValue({ rows: [], count: 0 });
+      await sessionService.listSessions({
+        page: 1, limit: 10, sort: 'session_date', order: 'desc',
+        matchId: 'match-001',
+      } as any);
+      const call = mockSessionFindAndCountAll.mock.calls[0][0];
+      expect(call.where.matchId).toBe('match-001');
     });
   });
 

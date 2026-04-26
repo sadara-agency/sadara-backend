@@ -31,7 +31,13 @@ async function getPlayerPackage(
       const player = await Player.findByPk(playerId, {
         attributes: ["id", "playerPackage"],
       });
-      return player?.playerPackage ?? null;
+      // Normalize plus-grade variants (A+→A, B+→B, C+→C) to canonical tier
+      const raw = player?.playerPackage;
+      if (!raw) return null;
+      const normalized = raw.replace("+", "") as PlayerPackage;
+      return (["A", "B", "C"] as PlayerPackage[]).includes(normalized)
+        ? normalized
+        : null;
     },
     3600, // 1 hour TTL
   );
