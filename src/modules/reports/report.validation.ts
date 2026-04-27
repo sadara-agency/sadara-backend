@@ -14,8 +14,24 @@ export const reportQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(500).default(20),
   playerId: z.string().uuid().optional(),
-  status: z.enum(["Draft", "Generating", "Generated", "Failed"]).optional(),
+  status: z
+    .enum([
+      "Draft",
+      "Generating",
+      "Generated",
+      "Failed",
+      "AiDraft",
+      "Reviewing",
+      "Published",
+    ])
+    .optional(),
 });
+
+export const publishReportSchema = z.object({
+  editedContent: z.string().min(1).max(50_000).optional(),
+});
+
+export type PublishReportInput = z.infer<typeof publishReportSchema>;
 
 export const reportFiltersSchema = z.object({
   dateFrom: z.string().optional(),

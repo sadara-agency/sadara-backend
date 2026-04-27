@@ -2,7 +2,14 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
 export type ReportPeriodType = "Season" | "DateRange" | "LastNMatches";
-export type ReportStatus = "Draft" | "Generating" | "Generated" | "Failed";
+export type ReportStatus =
+  | "Draft"
+  | "Generating"
+  | "Generated"
+  | "Failed"
+  | "AiDraft"
+  | "Reviewing"
+  | "Published";
 
 interface TechnicalReportAttributes {
   id: string;
@@ -14,13 +21,30 @@ interface TechnicalReportAttributes {
   status: ReportStatus;
   notes: string | null;
   createdBy: string;
+  aiDraft: string | null;
+  aiModel: string | null;
+  promptHash: string | null;
+  aiGeneratedAt: Date | null;
+  publishedAt: Date | null;
+  publishedBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface TechnicalReportCreation extends Optional<
   TechnicalReportAttributes,
-  "id" | "filePath" | "status" | "notes" | "createdAt" | "updatedAt"
+  | "id"
+  | "filePath"
+  | "status"
+  | "notes"
+  | "aiDraft"
+  | "aiModel"
+  | "promptHash"
+  | "aiGeneratedAt"
+  | "publishedAt"
+  | "publishedBy"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 export class TechnicalReport
@@ -36,6 +60,12 @@ export class TechnicalReport
   declare status: ReportStatus;
   declare notes: string | null;
   declare createdBy: string;
+  declare aiDraft: string | null;
+  declare aiModel: string | null;
+  declare promptHash: string | null;
+  declare aiGeneratedAt: Date | null;
+  declare publishedAt: Date | null;
+  declare publishedBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -73,7 +103,8 @@ TechnicalReport.init(
       field: "file_path",
     },
     status: {
-      type: DataTypes.ENUM("Draft", "Generating", "Generated", "Failed"),
+      type: DataTypes.STRING(30),
+      allowNull: false,
       defaultValue: "Draft",
     },
     notes: {
@@ -84,6 +115,36 @@ TechnicalReport.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "created_by",
+    },
+    aiDraft: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "ai_draft",
+    },
+    aiModel: {
+      type: DataTypes.STRING(100),
+      allowNull: true,
+      field: "ai_model",
+    },
+    promptHash: {
+      type: DataTypes.STRING(64),
+      allowNull: true,
+      field: "prompt_hash",
+    },
+    aiGeneratedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "ai_generated_at",
+    },
+    publishedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "published_at",
+    },
+    publishedBy: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "published_by",
     },
   },
   {

@@ -8,6 +8,7 @@ import { CachePrefix, CacheTTL } from "@shared/utils/cache";
 import {
   createReportSchema,
   reportQuerySchema,
+  publishReportSchema,
 } from "@modules/reports/report.validation";
 import * as ctrl from "@modules/reports/report.controller";
 
@@ -106,6 +107,17 @@ router.delete(
   "/:id",
   authorizeModule("reports", "delete"),
   asyncHandler(ctrl.remove),
+);
+router.post(
+  "/:id/summary",
+  authorizeModule("reports", "update"),
+  asyncHandler(ctrl.generateSummary),
+);
+router.post(
+  "/:id/publish",
+  authorizeModule("reports", "update"),
+  validate(publishReportSchema),
+  asyncHandler(ctrl.publishReport),
 );
 
 export default router;

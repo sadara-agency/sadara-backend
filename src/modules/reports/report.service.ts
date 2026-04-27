@@ -13,6 +13,8 @@ import {
 import { generateReportPdf } from "@modules/reports/report.pdf";
 import { logger } from "@config/logger";
 import { generateReportFailedTask } from "@modules/reports/reportAutoTasks";
+import { callLlm } from "@shared/utils/llm";
+import type { AuthUser } from "@shared/types";
 
 // ── Shared includes ──
 const REPORT_INCLUDES = [
@@ -860,4 +862,87 @@ export async function getExpiringContractsReport(filters: ReportFilters) {
     });
     throw new AppError("Failed to generate Expiring Contracts report", 500);
   }
+}
+
+export async function generateAiSummary(
+  id: string,
+  user: AuthUser,
+): Promise<TechnicalReport> {
+  const report = await getReportById(id);
+  if (report.status === "Published") {
+    throw new AppError("Cannot regenerate summary for a published report", 409);
+  }
+
+  const player = await Player.findByPk(report.playerId, {
+    attributes: [
+      "firstName",
+      "lastName",
+      "firstNameAr",
+      "lastNameAr",
+      "position",
+      "nationality",
+      "dateOfBirth",
+    ],
+  });
+
+  const playerName = player
+    ? `${player.firstName} ${player.lastName}`
+    : "Unknown Player";
+  const periodDesc =
+    report.periodType === "Season"
+      ? `Season ${(report.periodParams as { season?: string }).season ?? ""}`
+      : report.periodType === "LastNMatches"
+        ? `Last ${(report.periodParams as { n?: number }).n ?? "N"} matches`
+        : `${(report.periodParams as { startDate?: string }).startDate ?? ""} to ${(report.periodParams as { endDate?: string }).endDate ?? ""}`;
+
+  const systemPrompt = `You are a professional football technical analyst with expertise in player performance assessment.
+Write concise, data-driven technical reports in a professional tone suitable for sporting directors and coaches.
+Reports should include observations on technical skills, tactical awareness, physical attributes, and areas for improvement.
+Use specific football terminology. Keep the report between 400 and 600 words.`;
+
+  const userPrompt = `Write a technical scouting/performance report for the following player:
+
+Player: ${playerName}
+Position: ${player?.position ?? "N/A"}
+Nationality: ${player?.nationality ?? "N/A"}
+Report Title: ${report.title}
+Analysis Period: ${periodDesc}
+${report.notes ? `Scout/Analyst Notes: ${report.notes}` : ""}
+
+Provide a structured report with: Executive Summary, Technical Analysis, Tactical Contribution, Physical Profile, and Development Recommendations.`;
+
+  const result = await callLlm(systemPrompt, userPrompt);
+
+  await report.update({
+    aiDraft: result.content,
+    aiModel: result.model,
+    promptHash: result.promptHash,
+    aiGeneratedAt: new Date(),
+    status: "AiDraft",
+  });
+
+  return report;
+}
+
+export async function publishReport(
+  id: string,
+  editedContent: string | undefined,
+  user: AuthUser,
+): Promise<TechnicalReport> {
+  const report = await getReportById(id);
+  if (report.status !== "AiDraft" && report.status !== "Reviewing") {
+    throw new AppError(
+      "Only reports in AiDraft or Reviewing status can be published",
+      422,
+    );
+  }
+
+  await report.update({
+    ...(editedContent !== undefined ? { aiDraft: editedContent } : {}),
+    status: "Published",
+    publishedAt: new Date(),
+    publishedBy: user.id,
+  });
+
+  return report;
 }
