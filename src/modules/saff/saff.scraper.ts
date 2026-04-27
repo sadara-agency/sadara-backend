@@ -2,6 +2,7 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import * as iconv from "iconv-lite";
 import { logger } from "@config/logger";
+import { createBreaker, CircuitOpenError } from "@shared/utils/circuitBreaker";
 import {
   scrapedStandingSchema,
   scrapedFixtureSchema,
@@ -104,59 +105,76 @@ function parseScore(scoreStr: string): [number | null, number | null] {
   return [isNaN(home) ? null : home, isNaN(away) ? null : away];
 }
 
-// ── Fetch page with proper encoding + retry ──
+// ── Fetch page with proper encoding + retry + circuit breaker ──
 
 const MAX_RETRIES = 2;
 const RETRY_DELAY = 3000; // ms
+
+// One breaker for the whole SAFF endpoint — when SAFF is down, every cron
+// caller short-circuits instead of stacking up timeouts behind a dead host.
+const saffBreaker = createBreaker({
+  name: "saff",
+  failureThreshold: 5,
+  monitoringWindowMs: 30_000,
+  resetTimeoutMs: 60_000,
+});
+
+export function getSaffBreakerState() {
+  return saffBreaker.state;
+}
+
+export { CircuitOpenError };
+
+async function fetchOnce(
+  url: string,
+  lang: "en" | "ar",
+): Promise<cheerio.CheerioAPI> {
+  const response = await axios.get(url, {
+    responseType: "arraybuffer",
+    timeout: 30000,
+    maxRedirects: 5,
+    headers: {
+      "User-Agent": BROWSER_UA,
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "Accept-Language": lang === "ar" ? "ar,en;q=0.5" : "en,ar;q=0.5",
+      "Accept-Encoding": "gzip, deflate",
+      Connection: "keep-alive",
+      "Cache-Control": "no-cache",
+      Referer: "https://www.saff.com.sa/",
+    },
+  });
+
+  // SAFF uses windows-1256 encoding — decode properly
+  const contentType = response.headers["content-type"] || "";
+  const html = contentType.includes("1256")
+    ? iconv.decode(Buffer.from(response.data), "windows-1256")
+    : Buffer.from(response.data).toString("utf-8");
+
+  return cheerio.load(html);
+}
 
 async function fetchPage(
   url: string,
   lang: "en" | "ar" = "en",
 ): Promise<cheerio.CheerioAPI> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      if (attempt > 0) await delay(RETRY_DELAY * attempt);
-
-      const response = await axios.get(url, {
-        responseType: "arraybuffer",
-        timeout: 30000,
-        maxRedirects: 5,
-        headers: {
-          "User-Agent": BROWSER_UA,
-          Accept:
-            "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-          "Accept-Language": lang === "ar" ? "ar,en;q=0.5" : "en,ar;q=0.5",
-          "Accept-Encoding": "gzip, deflate",
-          Connection: "keep-alive",
-          "Cache-Control": "no-cache",
-          Referer: "https://www.saff.com.sa/",
-        },
-      });
-
-      // SAFF uses windows-1256 encoding — decode properly
-      const contentType = response.headers["content-type"] || "";
-      let html: string;
-
-      if (contentType.includes("1256")) {
-        html = iconv.decode(Buffer.from(response.data), "windows-1256");
-      } else {
-        html = Buffer.from(response.data).toString("utf-8");
-      }
-
-      return cheerio.load(html);
-    } catch (err: any) {
-      lastError = err;
-      if (attempt < MAX_RETRIES) {
-        logger.warn(
-          `[SAFF Scraper] Retry ${attempt + 1}/${MAX_RETRIES} for ${url}: ${err.message}`,
-        );
+  return saffBreaker.run(async () => {
+    let lastError: Error | null = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) await delay(RETRY_DELAY * attempt);
+        return await fetchOnce(url, lang);
+      } catch (err) {
+        lastError = err as Error;
+        if (attempt < MAX_RETRIES) {
+          logger.warn(
+            `[SAFF Scraper] Retry ${attempt + 1}/${MAX_RETRIES} for ${url}: ${(err as Error).message}`,
+          );
+        }
       }
     }
-  }
-
-  throw lastError;
+    throw lastError;
+  });
 }
 
 // ══════════════════════════════════════════
@@ -726,12 +744,22 @@ export async function scrapeBatch(
           {
             entity: "standing",
             reason: error.message,
-            raw: { saffId },
+            raw: { saffId, circuitOpen: error instanceof CircuitOpenError },
           },
         ],
         scraperVersion: SELECTOR_VERSION,
         scrapedAt: new Date(),
       });
+
+      // Circuit open: SAFF is down. Stop the batch — every remaining call
+      // will short-circuit anyway, and a 50-tournament loop racing against a
+      // dead host wastes ~75 seconds of inter-request delays.
+      if (error instanceof CircuitOpenError) {
+        logger.warn(
+          `[SAFF Scraper] Aborting batch — circuit breaker open after #${saffId}`,
+        );
+        break;
+      }
     }
 
     if (i < saffIds.length - 1) {

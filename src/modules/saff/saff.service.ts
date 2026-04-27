@@ -27,6 +27,7 @@ import {
   scrapeBatch,
   scrapeTeamLogos,
   scrapeTournamentList,
+  getSaffBreakerState,
 } from "@modules/saff/saff.scraper";
 import type {
   TournamentQuery,
@@ -547,6 +548,28 @@ export async function fetchFromSaff(input: FetchRequest) {
 
   // Run scraper
   const results = await scrapeBatch(tournamentIds, season);
+
+  // If the circuit broke mid-batch, leave a single audit breadcrumb so ops
+  // can tell "SAFF was down" apart from "individual tournaments failed".
+  const breakerState = getSaffBreakerState();
+  if (breakerState === "open") {
+    await SeasonSync.upsert({
+      source: "saff",
+      competition: "(circuit-breaker)",
+      competitionId: null,
+      season,
+      dataType: "fixtures",
+      status: "failed",
+      syncedAt: new Date(),
+      recordCount: 0,
+      errorMessage:
+        "SAFF circuit breaker open — upstream marked unreachable; remaining tournaments skipped",
+    } as any).catch((err) =>
+      logger.warn("[SAFF] Failed to record breaker-open audit row", {
+        error: (err as Error).message,
+      }),
+    );
+  }
 
   // Store results
   const summary = { standings: 0, fixtures: 0, teams: 0 };
