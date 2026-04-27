@@ -50,14 +50,10 @@ export async function up({
     `SELECT 1 FROM pg_indexes WHERE indexname = 'uq_salary_benchmarks_key'`,
   );
   if ((uqRows as any[]).length === 0) {
-    await queryInterface.addIndex(
-      "salary_benchmarks",
-      ["position", "tier", "league", "player_type"],
-      {
-        name: "uq_salary_benchmarks_key",
-        unique: true,
-        where: "season IS NULL",
-      },
+    await (queryInterface.sequelize as any).query(
+      `CREATE UNIQUE INDEX uq_salary_benchmarks_key
+       ON salary_benchmarks (position, tier, league, player_type)
+       WHERE season IS NULL`,
     );
   }
 }
