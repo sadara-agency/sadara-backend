@@ -846,6 +846,24 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
     canUpdate: true,
   }),
+
+  // ── Analyst Saved Views (Analyst Portal MVP-1) ──
+  // Owner-scope visibility is enforced in the service layer; module-level
+  // permission gates who is allowed to use the feature at all. Analysts
+  // get full CRUD on their own views. Admin/Manager/Executive can read
+  // shared views.
+  ...forRoles("analyst_views", ["Analyst", "Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("analyst_views", ["Manager", "Executive"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
