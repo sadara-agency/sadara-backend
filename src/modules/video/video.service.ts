@@ -32,7 +32,13 @@ export async function listClips(query: ListClipsQuery) {
       {
         model: Player,
         as: "player",
-        attributes: ["id", "fullName", "fullNameAr"],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+        ],
       },
       {
         model: User,
@@ -60,7 +66,13 @@ export async function getClipById(id: string) {
       {
         model: Player,
         as: "player",
-        attributes: ["id", "fullName", "fullNameAr"],
+        attributes: [
+          "id",
+          "firstName",
+          "lastName",
+          "firstNameAr",
+          "lastNameAr",
+        ],
       },
       {
         model: User,
