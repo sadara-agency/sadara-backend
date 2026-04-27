@@ -10,6 +10,7 @@ const mockUserFindByPk = jest.fn();
 
 jest.mock('../../../src/config/database', () => ({
   sequelize: { query: jest.fn(), authenticate: jest.fn() },
+  transaction: jest.fn(async (cb: (t: unknown) => Promise<unknown>) => cb({})),
 }));
 
 jest.mock('../../../src/shared/utils/displayId', () => ({
@@ -175,7 +176,10 @@ describe('Referral Service', () => {
       const ref = mockModelInstance(mockReferral({ status: 'InProgress', isRestricted: false }));
       mockReferralFindByPk.mockResolvedValue(ref);
       await referralService.updateReferralStatus('ref-001', { status: 'Closed', closureNotes: 'Done' }, adminUser);
-      expect(ref.update).toHaveBeenCalledWith(expect.objectContaining({ closedAt: expect.any(Date) }));
+      expect(ref.update).toHaveBeenCalledWith(
+        expect.objectContaining({ closedAt: expect.any(Date) }),
+        expect.objectContaining({ transaction: expect.anything() }),
+      );
     });
   });
 

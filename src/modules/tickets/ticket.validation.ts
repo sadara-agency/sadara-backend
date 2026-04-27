@@ -19,11 +19,12 @@ const TICKET_TYPES = [
   "Mental",
   "Administrative",
   "General",
+  "SportsDecision",
 ] as const;
 
 // ── Create Ticket ──
 export const createTicketSchema = z.object({
-  playerId: z.string().uuid("Invalid player ID"),
+  playerId: z.string().uuid("Invalid player ID").optional(),
   journeyStageId: z.string().uuid("Invalid journey stage ID").optional(),
   title: z.string().min(1, "Title is required"),
   titleAr: z.string().optional(),
@@ -32,6 +33,7 @@ export const createTicketSchema = z.object({
   ticketType: z.enum(TICKET_TYPES).default("General"),
   priority: z.enum(TICKET_PRIORITIES).default("medium"),
   assignedTo: z.string().uuid("Invalid user ID").optional(),
+  additionalAssignees: z.array(z.string().uuid("Invalid user ID")).optional(),
   receivingParty: z.string().optional(),
   receivingPartyAr: z.string().optional(),
   dueDate: z
@@ -57,6 +59,10 @@ export const updateTicketSchema = z.object({
   priority: z.enum(TICKET_PRIORITIES).optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   assignedTo: z.string().uuid("Invalid user ID").nullable().optional(),
+  additionalAssignees: z
+    .array(z.string().uuid("Invalid user ID"))
+    .nullable()
+    .optional(),
   receivingParty: z.string().nullable().optional(),
   receivingPartyAr: z.string().nullable().optional(),
   dueDate: z

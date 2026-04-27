@@ -18,12 +18,13 @@ export type TicketType =
   | "Medical"
   | "Mental"
   | "Administrative"
-  | "General";
+  | "General"
+  | "SportsDecision";
 
 interface TicketAttributes {
   id: string;
   displayId: string | null;
-  playerId: string;
+  playerId: string | null;
   journeyStageId: string | null;
   title: string;
   titleAr: string | null;
@@ -33,6 +34,7 @@ interface TicketAttributes {
   priority: TicketPriority;
   status: TicketStatus;
   assignedTo: string | null;
+  additionalAssignees: string[] | null;
   receivingParty: string | null;
   receivingPartyAr: string | null;
   dueDate: string | null;
@@ -49,6 +51,7 @@ interface TicketCreationAttributes extends Optional<
   TicketAttributes,
   | "id"
   | "displayId"
+  | "playerId"
   | "journeyStageId"
   | "titleAr"
   | "description"
@@ -57,6 +60,7 @@ interface TicketCreationAttributes extends Optional<
   | "priority"
   | "status"
   | "assignedTo"
+  | "additionalAssignees"
   | "receivingParty"
   | "receivingPartyAr"
   | "dueDate"
@@ -75,7 +79,7 @@ export class Ticket
 {
   declare id: string;
   declare displayId: string | null;
-  declare playerId: string;
+  declare playerId: string | null;
   declare journeyStageId: string | null;
   declare title: string;
   declare titleAr: string | null;
@@ -85,6 +89,7 @@ export class Ticket
   declare priority: TicketPriority;
   declare status: TicketStatus;
   declare assignedTo: string | null;
+  declare additionalAssignees: string[] | null;
   declare receivingParty: string | null;
   declare receivingPartyAr: string | null;
   declare dueDate: string | null;
@@ -111,7 +116,7 @@ Ticket.init(
     },
     playerId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       field: "player_id",
     },
     journeyStageId: {
@@ -144,6 +149,12 @@ Ticket.init(
     assignedTo: {
       type: DataTypes.UUID,
       field: "assigned_to",
+    },
+    additionalAssignees: {
+      type: DataTypes.ARRAY(DataTypes.UUID),
+      allowNull: true,
+      defaultValue: null,
+      field: "additional_assignees",
     },
     receivingParty: {
       type: DataTypes.STRING(255),

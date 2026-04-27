@@ -113,7 +113,13 @@ Injury.init(
       unique: true,
       field: "display_id",
     },
-    playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
+    playerId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "player_id",
+      references: { model: "players", key: "id" },
+      onDelete: "RESTRICT",
+    },
     matchId: { type: DataTypes.UUID, field: "match_id" },
 
     // ── Core ──

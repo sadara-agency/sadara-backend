@@ -17,7 +17,16 @@ export async function listTickets(query: TicketQuery) {
   if (query.status) where.status = query.status;
   if (query.priority) where.priority = query.priority;
   if (query.ticketType) where.ticketType = query.ticketType;
-  if (query.assignedTo) where.assignedTo = query.assignedTo;
+  if (query.assignedTo) {
+    const existingAnd: unknown[] = (where as any)[Op.and] ?? [];
+    existingAnd.push({
+      [Op.or]: [
+        { assignedTo: query.assignedTo },
+        { additionalAssignees: { [Op.contains]: [query.assignedTo] } },
+      ],
+    });
+    (where as any)[Op.and] = existingAnd;
+  }
   if (query.search) {
     (where as any)[Op.or] = [
       { title: { [Op.iLike]: `%${query.search}%` } },

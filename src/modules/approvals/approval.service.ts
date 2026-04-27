@@ -13,7 +13,8 @@ import {
 import { logger } from "@config/logger";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
-import { generateApprovalRejectedTask } from "@modules/approvals/approvalAutoTasks";
+import { enqueue, QueueName } from "@modules/queues/queues";
+import type { ApprovalTaskCreationJobData } from "@modules/queues/workers/approvalTask.worker";
 import {
   findActiveTemplate,
   createStepsForApproval,
@@ -231,13 +232,20 @@ export async function resolveApproval(
     }),
   );
 
-  // Fire-and-forget: auto-create task on rejection
-  generateApprovalRejectedTask(id, decision).catch((err) =>
-    logger.warn("Approval rejection auto-task failed", {
-      approvalId: id,
-      error: (err as Error).message,
-    }),
-  );
+  // Enqueue auto-task creation. BullMQ retries 3× with exponential backoff
+  // and surfaces terminal failures into Bull Board + audit log.
+  if (decision === "Rejected") {
+    enqueue<ApprovalTaskCreationJobData>(
+      QueueName.ApprovalTaskCreation,
+      "approval-rejected",
+      { approvalId: id, decision },
+    ).catch((err) =>
+      logger.error("Failed to enqueue approval auto-task job", {
+        approvalId: id,
+        error: (err as Error).message,
+      }),
+    );
+  }
 
   return approval;
 }

@@ -252,17 +252,13 @@ async function syncCaseFromInjury(
 export async function updateInjury(id: string, input: UpdateInjuryInput) {
   const injury = await findOrThrow(Injury, id, "Injury");
 
-  const updated = await injury.update(input as any);
-
-  // Sync linked case status
-  if (input.status) {
-    syncCaseFromInjury(id, input.status).catch((err) =>
-      logger.warn("Case sync from injury failed", {
-        injuryId: id,
-        error: (err as Error).message,
-      }),
-    );
-  }
+  const updated = await transaction(async (t) => {
+    const inj = await injury.update(input as any, { transaction: t });
+    if (input.status) {
+      await syncCaseFromInjury(id, input.status, t);
+    }
+    return inj;
+  });
 
   // If recovered, update player status back to active
   if (input.status === "Recovered" && input.actualReturnDate) {

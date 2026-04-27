@@ -12,7 +12,7 @@
 // Performances: raw SQL using ON CONFLICT (player_id, season, competition)
 // ─────────────────────────────────────────────────────────────
 
-import { Op, QueryTypes, Sequelize } from "sequelize";
+import { Op, QueryTypes, Sequelize, type Transaction } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import { Player } from "@modules/players/player.model";
@@ -74,98 +74,112 @@ function splitName(full: string): { firstName: string; lastName: string } {
 async function resolvePlayer(
   scraped: ScrapedPlayerFull,
 ): Promise<PlayerSyncResult> {
-  const { bio, currentSeasonStats } = scraped;
-  const { firstName, lastName } = splitName(bio.fullName);
+  // The whole resolution (mapping check → player upsert → performance upsert)
+  // is one atomic unit. If any of the writes fails, none of them are committed
+  // — the next sync attempt sees a clean slate instead of a half-updated row.
+  return sequelize.transaction(async (t) => {
+    const { bio, currentSeasonStats } = scraped;
+    const { firstName, lastName } = splitName(bio.fullName);
 
-  // ── 1. Check ExternalProviderMapping ──
-  const existing = await ExternalProviderMapping.findOne({
-    where: { providerName: PROVIDER_SPL, externalPlayerId: bio.splPlayerId },
-  });
+    // ── 1. Check ExternalProviderMapping ──
+    const existing = await ExternalProviderMapping.findOne({
+      where: { providerName: PROVIDER_SPL, externalPlayerId: bio.splPlayerId },
+      transaction: t,
+    });
 
-  if (existing) {
-    const player = await Player.findByPk(existing.playerId);
-    if (!player) {
+    if (existing) {
+      const player = await Player.findByPk(existing.playerId, {
+        transaction: t,
+      });
+      if (!player) {
+        return {
+          splPlayerId: bio.splPlayerId,
+          playerName: bio.fullName,
+          sadaraPlayerId: existing.playerId,
+          action: "skipped",
+          reason: "Mapping exists but player missing",
+        };
+      }
+
+      const updates: Record<string, any> = {};
+      if (bio.photoUrl && !player.getDataValue("photoUrl"))
+        updates.photoUrl = bio.photoUrl;
+      if (bio.heightCm && !player.getDataValue("heightCm"))
+        updates.heightCm = bio.heightCm;
+      if (bio.jerseyNumber !== null) updates.jerseyNumber = bio.jerseyNumber;
+      if (bio.position) updates.position = normalizePosition(bio.position);
+      if (bio.splTeamId) {
+        const club = await findClubBySplId(bio.splTeamId, t);
+        if (club) updates.currentClubId = club.id;
+      }
+      if (Object.keys(updates).length > 0)
+        await player.update(updates, { transaction: t });
+      await existing.update({ lastSyncedAt: new Date() }, { transaction: t });
+
+      if (currentSeasonStats)
+        await upsertPerformance(player.id, currentSeasonStats, t);
       return {
         splPlayerId: bio.splPlayerId,
         playerName: bio.fullName,
-        sadaraPlayerId: existing.playerId,
-        action: "skipped",
-        reason: "Mapping exists but player missing",
+        sadaraPlayerId: player.id,
+        action: "updated",
       };
     }
 
-    // Update fields that may have changed
-    const updates: Record<string, any> = {};
-    if (bio.photoUrl && !player.getDataValue("photoUrl"))
-      updates.photoUrl = bio.photoUrl;
-    if (bio.heightCm && !player.getDataValue("heightCm"))
-      updates.heightCm = bio.heightCm;
-    if (bio.jerseyNumber !== null) updates.jerseyNumber = bio.jerseyNumber;
-    if (bio.position) updates.position = normalizePosition(bio.position);
-    if (bio.splTeamId) {
-      const club = await findClubBySplId(bio.splTeamId);
-      if (club) updates.currentClubId = club.id;
+    // ── 2. Fuzzy match name + DOB ──
+    const fuzzy = await findByNameDob(firstName, lastName, bio.dateOfBirth, t);
+    if (fuzzy) {
+      await createMappings(fuzzy.id, bio, t);
+      await fuzzy.update(
+        {
+          photoUrl: bio.photoUrl || fuzzy.getDataValue("photoUrl"),
+          heightCm: bio.heightCm || fuzzy.getDataValue("heightCm"),
+          jerseyNumber: bio.jerseyNumber ?? fuzzy.getDataValue("jerseyNumber"),
+        },
+        { transaction: t },
+      );
+      if (currentSeasonStats)
+        await upsertPerformance(fuzzy.id, currentSeasonStats, t);
+      return {
+        splPlayerId: bio.splPlayerId,
+        playerName: bio.fullName,
+        sadaraPlayerId: fuzzy.id,
+        action: "updated",
+        reason: "Linked via name+DOB",
+      };
     }
-    if (Object.keys(updates).length > 0) await player.update(updates);
-    await existing.update({ lastSyncedAt: new Date() });
 
+    // ── 3. Create new player ──
+    const clubId = bio.splTeamId
+      ? (await findClubBySplId(bio.splTeamId, t))?.id
+      : null;
+    const newPlayer = await Player.create(
+      {
+        firstName,
+        lastName,
+        dateOfBirth: bio.dateOfBirth || "2000-01-01",
+        nationality: bio.nationality || undefined,
+        position: normalizePosition(bio.position) || undefined,
+        heightCm: bio.heightCm || undefined,
+        jerseyNumber: bio.jerseyNumber || undefined,
+        photoUrl: bio.photoUrl || undefined,
+        currentClubId: clubId || undefined,
+        playerType: "Pro",
+        status: "active",
+      } as any,
+      { transaction: t },
+    );
+
+    await createMappings(newPlayer.id, bio, t);
     if (currentSeasonStats)
-      await upsertPerformance(player.id, currentSeasonStats);
+      await upsertPerformance(newPlayer.id, currentSeasonStats, t);
     return {
       splPlayerId: bio.splPlayerId,
       playerName: bio.fullName,
-      sadaraPlayerId: player.id,
-      action: "updated",
+      sadaraPlayerId: newPlayer.id,
+      action: "created",
     };
-  }
-
-  // ── 2. Fuzzy match name + DOB ──
-  const fuzzy = await findByNameDob(firstName, lastName, bio.dateOfBirth);
-  if (fuzzy) {
-    await createMappings(fuzzy.id, bio);
-    await fuzzy.update({
-      photoUrl: bio.photoUrl || fuzzy.getDataValue("photoUrl"),
-      heightCm: bio.heightCm || fuzzy.getDataValue("heightCm"),
-      jerseyNumber: bio.jerseyNumber ?? fuzzy.getDataValue("jerseyNumber"),
-    });
-    if (currentSeasonStats)
-      await upsertPerformance(fuzzy.id, currentSeasonStats);
-    return {
-      splPlayerId: bio.splPlayerId,
-      playerName: bio.fullName,
-      sadaraPlayerId: fuzzy.id,
-      action: "updated",
-      reason: "Linked via name+DOB",
-    };
-  }
-
-  // ── 3. Create new player ──
-  const clubId = bio.splTeamId
-    ? (await findClubBySplId(bio.splTeamId))?.id
-    : null;
-  const newPlayer = await Player.create({
-    firstName,
-    lastName,
-    dateOfBirth: bio.dateOfBirth || "2000-01-01",
-    nationality: bio.nationality || undefined,
-    position: normalizePosition(bio.position) || undefined,
-    heightCm: bio.heightCm || undefined,
-    jerseyNumber: bio.jerseyNumber || undefined,
-    photoUrl: bio.photoUrl || undefined,
-    currentClubId: clubId || undefined,
-    playerType: "Pro",
-    status: "active",
-  } as any);
-
-  await createMappings(newPlayer.id, bio);
-  if (currentSeasonStats)
-    await upsertPerformance(newPlayer.id, currentSeasonStats);
-  return {
-    splPlayerId: bio.splPlayerId,
-    playerName: bio.fullName,
-    sadaraPlayerId: newPlayer.id,
-    action: "created",
-  };
+  });
 }
 
 // ══════════════════════════════════════════
@@ -176,6 +190,7 @@ async function findByNameDob(
   first: string,
   last: string,
   dob: string | null,
+  t?: Transaction,
 ): Promise<Player | null> {
   const where: any = {
     [Op.and]: [
@@ -190,10 +205,13 @@ async function findByNameDob(
     ],
   };
   if (dob) where.dateOfBirth = dob;
-  return Player.findOne({ where });
+  return Player.findOne({ where, ...(t ? { transaction: t } : {}) });
 }
 
-async function findClubBySplId(splTeamId: string): Promise<Club | null> {
+async function findClubBySplId(
+  splTeamId: string,
+  t?: Transaction,
+): Promise<Club | null> {
   const entry = SPL_CLUB_REGISTRY.find((c) => c.splTeamId === splTeamId);
   // Try spl_team_id column first, then name fallback
   return Club.findOne({
@@ -203,31 +221,40 @@ async function findClubBySplId(splTeamId: string): Promise<Club | null> {
         ...(entry ? [{ name: { [Op.iLike]: `%${entry.nameEn}%` } }] : []),
       ],
     },
+    ...(t ? { transaction: t } : {}),
   });
 }
 
 async function createMappings(
   playerId: string,
   bio: ScrapedPlayerFull["bio"],
+  t?: Transaction,
 ): Promise<void> {
+  const txOpt = t ? { transaction: t } : undefined;
   // Real constraint: UNIQUE(player_id, provider_name)
-  await ExternalProviderMapping.upsert({
-    playerId,
-    providerName: PROVIDER_SPL,
-    externalPlayerId: bio.splPlayerId,
-    externalTeamId: bio.splTeamId || undefined,
-    apiBaseUrl: `https://www.spl.com.sa/en/players/${bio.splPlayerId}/${bio.slug}`,
-    lastSyncedAt: new Date(),
-  } as any);
+  await ExternalProviderMapping.upsert(
+    {
+      playerId,
+      providerName: PROVIDER_SPL,
+      externalPlayerId: bio.splPlayerId,
+      externalTeamId: bio.splTeamId || undefined,
+      apiBaseUrl: `https://www.spl.com.sa/en/players/${bio.splPlayerId}/${bio.slug}`,
+      lastSyncedAt: new Date(),
+    } as any,
+    txOpt,
+  );
 
   if (bio.pulseLiveId) {
-    await ExternalProviderMapping.upsert({
-      playerId,
-      providerName: PROVIDER_PULSELIVE,
-      externalPlayerId: bio.pulseLiveId,
-      apiBaseUrl: bio.photoUrl || undefined,
-      lastSyncedAt: new Date(),
-    } as any);
+    await ExternalProviderMapping.upsert(
+      {
+        playerId,
+        providerName: PROVIDER_PULSELIVE,
+        externalPlayerId: bio.pulseLiveId,
+        apiBaseUrl: bio.photoUrl || undefined,
+        lastSyncedAt: new Date(),
+      } as any,
+      txOpt,
+    );
   } else {
     logger.warn(
       `[SPL Sync] No PulseLive ID for player "${bio.fullName}" (SPL#${bio.splPlayerId}) — photo URL: ${bio.photoUrl ?? "none"}`,
@@ -245,6 +272,7 @@ async function createMappings(
 async function upsertPerformance(
   playerId: string,
   stats: NonNullable<ScrapedPlayerFull["currentSeasonStats"]>,
+  t?: Transaction,
 ): Promise<void> {
   const season = "2025-2026";
   const competition = "Saudi Pro League";
@@ -257,6 +285,7 @@ async function upsertPerformance(
     {
       replacements: { playerId, season, competition },
       type: QueryTypes.SELECT,
+      ...(t ? { transaction: t } : {}),
     },
   );
   if (!canOverwrite(existing[0]?.data_source, "SPL", PERFORMANCE_PRIORITY)) {
@@ -303,6 +332,7 @@ async function upsertPerformance(
         yellowCards: stats.yellowCards,
         redCards: stats.redCards,
       },
+      ...(t ? { transaction: t } : {}),
     },
   );
 }

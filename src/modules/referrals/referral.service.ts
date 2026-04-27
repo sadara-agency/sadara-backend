@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, literal, type ProjectionAlias } from "sequelize";
 import {
   Referral,
   type ReferralAttributes,
@@ -9,6 +9,7 @@ import { Injury } from "@modules/injuries/injury.model";
 import { Session } from "@modules/sessions/session.model";
 import { Ticket } from "@modules/tickets/ticket.model";
 import { AppError } from "@middleware/errorHandler";
+import { transaction } from "@config/database";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import {
@@ -46,8 +47,24 @@ function referralIncludes() {
   ];
 }
 
+// Computed sessionCount — replaces the formerly-stored, manually-maintained
+// counter. Correlated subquery against the outer "Referral" alias.
+const SESSION_COUNT_LITERAL: ProjectionAlias = [
+  literal(
+    `(SELECT COUNT(*)::int FROM "sessions" WHERE "sessions"."referral_id" = "Referral"."id")`,
+  ),
+  "sessionCount",
+];
+
+function referralAttributesWithComputed() {
+  return { include: [SESSION_COUNT_LITERAL] };
+}
+
 async function refetchWithIncludes(id: string) {
-  return Referral.findByPk(id, { include: referralIncludes() });
+  return Referral.findByPk(id, {
+    include: referralIncludes(),
+    attributes: referralAttributesWithComputed(),
+  });
 }
 
 // ── List ──
@@ -90,6 +107,7 @@ export async function listReferrals(queryParams: any, user?: AuthUser) {
     offset,
     order: [[sort, order]],
     include: referralIncludes(),
+    attributes: referralAttributesWithComputed(),
     subQuery: false,
   });
 
@@ -99,7 +117,10 @@ export async function listReferrals(queryParams: any, user?: AuthUser) {
 // ── Get by ID ──
 
 export async function getReferralById(id: string, user?: AuthUser) {
-  const referral = await Referral.findByPk(id, { include: referralIncludes() });
+  const referral = await Referral.findByPk(id, {
+    include: referralIncludes(),
+    attributes: referralAttributesWithComputed(),
+  });
   if (!referral) throw new AppError("Referral not found", 404);
 
   const allowed = await checkRowAccess("referrals", referral, user);
@@ -298,17 +319,12 @@ export async function updateReferralStatus(
     }).catch((err) => logger.error("Failed to send re-open notification", err));
   }
 
-  await referral.update(updateData);
-
-  // Reverse sync: if case closed and has linked injury, recover the injury
-  if (input.status === "Closed" && referral.injuryId) {
-    syncInjuryFromCase(referral.injuryId, referral.playerId).catch((err) =>
-      logger.warn("Injury sync from case failed", {
-        referralId: id,
-        error: (err as Error).message,
-      }),
-    );
-  }
+  await transaction(async (t) => {
+    await referral.update(updateData, { transaction: t });
+    if (input.status === "Closed" && referral.injuryId) {
+      await syncInjuryFromCase(referral.injuryId, referral.playerId, t);
+    }
+  });
 
   return refetchWithIncludes(id);
 }
@@ -320,14 +336,19 @@ export async function updateReferralStatus(
 async function syncInjuryFromCase(
   injuryId: string,
   playerId: string,
+  t?: any,
 ): Promise<void> {
-  const injury = await Injury.findByPk(injuryId);
+  const txOpt = t ? { transaction: t } : undefined;
+  const injury = await Injury.findByPk(injuryId, txOpt);
   if (!injury || injury.status === "Recovered") return;
 
-  await injury.update({
-    status: "Recovered",
-    actualReturnDate: new Date().toISOString().split("T")[0],
-  } as any);
+  await injury.update(
+    {
+      status: "Recovered",
+      actualReturnDate: new Date().toISOString().split("T")[0],
+    } as any,
+    txOpt,
+  );
 
   // Check if player has other active injuries
   const activeCount = await Injury.count({
@@ -336,13 +357,18 @@ async function syncInjuryFromCase(
       status: { [Op.in]: ["UnderTreatment", "Relapsed"] },
       id: { [Op.ne]: injuryId },
     },
+    ...(t ? { transaction: t } : {}),
   });
   if (activeCount === 0) {
     const player = await Player.findByPk(playerId, {
       attributes: ["id", "status"],
+      ...(t ? { transaction: t } : {}),
     });
     const prevStatus = player?.getDataValue("status") ?? null;
-    await Player.update({ status: "active" }, { where: { id: playerId } });
+    await Player.update(
+      { status: "active" },
+      { where: { id: playerId }, ...(t ? { transaction: t } : {}) },
+    );
     logAudit(
       "UPDATE",
       "players",

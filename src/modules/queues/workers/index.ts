@@ -4,6 +4,7 @@ import { createEmailWorker } from "./email.worker";
 import { createNotificationWorker } from "./notification.worker";
 import { createEngineWorker } from "./engine.worker";
 import { createSaffWorker } from "./saff.worker";
+import { createApprovalTaskWorker } from "./approvalTask.worker";
 import { logger } from "@config/logger";
 
 const workers: Worker[] = [];
@@ -15,6 +16,7 @@ export function startWorkers(): void {
     createNotificationWorker(),
     createEngineWorker(),
     createSaffWorker(),
+    createApprovalTaskWorker(),
   );
   logger.info("BullMQ workers started", { count: workers.length });
 }

@@ -65,7 +65,6 @@ export const updateReferralSchema = z.object({
   dueDate: z.string().nullable().optional(),
   notes: z.string().optional(),
   evidenceCount: z.number().int().min(0).optional(),
-  sessionCount: z.number().int().min(0).optional(),
   isRestricted: z.boolean().optional(),
   restrictedTo: z.array(z.string().uuid()).optional(),
 });
