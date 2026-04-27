@@ -2,6 +2,7 @@ import { Router } from "express";
 import kpiRoutes from "./kpis/tacticalKpi.routes";
 import setPieceRoutes from "./set-pieces/setPiece.routes";
 import reportRoutes from "./reports/tacticalReport.routes";
+import oppositionRoutes from "./opposition/oppositionReport.routes";
 
 const router = Router();
 
@@ -14,5 +15,8 @@ router.use("/set-pieces", setPieceRoutes);
 
 // /api/v1/tactical/reports
 router.use("/reports", reportRoutes);
+
+// /api/v1/tactical/opposition
+router.use("/opposition", oppositionRoutes);
 
 export default router;

@@ -56,6 +56,7 @@ export const CachePrefix = {
   VIDEO_TAGS: "video-tags",
   STAFF_MON: "staff-mon",
   ANALYST_VIEWS: "analyst-views",
+  OPPOSITION_REPORTS: "opposition-reports",
 } as const;
 
 // ── Core Operations ──
