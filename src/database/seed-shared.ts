@@ -864,6 +864,17 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
+
+  // ── Salary Benchmarks (Commercial Analytics MVP-6) ──
+  ...forRoles("salary_benchmarks", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("salary_benchmarks", ["Analyst", "Executive"], {
+    canRead: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
