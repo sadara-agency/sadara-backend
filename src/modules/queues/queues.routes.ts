@@ -20,6 +20,7 @@ try {
       new BullMQAdapter(getQueue(QueueName.NotificationFanout)),
       new BullMQAdapter(getQueue(QueueName.EngineTask)),
       new BullMQAdapter(getQueue(QueueName.SaffFetch)),
+      new BullMQAdapter(getQueue(QueueName.ApprovalTaskCreation)),
     ],
     serverAdapter,
   });

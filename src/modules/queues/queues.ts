@@ -16,6 +16,7 @@ export enum QueueName {
   NotificationFanout = "notification-fanout",
   EngineTask = "engine-task",
   SaffFetch = "saff-fetch",
+  ApprovalTaskCreation = "approval-task-creation",
 }
 
 export const DEFAULT_JOB_OPTIONS: JobsOptions = {
