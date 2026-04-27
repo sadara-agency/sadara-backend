@@ -93,7 +93,12 @@ Invoice.init(
       allowNull: false,
       field: "invoice_number",
     },
-    contractId: { type: DataTypes.UUID, field: "contract_id" },
+    contractId: {
+      type: DataTypes.UUID,
+      field: "contract_id",
+      references: { model: "contracts", key: "id" },
+      onDelete: "RESTRICT",
+    },
     playerId: { type: DataTypes.UUID, field: "player_id" },
     clubId: { type: DataTypes.UUID, field: "club_id" },
     amount: { type: DataTypes.DECIMAL(15, 2), allowNull: false },

@@ -150,6 +150,8 @@ Referral.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "player_id",
+      references: { model: "players", key: "id" },
+      onDelete: "RESTRICT",
     },
     injuryId: {
       type: DataTypes.UUID,

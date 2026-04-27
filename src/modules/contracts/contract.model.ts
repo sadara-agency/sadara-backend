@@ -204,11 +204,15 @@ Contract.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "player_id",
+      references: { model: "players", key: "id" },
+      onDelete: "RESTRICT",
     },
     clubId: {
       type: DataTypes.UUID,
       allowNull: false,
       field: "club_id",
+      references: { model: "clubs", key: "id" },
+      onDelete: "RESTRICT",
     },
     category: {
       type: DataTypes.ENUM("Club", "Sponsorship", "Agency"),

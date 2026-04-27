@@ -501,14 +501,33 @@ export async function updatePlayer(id: string, input: any) {
 }
 
 export async function deletePlayer(id: string) {
-  const [deps] = await sequelize.query<{ active_contracts: number }>(
-    `SELECT COUNT(*)::int AS active_contracts FROM contracts WHERE player_id = :id AND status = 'Active'`,
+  const [deps] = await sequelize.query<{
+    active_contracts: number;
+    referrals: number;
+    injuries: number;
+  }>(
+    `SELECT
+       (SELECT COUNT(*)::int FROM contracts WHERE player_id = :id AND status = 'Active') AS active_contracts,
+       (SELECT COUNT(*)::int FROM referrals WHERE player_id = :id) AS referrals,
+       (SELECT COUNT(*)::int FROM injuries WHERE player_id = :id) AS injuries`,
     { replacements: { id }, type: QueryTypes.SELECT },
   );
 
-  if (deps && deps.active_contracts > 0) {
+  if (deps?.active_contracts) {
     throw new AppError(
       "Cannot delete player with active contracts. Terminate or transfer contracts first.",
+      400,
+    );
+  }
+  if (deps?.referrals) {
+    throw new AppError(
+      "Cannot delete player with referrals on file. Archive the player instead.",
+      400,
+    );
+  }
+  if (deps?.injuries) {
+    throw new AppError(
+      "Cannot delete player with injury history. Archive the player instead.",
       400,
     );
   }
