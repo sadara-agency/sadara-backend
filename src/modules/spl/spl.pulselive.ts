@@ -5,9 +5,10 @@
 // Rate limit: 500ms between requests.
 // ─────────────────────────────────────────────────────────────
 
-import axios, { AxiosInstance } from "axios";
+import axios, { AxiosInstance, AxiosResponse } from "axios";
 import { logger } from "@config/logger";
 import { env } from "@config/env";
+import { createBreaker, CircuitOpenError } from "@shared/utils/circuitBreaker";
 import type {
   PulseLivePlayerStatsResponse,
   PulseLiveTeamStatsResponse,
@@ -50,6 +51,63 @@ const client: AxiosInstance = axios.create({
   },
 });
 
+// ── Retry + circuit breaker (shared across all fetch* functions) ──
+
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 1_500;
+
+const splBreaker = createBreaker({
+  name: "spl-pulselive",
+  failureThreshold: 5,
+  monitoringWindowMs: 30_000,
+  resetTimeoutMs: 60_000,
+});
+
+export function getSplBreakerState() {
+  return splBreaker.state;
+}
+
+export { CircuitOpenError };
+
+/**
+ * Single retry+breaker entry point for every PulseLive call.
+ *  - 404 → return null (resource not found is not a breaker failure).
+ *  - Other failures → up to MAX_RETRIES retries with exponential backoff,
+ *    all wrapped by the breaker so repeated outages short-circuit.
+ */
+async function fetchJson<T>(
+  label: string,
+  request: () => Promise<AxiosResponse<T>>,
+): Promise<T | null> {
+  await rateLimitedDelay();
+  return splBreaker.run(async () => {
+    let lastErr: unknown = null;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        if (attempt > 0) {
+          await new Promise((r) => setTimeout(r, RETRY_BASE_MS * attempt));
+        }
+        const { data } = await request();
+        return data;
+      } catch (err: unknown) {
+        const status = (err as { response?: { status?: number } }).response
+          ?.status;
+        if (status === 404) return null;
+        lastErr = err;
+        if (attempt < MAX_RETRIES) {
+          logger.warn(
+            `[PulseLive] Retry ${attempt + 1}/${MAX_RETRIES} ${label}: ${(err as Error).message}`,
+          );
+        }
+      }
+    }
+    logger.error(
+      `[PulseLive] ${label} failed after ${MAX_RETRIES} retries: ${(lastErr as Error)?.message}`,
+    );
+    throw lastErr;
+  });
+}
+
 // ── Helpers ──
 
 function seasonParam(seasonId?: number): number {
@@ -78,31 +136,21 @@ export async function fetchPlayerStats(
   entity: PulseLivePlayerStatsResponse["entity"];
   stats: Record<string, number>;
 } | null> {
-  await rateLimitedDelay();
-  try {
-    const { data } = await client.get<PulseLivePlayerStatsResponse>(
-      `/football/stats/player/${pulseLivePlayerId}`,
-      {
-        params: {
-          comps: compId ?? COMP_ID,
-          compSeasons: seasonParam(seasonId),
+  const data = await fetchJson<PulseLivePlayerStatsResponse>(
+    `fetchPlayerStats(${pulseLivePlayerId})`,
+    () =>
+      client.get<PulseLivePlayerStatsResponse>(
+        `/football/stats/player/${pulseLivePlayerId}`,
+        {
+          params: {
+            comps: compId ?? COMP_ID,
+            compSeasons: seasonParam(seasonId),
+          },
         },
-      },
-    );
-
-    if (!data.stats || data.stats.length === 0) return null;
-
-    return {
-      entity: data.entity,
-      stats: statsArrayToMap(data.stats),
-    };
-  } catch (err: any) {
-    if (err.response?.status === 404) return null;
-    logger.error(
-      `[PulseLive] fetchPlayerStats(${pulseLivePlayerId}): ${err.message}`,
-    );
-    throw err;
-  }
+      ),
+  );
+  if (!data || !data.stats || data.stats.length === 0) return null;
+  return { entity: data.entity, stats: statsArrayToMap(data.stats) };
 }
 
 /**
@@ -117,31 +165,21 @@ export async function fetchTeamStats(
   entity: PulseLiveTeamStatsResponse["entity"];
   stats: Record<string, number>;
 } | null> {
-  await rateLimitedDelay();
-  try {
-    const { data } = await client.get<PulseLiveTeamStatsResponse>(
-      `/football/stats/team/${pulseLiveTeamId}`,
-      {
-        params: {
-          comps: compId ?? COMP_ID,
-          compSeasons: seasonParam(seasonId),
+  const data = await fetchJson<PulseLiveTeamStatsResponse>(
+    `fetchTeamStats(${pulseLiveTeamId})`,
+    () =>
+      client.get<PulseLiveTeamStatsResponse>(
+        `/football/stats/team/${pulseLiveTeamId}`,
+        {
+          params: {
+            comps: compId ?? COMP_ID,
+            compSeasons: seasonParam(seasonId),
+          },
         },
-      },
-    );
-
-    if (!data.stats || data.stats.length === 0) return null;
-
-    return {
-      entity: data.entity,
-      stats: statsArrayToMap(data.stats),
-    };
-  } catch (err: any) {
-    if (err.response?.status === 404) return null;
-    logger.error(
-      `[PulseLive] fetchTeamStats(${pulseLiveTeamId}): ${err.message}`,
-    );
-    throw err;
-  }
+      ),
+  );
+  if (!data || !data.stats || data.stats.length === 0) return null;
+  return { entity: data.entity, stats: statsArrayToMap(data.stats) };
 }
 
 /**
@@ -152,24 +190,15 @@ export async function fetchStandings(
   seasonId?: number,
   compId?: number,
 ): Promise<PulseLiveStandingsResponse | null> {
-  await rateLimitedDelay();
-  try {
-    const { data } = await client.get<PulseLiveStandingsResponse>(
-      "/football/standings",
-      {
-        params: {
-          comps: compId ?? COMP_ID,
-          compSeasons: seasonParam(seasonId),
-          altIds: true,
-        },
+  return fetchJson<PulseLiveStandingsResponse>("fetchStandings", () =>
+    client.get<PulseLiveStandingsResponse>("/football/standings", {
+      params: {
+        comps: compId ?? COMP_ID,
+        compSeasons: seasonParam(seasonId),
+        altIds: true,
       },
-    );
-    return data;
-  } catch (err: any) {
-    if (err.response?.status === 404) return null;
-    logger.error(`[PulseLive] fetchStandings: ${err.message}`);
-    throw err;
-  }
+    }),
+  );
 }
 
 /**
@@ -183,9 +212,8 @@ export async function fetchRankedPlayers(
   seasonId?: number,
   compId?: number,
 ): Promise<PulseLiveRankedResponse | null> {
-  await rateLimitedDelay();
-  try {
-    const { data } = await client.get<PulseLiveRankedResponse>(
+  return fetchJson<PulseLiveRankedResponse>(`fetchRankedPlayers(${stat})`, () =>
+    client.get<PulseLiveRankedResponse>(
       `/football/stats/ranked/players/${stat}`,
       {
         params: {
@@ -196,13 +224,8 @@ export async function fetchRankedPlayers(
           altIds: true,
         },
       },
-    );
-    return data;
-  } catch (err: any) {
-    if (err.response?.status === 404) return null;
-    logger.error(`[PulseLive] fetchRankedPlayers(${stat}): ${err.message}`);
-    throw err;
-  }
+    ),
+  );
 }
 
 /**
@@ -213,26 +236,17 @@ export async function fetchTeams(
   seasonId?: number,
   compId?: number,
 ): Promise<PulseLiveTeamsResponse | null> {
-  await rateLimitedDelay();
-  try {
-    const { data } = await client.get<PulseLiveTeamsResponse>(
-      "/football/teams",
-      {
-        params: {
-          comps: compId ?? COMP_ID,
-          compSeasons: seasonParam(seasonId),
-          altIds: true,
-          page: 0,
-          pageSize: 30,
-        },
+  return fetchJson<PulseLiveTeamsResponse>("fetchTeams", () =>
+    client.get<PulseLiveTeamsResponse>("/football/teams", {
+      params: {
+        comps: compId ?? COMP_ID,
+        compSeasons: seasonParam(seasonId),
+        altIds: true,
+        page: 0,
+        pageSize: 30,
       },
-    );
-    return data;
-  } catch (err: any) {
-    if (err.response?.status === 404) return null;
-    logger.error(`[PulseLive] fetchTeams: ${err.message}`);
-    throw err;
-  }
+    }),
+  );
 }
 
 /**
