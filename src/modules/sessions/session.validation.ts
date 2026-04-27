@@ -1,5 +1,20 @@
 import { z } from "zod";
 
+export const SESSION_OUTCOME_TAGS = [
+  "InjuryConcern",
+  "FatigueFlag",
+  "TacticalImprovement",
+  "MentalHealthFlag",
+  "NutritionAlert",
+  "ExceptionalPerformance",
+  "MotivationLow",
+  "ReadyForMatchday",
+  "RequiresMedicalReview",
+  "TechniqueBreakthrough",
+] as const;
+
+export type SessionOutcomeTag = (typeof SESSION_OUTCOME_TAGS)[number];
+
 const SESSION_TYPES = [
   "Physical",
   "Skill",
@@ -58,6 +73,7 @@ export const createSessionSchema = z.object({
   rating: z.number().int().min(1).max(10).nullable().optional(),
   videoTimestamps: z.array(videoTimestampSchema).nullable().optional(),
   resultingTicketId: z.string().uuid("Invalid ticket ID").nullable().optional(),
+  outcomeTags: z.array(z.enum(SESSION_OUTCOME_TAGS)).nullable().optional(),
 });
 
 // ── Update Session ──
@@ -82,7 +98,20 @@ export const updateSessionSchema = z.object({
   rating: z.number().int().min(1).max(10).nullable().optional(),
   videoTimestamps: z.array(videoTimestampSchema).nullable().optional(),
   resultingTicketId: z.string().uuid().nullable().optional(),
+  outcomeTags: z.array(z.enum(SESSION_OUTCOME_TAGS)).nullable().optional(),
 });
+
+// ── Coverage Radar ──
+
+export const coverageRadarQuerySchema = z.object({
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "dateFrom must be YYYY-MM-DD"),
+  dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "dateTo must be YYYY-MM-DD"),
+  playerIds: z.string().optional(),
+});
+
+export type CoverageRadarQuery = z.infer<typeof coverageRadarQuerySchema>;
 
 // ── Query Sessions ──
 
@@ -117,6 +146,7 @@ export const sessionQuerySchema = z.object({
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/)
     .optional(),
+  outcomeTags: z.string().optional(),
 });
 
 // ── Inferred Types ──

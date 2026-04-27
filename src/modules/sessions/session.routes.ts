@@ -4,12 +4,13 @@ import { authenticate, authorizeModule } from "@middleware/auth";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { cacheRoute } from "@middleware/cache.middleware";
-import { CacheTTL } from "@shared/utils/cache";
+import { CacheTTL, CachePrefix } from "@shared/utils/cache";
 import { validate } from "@middleware/validate";
 import {
   createSessionSchema,
   updateSessionSchema,
   sessionQuerySchema,
+  coverageRadarQuerySchema,
 } from "./session.validation";
 import * as sessionController from "./session.controller";
 import feedbackRoutes from "./feedback/sessionFeedback.routes";
@@ -57,6 +58,19 @@ router.get(
   dynamicFieldAccess("sessions"),
   cacheRoute("sessions", CacheTTL.MEDIUM),
   asyncHandler(sessionController.listByPlayer),
+);
+router.get(
+  "/coverage-radar",
+  authorizeModule("sessions", "read"),
+  validate(coverageRadarQuerySchema, "query"),
+  cacheRoute(CachePrefix.SESSION_COVERAGE, CacheTTL.SHORT),
+  asyncHandler(sessionController.coverageRadar),
+);
+router.get(
+  "/:id/suggestions",
+  authorizeModule("sessions", "read"),
+  cacheRoute(CachePrefix.SESSION_COVERAGE, CacheTTL.SHORT),
+  asyncHandler(sessionController.suggestions),
 );
 router.get(
   "/:id",

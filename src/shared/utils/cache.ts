@@ -59,6 +59,7 @@ export const CachePrefix = {
   OPPOSITION_REPORTS: "opposition-reports",
   SALARY_BENCHMARKS: "salary-benchmarks",
   GOVERNANCE_GATES: "governance-gates",
+  SESSION_COVERAGE: "session-coverage",
 } as const;
 
 // ── Core Operations ──
