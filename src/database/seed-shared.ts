@@ -875,6 +875,21 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("salary_benchmarks", ["Analyst", "Executive"], {
     canRead: true,
   }),
+
+  // ── Governance Gates (MVP-7) ──
+  // Admin/Manager can trigger, resolve, and delete gates.
+  // All analyst-tier roles can trigger gates and read the queue.
+  ...forRoles("governance_gates", ["Admin", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "governance_gates",
+    ["Analyst", "Scout", "Legal", "Finance", "SportingDirector", "Executive"],
+    { canCreate: true, canRead: true },
+  ),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

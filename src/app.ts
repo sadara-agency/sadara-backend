@@ -82,6 +82,7 @@ import staffMonitoringRoutes from "@modules/staffMonitoring/staffMonitoring.rout
 import squadRoutes from "@modules/squads/squad.routes";
 import analystViewRoutes from "@modules/analystviews/analystview.routes";
 import salaryBenchmarkRoutes from "@modules/commercialAnalytics/salaryBenchmark.routes";
+import governanceGateRoutes from "@modules/governanceGates/governanceGate.routes";
 import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
@@ -393,6 +394,7 @@ app.use("/api/v1/staff-monitoring", staffMonitoringRoutes);
 app.use("/api/v1/squads", squadRoutes);
 app.use("/api/v1/analyst-views", analystViewRoutes);
 app.use("/api/v1/salary-benchmarks", salaryBenchmarkRoutes);
+app.use("/api/v1/governance-gates", governanceGateRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(
