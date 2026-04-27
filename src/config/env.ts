@@ -125,6 +125,9 @@ const envSchema = z.object({
   // Puppeteer (optional — override Chromium binary path)
   PUPPETEER_EXECUTABLE_PATH: z.string().default(""),
 
+  // Anthropic LLM (optional — required for AI summary generation)
+  ANTHROPIC_API_KEY: z.string().default(""),
+
   // Production admin seed (optional)
   PROD_ADMIN_EMAIL: z.string().default("admin@sadara.com"),
   PROD_ADMIN_PASSWORD: z.string().default(""),
@@ -272,6 +275,10 @@ export const env = {
     password: validated.PROD_ADMIN_PASSWORD,
     name: validated.PROD_ADMIN_NAME,
     nameAr: validated.PROD_ADMIN_NAME_AR,
+  },
+
+  anthropic: {
+    apiKey: validated.ANTHROPIC_API_KEY,
   },
 
   pagination: {

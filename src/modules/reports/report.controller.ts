@@ -14,6 +14,7 @@ import * as svc from "@modules/reports/report.service";
 import type {
   ReportQuery,
   ReportFilters,
+  PublishReportInput,
 } from "@modules/reports/report.validation";
 import { generateReportXlsx } from "@modules/reports/report.xlsx";
 import { generatePredefinedReportPdf } from "@modules/reports/report.predefined-pdf";
@@ -221,6 +222,47 @@ export async function exportXlsx(
   );
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   res.send(buffer);
+}
+
+export async function generateSummary(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  const report = await svc.generateAiSummary(req.params.id, req.user!);
+  Promise.all([
+    invalidateMultiple([CachePrefix.REPORTS]),
+    logAudit(
+      "UPDATE",
+      "technical_reports",
+      report.id,
+      buildAuditContext(req.user!, req.ip),
+      "AI summary generated",
+    ),
+  ]).catch(() => {});
+  sendSuccess(res, report, "AI summary generated");
+}
+
+export async function publishReport(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  const { editedContent } = req.body as PublishReportInput;
+  const report = await svc.publishReport(
+    req.params.id,
+    editedContent,
+    req.user!,
+  );
+  Promise.all([
+    invalidateMultiple([CachePrefix.REPORTS]),
+    logAudit(
+      "UPDATE",
+      "technical_reports",
+      report.id,
+      buildAuditContext(req.user!, req.ip),
+      "Report published",
+    ),
+  ]).catch(() => {});
+  sendSuccess(res, report, "Report published");
 }
 
 export async function exportPdf(
