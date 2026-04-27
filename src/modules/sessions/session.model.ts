@@ -141,6 +141,8 @@ Session.init(
       type: DataTypes.UUID,
       allowNull: true,
       field: "referral_id",
+      references: { model: "referrals", key: "id" },
+      onDelete: "CASCADE",
     },
     matchId: {
       type: DataTypes.UUID,

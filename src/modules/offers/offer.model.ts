@@ -150,6 +150,8 @@ Offer.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "player_id",
+      references: { model: "players", key: "id" },
+      onDelete: "CASCADE",
     },
     fromClubId: {
       type: DataTypes.UUID,
