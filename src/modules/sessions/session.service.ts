@@ -211,11 +211,6 @@ export async function createSession(body: CreateSessionInput, userId: string) {
     createdBy: userId,
   });
 
-  // Increment sessionCount on the referral, when one was provided
-  if (referral) {
-    await referral.increment("sessionCount");
-  }
-
   return Session.findByPk(session.id, { include: sessionIncludes() });
 }
 
@@ -234,14 +229,6 @@ export async function updateSession(id: string, body: UpdateSessionInput) {
 export async function deleteSession(id: string) {
   const session = await Session.findByPk(id);
   if (!session) throw new AppError("Session not found", 404);
-
-  // Decrement sessionCount on the referral, when one was linked
-  if (session.referralId) {
-    const referral = await Referral.findByPk(session.referralId);
-    if (referral && referral.sessionCount > 0) {
-      await referral.decrement("sessionCount");
-    }
-  }
 
   await session.destroy();
   return { id };

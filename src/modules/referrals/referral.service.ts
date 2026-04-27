@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, literal, type ProjectionAlias } from "sequelize";
 import {
   Referral,
   type ReferralAttributes,
@@ -47,8 +47,24 @@ function referralIncludes() {
   ];
 }
 
+// Computed sessionCount — replaces the formerly-stored, manually-maintained
+// counter. Correlated subquery against the outer "Referral" alias.
+const SESSION_COUNT_LITERAL: ProjectionAlias = [
+  literal(
+    `(SELECT COUNT(*)::int FROM "sessions" WHERE "sessions"."referral_id" = "Referral"."id")`,
+  ),
+  "sessionCount",
+];
+
+function referralAttributesWithComputed() {
+  return { include: [SESSION_COUNT_LITERAL] };
+}
+
 async function refetchWithIncludes(id: string) {
-  return Referral.findByPk(id, { include: referralIncludes() });
+  return Referral.findByPk(id, {
+    include: referralIncludes(),
+    attributes: referralAttributesWithComputed(),
+  });
 }
 
 // ── List ──
@@ -91,6 +107,7 @@ export async function listReferrals(queryParams: any, user?: AuthUser) {
     offset,
     order: [[sort, order]],
     include: referralIncludes(),
+    attributes: referralAttributesWithComputed(),
     subQuery: false,
   });
 
@@ -100,7 +117,10 @@ export async function listReferrals(queryParams: any, user?: AuthUser) {
 // ── Get by ID ──
 
 export async function getReferralById(id: string, user?: AuthUser) {
-  const referral = await Referral.findByPk(id, { include: referralIncludes() });
+  const referral = await Referral.findByPk(id, {
+    include: referralIncludes(),
+    attributes: referralAttributesWithComputed(),
+  });
   if (!referral) throw new AppError("Referral not found", 404);
 
   const allowed = await checkRowAccess("referrals", referral, user);

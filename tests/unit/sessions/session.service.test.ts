@@ -110,10 +110,10 @@ describe('Session Service', () => {
   });
 
   describe('createSession', () => {
-    it('should create session and increment referral sessionCount', async () => {
+    it('should create session linked to referral', async () => {
       const player = mockModelInstance(mockPlayer());
       mockPlayerFindByPk.mockResolvedValue(player);
-      const referral = mockModelInstance({ id: 'referral-001', playerId: 'player-001', sessionCount: 0 });
+      const referral = mockModelInstance({ id: 'referral-001', playerId: 'player-001' });
       mockReferralFindByPk.mockResolvedValue(referral);
       const created = mockSession();
       mockSessionCreate.mockResolvedValue(created);
@@ -128,7 +128,8 @@ describe('Session Service', () => {
       } as any, 'user-001');
 
       expect(mockSessionCreate).toHaveBeenCalled();
-      expect(referral.increment).toHaveBeenCalledWith('sessionCount');
+      // sessionCount is computed at read time — no manual increment.
+      expect(referral.increment).not.toHaveBeenCalled();
     });
 
     it('should throw if player not found', async () => {
@@ -143,15 +144,16 @@ describe('Session Service', () => {
   });
 
   describe('deleteSession', () => {
-    it('should delete and decrement referral sessionCount', async () => {
+    it('should delete the session', async () => {
       const session = mockModelInstance(mockSession());
       mockSessionFindByPk.mockResolvedValue(session);
-      const referral = mockModelInstance({ id: 'referral-001', sessionCount: 3 });
+      const referral = mockModelInstance({ id: 'referral-001' });
       mockReferralFindByPk.mockResolvedValue(referral);
 
       const result = await sessionService.deleteSession('session-001');
       expect(session.destroy).toHaveBeenCalled();
-      expect(referral.decrement).toHaveBeenCalledWith('sessionCount');
+      // sessionCount is computed at read time — no manual decrement.
+      expect(referral.decrement).not.toHaveBeenCalled();
       expect(result).toEqual({ id: 'session-001' });
     });
 

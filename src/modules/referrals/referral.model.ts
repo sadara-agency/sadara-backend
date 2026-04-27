@@ -57,7 +57,12 @@ export interface ReferralAttributes {
   closedAt?: Date | null;
   closureNotes?: string | null;
   evidenceCount: number;
-  sessionCount: number;
+  /**
+   * Computed at query time via a correlated subquery — never stored.
+   * Always present on read paths that opt-in via `referralAttributesWithComputed`
+   * (see referral.service.ts).
+   */
+  sessionCount?: number;
   outcome?: string | null;
   notes?: string | null;
   isRestricted: boolean;
@@ -113,7 +118,7 @@ export class Referral
   declare closedAt: Date | null;
   declare closureNotes: string | null;
   declare evidenceCount: number;
-  declare sessionCount: number;
+  declare sessionCount: number | undefined;
   declare outcome: string | null;
   declare notes: string | null;
   declare isRestricted: boolean;
@@ -201,11 +206,6 @@ Referral.init(
       type: DataTypes.INTEGER,
       defaultValue: 0,
       field: "evidence_count",
-    },
-    sessionCount: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0,
-      field: "session_count",
     },
     outcome: {
       type: DataTypes.TEXT,
