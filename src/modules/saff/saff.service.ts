@@ -505,7 +505,7 @@ export async function syncTournamentsFromSaff(
 
 export async function listTournaments(query: TournamentQuery) {
   const { limit, offset, page } = parsePagination(query, "tier");
-  const where: any = { isActive: true };
+  const where: any = { isActive: true, isSupported: true };
 
   if (query.category) where.category = query.category;
   if (query.tier) where.tier = query.tier;
