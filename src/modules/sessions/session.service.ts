@@ -21,7 +21,9 @@ import type {
   CreateSessionInput,
   UpdateSessionInput,
   SessionQuery,
+  CoverageRadarQuery,
 } from "./session.validation";
+import { SESSION_OUTCOME_TAGS } from "./session.validation";
 
 const PLAYER_ATTRS = [
   "id",
@@ -106,6 +108,24 @@ function buildWhere(query: SessionQuery): WhereOptions {
       { notes: { [Op.iLike]: `%${query.search}%` } },
       { notesAr: { [Op.iLike]: `%${query.search}%` } },
     ];
+  }
+
+  if (query.outcomeTags) {
+    const validTags = query.outcomeTags
+      .split(",")
+      .map((t) => t.trim())
+      .filter((t): t is string =>
+        SESSION_OUTCOME_TAGS.includes(
+          t as (typeof SESSION_OUTCOME_TAGS)[number],
+        ),
+      );
+    if (validTags.length > 0) {
+      const tagList = validTags.map((t) => `'${t}'`).join(",");
+      where[Op.and] = [
+        ...((where[Op.and] as unknown[]) ?? []),
+        sequelize.literal(`"outcome_tags" ?| array[${tagList}]`),
+      ];
+    }
   }
 
   return where;
@@ -378,5 +398,142 @@ export async function getManagerDashboard() {
     incompleteSessions,
     lateSessionsCount: lateSessions.length,
     lateSessions,
+  };
+}
+
+// ── Session Outcome Tag Suggestions ──
+
+const TAG_TASK_SUGGESTIONS: Record<
+  string,
+  { title: string; titleAr: string; priority: string; dueDays: number }
+> = {
+  InjuryConcern: {
+    title: "Follow-up injury assessment",
+    titleAr: "متابعة تقييم إصابة",
+    priority: "high",
+    dueDays: 2,
+  },
+  FatigueFlag: {
+    title: "Recovery check",
+    titleAr: "فحص التعافي",
+    priority: "medium",
+    dueDays: 3,
+  },
+  MentalHealthFlag: {
+    title: "Mental wellness follow-up",
+    titleAr: "متابعة الصحة النفسية",
+    priority: "high",
+    dueDays: 1,
+  },
+  NutritionAlert: {
+    title: "Nutrition plan review",
+    titleAr: "مراجعة خطة التغذية",
+    priority: "medium",
+    dueDays: 3,
+  },
+  RequiresMedicalReview: {
+    title: "Schedule medical review",
+    titleAr: "جدولة فحص طبي",
+    priority: "critical",
+    dueDays: 1,
+  },
+  MotivationLow: {
+    title: "Motivation follow-up",
+    titleAr: "متابعة التحفيز",
+    priority: "medium",
+    dueDays: 2,
+  },
+};
+
+export async function getSessionSuggestions(id: string) {
+  const session = await getSessionById(id);
+  if (!session.outcomeTags || session.outcomeTags.length === 0) return [];
+
+  return session.outcomeTags
+    .filter((tag) => tag in TAG_TASK_SUGGESTIONS)
+    .map((tag) => {
+      const s = TAG_TASK_SUGGESTIONS[tag];
+      const base = new Date(session.sessionDate);
+      const due = new Date(base);
+      due.setDate(base.getDate() + s.dueDays);
+      return {
+        tag,
+        title: s.title,
+        titleAr: s.titleAr,
+        priority: s.priority,
+        dueDate: due.toISOString().split("T")[0],
+        playerId: session.playerId,
+        sessionId: session.id,
+      };
+    });
+}
+
+// ── Coverage Radar ──
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function getCoverageRadar(params: CoverageRadarQuery) {
+  let playerFilter = "";
+  if (params.playerIds) {
+    const ids = params.playerIds
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => UUID_PATTERN.test(id));
+    if (ids.length > 0) {
+      playerFilter = `AND p.id IN (${ids.map((id) => `'${id}'`).join(",")})`;
+    }
+  }
+
+  const rows = await sequelize.query<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
+    session_count: string;
+  }>(
+    `SELECT
+       p.id,
+       p.first_name,
+       p.last_name,
+       p.first_name_ar,
+       p.last_name_ar,
+       COUNT(s.id)::int AS session_count
+     FROM players p
+     LEFT JOIN sessions s
+       ON s.player_id = p.id
+       AND s.session_date >= :dateFrom
+       AND s.session_date <= :dateTo
+     WHERE p.deleted_at IS NULL
+     ${playerFilter}
+     GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
+     ORDER BY session_count DESC, p.last_name ASC`,
+    {
+      type: QueryTypes.SELECT,
+      replacements: { dateFrom: params.dateFrom, dateTo: params.dateTo },
+    },
+  );
+
+  const covered = rows.filter((r) => parseInt(r.session_count) > 0);
+  const uncovered = rows.filter((r) => parseInt(r.session_count) === 0);
+
+  const toPlayerRow = (r: (typeof rows)[0]) => ({
+    id: r.id,
+    firstName: r.first_name,
+    lastName: r.last_name,
+    firstNameAr: r.first_name_ar,
+    lastNameAr: r.last_name_ar,
+    sessionCount: parseInt(r.session_count),
+  });
+
+  return {
+    covered: covered.map(toPlayerRow),
+    uncovered: uncovered.map(toPlayerRow),
+    total: rows.length,
+    coveredCount: covered.length,
+    uncoveredCount: uncovered.length,
+    coverageRate:
+      rows.length > 0 ? Math.round((covered.length / rows.length) * 100) : 0,
   };
 }

@@ -117,3 +117,15 @@ export async function getManagerDashboard(req: AuthRequest, res: Response) {
   const data = await sessionService.getManagerDashboard();
   sendSuccess(res, data);
 }
+
+// ── Session Suggestions ──
+export async function suggestions(req: AuthRequest, res: Response) {
+  const data = await sessionService.getSessionSuggestions(req.params.id);
+  sendSuccess(res, data);
+}
+
+// ── Coverage Radar ──
+export async function coverageRadar(req: AuthRequest, res: Response) {
+  const data = await sessionService.getCoverageRadar(req.query as any);
+  sendSuccess(res, data);
+}
