@@ -1,11 +1,20 @@
 import { QueryInterface, DataTypes } from "sequelize";
-import { addColumnIfMissing, removeColumnIfPresent } from "../migrationHelpers";
+import {
+  addColumnIfMissing,
+  removeColumnIfPresent,
+  tableExists,
+} from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  // Fresh-DB guard: the `tickets` table doesn't exist on CI (the module
+  // was repurposed in CLI-NOTION-PH2 as a filtered referrals view). Skip
+  // the patch entirely when the parent table is absent.
+  if (!(await tableExists(queryInterface, "tickets"))) return;
+
   // Fix 2: make player_id nullable (tickets can be agency-level, not player-specific)
   await queryInterface.sequelize.query(
     `ALTER TABLE tickets ALTER COLUMN player_id DROP NOT NULL`,
@@ -24,6 +33,8 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
+  if (!(await tableExists(queryInterface, "tickets"))) return;
+
   await removeColumnIfPresent(
     queryInterface,
     "tickets",
