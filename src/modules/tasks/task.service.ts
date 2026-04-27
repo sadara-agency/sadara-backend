@@ -114,6 +114,84 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
 }
 
 // ────────────────────────────────────────────────────────────
+// Task Stats (full-dataset aggregations for KPI cards)
+// Mirrors the same filters as listTasks but returns counts
+// across the entire matching dataset, not a paginated slice.
+// ────────────────────────────────────────────────────────────
+export async function getTaskStats(queryParams: any, user?: AuthUser) {
+  const where: any = {};
+
+  if (queryParams.parentTaskId) {
+    where.parentTaskId = queryParams.parentTaskId;
+  } else if (queryParams.topLevelOnly !== "false") {
+    where.parentTaskId = { [Op.is]: null };
+  }
+
+  if (queryParams.status) where.status = queryParams.status;
+  if (queryParams.type) where.type = queryParams.type;
+  if (queryParams.priority) where.priority = queryParams.priority;
+  if (queryParams.assignedTo) where.assignedTo = queryParams.assignedTo;
+  if (queryParams.playerId) where.playerId = queryParams.playerId;
+  if (queryParams.referralId) where.referralId = queryParams.referralId;
+  if (queryParams.mediaTaskType)
+    where.mediaTaskType = queryParams.mediaTaskType;
+  if (queryParams.isAutoCreated === "true") where.isAutoCreated = true;
+
+  if (queryParams.search) {
+    const pattern = `%${queryParams.search}%`;
+    where[Op.or] = [
+      { title: { [Op.iLike]: pattern } },
+      { titleAr: { [Op.iLike]: pattern } },
+      { description: { [Op.iLike]: pattern } },
+    ];
+  }
+
+  const scope = await buildRowScope("tasks", user);
+  if (scope) mergeScope(where, scope);
+
+  const row = (await Task.findOne({
+    where,
+    attributes: [
+      [literal("COUNT(*)"), "total"],
+      [literal("COUNT(*) FILTER (WHERE status = 'Open')"), "open"],
+      [literal("COUNT(*) FILTER (WHERE status = 'InProgress')"), "inProgress"],
+      [literal("COUNT(*) FILTER (WHERE status = 'Completed')"), "completed"],
+      [literal("COUNT(*) FILTER (WHERE status = 'Canceled')"), "canceled"],
+      [
+        literal(
+          "COUNT(*) FILTER (WHERE status NOT IN ('Completed','Canceled') AND due_date IS NOT NULL AND due_date < CURRENT_DATE)",
+        ),
+        "overdue",
+      ],
+      [literal("COUNT(*) FILTER (WHERE is_auto_created = TRUE)"), "automated"],
+      [literal("COUNT(*) FILTER (WHERE priority = 'critical')"), "critical"],
+      [literal("COUNT(*) FILTER (WHERE assigned_to IS NULL)"), "unassigned"],
+    ],
+    raw: true,
+  })) as any;
+
+  // Postgres COUNT returns bigint (string in node-postgres); coerce to number.
+  const n = (v: unknown) =>
+    typeof v === "number" ? v : parseInt(String(v ?? "0"), 10) || 0;
+
+  const total = n(row?.total);
+  const completed = n(row?.completed);
+
+  return {
+    total,
+    open: n(row?.open),
+    inProgress: n(row?.inProgress),
+    completed,
+    canceled: n(row?.canceled),
+    overdue: n(row?.overdue),
+    automated: n(row?.automated),
+    critical: n(row?.critical),
+    unassigned: n(row?.unassigned),
+    completionPct: total > 0 ? Math.round((completed / total) * 100) : 0,
+  };
+}
+
+// ────────────────────────────────────────────────────────────
 // Get Task by ID
 // ────────────────────────────────────────────────────────────
 export async function getTaskById(id: string, user?: AuthUser) {
