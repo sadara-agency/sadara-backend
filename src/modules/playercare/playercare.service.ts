@@ -103,7 +103,7 @@ export async function listCases(query: PlayerCareQuery, user?: AuthUser) {
     ],
     limit,
     offset,
-    order: [[sort === "createdAt" ? "created_at" : sort, order]],
+    order: [[sort, order]],
     distinct: true,
   });
 
