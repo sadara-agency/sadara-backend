@@ -45,8 +45,24 @@ async function run() {
       break;
     }
 
+    case "fresh": {
+      if (process.env.NODE_ENV === "production") {
+        console.error("migrate:fresh is not allowed in production.");
+        process.exit(1);
+      }
+      console.log("Dropping public schema...");
+      await sequelize.query("DROP SCHEMA public CASCADE");
+      await sequelize.query("CREATE SCHEMA public");
+      console.log("Schema reset. Running all migrations from scratch...");
+      await migrator.up();
+      console.log("Fresh migration complete.");
+      break;
+    }
+
     default:
-      console.error(`Unknown command: ${command}. Use up, down, or status.`);
+      console.error(
+        `Unknown command: ${command}. Use up, down, status, or fresh.`,
+      );
       process.exit(1);
   }
 

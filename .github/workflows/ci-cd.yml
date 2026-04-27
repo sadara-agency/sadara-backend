@@ -83,13 +83,37 @@ jobs:
       - name: npm audit (high + critical)
         run: npm audit --audit-level=high --omit=dev || true
 
+  # ─── Migration Change Detection ─────────────────────────────
+  # Determines whether any migration file changed so migrate-smoke
+  # can be skipped on PRs that don't touch migrations (saves ~5 min).
+  migration-changes:
+    name: Detect Migration Changes
+    runs-on: ubuntu-latest
+    outputs:
+      migrations_changed: ${{ steps.filter.outputs.migrations }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            migrations:
+              - 'src/database/migrations/**'
+              - 'src/database/migrationHelpers.ts'
+              - 'src/database/migrate-cli.ts'
+              - 'src/config/migrator.ts'
+
   # ─── Fresh Migration Smoke ───────────────────────────────────
   # Catches migrations that only fail on an empty schema (e.g. migration 130's
   # NULL id bug). The `test` job runs with --sync-first which can mask these.
+  # Skipped on PRs that don't touch migration files (see migration-changes job).
   migrate-smoke:
     name: Fresh Migration Smoke
     runs-on: ubuntu-latest
-    needs: install
+    needs: [install, migration-changes]
+    if: >
+      github.event_name == 'push' ||
+      needs.migration-changes.outputs.migrations_changed == 'true'
 
     services:
       postgres:
@@ -214,6 +238,7 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     needs: [lint, test, migrate-smoke]
+    if: always() && !failure() && !cancelled()
     steps:
       - uses: actions/checkout@v4
 

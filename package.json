@@ -7,7 +7,7 @@
     "dev": "cross-env NODE_ENV=development nodemon",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && cp -r src/assets dist/assets",
     "start:prod": "cross-env NODE_ENV=production node dist/index.js",
-    "lint": "eslint src",
+    "lint:eslint": "eslint src",
     "format": "prettier --write \"src/**/*.ts\"",
     "test": "jest --config jest.config.ts",
     "test:watch": "jest --watch",
@@ -15,6 +15,9 @@
     "migrate": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts up",
     "migrate:down": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts down",
     "migrate:status": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts status",
+    "migrate:fresh": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts fresh",
+    "migrate:lint": "ts-node -r tsconfig-paths/register scripts/lint-migrations.ts",
+    "lint": "eslint src && npm run migrate:lint",
     "prepare": "husky || true"
   },
   "dependencies": {
