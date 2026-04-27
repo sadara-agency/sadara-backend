@@ -259,4 +259,42 @@ router.delete(
   scoringCtrl.deleteScoringCard,
 );
 
+// ── Scout Report Attributes ──
+import {
+  upsertScoutReportSchema,
+  watchlistIdParamsSchema,
+} from "@modules/scouting/scoutReport.validation";
+import * as reportCtrl from "@modules/scouting/scoutReport.controller";
+
+router.get(
+  "/reports",
+  authorizeModule("scouting", "read"),
+  asyncHandler(reportCtrl.listReports),
+);
+router.get(
+  "/reports/:watchlistId",
+  authorizeModule("scouting", "read"),
+  validate(watchlistIdParamsSchema, "params"),
+  asyncHandler(reportCtrl.getReport),
+);
+router.put(
+  "/reports/:watchlistId",
+  authorizeModule("scouting", "update"),
+  validate(watchlistIdParamsSchema, "params"),
+  validate(upsertScoutReportSchema),
+  asyncHandler(reportCtrl.upsertReport),
+);
+router.delete(
+  "/reports/:watchlistId",
+  authorizeModule("scouting", "delete"),
+  validate(watchlistIdParamsSchema, "params"),
+  asyncHandler(reportCtrl.deleteReport),
+);
+router.get(
+  "/reports/:watchlistId/similar",
+  authorizeModule("scouting", "read"),
+  validate(watchlistIdParamsSchema, "params"),
+  asyncHandler(reportCtrl.similarProspects),
+);
+
 export default router;

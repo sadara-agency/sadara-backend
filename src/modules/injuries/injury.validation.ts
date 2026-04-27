@@ -109,6 +109,7 @@ export const injuryQuerySchema = z.object({
     .optional(),
   order: z.enum(["ASC", "DESC", "asc", "desc"]).optional(),
   search: z.string().optional(),
+  bodyPart: z.string().optional(),
 });
 
 export type CreateInjuryInput = z.infer<typeof createInjurySchema>;

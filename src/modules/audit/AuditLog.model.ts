@@ -15,6 +15,8 @@ interface AuditLogAttributes {
   userAgent: string | null;
   requestMethod: string | null;
   requestPath: string | null;
+  hash: string | null;
+  prevHash: string | null;
   loggedAt?: Date;
 }
 
@@ -31,6 +33,8 @@ interface AuditLogCreationAttributes extends Optional<
   | "userAgent"
   | "requestMethod"
   | "requestPath"
+  | "hash"
+  | "prevHash"
   | "loggedAt"
 > {}
 
@@ -51,6 +55,8 @@ export class AuditLog
   declare userAgent: string | null;
   declare requestMethod: string | null;
   declare requestPath: string | null;
+  declare hash: string | null;
+  declare prevHash: string | null;
   declare loggedAt: Date;
 }
 
@@ -106,6 +112,16 @@ AuditLog.init(
     requestPath: {
       type: DataTypes.TEXT,
       field: "request_path",
+    },
+    hash: {
+      type: DataTypes.STRING(64),
+      field: "hash",
+      allowNull: true,
+    },
+    prevHash: {
+      type: DataTypes.STRING(64),
+      field: "prev_hash",
+      allowNull: true,
     },
     loggedAt: {
       type: DataTypes.DATE,
