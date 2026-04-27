@@ -39,6 +39,10 @@ export async function listAnalystViews(
   const u = requireUser(user);
   const { page, limit, sort, order, persona, pinnedOnly } = query;
 
+  const sortField = sort.replace(/_([a-z])/g, (_, c: string) =>
+    c.toUpperCase(),
+  );
+
   const visibility = {
     [Op.or]: [
       { ownerUserId: u.id },
@@ -58,7 +62,7 @@ export async function listAnalystViews(
 
   const { rows, count } = await AnalystView.findAndCountAll({
     where,
-    order: [[sort, order]],
+    order: [[sortField, order]],
     limit,
     offset: (page - 1) * limit,
   });
