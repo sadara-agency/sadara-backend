@@ -5,6 +5,13 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  // Skip if the technical_reports table doesn't exist yet (fresh DB — a later migration creates it)
+  const [tableRows] = await queryInterface.sequelize.query(`
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'technical_reports'
+  `);
+  if ((tableRows as unknown[]).length === 0) return;
+
   // Convert status from PostgreSQL ENUM to VARCHAR(30) to support new values
   const [statusRows] = await queryInterface.sequelize.query(`
     SELECT udt_name FROM information_schema.columns
