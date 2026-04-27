@@ -80,6 +80,7 @@ import clubNeedRoutes from "@modules/club-needs/clubNeed.routes";
 import playerCoachAssignmentRoutes from "@modules/player-coach-assignments/playerCoachAssignment.routes";
 import staffMonitoringRoutes from "@modules/staffMonitoring/staffMonitoring.routes";
 import squadRoutes from "@modules/squads/squad.routes";
+import analystViewRoutes from "@modules/analystviews/analystview.routes";
 import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
@@ -389,6 +390,7 @@ app.use("/api/v1/club-needs", clubNeedRoutes);
 app.use("/api/v1/player-coach-assignments", playerCoachAssignmentRoutes);
 app.use("/api/v1/staff-monitoring", staffMonitoringRoutes);
 app.use("/api/v1/squads", squadRoutes);
+app.use("/api/v1/analyst-views", analystViewRoutes);
 
 // ── Signed documents — authenticated serving ──
 app.get(
