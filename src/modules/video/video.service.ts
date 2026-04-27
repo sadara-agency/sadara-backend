@@ -43,7 +43,7 @@ export async function listClips(query: ListClipsQuery) {
       {
         model: User,
         as: "uploader",
-        attributes: ["id", "firstName", "lastName"],
+        attributes: ["id", "fullName", "fullNameAr"],
       },
       {
         model: VideoTag,
@@ -77,7 +77,7 @@ export async function getClipById(id: string) {
       {
         model: User,
         as: "uploader",
-        attributes: ["id", "firstName", "lastName"],
+        attributes: ["id", "fullName", "fullNameAr"],
       },
       {
         model: VideoTag,
