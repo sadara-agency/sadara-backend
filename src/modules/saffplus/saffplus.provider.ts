@@ -679,33 +679,144 @@ export async function scrapeMatchEvents(
   providerMatchId: string,
 ): Promise<SaffPlusMatchEvent[]> {
   const seen = new Map<string, SaffPlusMatchEvent>();
-  const paths = [
-    `/ar/event/match/${providerMatchId}`,
-    `/en/event/match/${providerMatchId}`,
+
+  function addEvent(ev: SaffPlusMatchEvent) {
+    const key =
+      ev.externalEventId ??
+      `${ev.minute}|${ev.type}|${ev.playerName ?? ev.playerNameAr ?? ""}`;
+    if (!seen.has(key)) seen.set(key, ev);
+  }
+
+  // ── PRIMARY: Motto CDA API ──
+  // Try multiple filter patterns — the exact type_id varies by competition.
+  const eventFilters = [
+    `type_id:match_event AND fields.match_id:${providerMatchId}`,
+    `type_id:event AND fields.match_id:${providerMatchId}`,
+    `type_id:timeline AND fields.match_id:${providerMatchId}`,
+    `type_id:match_event AND fields.event_id:${providerMatchId}`,
+    `type_id:match_incident AND fields.match_id:${providerMatchId}`,
   ];
-
-  for (const path of paths) {
-    let html: string;
-    try {
-      html = await fetchPage(path);
-    } catch (err) {
-      logger.warn(
-        `[SAFF+] scrapeMatchEvents: ${path} failed — ${(err as Error).message}`,
-      );
-      await sleep(1500);
-      continue;
+  for (const filter of eventFilters) {
+    const entities = await listMottoCdaEntities(filter, {
+      locale: "ar",
+      pageSize: 200,
+    });
+    if (entities.length === 0) continue;
+    logger.info(
+      `[SAFF+] Match events via CDA: "${filter}" (${entities.length} items)`,
+    );
+    for (const o of entities) {
+      try {
+        const f = (o.fields as Record<string, unknown> | undefined) ?? {};
+        const merged: Record<string, unknown> = { ...f, ...o };
+        const minute =
+          typeof merged.minute === "number"
+            ? merged.minute
+            : typeof merged.time === "number"
+              ? merged.time
+              : typeof merged.elapsed === "number"
+                ? merged.elapsed
+                : null;
+        if (minute == null) continue;
+        const rawType =
+          (merged.type as string) ??
+          (merged.event_type as string) ??
+          (merged.event as string) ??
+          null;
+        const type = normalizeMatchEventType(rawType);
+        if (!type) continue;
+        const teamSideRaw =
+          (merged.team as string) ?? (merged.side as string) ?? null;
+        const teamSide: "home" | "away" =
+          teamSideRaw === "away" || teamSideRaw === "guest" ? "away" : "home";
+        addEvent({
+          externalEventId:
+            (merged.id as string) ?? (merged.event_id as string) ?? null,
+          minute,
+          stoppageMinute:
+            (merged.stoppage as number) ??
+            (merged.added_time as number) ??
+            null,
+          type,
+          teamSide,
+          playerName:
+            (merged.player_name as string) ?? (merged.player as string) ?? null,
+          playerNameAr:
+            (merged.player_name_ar as string) ??
+            (merged.name_ar as string) ??
+            null,
+          relatedPlayerName:
+            (merged.assist as string) ??
+            (merged.related_player as string) ??
+            null,
+          relatedPlayerNameAr:
+            (merged.assist_ar as string) ??
+            (merged.related_player_ar as string) ??
+            null,
+          descriptionEn:
+            (merged.description as string) ?? (merged.text as string) ?? null,
+          descriptionAr:
+            (merged.description_ar as string) ??
+            (merged.text_ar as string) ??
+            null,
+          raw: { source: "cda", filter, rawType },
+        });
+      } catch {
+        // skip malformed entity
+      }
     }
-    await sleep(1500);
-
-    const rscChunks = extractRscData(html);
-    for (const ev of extractEventsFromRsc(rscChunks)) {
-      const key =
-        ev.externalEventId ??
-        `${ev.minute}|${ev.type}|${ev.playerName ?? ev.playerNameAr ?? ""}`;
-      if (!seen.has(key)) seen.set(key, ev);
-    }
-
     if (seen.size > 0) break;
+  }
+
+  // ── FALLBACK: Puppeteer render + RSC + jsonResponses ──
+  if (seen.size === 0) {
+    const paths = [
+      `/ar/event/match/${providerMatchId}`,
+      `/en/event/match/${providerMatchId}`,
+    ];
+    for (const path of paths) {
+      let html: string;
+      let jsonResponses: Array<{ url: string; data: unknown }> = [];
+      try {
+        const result = await fetchPageWithJson(path);
+        html = result.html;
+        jsonResponses = result.jsonResponses;
+      } catch (err) {
+        logger.warn(
+          `[SAFF+] scrapeMatchEvents: ${path} failed — ${(err as Error).message}`,
+        );
+        await sleep(1500);
+        continue;
+      }
+      await sleep(1500);
+
+      // Try RSC chunks from the rendered HTML
+      const rscChunks = extractRscData(html);
+      for (const ev of extractEventsFromRsc(rscChunks)) addEvent(ev);
+
+      // Also scan captured XHR/fetch responses for event arrays
+      if (seen.size === 0) {
+        for (const { data } of jsonResponses) {
+          if (!data || typeof data !== "object") continue;
+          const d = data as Record<string, unknown>;
+          // Look for arrays keyed as events/incidents/timeline
+          for (const key of [
+            "events",
+            "incidents",
+            "timeline",
+            "match_events",
+            "data",
+          ]) {
+            const arr = d[key];
+            if (!Array.isArray(arr)) continue;
+            const chunks = arr.map((item) => JSON.stringify(item));
+            for (const ev of extractEventsFromRsc(chunks)) addEvent(ev);
+          }
+        }
+      }
+
+      if (seen.size > 0) break;
+    }
   }
 
   const events = Array.from(seen.values()).sort(
