@@ -413,17 +413,42 @@ export async function extractMatchVideoUrl(
   }
 
   let page: Page | null = null;
+  // Network-intercepted URLs (Motto API delivers the HLS manifest via XHR,
+  // not by setting <video src> in the DOM — so DOM inspection alone misses it).
+  const networkUrls: Array<{ url: string; kind: string }> = [];
+
   try {
     const browser = await getBrowser();
     page = await browser.newPage();
     page.setDefaultTimeout(PAGE_TIMEOUT_MS);
     page.setDefaultNavigationTimeout(PAGE_TIMEOUT_MS);
 
-    const url = `https://saffplus.sa/ar/event/match/${providerMatchId}`;
-    await page.goto(url, { waitUntil: "domcontentloaded" });
+    // Capture any response URL that looks like a stream manifest or player embed.
+    // We listen to request URLs (not response bodies) so we catch redirects too.
+    page.on("request", (req) => {
+      const u = req.url();
+      const lower = u.toLowerCase();
+      if (
+        lower.includes(".m3u8") ||
+        lower.includes(".mpd") ||
+        lower.includes("mottostreaming.com") ||
+        lower.includes("mottocdn.com") ||
+        lower.includes("sadeem.tv")
+      ) {
+        const kind = lower.includes(".m3u8")
+          ? "hls"
+          : lower.includes(".mpd")
+            ? "dash"
+            : "iframe";
+        networkUrls.push({ url: u, kind });
+      }
+    });
 
-    // Race the player selectors — first to resolve wins; if neither
-    // appears we treat the page as having no player.
+    const pageUrl = `https://saffplus.sa/ar/event/match/${providerMatchId}`;
+    // Use networkidle0 so we wait for the Motto API calls to complete.
+    await page.goto(pageUrl, { waitUntil: "networkidle0" });
+
+    // Also wait for a DOM player element as a secondary signal; ignore timeout.
     await Promise.race([
       page.waitForSelector("video", { timeout: PAGE_TIMEOUT_MS }),
       page.waitForSelector('iframe[src*="player"]', {
@@ -432,14 +457,12 @@ export async function extractMatchVideoUrl(
       page.waitForSelector('source[type="application/x-mpegURL"]', {
         timeout: PAGE_TIMEOUT_MS,
       }),
-    ]).catch(() => {
-      // No player rendered — fall through to evaluate which returns []
-    });
+    ]).catch(() => {});
 
     // Note: this callback runs in the browser context, not Node.
     // We avoid pulling DOM lib types into the backend tsconfig by
     // accessing document through a generic cast.
-    const captured = await page.evaluate(() => {
+    const domCaptured = await page.evaluate(() => {
       const doc = (
         globalThis as unknown as {
           document: { querySelectorAll: (s: string) => Iterable<unknown> };
@@ -466,8 +489,12 @@ export async function extractMatchVideoUrl(
       return out;
     });
 
+    // Merge network-intercepted + DOM sources; network takes priority for HLS/DASH.
+    const captured = [...networkUrls, ...domCaptured];
+
     if (captured.length === 0) {
-      recordFailure();
+      // Page loaded but no player found — not a Puppeteer/infra failure,
+      // so don't count against the circuit breaker.
       return { videos: [], reason: "no_player_found" };
     }
 
