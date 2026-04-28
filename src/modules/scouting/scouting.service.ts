@@ -22,6 +22,7 @@ import {
   mergeScope,
   checkRowAccess,
 } from "@shared/utils/rowScope";
+import { freeformToTemplate } from "./positionTemplate";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 
@@ -143,12 +144,29 @@ export async function getWatchlistById(id: string, user?: AuthUser) {
 }
 
 export async function createWatchlist(input: any, userId: string) {
-  return await Watchlist.create({ ...input, scoutedBy: userId });
+  const positionTemplate =
+    input.positionTemplate ?? freeformToTemplate(input.position);
+  return await Watchlist.create({
+    ...input,
+    positionTemplate,
+    scoutedBy: userId,
+  });
 }
 
 export async function updateWatchlist(id: string, input: any) {
   const item = await findOrThrow(Watchlist, id, "Watchlist entry");
-  return await item.update(input);
+  // If the freeform position changed and no explicit template was supplied,
+  // re-derive the template. Doesn't overwrite an existing template that the
+  // caller is explicitly nulling out.
+  const patch: Record<string, unknown> = { ...input };
+  if (
+    !("positionTemplate" in input) &&
+    typeof input.position === "string" &&
+    input.position !== item.position
+  ) {
+    patch.positionTemplate = freeformToTemplate(input.position);
+  }
+  return await item.update(patch);
 }
 
 export async function updateWatchlistStatus(id: string, status: string) {

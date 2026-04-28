@@ -20,6 +20,12 @@ export interface ScoutReportAttributes {
   positioning: number | null;
   pressingScore: number | null;
   tacticalAwareness: number | null;
+  composure: number | null;
+  resilience: number | null;
+  teamFit: number | null;
+  communication: number | null;
+  coachability: number | null;
+  offFieldConduct: number | null;
   overallScore: number | null;
   recommendation: Recommendation | null;
   notes: string | null;
@@ -46,6 +52,12 @@ interface ScoutReportCreationAttributes extends Optional<
   | "positioning"
   | "pressingScore"
   | "tacticalAwareness"
+  | "composure"
+  | "resilience"
+  | "teamFit"
+  | "communication"
+  | "coachability"
+  | "offFieldConduct"
   | "overallScore"
   | "recommendation"
   | "notes"
@@ -75,6 +87,12 @@ class ScoutReport
   public positioning!: number | null;
   public pressingScore!: number | null;
   public tacticalAwareness!: number | null;
+  public composure!: number | null;
+  public resilience!: number | null;
+  public teamFit!: number | null;
+  public communication!: number | null;
+  public coachability!: number | null;
+  public offFieldConduct!: number | null;
   public overallScore!: number | null;
   public recommendation!: Recommendation | null;
   public notes!: string | null;
@@ -106,6 +124,12 @@ ScoutReport.init(
     positioning: { type: DataTypes.INTEGER, allowNull: true },
     pressingScore: { type: DataTypes.INTEGER, allowNull: true },
     tacticalAwareness: { type: DataTypes.INTEGER, allowNull: true },
+    composure: { type: DataTypes.INTEGER, allowNull: true },
+    resilience: { type: DataTypes.INTEGER, allowNull: true },
+    teamFit: { type: DataTypes.INTEGER, allowNull: true },
+    communication: { type: DataTypes.INTEGER, allowNull: true },
+    coachability: { type: DataTypes.INTEGER, allowNull: true },
+    offFieldConduct: { type: DataTypes.INTEGER, allowNull: true },
     overallScore: { type: DataTypes.DECIMAL(4, 2), allowNull: true },
     recommendation: { type: DataTypes.STRING(20), allowNull: true },
     notes: { type: DataTypes.TEXT, allowNull: true },
