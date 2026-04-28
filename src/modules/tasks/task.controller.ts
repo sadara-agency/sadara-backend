@@ -22,6 +22,12 @@ const crud = createCrudController({
 
 export const { list, getById, create, update, remove } = crud;
 
+// ── Stats (full-dataset aggregations for KPIs) ──
+export async function getStats(req: AuthRequest, res: Response) {
+  const stats = await taskService.getTaskStats(req.query, req.user);
+  sendSuccess(res, stats);
+}
+
 // ── Update Status (custom) ──
 export async function updateStatus(req: AuthRequest, res: Response) {
   const task = await taskService.updateTaskStatus(

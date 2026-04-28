@@ -42,6 +42,12 @@ router.get(
   asyncHandler(taskController.list),
 );
 router.get(
+  "/stats",
+  authorizeModule("tasks", "read"),
+  validate(taskQuerySchema, "query"),
+  asyncHandler(taskController.getStats),
+);
+router.get(
   "/:id",
   authorizeModule("tasks", "read"),
   asyncHandler(taskController.getById),
