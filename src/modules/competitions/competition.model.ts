@@ -27,6 +27,7 @@ interface CompetitionAttributes {
   gender: CompetitionGender;
   format: CompetitionFormat;
   agencyValue: AgencyValue;
+  logoUrl: string | null;
   sportmonksLeagueId: number | null;
   saffId: number | null;
   saffplusSlug: string | null;
@@ -37,7 +38,7 @@ interface CompetitionAttributes {
 
 interface CompetitionCreationAttributes extends Optional<
   CompetitionAttributes,
-  "id" | "createdAt" | "updatedAt"
+  "id" | "logoUrl" | "createdAt" | "updatedAt"
 > {}
 
 export class Competition
@@ -54,6 +55,7 @@ export class Competition
   declare gender: CompetitionGender;
   declare format: CompetitionFormat;
   declare agencyValue: AgencyValue;
+  declare logoUrl: string | null;
   declare sportmonksLeagueId: number | null;
   declare saffId: number | null;
   declare saffplusSlug: string | null;
@@ -108,6 +110,11 @@ Competition.init(
       type: DataTypes.INTEGER,
       unique: true,
       field: "saff_id",
+    },
+    logoUrl: {
+      type: DataTypes.STRING(1000),
+      allowNull: true,
+      field: "logo_url",
     },
     saffplusSlug: {
       type: DataTypes.STRING(120),

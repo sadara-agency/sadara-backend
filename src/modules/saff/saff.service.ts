@@ -987,6 +987,7 @@ export async function importToSadara(input: ImportRequest) {
             tier: tournament.tier,
             agencyValue: tournament.agencyValue,
             saffId: tournament.saffId,
+            logoUrl: tournament.logoUrl ?? null,
             isActive: true,
           } as any,
           transaction: txn,
@@ -1060,6 +1061,7 @@ export async function importToSadara(input: ImportRequest) {
                 city: tm.city || undefined,
                 league: tournament.name,
                 saffTeamId: tm.saffTeamId,
+                logoUrl: tm.logoUrl ?? null,
               },
               { transaction: txn },
             );
@@ -1071,6 +1073,9 @@ export async function importToSadara(input: ImportRequest) {
           }
           if (!created && !club.isActive) {
             await club.update({ isActive: true }, { transaction: txn });
+          }
+          if (!created && !club.logoUrl && tm.logoUrl) {
+            await club.update({ logoUrl: tm.logoUrl }, { transaction: txn });
           }
           if (!club.saffTeamId) {
             await club.update(
