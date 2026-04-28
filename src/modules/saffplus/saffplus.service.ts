@@ -582,7 +582,7 @@ export async function syncCompetitionMatches(
 
   const competition = await Competition.findByPk(competitionId);
   if (!competition) {
-    throw new Error(`Competition ${competitionId} not found`);
+    throw new AppError(`Competition ${competitionId} not found`, 404);
   }
 
   // ── Layer-2 women's filter ──
@@ -855,15 +855,17 @@ export async function syncMatchEvents(matchId: string): Promise<{
   };
 
   const match = await Match.findByPk(matchId);
-  if (!match) throw new Error(`Match ${matchId} not found`);
+  if (!match) throw new AppError(`Match ${matchId} not found`, 404);
   if (match.providerSource !== "saffplus") {
-    throw new Error(
+    throw new AppError(
       `Match ${matchId} is not from SAFF+ (provider=${match.providerSource})`,
+      422,
     );
   }
   if (!match.providerMatchId) {
-    throw new Error(
+    throw new AppError(
       `Match ${matchId} has no provider_match_id — re-sync the parent competition first`,
+      422,
     );
   }
 
@@ -1041,7 +1043,7 @@ export async function syncMatchMedia(matchId: string): Promise<{
 
 export async function getMatchEvents(matchId: string) {
   const match = await Match.findByPk(matchId, { attributes: ["id"] });
-  if (!match) throw new Error(`Match ${matchId} not found`);
+  if (!match) throw new AppError(`Match ${matchId} not found`, 404);
   return MatchEvent.findAll({
     where: { matchId },
     order: [
@@ -1057,7 +1059,7 @@ export async function getMatchEvents(matchId: string) {
 
 export async function getMatchMedia(matchId: string) {
   const match = await Match.findByPk(matchId, { attributes: ["id"] });
-  if (!match) throw new Error(`Match ${matchId} not found`);
+  if (!match) throw new AppError(`Match ${matchId} not found`, 404);
   return MatchMedia.findAll({
     where: { matchId },
     order: [["createdAt", "DESC"]],
