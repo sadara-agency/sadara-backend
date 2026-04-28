@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { positionTemplateSchema } from "./positionTemplate";
 
 // ── Watchlist ──
 
@@ -35,6 +36,7 @@ export const createWatchlistSchema = z.object({
   physicalRating: z.number().int().min(1).max(10).optional(),
   mentalRating: z.number().int().min(1).max(10).optional(),
   potentialRating: z.number().int().min(1).max(10).optional(),
+  positionTemplate: positionTemplateSchema.nullable().optional(),
   notes: z.string().optional(),
 });
 

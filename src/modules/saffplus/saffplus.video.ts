@@ -423,24 +423,46 @@ export async function extractMatchVideoUrl(
     page.setDefaultTimeout(PAGE_TIMEOUT_MS);
     page.setDefaultNavigationTimeout(PAGE_TIMEOUT_MS);
 
-    // Capture any response URL that looks like a stream manifest or player embed.
-    // We listen to request URLs (not response bodies) so we catch redirects too.
+    // Capture network request URLs that are definitively stream manifests or
+    // known player embed pages. We intentionally exclude image/asset CDN paths
+    // (mottocdn.com/images, mottocdn.com/assets) to avoid treating poster
+    // thumbnails as video sources.
     page.on("request", (req) => {
       const u = req.url();
       const lower = u.toLowerCase();
-      if (
-        lower.includes(".m3u8") ||
-        lower.includes(".mpd") ||
-        lower.includes("mottostreaming.com") ||
-        lower.includes("mottocdn.com") ||
-        lower.includes("sadeem.tv")
-      ) {
-        const kind = lower.includes(".m3u8")
-          ? "hls"
-          : lower.includes(".mpd")
-            ? "dash"
-            : "iframe";
+
+      // Direct stream manifests — highest confidence
+      if (lower.includes(".m3u8") || lower.includes(".mpd")) {
+        const kind = lower.includes(".m3u8") ? "hls" : "dash";
         networkUrls.push({ url: u, kind });
+        return;
+      }
+
+      // Motto streaming player pages (not CDN image/asset paths)
+      if (
+        lower.includes("mottostreaming.com") &&
+        !lower.includes("/images/") &&
+        !lower.includes("/assets/") &&
+        !lower.includes("/static/") &&
+        (lower.includes("/watch") ||
+          lower.includes("/live") ||
+          lower.includes("/event") ||
+          lower.includes("/player") ||
+          lower.includes("/embed"))
+      ) {
+        networkUrls.push({ url: u, kind: "iframe" });
+        return;
+      }
+
+      // Sadeem TV player pages
+      if (
+        lower.includes("sadeem.tv") &&
+        (lower.includes("/watch") ||
+          lower.includes("/live") ||
+          lower.includes("/embed") ||
+          lower.includes("/player"))
+      ) {
+        networkUrls.push({ url: u, kind: "iframe" });
       }
     });
 

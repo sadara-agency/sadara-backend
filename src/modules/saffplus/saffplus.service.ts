@@ -713,7 +713,13 @@ export async function syncCompetitionMatches(
       const rawStatus = fixture.status?.toLowerCase();
       const homeScore = fixture.homeScore ?? null;
       const awayScore = fixture.awayScore ?? null;
-      const matchDate = fixture.date ? new Date(fixture.date) : new Date();
+      // Combine date + time if both are present (provider returns them separately).
+      // fixture.date is "YYYY-MM-DD", fixture.time is "HH:MM" or "HH:MM:SS".
+      const matchDate = fixture.date
+        ? fixture.time
+          ? new Date(`${fixture.date}T${fixture.time}`)
+          : new Date(fixture.date)
+        : new Date();
       const matchTime = matchDate.getTime();
 
       // Primary: explicit status from provider
@@ -773,7 +779,20 @@ export async function syncCompetitionMatches(
       });
 
       if (existing) {
-        await existing.update(matchValues);
+        // Don't overwrite a real non-zero score with 0 — CDA returns home_score=0
+        // for pre-match/in-progress states, which would corrupt a correct result.
+        const safeValues = { ...matchValues };
+        if (
+          existing.homeScore != null &&
+          existing.homeScore !== 0 &&
+          homeScore === 0 &&
+          awayScore === 0 &&
+          status !== "completed"
+        ) {
+          delete (safeValues as Partial<typeof safeValues>).homeScore;
+          delete (safeValues as Partial<typeof safeValues>).awayScore;
+        }
+        await existing.update(safeValues);
       } else {
         await Match.create(matchValues);
       }

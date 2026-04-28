@@ -35,6 +35,7 @@ export interface WatchlistAttributes {
   physicalRating?: number | null;
   mentalRating?: number | null;
   potentialRating?: number | null;
+  positionTemplate?: string | null;
   notes?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -66,6 +67,7 @@ export class Watchlist
   declare physicalRating: number | null;
   declare mentalRating: number | null;
   declare potentialRating: number | null;
+  declare positionTemplate: string | null;
   declare notes: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -105,6 +107,11 @@ Watchlist.init(
     physicalRating: { type: DataTypes.INTEGER, field: "physical_rating" },
     mentalRating: { type: DataTypes.INTEGER, field: "mental_rating" },
     potentialRating: { type: DataTypes.INTEGER, field: "potential_rating" },
+    positionTemplate: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: "position_template",
+    },
     notes: { type: DataTypes.TEXT },
   },
   {

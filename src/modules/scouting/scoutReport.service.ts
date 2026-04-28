@@ -4,37 +4,11 @@ import ScoutReport, { type Recommendation } from "./scoutReport.model";
 import { Watchlist } from "./scouting.model";
 import type { UpsertScoutReportDTO } from "./scoutReport.validation";
 import { AppError } from "@middleware/errorHandler";
-
-type RatingKey =
-  | "pace"
-  | "strength"
-  | "stamina"
-  | "ballControl"
-  | "passing"
-  | "shooting"
-  | "defending"
-  | "decisionMaking"
-  | "leadership"
-  | "workRate"
-  | "positioning"
-  | "pressingScore"
-  | "tacticalAwareness";
-
-const RATING_KEYS: RatingKey[] = [
-  "pace",
-  "strength",
-  "stamina",
-  "ballControl",
-  "passing",
-  "shooting",
-  "defending",
-  "decisionMaking",
-  "leadership",
-  "workRate",
-  "positioning",
-  "pressingScore",
-  "tacticalAwareness",
-];
+import {
+  computeWeightedOverall,
+  freeformToTemplate,
+  type PositionTemplate,
+} from "./positionTemplate";
 
 export async function listScoutReports(filters: {
   recommendation?: string;
@@ -71,16 +45,12 @@ export async function upsertScoutReport(
 
   const existing = await ScoutReport.findOne({ where: { watchlistId } });
 
-  // Auto-derive overall score from provided ratings if not explicitly supplied
-  const ratings = RATING_KEYS.map((k) => data[k]).filter(
-    (v): v is number => typeof v === "number",
-  );
-  const autoOverall =
-    ratings.length > 0
-      ? parseFloat(
-          (ratings.reduce((a, b) => a + b, 0) / ratings.length).toFixed(2),
-        )
-      : null;
+  // Auto-derive overall score using position-weighted aggregation. Falls back
+  // to flat mean when the prospect's position can't be resolved to a template.
+  const template =
+    (wl.positionTemplate as PositionTemplate | null | undefined) ??
+    freeformToTemplate(wl.position);
+  const autoOverall = computeWeightedOverall(data, template);
 
   const payload = {
     ...data,
@@ -137,7 +107,13 @@ export async function getSimilarProspects(watchlistId: string) {
         COALESCE(ABS(r.work_rate          - :workRate), 0) +
         COALESCE(ABS(r.positioning        - :positioning), 0) +
         COALESCE(ABS(r.pressing_score     - :pressingScore), 0) +
-        COALESCE(ABS(r.tactical_awareness - :tacticalAwareness), 0)
+        COALESCE(ABS(r.tactical_awareness - :tacticalAwareness), 0) +
+        COALESCE(ABS(r.composure          - :composure), 0) +
+        COALESCE(ABS(r.resilience         - :resilience), 0) +
+        COALESCE(ABS(r.team_fit           - :teamFit), 0) +
+        COALESCE(ABS(r.communication      - :communication), 0) +
+        COALESCE(ABS(r.coachability       - :coachability), 0) +
+        COALESCE(ABS(r.off_field_conduct  - :offFieldConduct), 0)
       ) AS similarity
     FROM watchlists w
     JOIN scout_report_attributes r ON r.watchlist_id = w.id
@@ -161,6 +137,12 @@ export async function getSimilarProspects(watchlistId: string) {
         positioning: target.positioning ?? 5,
         pressingScore: target.pressingScore ?? 5,
         tacticalAwareness: target.tacticalAwareness ?? 5,
+        composure: target.composure ?? 5,
+        resilience: target.resilience ?? 5,
+        teamFit: target.teamFit ?? 5,
+        communication: target.communication ?? 5,
+        coachability: target.coachability ?? 5,
+        offFieldConduct: target.offFieldConduct ?? 5,
       },
     },
   );
