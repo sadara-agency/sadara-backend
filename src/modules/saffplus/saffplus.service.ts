@@ -713,7 +713,13 @@ export async function syncCompetitionMatches(
       const rawStatus = fixture.status?.toLowerCase();
       const homeScore = fixture.homeScore ?? null;
       const awayScore = fixture.awayScore ?? null;
-      const matchDate = fixture.date ? new Date(fixture.date) : new Date();
+      // Combine date + time if both are present (provider returns them separately).
+      // fixture.date is "YYYY-MM-DD", fixture.time is "HH:MM" or "HH:MM:SS".
+      const matchDate = fixture.date
+        ? fixture.time
+          ? new Date(`${fixture.date}T${fixture.time}`)
+          : new Date(fixture.date)
+        : new Date();
       const matchTime = matchDate.getTime();
 
       // Primary: explicit status from provider
