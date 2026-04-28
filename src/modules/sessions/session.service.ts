@@ -492,7 +492,7 @@ export async function getCoverageRadar(params: CoverageRadarQuery) {
        ON s.player_id = p.id
        AND s.session_date >= :dateFrom
        AND s.session_date <= :dateTo
-     WHERE p.deleted_at IS NULL
+     WHERE 1=1
      ${playerFilter}
      GROUP BY p.id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar
      ORDER BY session_count DESC, p.last_name ASC`,
