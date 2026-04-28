@@ -28,6 +28,8 @@ import {
   scrapeTeamLogos,
   scrapeTournamentList,
   getSaffBreakerState,
+  type ArNameResolver,
+  type ArTournamentNameResolver,
 } from "@modules/saff/saff.scraper";
 import type {
   TournamentQuery,
@@ -55,6 +57,47 @@ import tournamentContextRaw from "@modules/saff/saff.tournament-context.json";
 // ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
+
+/**
+ * Warm-cache resolver for Arabic team names. Reads from saff_team_maps —
+ * after the first scrape of a tournament, every later scrape can pull AR
+ * names from the DB instead of re-fetching the AR championship page.
+ */
+export const teamNameArResolver: ArNameResolver = {
+  async lookupTeamNamesAr(saffTeamIds) {
+    if (saffTeamIds.length === 0) return new Map();
+    const rows = await SaffTeamMap.findAll({
+      where: { saffTeamId: { [Op.in]: saffTeamIds } },
+      attributes: ["saffTeamId", "teamNameAr"],
+      raw: true,
+    });
+    const map = new Map<number, string>();
+    for (const r of rows as Array<{ saffTeamId: number; teamNameAr: string }>) {
+      // Multiple seasons can share a saffTeamId — first non-empty AR name wins
+      if (r.teamNameAr && !map.has(r.saffTeamId)) {
+        map.set(r.saffTeamId, r.teamNameAr);
+      }
+    }
+    return map;
+  },
+};
+
+/** Same idea for the tournament index — reads from saff_tournaments.name_ar. */
+export const tournamentNameArResolver: ArTournamentNameResolver = {
+  async lookupTournamentNamesAr(saffIds) {
+    if (saffIds.length === 0) return new Map();
+    const rows = await SaffTournament.findAll({
+      where: { saffId: { [Op.in]: saffIds } },
+      attributes: ["saffId", "nameAr"],
+      raw: true,
+    });
+    const map = new Map<number, string>();
+    for (const r of rows as Array<{ saffId: number; nameAr: string }>) {
+      if (r.nameAr) map.set(r.saffId, r.nameAr);
+    }
+    return map;
+  },
+};
 
 /** Calculate current football season from date (season starts ~August). */
 export function getCurrentSeason(): string {
@@ -468,7 +511,7 @@ export async function seedTournaments(): Promise<number> {
 export async function syncTournamentsFromSaff(
   _season: string = getCurrentSeason(),
 ): Promise<number> {
-  const scraped = await scrapeTournamentList();
+  const scraped = await scrapeTournamentList(tournamentNameArResolver);
   let created = 0;
 
   for (const t of scraped) {
@@ -546,8 +589,14 @@ export async function fetchFromSaff(input: FetchRequest) {
 
   const tournamentMap = new Map(tournaments.map((t) => [t.saffId, t]));
 
-  // Run scraper
-  const results = await scrapeBatch(tournamentIds, season);
+  // Run scraper — pass the warm-cache resolver so each tournament's AR-page
+  // fetch is skipped when we already know all its team names.
+  const results = await scrapeBatch(
+    tournamentIds,
+    season,
+    undefined,
+    teamNameArResolver,
+  );
 
   // If the circuit broke mid-batch, leave a single audit breadcrumb so ops
   // can tell "SAFF was down" apart from "individual tournaments failed".

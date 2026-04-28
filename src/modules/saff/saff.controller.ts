@@ -8,7 +8,10 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AuthRequest } from "@shared/types";
 import * as saffService from "@modules/saff/saff.service";
 import * as sessionService from "@modules/saff/importSession.service";
-import { getCurrentSeason } from "@modules/saff/saff.service";
+import {
+  getCurrentSeason,
+  teamNameArResolver,
+} from "@modules/saff/saff.service";
 import {
   getSyncStatus as getSchedulerStatus,
   runSync,
@@ -219,7 +222,7 @@ export async function syncDebug(req: AuthRequest, res: Response) {
   const startedAt = Date.now();
 
   try {
-    result = await scrapeChampionship(saffId, season);
+    result = await scrapeChampionship(saffId, season, teamNameArResolver);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

@@ -79,6 +79,21 @@ export interface ScrapeResult {
   scrapedAt: Date;
 }
 
+/**
+ * Resolves Arabic team names from a warm cache (typically saff_team_maps).
+ * Returned map: saffTeamId → teamNameAr. Missing entries trigger an AR-page
+ * fetch as a fallback. Without a resolver, scrapeChampionship always fetches
+ * the AR page (cold path).
+ */
+export interface ArNameResolver {
+  lookupTeamNamesAr(saffTeamIds: number[]): Promise<Map<number, string>>;
+}
+
+/** Same shape, for the championships index (saffId → nameAr). */
+export interface ArTournamentNameResolver {
+  lookupTournamentNamesAr(saffIds: number[]): Promise<Map<number, string>>;
+}
+
 // ── Utility: Delay between requests ──
 
 function delay(ms: number): Promise<void> {
@@ -184,6 +199,7 @@ async function fetchPage(
 export async function scrapeChampionship(
   saffId: number,
   season: string,
+  arResolver?: ArNameResolver,
 ): Promise<ScrapeResult> {
   const path = URL_PATTERNS.championship(saffId);
   const urlEn = `${BASE_URL_EN}/${path}`;
@@ -200,55 +216,68 @@ export async function scrapeChampionship(
     $en = await fetchPage(urlArFallback, "en");
   }
 
-  // Fetch AR page (always uses root URL)
-  const $ar = await fetchPage(urlArFallback, "ar");
-
   // Scrape English data (primary)
   const rawStandingsEn = scrapeStandings($en);
   const rawFixturesEn = scrapeFixtures($en);
   const rawTeamsEn = extractTeams($en);
 
-  // Scrape Arabic data for name merging
-  const rawStandingsAr = scrapeStandings($ar);
-  const rawTeamsAr = extractTeams($ar);
-  const rawFixturesAr = scrapeFixtures($ar);
+  // Collect every saffTeamId we saw — these are the IDs we need AR names for
+  const allTeamIds = new Set<number>();
+  for (const s of rawStandingsEn) allTeamIds.add(s.saffTeamId);
+  for (const f of rawFixturesEn) {
+    allTeamIds.add(f.saffHomeTeamId);
+    allTeamIds.add(f.saffAwayTeamId);
+  }
+  for (const t of rawTeamsEn) allTeamIds.add(t.saffTeamId);
 
-  // Build Arabic name lookup by saffTeamId
-  // Note: "teamNameEn" from the AR page actually contains the Arabic text
-  const arNameMap = new Map<number, string>();
-  rawStandingsAr.forEach((s) => arNameMap.set(s.saffTeamId, s.teamNameEn));
-  rawTeamsAr.forEach((t) => arNameMap.set(t.saffTeamId, t.teamNameEn));
+  // 1) Try the warm cache first (saff_team_maps via resolver)
+  const arNameMap = arResolver
+    ? await arResolver.lookupTeamNamesAr([...allTeamIds])
+    : new Map<number, string>();
 
-  // Merge Arabic names into English standings
+  // 2) Only fetch the AR page if some IDs are still unknown
+  const missing = [...allTeamIds].filter((id) => !arNameMap.has(id));
+  if (missing.length > 0) {
+    try {
+      const $ar = await fetchPage(urlArFallback, "ar");
+      // Note: extractTeams/scrapeStandings parse the AR HTML — the
+      // "teamNameEn" field on returned rows actually contains Arabic text
+      // because we're reusing the EN-page parser on AR HTML.
+      const arTeams = extractTeams($ar);
+      for (const t of arTeams) {
+        if (!arNameMap.has(t.saffTeamId) && t.teamNameEn) {
+          arNameMap.set(t.saffTeamId, t.teamNameEn);
+        }
+      }
+      const arStandings = scrapeStandings($ar);
+      for (const s of arStandings) {
+        if (!arNameMap.has(s.saffTeamId) && s.teamNameEn) {
+          arNameMap.set(s.saffTeamId, s.teamNameEn);
+        }
+      }
+    } catch (err) {
+      logger.warn(
+        `[SAFF Scraper] AR fallback fetch failed for saffId=${saffId}: ${
+          (err as Error).message
+        } — proceeding with partial AR names (warm-cache hits will still apply)`,
+      );
+      // Don't throw — partial bilingual data is better than none. The next
+      // successful scrape (or a manual re-run) will fill the gaps.
+    }
+  }
+
+  // 3) Merge AR names into the EN data, keyed on saffTeamId (stable)
   const mergedStandings = rawStandingsEn.map((s) => ({
     ...s,
     teamNameAr: arNameMap.get(s.saffTeamId) || "",
   }));
 
-  // Merge Arabic names into fixtures
-  const arFixtureMap = new Map<string, { home: string; away: string }>();
-  rawFixturesAr.forEach((f) => {
-    arFixtureMap.set(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`, {
-      home: f.homeTeamNameEn,
-      away: f.awayTeamNameEn,
-    });
-  });
-
   const mergedFixtures = rawFixturesEn.map((f) => ({
     ...f,
-    homeTeamNameAr:
-      arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)
-        ?.home ||
-      arNameMap.get(f.saffHomeTeamId) ||
-      "",
-    awayTeamNameAr:
-      arFixtureMap.get(`${f.date}-${f.saffHomeTeamId}-${f.saffAwayTeamId}`)
-        ?.away ||
-      arNameMap.get(f.saffAwayTeamId) ||
-      "",
+    homeTeamNameAr: arNameMap.get(f.saffHomeTeamId) || "",
+    awayTeamNameAr: arNameMap.get(f.saffAwayTeamId) || "",
   }));
 
-  // Merge Arabic names into teams
   const mergedTeams = rawTeamsEn.map((t) => ({
     ...t,
     teamNameAr: arNameMap.get(t.saffTeamId) || "",
@@ -626,8 +655,9 @@ export async function scrapeWeek(
   saffId: number,
   season: string,
   _week: number,
+  arResolver?: ArNameResolver,
 ): Promise<ScrapedFixture[]> {
-  const result = await scrapeChampionship(saffId, season);
+  const result = await scrapeChampionship(saffId, season, arResolver);
   return result.fixtures;
 }
 
@@ -635,11 +665,12 @@ export async function scrapeAllWeeks(
   saffId: number,
   season: string,
   totalWeeks: number = 34,
+  arResolver?: ArNameResolver,
 ): Promise<ScrapedFixture[]> {
   logger.info(
     `[SAFF Scraper] Scraping all ${totalWeeks} weeks for championship ${saffId}`,
   );
-  const result = await scrapeChampionship(saffId, season);
+  const result = await scrapeChampionship(saffId, season, arResolver);
   return result.fixtures;
 }
 
@@ -653,9 +684,12 @@ export interface ScrapedTournamentMeta {
   nameAr: string;
 }
 
-export async function scrapeTournamentList(): Promise<ScrapedTournamentMeta[]> {
+export async function scrapeTournamentList(
+  arResolver?: ArTournamentNameResolver,
+): Promise<ScrapedTournamentMeta[]> {
   const results = new Map<number, ScrapedTournamentMeta>();
 
+  // 1) EN page (primary — gives us the saffId list and English names)
   try {
     const $en = await fetchPage(
       `${BASE_URL_EN}/${URL_PATTERNS.championships}`,
@@ -678,28 +712,55 @@ export async function scrapeTournamentList(): Promise<ScrapedTournamentMeta[]> {
     logger.warn(`[SAFF Scraper] EN tournament list failed: ${msg}`);
   }
 
-  try {
-    await delay(REQUEST_DELAY);
-    const $ar = await fetchPage(
-      `${BASE_URL_AR}/${URL_PATTERNS.championships}`,
-      "ar",
-    );
-    $ar(SELECTORS.tournamentLink).each((_, el) => {
-      const href = $ar(el).attr("href") || "";
-      const match = href.match(/championship\.php\?id=(\d+)/);
-      const id = match ? parseInt(match[1], 10) : 0;
-      const nameAr = $ar(el).text().trim();
-      if (!id || !nameAr) return;
-      const existing = results.get(id);
-      if (existing) {
-        existing.nameAr = nameAr;
-      } else {
-        results.set(id, { saffId: id, name: nameAr, nameAr });
+  const allIds = [...results.keys()];
+
+  // 2) Warm cache: ask the resolver (saff_tournaments.name_ar) for AR names
+  let arNames = new Map<number, string>();
+  if (arResolver && allIds.length > 0) {
+    try {
+      arNames = await arResolver.lookupTournamentNamesAr(allIds);
+      for (const [id, nameAr] of arNames) {
+        const existing = results.get(id);
+        if (existing && nameAr) existing.nameAr = nameAr;
       }
-    });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.warn(`[SAFF Scraper] AR tournament list failed: ${msg}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        `[SAFF Scraper] Tournament AR resolver failed (continuing to AR scrape): ${msg}`,
+      );
+    }
+  }
+
+  // 3) AR page only if (a) we discovered IDs without AR names from cache, OR
+  //    (b) no resolver was provided (cold path). The AR scrape can also
+  //    surface tournaments that didn't appear on the EN index.
+  const needAr =
+    allIds.length === 0 || [...results.values()].some((t) => !t.nameAr);
+
+  if (needAr) {
+    try {
+      await delay(REQUEST_DELAY);
+      const $ar = await fetchPage(
+        `${BASE_URL_AR}/${URL_PATTERNS.championships}`,
+        "ar",
+      );
+      $ar(SELECTORS.tournamentLink).each((_, el) => {
+        const href = $ar(el).attr("href") || "";
+        const match = href.match(/championship\.php\?id=(\d+)/);
+        const id = match ? parseInt(match[1], 10) : 0;
+        const nameAr = $ar(el).text().trim();
+        if (!id || !nameAr) return;
+        const existing = results.get(id);
+        if (existing) {
+          if (!existing.nameAr) existing.nameAr = nameAr;
+        } else {
+          results.set(id, { saffId: id, name: nameAr, nameAr });
+        }
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(`[SAFF Scraper] AR tournament list failed: ${msg}`);
+    }
   }
 
   return Array.from(results.values()).filter((t) => t.name);
@@ -713,6 +774,7 @@ export async function scrapeBatch(
   saffIds: number[],
   season: string,
   onProgress?: (current: number, total: number, name: string) => void,
+  arResolver?: ArNameResolver,
 ): Promise<ScrapeResult[]> {
   const results: ScrapeResult[] = [];
 
@@ -723,7 +785,7 @@ export async function scrapeBatch(
       if (onProgress)
         onProgress(i + 1, saffIds.length, `Championship #${saffId}`);
 
-      const result = await scrapeChampionship(saffId, season);
+      const result = await scrapeChampionship(saffId, season, arResolver);
       results.push(result);
 
       logger.info(
