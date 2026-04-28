@@ -520,12 +520,28 @@ export async function extractMatchVideoUrl(
       return { videos: [], reason: "no_player_found" };
     }
 
-    // Dedupe + classify
+    // Dedupe + classify — drop URLs that are clearly not playable streams
     const seen = new Set<string>();
     const videos: ExtractedVideo[] = [];
     for (const c of captured) {
       if (seen.has(c.url)) continue;
       seen.add(c.url);
+
+      const lower = c.url.toLowerCase();
+      // Skip image CDN paths
+      if (
+        lower.includes("/images/") ||
+        lower.includes("/assets/") ||
+        lower.includes("/static/")
+      )
+        continue;
+      // Skip bare MP4 segments (init.mp4, segment_NNNNN.mp4) — not standalone playable
+      if (/\/segment_\d+\.mp4|\/init\.mp4/.test(lower)) continue;
+      // Skip CDA API calls stored as video URLs
+      if (lower.includes("cda.mottostreaming.com")) continue;
+      // Skip data URIs
+      if (lower.startsWith("data:")) continue;
+
       const cls = classifyStreamUrl(c.url);
       videos.push({
         url: c.url,
