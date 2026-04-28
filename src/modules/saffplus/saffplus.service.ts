@@ -634,7 +634,9 @@ export async function syncCompetitionMatches(
     );
     if (match) {
       slug = match.id as string;
-      await competition.update({ saffplusSlug: slug });
+      const updateFields: Record<string, unknown> = { saffplusSlug: slug };
+      if (!competition.logoUrl && match.logo) updateFields.logoUrl = match.logo;
+      await competition.update(updateFields);
       logger.info(
         `[SAFF+] Auto-discovered slug '${slug}' for '${competition.name}'`,
       );
