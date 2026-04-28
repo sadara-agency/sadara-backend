@@ -144,7 +144,11 @@ export async function getStandings(
   competitionId: number | string,
   season?: string,
 ) {
-  const raw = await provider.fetchStandings(competitionId, season);
+  const competition = await Competition.findByPk(String(competitionId));
+  if (!competition)
+    throw new AppError(`Competition ${competitionId} not found`, 404);
+  const slug = competition.saffplusSlug ?? String(competitionId);
+  const raw = await provider.fetchStandings(slug, season);
   return {
     total: raw.length,
     standings: raw.map(normalizeStanding),
@@ -159,7 +163,11 @@ export async function getMatches(
   competitionId: number | string,
   season?: string,
 ) {
-  const raw = await provider.fetchMatches(competitionId, season);
+  const competition = await Competition.findByPk(String(competitionId));
+  if (!competition)
+    throw new AppError(`Competition ${competitionId} not found`, 404);
+  const slug = competition.saffplusSlug ?? String(competitionId);
+  const raw = await provider.fetchMatches(slug, season);
   return {
     total: raw.length,
     fixtures: raw.map(normalizeFixture),
