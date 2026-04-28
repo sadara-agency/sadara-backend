@@ -8,6 +8,7 @@
 
 import { Op } from "sequelize";
 import { logger } from "@config/logger";
+import { AppError } from "@middleware/errorHandler";
 import * as provider from "./saffplus.provider";
 import {
   isWomensCompetition,
@@ -972,10 +973,11 @@ export async function syncMatchMedia(matchId: string): Promise<{
   };
 
   const match = await Match.findByPk(matchId);
-  if (!match) throw new Error(`Match ${matchId} not found`);
+  if (!match) throw new AppError(`Match ${matchId} not found`, 404);
   if (!match.providerMatchId) {
-    throw new Error(
-      `Match ${matchId} has no provider_match_id — re-sync parent competition first`,
+    throw new AppError(
+      `Match ${matchId} has no provider_match_id — re-sync the parent competition first`,
+      422,
     );
   }
 
