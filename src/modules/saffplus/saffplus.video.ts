@@ -80,6 +80,7 @@ export function classifyStreamUrl(url: string): {
   else if (lower.includes("twitch.tv")) protocol = "twitch";
   else if (
     lower.includes("/embed/") ||
+    lower.includes("player.mottostreaming.com") ||
     lower.includes("player.") ||
     lower.includes("?embed=")
   )
@@ -435,6 +436,30 @@ export async function extractMatchVideoUrl(
       if (lower.includes(".m3u8") || lower.includes(".mpd")) {
         const kind = lower.includes(".m3u8") ? "hls" : "dash";
         networkUrls.push({ url: u, kind });
+        return;
+      }
+
+      // Motto CDA BatchGetVideos — extract the video ID to build an embed URL
+      if (lower.includes("batchgetvideos") && lower.includes("videoids")) {
+        try {
+          const parsed = new URL(u);
+          const msg = parsed.searchParams.get("message");
+          if (msg) {
+            const body = JSON.parse(decodeURIComponent(msg)) as Record<
+              string,
+              unknown
+            >;
+            const ids = body["videoIds"] as string[] | undefined;
+            if (ids && ids.length > 0) {
+              networkUrls.push({
+                url: `https://player.mottostreaming.com/embed/${ids[0]}`,
+                kind: "iframe",
+              });
+            }
+          }
+        } catch {
+          // malformed — ignore
+        }
         return;
       }
 

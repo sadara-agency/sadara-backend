@@ -796,7 +796,10 @@ export async function scrapeMatchEvents(
 
       // Also scan captured XHR/fetch responses for event arrays
       if (seen.size === 0) {
-        for (const { data } of jsonResponses) {
+        logger.info(
+          `[SAFF+] scrapeMatchEvents fallback: ${jsonResponses.length} json responses — keys: ${jsonResponses.map((r) => `${r.url.split("/").slice(-2).join("/")}→[${Object.keys((r.data as Record<string, unknown>) ?? {}).join(",")}]`).join(" | ")}`,
+        );
+        for (const { url, data } of jsonResponses) {
           if (!data || typeof data !== "object") continue;
           const d = data as Record<string, unknown>;
           // Look for arrays keyed as events/incidents/timeline
@@ -806,9 +809,15 @@ export async function scrapeMatchEvents(
             "timeline",
             "match_events",
             "data",
+            "items",
+            "results",
+            "entities",
           ]) {
             const arr = d[key];
-            if (!Array.isArray(arr)) continue;
+            if (!Array.isArray(arr) || arr.length === 0) continue;
+            logger.info(
+              `[SAFF+] scrapeMatchEvents: found array key="${key}" len=${arr.length} in ${url.split("/").slice(-2).join("/")} — sample keys: ${Object.keys((arr[0] as Record<string, unknown>) ?? {}).join(",")}`,
+            );
             const chunks = arr.map((item) => JSON.stringify(item));
             for (const ev of extractEventsFromRsc(chunks)) addEvent(ev);
           }
