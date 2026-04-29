@@ -28,7 +28,13 @@ interface TaskAttributes {
     | "Offer"
     | "General"
     | "Media";
-  status: "Open" | "InProgress" | "Completed" | "Canceled";
+  status:
+    | "Open"
+    | "InProgress"
+    | "PendingReview"
+    | "NeedsRework"
+    | "Completed"
+    | "Canceled";
   priority: "low" | "medium" | "high" | "critical";
   assignedTo: string | null;
   assignedBy: string | null;
@@ -46,6 +52,9 @@ interface TaskAttributes {
   mediaTaskType: string | null;
   mediaPlatforms: string[] | null;
   deliverables: MediaTaskDeliverable[] | null;
+  reviewNote: string | null;
+  reviewedBy: string | null;
+  reviewedAt: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -76,6 +85,9 @@ interface TaskCreationAttributes extends Optional<
   | "mediaTaskType"
   | "mediaPlatforms"
   | "deliverables"
+  | "reviewNote"
+  | "reviewedBy"
+  | "reviewedAt"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -98,7 +110,13 @@ export class Task
     | "Offer"
     | "General"
     | "Media";
-  declare status: "Open" | "InProgress" | "Completed" | "Canceled";
+  declare status:
+    | "Open"
+    | "InProgress"
+    | "PendingReview"
+    | "NeedsRework"
+    | "Completed"
+    | "Canceled";
   declare priority: "low" | "medium" | "high" | "critical";
   declare assignedTo: string | null;
   declare assignedBy: string | null;
@@ -116,6 +134,9 @@ export class Task
   declare mediaTaskType: string | null;
   declare mediaPlatforms: string[] | null;
   declare deliverables: MediaTaskDeliverable[] | null;
+  declare reviewNote: string | null;
+  declare reviewedBy: string | null;
+  declare reviewedAt: Date | null;
 
   // Associations (populated by include)
   declare subTasks?: Task[];
@@ -162,7 +183,14 @@ Task.init(
       defaultValue: "General",
     },
     status: {
-      type: DataTypes.ENUM("Open", "InProgress", "Completed", "Canceled"),
+      type: DataTypes.ENUM(
+        "Open",
+        "InProgress",
+        "PendingReview",
+        "NeedsRework",
+        "Completed",
+        "Canceled",
+      ),
       defaultValue: "Open",
     },
     priority: {
@@ -230,6 +258,9 @@ Task.init(
       defaultValue: [],
     },
     deliverables: { type: DataTypes.JSONB, defaultValue: [] },
+    reviewNote: { type: DataTypes.TEXT, field: "review_note", allowNull: true },
+    reviewedBy: { type: DataTypes.UUID, field: "reviewed_by", allowNull: true },
+    reviewedAt: { type: DataTypes.DATE, field: "reviewed_at", allowNull: true },
   },
   {
     sequelize,
