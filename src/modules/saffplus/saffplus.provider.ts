@@ -479,10 +479,8 @@ export async function scrapeClubSquads(
       logger.warn(
         `[SAFF+] scrapeClubSquads: ${path} failed — ${(err as Error).message}`,
       );
-      await sleep(1500);
       continue;
     }
-    await sleep(1500);
 
     // Layer 1 — RSC. Look for objects with both name and age/category fields.
     const rscChunks = extractRscData(html);
@@ -581,10 +579,8 @@ export async function scrapeSquadRoster(
       logger.warn(
         `[SAFF+] scrapeSquadRoster: ${path} failed — ${(err as Error).message}`,
       );
-      await sleep(1500);
       continue;
     }
-    await sleep(1500);
 
     const rscChunks = extractRscData(html);
     for (const entry of extractRosterFromRsc(rscChunks)) {
@@ -793,10 +789,8 @@ export async function scrapeMatchEvents(
         logger.warn(
           `[SAFF+] scrapeMatchEvents: ${path} failed — ${(err as Error).message}`,
         );
-        await sleep(1500);
         continue;
       }
-      await sleep(1500);
 
       // Try RSC chunks from the rendered HTML
       const rscChunks = extractRscData(html);
@@ -1081,7 +1075,6 @@ export function clearDiscoveryCache() {
  */
 export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
   try {
-    const { html, jsonResponses } = await fetchPageWithJson("/competitions");
     const competitions: SaffPlusCompetition[] = [];
     const womenSkipped: string[] = [];
 
@@ -1102,13 +1095,23 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
       }
     };
 
-    // ── PRIMARY: extract from captured JSON XHR responses ──
-    const jsonHit = findEntityArrayInJson(jsonResponses, { minItems: 1 });
-    if (jsonHit.items.length > 0) {
+    // ── PRIMARY: Direct Motto CDA API (no Puppeteer) ──
+    const compFilters = [
+      "type_id:competition",
+      "type_id:season",
+      "type_id:tournament",
+      "type_id:league",
+    ];
+    for (const filter of compFilters) {
+      const entities = await listMottoCdaEntities(filter, {
+        locale: "en",
+        pageSize: 200,
+      });
+      if (entities.length === 0) continue;
       logger.info(
-        `[SAFF+] Competitions JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} items)`,
+        `[SAFF+] Competitions via direct CDA API: "${filter}" (${entities.length} items)`,
       );
-      for (const item of jsonHit.items) {
+      for (const item of entities) {
         const id = pickStr(item, "slug", "id", "uuid") ?? String(item.id ?? "");
         const name = pickStr(item, "name", "title");
         if (!id || !name) continue;
@@ -1122,49 +1125,84 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
           ageGroup: pickStr(item, "age_group", "ageGroup", "category"),
         });
       }
+      if (competitions.length > 0) break;
     }
 
-    // ── FALLBACK 1: rendered DOM anchors ──
-    if (competitions.length === 0 && html) {
-      const $ = cheerio.load(html);
-      $('a[href*="/competitions/"]').each((_, el) => {
-        const href = $(el).attr("href") || "";
-        const slug = href.match(/\/competitions\/([^/]+)/)?.[1] ?? "";
-        if (!slug || slug === "competitions") return;
-        const name =
-          $(el).find("h3, h2, [class*=title]").first().text().trim() ||
-          $(el).text().trim().split("\n")[0]?.trim();
-        if (!name) return;
-        tryAdd({ id: slug, name, season: "", type: "league" });
-      });
-    }
+    // ── FALLBACK: Puppeteer render (when CDA returns nothing) ──
+    if (competitions.length === 0) {
+      const { html, jsonResponses } = await fetchPageWithJson("/competitions");
 
-    // ── FALLBACK 2: RSC flight payload (legacy) ──
-    if (competitions.length === 0 && html) {
-      const rscChunks = extractRscData(html);
-      for (const chunk of rscChunks) {
-        const competitionMatches = chunk.matchAll(
-          /"slug"\s*:\s*"([^"]+)"[^{}]{0,400}?"name"\s*:\s*"([^"]+)"/g,
+      const jsonHit = findEntityArrayInJson(jsonResponses, { minItems: 1 });
+      if (jsonHit.items.length > 0) {
+        logger.info(
+          `[SAFF+] Competitions JSON source (Puppeteer XHR): ${jsonHit.sourceUrl} (${jsonHit.items.length} items)`,
         );
-        for (const m of competitionMatches) {
-          const slug = m[1];
-          const name = m[2];
-          const window = chunk.slice(m.index ?? 0, (m.index ?? 0) + 800);
-          const nameAr = window.match(/"name_ar"\s*:\s*"([^"]+)"/)?.[1];
-          const gender = window.match(/"gender"\s*:\s*"([^"]+)"/)?.[1];
-          const ageGroup =
-            window.match(/"age_group"\s*:\s*"([^"]+)"/)?.[1] ??
-            window.match(/"category"\s*:\s*"([^"]+)"/)?.[1];
+        for (const item of jsonHit.items) {
+          const id =
+            pickStr(item, "slug", "id", "uuid") ?? String(item.id ?? "");
+          const name = pickStr(item, "name", "title");
+          if (!id || !name) continue;
           tryAdd({
-            id: slug,
+            id,
             name,
-            nameAr,
-            season: "",
-            type: "league",
-            gender,
-            ageGroup,
+            nameAr: pickStr(item, "name_ar", "nameAr", "title_ar", "titleAr"),
+            season: pickStr(item, "season") ?? "",
+            type: pickStr(item, "type", "competition_type") ?? "league",
+            gender: pickStr(item, "gender"),
+            ageGroup: pickStr(item, "age_group", "ageGroup", "category"),
           });
         }
+      }
+
+      if (competitions.length === 0 && html) {
+        const $ = cheerio.load(html);
+        $('a[href*="/competitions/"]').each((_, el) => {
+          const href = $(el).attr("href") || "";
+          const slug = href.match(/\/competitions\/([^/]+)/)?.[1] ?? "";
+          if (!slug || slug === "competitions") return;
+          const name =
+            $(el).find("h3, h2, [class*=title]").first().text().trim() ||
+            $(el).text().trim().split("\n")[0]?.trim();
+          if (!name) return;
+          tryAdd({ id: slug, name, season: "", type: "league" });
+        });
+      }
+
+      if (competitions.length === 0 && html) {
+        const rscChunks = extractRscData(html);
+        for (const chunk of rscChunks) {
+          const competitionMatches = chunk.matchAll(
+            /"slug"\s*:\s*"([^"]+)"[^{}]{0,400}?"name"\s*:\s*"([^"]+)"/g,
+          );
+          for (const m of competitionMatches) {
+            const slug = m[1];
+            const name = m[2];
+            const win = chunk.slice(m.index ?? 0, (m.index ?? 0) + 800);
+            const nameAr = win.match(/"name_ar"\s*:\s*"([^"]+)"/)?.[1];
+            const gender = win.match(/"gender"\s*:\s*"([^"]+)"/)?.[1];
+            const ageGroup =
+              win.match(/"age_group"\s*:\s*"([^"]+)"/)?.[1] ??
+              win.match(/"category"\s*:\s*"([^"]+)"/)?.[1];
+            tryAdd({
+              id: slug,
+              name,
+              nameAr,
+              season: "",
+              type: "league",
+              gender,
+              ageGroup,
+            });
+          }
+        }
+      }
+
+      if (competitions.length === 0 && jsonResponses.length > 0) {
+        logger.info(
+          `[SAFF+] No competitions extracted; captured JSON URLs: ${jsonResponses
+            .map((r) => r.url)
+            .slice(0, 8)
+            .join(" | ")}`,
+        );
       }
     }
 
@@ -1176,16 +1214,6 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
     logger.info(
       `[SAFF+] Found ${competitions.length} competitions (men's only)`,
     );
-    if (competitions.length === 0 && jsonResponses.length > 0) {
-      // Log captured URLs so the operator can see what JSON we DID get,
-      // for tightening the heuristic in a follow-up.
-      logger.info(
-        `[SAFF+] No competitions extracted; captured JSON URLs: ${jsonResponses
-          .map((r) => r.url)
-          .slice(0, 8)
-          .join(" | ")}`,
-      );
-    }
     return competitions;
   } catch (err) {
     logger.warn(
@@ -1207,7 +1235,6 @@ export async function fetchCompetitions(): Promise<SaffPlusCompetition[]> {
  */
 export async function fetchTeams(): Promise<SaffPlusTeam[]> {
   try {
-    const { html, jsonResponses } = await fetchPageWithJson("/clubs");
     const teams: SaffPlusTeam[] = [];
 
     const tryAdd = (team: SaffPlusTeam) => {
@@ -1216,13 +1243,22 @@ export async function fetchTeams(): Promise<SaffPlusTeam[]> {
       }
     };
 
-    // ── PRIMARY: extract from captured JSON XHR responses ──
-    const jsonHit = findEntityArrayInJson(jsonResponses, { minItems: 1 });
-    if (jsonHit.items.length > 0) {
+    // ── PRIMARY: Direct Motto CDA API ──
+    const clubFilters = [
+      "type_id:club",
+      "type_id:team",
+      "type_id:organization",
+    ];
+    for (const filter of clubFilters) {
+      const entities = await listMottoCdaEntities(filter, {
+        locale: "en",
+        pageSize: 200,
+      });
+      if (entities.length === 0) continue;
       logger.info(
-        `[SAFF+] Clubs JSON source: ${jsonHit.sourceUrl} (${jsonHit.items.length} items)`,
+        `[SAFF+] Clubs via direct CDA API: "${filter}" (${entities.length} items)`,
       );
-      for (const item of jsonHit.items) {
+      for (const item of entities) {
         const id = pickStr(item, "slug", "id", "uuid") ?? String(item.id ?? "");
         const name = pickStr(item, "name", "title");
         if (!id || !name) continue;
@@ -1235,53 +1271,79 @@ export async function fetchTeams(): Promise<SaffPlusTeam[]> {
           stadium: pickStr(item, "stadium", "venue"),
         });
       }
+      if (teams.length > 0) break;
     }
 
-    // ── FALLBACK 1: rendered DOM anchors ──
-    if (teams.length === 0 && html) {
-      const $ = cheerio.load(html);
-      $('a[href*="/clubs/"]').each((_, el) => {
-        const href = $(el).attr("href") || "";
-        const slug = href.replace("/clubs/", "").split("/")[0];
-        if (!slug || slug === "clubs") return;
+    // ── FALLBACK: Puppeteer render ──
+    if (teams.length === 0) {
+      const { html, jsonResponses } = await fetchPageWithJson("/clubs");
 
-        const name =
-          $(el).find("h3, h2, span, [class*=name]").first().text().trim() ||
-          $(el).text().trim().split("\n")[0]?.trim();
-        const logo = $(el).find("img").first().attr("src");
-
-        if (name) {
+      const jsonHit = findEntityArrayInJson(jsonResponses, { minItems: 1 });
+      if (jsonHit.items.length > 0) {
+        logger.info(
+          `[SAFF+] Clubs JSON source (Puppeteer XHR): ${jsonHit.sourceUrl} (${jsonHit.items.length} items)`,
+        );
+        for (const item of jsonHit.items) {
+          const id =
+            pickStr(item, "slug", "id", "uuid") ?? String(item.id ?? "");
+          const name = pickStr(item, "name", "title");
+          if (!id || !name) continue;
           tryAdd({
-            id: slug,
-            name: name || slug,
-            logo: logo || undefined,
+            id,
+            name,
+            nameAr: pickStr(item, "name_ar", "nameAr", "title_ar", "titleAr"),
+            logo: pickStr(
+              item,
+              "logo",
+              "thumbnail_url",
+              "thumbnailUrl",
+              "image",
+            ),
+            city: pickStr(item, "city", "location"),
+            stadium: pickStr(item, "stadium", "venue"),
           });
         }
-      });
-    }
+      }
 
-    // ── FALLBACK 2: RSC flight payload (legacy) ──
-    if (teams.length === 0 && html) {
-      const rscChunks = extractRscData(html);
-      for (const chunk of rscChunks) {
-        const teamMatches = chunk.matchAll(
-          /"slug"\s*:\s*"([^"]+)"[^}]*?"name"\s*:\s*"([^"]+)"/g,
-        );
-        for (const m of teamMatches) {
-          tryAdd({ id: m[1], name: m[2] });
+      if (teams.length === 0 && html) {
+        const $ = cheerio.load(html);
+        $('a[href*="/clubs/"]').each((_, el) => {
+          const href = $(el).attr("href") || "";
+          const slug = href.replace("/clubs/", "").split("/")[0];
+          if (!slug || slug === "clubs") return;
+          const name =
+            $(el).find("h3, h2, span, [class*=name]").first().text().trim() ||
+            $(el).text().trim().split("\n")[0]?.trim();
+          const logo = $(el).find("img").first().attr("src");
+          if (name) {
+            tryAdd({ id: slug, name: name || slug, logo: logo || undefined });
+          }
+        });
+      }
+
+      if (teams.length === 0 && html) {
+        const rscChunks = extractRscData(html);
+        for (const chunk of rscChunks) {
+          const teamMatches = chunk.matchAll(
+            /"slug"\s*:\s*"([^"]+)"[^}]*?"name"\s*:\s*"([^"]+)"/g,
+          );
+          for (const m of teamMatches) {
+            tryAdd({ id: m[1], name: m[2] });
+          }
         }
+      }
+
+      if (teams.length === 0 && jsonResponses.length > 0) {
+        logger.info(
+          `[SAFF+] No clubs extracted; captured JSON URLs: ${jsonResponses
+            .map((r) => r.url)
+            .slice(0, 8)
+            .join(" | ")}`,
+        );
       }
     }
 
     logger.info(`[SAFF+] Found ${teams.length} clubs`);
-    if (teams.length === 0 && jsonResponses.length > 0) {
-      logger.info(
-        `[SAFF+] No clubs extracted; captured JSON URLs: ${jsonResponses
-          .map((r) => r.url)
-          .slice(0, 8)
-          .join(" | ")}`,
-      );
-    }
     return teams;
   } catch (err) {
     logger.warn(`[SAFF+] Failed to fetch clubs: ${(err as Error).message}`);
@@ -1397,10 +1459,8 @@ export async function fetchStandings(
       logger.warn(
         `[SAFF+] fetchStandings: ${path} failed — ${(err as Error).message}`,
       );
-      await sleep(1500);
       continue;
     }
-    await sleep(1500);
 
     // ── PRIMARY: JSON XHR responses ──
     // Motto CDA entities: stats may be top-level OR nested under entity.fields.
@@ -1659,11 +1719,6 @@ function extractStandingsFromHtml(html: string): SaffPlusStanding[] {
   });
 
   return rows;
-}
-
-// ── Rate-limit helper ──
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -1928,7 +1983,6 @@ export async function fetchMatches(
         // fired before we capture. Falls through silently on timeout.
         "[class*=fixture], [class*=match-card], [class*=game-row], [class*=event-row]",
       );
-      await sleep(1500);
 
       // ── PRIMARY: JSON XHR responses ──
       // Motto CDA: fixture fields may be top-level or nested under entity.fields.
@@ -2062,7 +2116,6 @@ export async function fetchMatches(
       logger.warn(
         `[SAFF+] fetchMatches failed for ${path}: ${(err as Error).message}`,
       );
-      await sleep(1500);
     }
   }
 
