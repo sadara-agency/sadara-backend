@@ -23,6 +23,8 @@ import {
   listNationalTeams,
 } from "@modules/saff/saff.nationalTeams.service";
 import { sendSuccess } from "@shared/utils/apiResponse";
+import { cacheRoute } from "@middleware/cache.middleware";
+import { CacheTTL } from "@shared/utils/cache";
 
 const router = Router();
 
@@ -113,6 +115,14 @@ router.get(
   "/stats",
   authorizeModule("saff-data", "read"),
   asyncHandler(saffController.getStats),
+);
+
+// ── Available seasons ──
+router.get(
+  "/seasons",
+  authorizeModule("saff-data", "read"),
+  cacheRoute("saff-seasons", CacheTTL.MEDIUM),
+  asyncHandler(saffController.getSeasons),
 );
 
 // ── Job status polling ──
