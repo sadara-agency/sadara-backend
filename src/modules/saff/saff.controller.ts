@@ -189,6 +189,13 @@ export async function getStats(req: AuthRequest, res: Response) {
   sendSuccess(res, stats);
 }
 
+// ── Available Seasons ──
+
+export async function getSeasons(_req: AuthRequest, res: Response) {
+  const seasons = await saffService.listSeasons();
+  sendSuccess(res, seasons);
+}
+
 // ── Sync (Scheduler) ──
 
 export async function getSyncStatus(req: AuthRequest, res: Response) {

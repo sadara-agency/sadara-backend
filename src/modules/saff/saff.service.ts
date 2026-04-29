@@ -1934,6 +1934,19 @@ export async function getStats(season?: string) {
   };
 }
 
+// ── Available Seasons ──
+
+export async function listSeasons(): Promise<string[]> {
+  const rows = await sequelize.query<{ season: string }>(
+    `SELECT DISTINCT season FROM saff_standings
+     UNION
+     SELECT DISTINCT season FROM saff_fixtures
+     ORDER BY season DESC`,
+    { type: QueryTypes.SELECT },
+  );
+  return rows.map((r) => r.season);
+}
+
 // ══════════════════════════════════════════
 // PLAYER-CENTRIC QUERIES
 // ══════════════════════════════════════════
