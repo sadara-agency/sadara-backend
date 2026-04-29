@@ -890,6 +890,22 @@ const RAW_PERMISSIONS: Perm[] = [
     ["Analyst", "Scout", "Legal", "Finance", "SportingDirector", "Executive"],
     { canCreate: true, canRead: true },
   ),
+
+  // ── Personal Workspace (Notes + Todos) ──
+  // Every role gets full CRUD — user_id scoping in the service is the
+  // actual security boundary; no user can access another user's data.
+  ...allRoles("personal-notes", {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...allRoles("personal-todos", {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
