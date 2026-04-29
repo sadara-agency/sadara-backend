@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import {
   SaffTournament,
   SaffStanding,
@@ -840,6 +840,7 @@ export async function fetchFromSaff(
       });
     }
 
+    let newTeamMapIds: string[] = [];
     if (dataTypes.includes("teams") && result.teams.length) {
       await runSaffUpsert(`${tag} teams`, async (txn) => {
         const saffTeamIds = result.teams.map((t) => t.saffTeamId);
@@ -874,7 +875,11 @@ export async function fetchFromSaff(
         }
 
         if (toCreate.length) {
-          await SaffTeamMap.bulkCreate(toCreate, { transaction: txn });
+          const created = await SaffTeamMap.bulkCreate(toCreate, {
+            transaction: txn,
+            returning: true,
+          });
+          newTeamMapIds = created.map((m) => m.id);
         }
         for (const upd of arUpdates) {
           await SaffTeamMap.update(
@@ -884,6 +889,14 @@ export async function fetchFromSaff(
         }
         summary.teams += result.teams.length;
       });
+    }
+
+    // Auto-link fires after the teams transaction commits so new rows are visible.
+    // Fire-and-forget: a failed match must never abort a successful scrape.
+    if (newTeamMapIds.length > 0) {
+      autoLinkTeamsToClubs(newTeamMapIds).catch((err: Error) =>
+        logger.warn(`[SAFF] Auto-link failed (non-fatal): ${err.message}`),
+      );
     }
 
     // Tournament metadata is its own tiny transaction so it survives even
@@ -1126,6 +1139,108 @@ export async function mapTeamToClub(input: MapTeamInput) {
     await txn.rollback();
     throw error;
   }
+}
+
+// ══════════════════════════════════════════
+// AUTO-LINK TEAMS TO CLUBS (fuzzy matching)
+// ══════════════════════════════════════════
+
+interface AutoLinkCandidate {
+  teamMapId: string;
+  saffTeamId: number;
+  clubId: string;
+  similarity: number;
+}
+
+/**
+ * For each unmapped saff_team_map row in `saffTeamMapIds`, run trigram
+ * similarity against clubs.name_ar and clubs.name_en. Results:
+ *   ≥ HIGH_THRESHOLD → auto-link: set club_id + auto_link_confidence='high'
+ *   ≥ LOW_THRESHOLD  → suggest:   set suggested_club_id + confidence='medium'
+ *
+ * Runs outside any caller transaction so the auto-link commit is independent
+ * of the main upsert (a failed auto-link must never abort a successful scrape).
+ */
+export async function autoLinkTeamsToClubs(
+  saffTeamMapIds: string[],
+): Promise<{ autoLinked: number; suggested: number }> {
+  if (saffTeamMapIds.length === 0) return { autoLinked: 0, suggested: 0 };
+
+  const HIGH_THRESHOLD = 0.85;
+  const LOW_THRESHOLD = 0.6;
+
+  // Single query: for each unmapped team_map row find the best-matching club
+  // using pg_trgm word_similarity across both name columns. word_similarity is
+  // more forgiving than strict_word_similarity for partial name matches.
+  const rows = await sequelize.query<AutoLinkCandidate>(
+    `SELECT
+       tm.id          AS "teamMapId",
+       tm.saff_team_id AS "saffTeamId",
+       c.id           AS "clubId",
+       GREATEST(
+         word_similarity(tm.team_name_ar, c.name_ar),
+         word_similarity(tm.team_name_en, c.name),
+         word_similarity(tm.team_name_ar, c.name),
+         word_similarity(tm.team_name_en, COALESCE(c.name_ar, ''))
+       )              AS similarity
+     FROM saff_team_maps tm
+     CROSS JOIN LATERAL (
+       SELECT c.id, c.name, c.name_ar
+       FROM clubs c
+       WHERE c.type = 'Club'
+       ORDER BY GREATEST(
+         word_similarity(tm.team_name_ar, c.name_ar),
+         word_similarity(tm.team_name_en, c.name),
+         word_similarity(tm.team_name_ar, c.name),
+         word_similarity(tm.team_name_en, COALESCE(c.name_ar, ''))
+       ) DESC
+       LIMIT 1
+     ) c
+     WHERE tm.id = ANY(:ids)
+       AND tm.club_id IS NULL
+       AND tm.auto_link_confidence IS NULL`,
+    {
+      type: QueryTypes.SELECT,
+      replacements: { ids: saffTeamMapIds },
+    },
+  );
+
+  let autoLinked = 0;
+  let suggested = 0;
+
+  for (const row of rows) {
+    if (row.similarity >= HIGH_THRESHOLD) {
+      await SaffTeamMap.update(
+        { clubId: row.clubId, autoLinkConfidence: "high" },
+        { where: { id: row.teamMapId } },
+      );
+      // Mirror the update to standings/fixtures for this team
+      await SaffStanding.update(
+        { clubId: row.clubId },
+        { where: { saffTeamId: row.saffTeamId } },
+      );
+      await SaffFixture.update(
+        { homeClubId: row.clubId },
+        { where: { saffHomeTeamId: row.saffTeamId } },
+      );
+      await SaffFixture.update(
+        { awayClubId: row.clubId },
+        { where: { saffAwayTeamId: row.saffTeamId } },
+      );
+      autoLinked++;
+    } else if (row.similarity >= LOW_THRESHOLD) {
+      await SaffTeamMap.update(
+        { suggestedClubId: row.clubId, autoLinkConfidence: "medium" },
+        { where: { id: row.teamMapId } },
+      );
+      suggested++;
+    }
+  }
+
+  logger.info(
+    `[SAFF] Auto-link: ${autoLinked} high-confidence links, ${suggested} suggestions (of ${saffTeamMapIds.length} new teams)`,
+  );
+  return { autoLinked, suggested };
 }
 
 // ══════════════════════════════════════════

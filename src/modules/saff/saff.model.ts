@@ -486,13 +486,23 @@ interface SaffTeamMapAttributes {
   // Phase 3 — squad-aware mapping
   tournamentId?: string | null; // NULL = legacy general mapping
   squadId?: string | null; // Resolved squad for this tournament context
+  // Auto-link fuzzy matching
+  autoLinkConfidence?: "high" | "medium" | null;
+  suggestedClubId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface SaffTeamMapCreation extends Optional<
   SaffTeamMapAttributes,
-  "id" | "clubId" | "tournamentId" | "squadId" | "createdAt" | "updatedAt"
+  | "id"
+  | "clubId"
+  | "tournamentId"
+  | "squadId"
+  | "autoLinkConfidence"
+  | "suggestedClubId"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 export class SaffTeamMap
@@ -509,6 +519,8 @@ export class SaffTeamMap
   declare clubId: string | null;
   declare tournamentId: string | null;
   declare squadId: string | null;
+  declare autoLinkConfidence: "high" | "medium" | null;
+  declare suggestedClubId: string | null;
 }
 
 SaffTeamMap.init(
@@ -553,6 +565,17 @@ SaffTeamMap.init(
       allowNull: true,
       field: "squad_id",
       references: { model: "squads", key: "id" },
+    },
+    autoLinkConfidence: {
+      type: DataTypes.STRING(10),
+      allowNull: true,
+      field: "auto_link_confidence",
+    },
+    suggestedClubId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "suggested_club_id",
+      references: { model: "clubs", key: "id" },
     },
   },
   {
