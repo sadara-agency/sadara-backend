@@ -128,6 +128,11 @@ const envSchema = z.object({
   // SAFF+ / Motto platform key (optional — for authenticating Motto CDA API calls)
   SAFFPLUS_PLATFORM_KEY: z.string().default(""),
 
+  // SAFF scraper rate limits — milliseconds between requests per domain.
+  // Lower = faster scrapes but higher risk of 429 / WAF blocks.
+  SAFF_REQUEST_DELAY_MS: z.coerce.number().int().min(0).default(1500),
+  SAFFPLUS_REQUEST_DELAY_MS: z.coerce.number().int().min(0).default(2000),
+
   // Anthropic LLM (optional — required for AI summary generation)
   ANTHROPIC_API_KEY: z.string().default(""),
 
@@ -286,6 +291,11 @@ export const env = {
 
   saffplus: {
     platformKey: validated.SAFFPLUS_PLATFORM_KEY,
+  },
+
+  saff: {
+    requestDelayMs: validated.SAFF_REQUEST_DELAY_MS,
+    saffplusRequestDelayMs: validated.SAFFPLUS_REQUEST_DELAY_MS,
   },
 
   pagination: {

@@ -23,8 +23,13 @@ export async function up({
     allowNull: true,
   });
 
-  // 2. team_season_stats table — createTable is idempotent by name in umzug
-  if (!(await tableExists(queryInterface, "team_season_stats"))) {
+  // 2. team_season_stats table — skip entirely on a fresh-DB smoke run where clubs
+  //    doesn't exist yet (the FK would fail). On real runs from migration 000, clubs
+  //    is created long before 185.
+  if (
+    (await tableExists(queryInterface, "clubs")) &&
+    !(await tableExists(queryInterface, "team_season_stats"))
+  ) {
     await queryInterface.createTable("team_season_stats", {
       id: {
         type: DataTypes.UUID,

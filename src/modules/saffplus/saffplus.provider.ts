@@ -14,6 +14,8 @@
 
 import * as cheerio from "cheerio";
 import { logger } from "@config/logger";
+import { env } from "@config/env";
+import { DomainRateLimiter } from "@shared/utils/rateLimiter";
 import type {
   SaffPlusCompetition,
   SaffPlusTeam,
@@ -35,6 +37,11 @@ import { renderSaffPlusPage, type RenderResult } from "./saffplus.video";
 // Set SAFFPLUS_RENDER_DISABLED=true to short-circuit (returns empty string,
 // so callers see "0 competitions" gracefully). Useful for local dev where
 // Chromium isn't installed.
+
+const saffPlusLimiter = new DomainRateLimiter(
+  { "saffplus.sa": env.saff.saffplusRequestDelayMs },
+  env.saff.saffplusRequestDelayMs,
+);
 
 async function fetchPage(path: string): Promise<string> {
   const r = await fetchPageWithJson(path);
@@ -68,6 +75,7 @@ async function fetchPageWithJson(
     return { html: "", jsonResponses: [] };
   }
 
+  await saffPlusLimiter.acquire("saffplus.sa");
   const result = await renderSaffPlusPage(path, {
     waitForNetworkIdle: true,
     selectorTimeoutMs: 15_000,

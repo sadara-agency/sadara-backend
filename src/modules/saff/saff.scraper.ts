@@ -2,7 +2,9 @@ import axios from "axios";
 import * as cheerio from "cheerio";
 import * as iconv from "iconv-lite";
 import { logger } from "@config/logger";
+import { env } from "@config/env";
 import { createBreaker, CircuitOpenError } from "@shared/utils/circuitBreaker";
+import { DomainRateLimiter } from "@shared/utils/rateLimiter";
 import {
   scrapedStandingSchema,
   scrapedFixtureSchema,
@@ -23,7 +25,13 @@ import {
 // falls back to root URL if the English page fails.
 const BASE_URL_EN = "https://www.saff.com.sa/en";
 const BASE_URL_AR = "https://www.saff.com.sa";
-const REQUEST_DELAY = 1500; // ms between requests to be respectful
+
+// Per-domain rate limiter — interval is configurable via env so ops can tune
+// without a code deploy. Default: 1500ms for saff.com.sa.
+export const saffLimiter = new DomainRateLimiter(
+  { "saff.com.sa": env.saff.requestDelayMs },
+  env.saff.requestDelayMs,
+);
 
 // Standard browser UA — SAFF's WAF rejects non-browser User-Agents
 const BROWSER_UA =
@@ -208,11 +216,13 @@ export async function scrapeChampionship(
   // Fetch EN page with fallback to root URL if /en/ path 404s
   let $en: cheerio.CheerioAPI;
   try {
+    await saffLimiter.acquire("saff.com.sa");
     $en = await fetchPage(urlEn, "en");
   } catch {
     logger.warn(
       `[SAFF Scraper] EN page failed for saffId=${saffId}, falling back to root URL`,
     );
+    await saffLimiter.acquire("saff.com.sa");
     $en = await fetchPage(urlArFallback, "en");
   }
 
@@ -239,6 +249,7 @@ export async function scrapeChampionship(
   const missing = [...allTeamIds].filter((id) => !arNameMap.has(id));
   if (missing.length > 0) {
     try {
+      await saffLimiter.acquire("saff.com.sa");
       const $ar = await fetchPage(urlArFallback, "ar");
       // Note: extractTeams/scrapeStandings parse the AR HTML — the
       // "teamNameEn" field on returned rows actually contains Arabic text
@@ -592,6 +603,7 @@ export async function scrapeTeamLogo(
   saffTeamId: number,
 ): Promise<string | null> {
   try {
+    await saffLimiter.acquire("saff.com.sa");
     const url = `${BASE_URL_EN}/${URL_PATTERNS.team(saffTeamId)}`;
     const $ = await fetchPage(url, "en");
 
@@ -637,10 +649,6 @@ export async function scrapeTeamLogos(
           r.reason instanceof Error ? r.reason.message : String(r.reason);
         logger.warn(`[SAFF Scraper] Failed to fetch logo: ${msg}`);
       }
-    }
-
-    if (i + BATCH_SIZE < saffTeamIds.length) {
-      await delay(800);
     }
   }
 
@@ -691,6 +699,7 @@ export async function scrapeTournamentList(
 
   // 1) EN page (primary — gives us the saffId list and English names)
   try {
+    await saffLimiter.acquire("saff.com.sa");
     const $en = await fetchPage(
       `${BASE_URL_EN}/${URL_PATTERNS.championships}`,
       "en",
@@ -739,7 +748,7 @@ export async function scrapeTournamentList(
 
   if (needAr) {
     try {
-      await delay(REQUEST_DELAY);
+      await saffLimiter.acquire("saff.com.sa");
       const $ar = await fetchPage(
         `${BASE_URL_AR}/${URL_PATTERNS.championships}`,
         "ar",
@@ -822,10 +831,6 @@ export async function scrapeBatch(
         );
         break;
       }
-    }
-
-    if (i < saffIds.length - 1) {
-      await delay(REQUEST_DELAY);
     }
   }
 
