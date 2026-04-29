@@ -3,6 +3,7 @@ import { logger } from "@config/logger";
 import * as saffService from "@modules/saff/saff.service";
 import { getCurrentSeason } from "@modules/saff/saff.service";
 import { reapExpiredSessions } from "@modules/saff/importSession.service";
+import { broadcastToAll } from "@modules/notifications/notification.sse";
 
 // ══════════════════════════════════════════
 // SCHEDULE CONFIG
@@ -120,6 +121,12 @@ export async function runSync(
     `[SAFF Scheduler] Starting sync — ${triggerSource} — values: [${agencyValues.join(", ")}] — season: ${season}`,
   );
 
+  broadcastToAll("saff.sync.started", {
+    isRunning: true,
+    lastRun: syncStatus.lastRun.toISOString(),
+    triggerSource,
+  });
+
   try {
     // 1. Get tournament IDs matching the agency values
     const tournamentsResult = await saffService.listTournaments({
@@ -157,11 +164,14 @@ export async function runSync(
     );
 
     // 2. Fetch from SAFF
-    const result = await saffService.fetchFromSaff({
-      tournamentIds,
-      season,
-      dataTypes: ["standings", "fixtures", "teams"],
-    });
+    const result = await saffService.fetchFromSaff(
+      {
+        tournamentIds,
+        season,
+        dataTypes: ["standings", "fixtures", "teams"],
+      },
+      triggerSource,
+    );
 
     syncStatus.lastSuccess = new Date();
     syncStatus.lastError = null;
@@ -177,6 +187,14 @@ export async function runSync(
         `${result.standings} standings, ${result.fixtures} fixtures, ${result.teams} teams`,
     );
 
+    broadcastToAll("saff.sync.done", {
+      isRunning: false,
+      lastRun: syncStatus.lastRun?.toISOString() ?? null,
+      lastSuccess: syncStatus.lastSuccess.toISOString(),
+      error: null,
+      result: syncStatus.lastResult,
+    });
+
     return {
       tournaments: result.results,
       standings: result.standings,
@@ -191,6 +209,15 @@ export async function runSync(
     syncStatus.lastError = error.message;
     syncStatus.totalErrors++;
     logger.error(`[SAFF Scheduler] ✗ Sync failed: ${error.message}`);
+
+    broadcastToAll("saff.sync.done", {
+      isRunning: false,
+      lastRun: syncStatus.lastRun?.toISOString() ?? null,
+      lastSuccess: syncStatus.lastSuccess?.toISOString() ?? null,
+      error: error.message,
+      result: null,
+    });
+
     return {
       tournaments: 0,
       standings: 0,

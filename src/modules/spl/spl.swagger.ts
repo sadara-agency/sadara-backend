@@ -69,4 +69,41 @@
  *     security: [{ bearerAuth: [] }]
  *     responses:
  *       200: { description: Club IDs seeded }
+ *
+ * /spl/sync/fixtures:
+ *   post:
+ *     tags: [SPL]
+ *     summary: Sync Pulselive fixtures into matches table
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Fixtures synced }
+ *
+ * /spl/sync/fixtures/{pulselivefixtureId}/detail:
+ *   post:
+ *     tags: [SPL]
+ *     summary: Sync a single fixture's events + lineups + referee
+ *     security: [{ bearerAuth: [] }]
+ *     parameters:
+ *       - in: path
+ *         name: pulselivefixtureId
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200: { description: Detail synced }
+ *
+ * /spl/sync/fixture-details:
+ *   post:
+ *     tags: [SPL]
+ *     summary: Bulk-sync match details for completed/live fixtures
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Bulk detail synced }
+ *
+ * /spl/provider-fixtures/dry-run:
+ *   get:
+ *     tags: [SPL]
+ *     summary: Fetch + return Pulselive fixtures without writing (QA tool)
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200: { description: Raw fixture list }
  */

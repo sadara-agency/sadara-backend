@@ -8,7 +8,10 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AuthRequest } from "@shared/types";
 import * as saffService from "@modules/saff/saff.service";
 import * as sessionService from "@modules/saff/importSession.service";
-import { getCurrentSeason } from "@modules/saff/saff.service";
+import {
+  getCurrentSeason,
+  teamNameArResolver,
+} from "@modules/saff/saff.service";
 import {
   getSyncStatus as getSchedulerStatus,
   runSync,
@@ -193,6 +196,16 @@ export async function getSyncStatus(req: AuthRequest, res: Response) {
   sendSuccess(res, status);
 }
 
+export async function getScrapeRuns(req: AuthRequest, res: Response) {
+  const limit = Math.min(Number(req.query.limit) || 50, 200);
+  const saffId = req.query.saffId ? Number(req.query.saffId) : undefined;
+  const status =
+    typeof req.query.status === "string" ? req.query.status : undefined;
+
+  const runs = await saffService.getScrapeRuns({ limit, saffId, status });
+  sendSuccess(res, runs);
+}
+
 // ── Sync Debug (diagnostic, read-only scrape) ──
 //
 // Runs scrapeChampionship() against ONE tournament and returns the raw result
@@ -219,7 +232,7 @@ export async function syncDebug(req: AuthRequest, res: Response) {
   const startedAt = Date.now();
 
   try {
-    result = await scrapeChampionship(saffId, season);
+    result = await scrapeChampionship(saffId, season, teamNameArResolver);
   } catch (err) {
     error = err instanceof Error ? err.message : String(err);
   }

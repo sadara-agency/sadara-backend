@@ -8,7 +8,7 @@
 // Bump `SELECTOR_VERSION` whenever this file is meaningfully edited.
 // ═══════════════════════════════════════════════════════════════
 
-export const SELECTOR_VERSION = 2;
+export const SELECTOR_VERSION = 3;
 
 export interface ColumnHeaderLabels {
   /** Played */
@@ -56,6 +56,12 @@ export const SELECTORS = {
   logoLarge: 'img[src*="saffteamlarge"]',
   logoSmall: 'img[src*="saffteamsmall"]',
   logoFallback: 'img[src*="uploadcenter/saffteam"]',
+  /** Player roster rows on team.php?id=N — tried in order, first to yield rows wins */
+  rosterTable: "table",
+  rosterRow: "tbody tr",
+  rosterCell: "td",
+  /** Player detail link — same pattern as teamLink but for player pages */
+  playerLink: 'a[href*="player.php?id="]',
   /**
    * Tournament/championship logo on championship.php?id=X.
    * Multiple selectors are tried in order — SAFF's championship pages don't
@@ -76,6 +82,8 @@ export const URL_PATTERNS = {
   championship: (saffId: number) => `championship.php?id=${saffId}`,
   team: (saffTeamId: number) => `team.php?id=${saffTeamId}`,
   championships: "championships.php",
+  nationalTeams: "nationalteams.php",
+  nationalTeam: (saffId: number) => `nationalteams.php?id=${saffId}`,
 } as const;
 
 /**

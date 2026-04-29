@@ -1,9 +1,10 @@
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import {
   SaffTournament,
   SaffStanding,
   SaffFixture,
   SaffTeamMap,
+  SaffScrapeRun,
 } from "@modules/saff/saff.model";
 import { Club } from "@modules/clubs/club.model";
 import { Match } from "@modules/matches/match.model";
@@ -26,9 +27,18 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   scrapeBatch,
   scrapeTeamLogos,
+  scrapeTeamRoster,
   scrapeTournamentList,
   getSaffBreakerState,
+  type ArNameResolver,
+  type ArTournamentNameResolver,
 } from "@modules/saff/saff.scraper";
+import {
+  matchPlayer,
+  type PlayerMatchResult,
+} from "@modules/saffplus/saffplus.service";
+import { upsertPendingReview } from "@modules/saffplus/playerReview.service";
+import { SquadMembership } from "@modules/squads/squadMembership.model";
 import type {
   TournamentQuery,
   FetchRequest,
@@ -55,6 +65,47 @@ import tournamentContextRaw from "@modules/saff/saff.tournament-context.json";
 // ══════════════════════════════════════════
 // HELPERS
 // ══════════════════════════════════════════
+
+/**
+ * Warm-cache resolver for Arabic team names. Reads from saff_team_maps —
+ * after the first scrape of a tournament, every later scrape can pull AR
+ * names from the DB instead of re-fetching the AR championship page.
+ */
+export const teamNameArResolver: ArNameResolver = {
+  async lookupTeamNamesAr(saffTeamIds) {
+    if (saffTeamIds.length === 0) return new Map();
+    const rows = await SaffTeamMap.findAll({
+      where: { saffTeamId: { [Op.in]: saffTeamIds } },
+      attributes: ["saffTeamId", "teamNameAr"],
+      raw: true,
+    });
+    const map = new Map<number, string>();
+    for (const r of rows as Array<{ saffTeamId: number; teamNameAr: string }>) {
+      // Multiple seasons can share a saffTeamId — first non-empty AR name wins
+      if (r.teamNameAr && !map.has(r.saffTeamId)) {
+        map.set(r.saffTeamId, r.teamNameAr);
+      }
+    }
+    return map;
+  },
+};
+
+/** Same idea for the tournament index — reads from saff_tournaments.name_ar. */
+export const tournamentNameArResolver: ArTournamentNameResolver = {
+  async lookupTournamentNamesAr(saffIds) {
+    if (saffIds.length === 0) return new Map();
+    const rows = await SaffTournament.findAll({
+      where: { saffId: { [Op.in]: saffIds } },
+      attributes: ["saffId", "nameAr"],
+      raw: true,
+    });
+    const map = new Map<number, string>();
+    for (const r of rows as Array<{ saffId: number; nameAr: string }>) {
+      if (r.nameAr) map.set(r.saffId, r.nameAr);
+    }
+    return map;
+  },
+};
 
 /** Calculate current football season from date (season starts ~August). */
 export function getCurrentSeason(): string {
@@ -468,7 +519,7 @@ export async function seedTournaments(): Promise<number> {
 export async function syncTournamentsFromSaff(
   _season: string = getCurrentSeason(),
 ): Promise<number> {
-  const scraped = await scrapeTournamentList();
+  const scraped = await scrapeTournamentList(tournamentNameArResolver);
   let created = 0;
 
   for (const t of scraped) {
@@ -536,7 +587,10 @@ export async function listTournaments(query: TournamentQuery) {
 // SCRAPE & STORE
 // ══════════════════════════════════════════
 
-export async function fetchFromSaff(input: FetchRequest) {
+export async function fetchFromSaff(
+  input: FetchRequest,
+  triggerSource: string = "api",
+) {
   const { tournamentIds, season, dataTypes } = input;
 
   // Resolve tournament UUIDs
@@ -546,27 +600,34 @@ export async function fetchFromSaff(input: FetchRequest) {
 
   const tournamentMap = new Map(tournaments.map((t) => [t.saffId, t]));
 
-  // Run scraper
-  const results = await scrapeBatch(tournamentIds, season);
+  // Run scraper — pass the warm-cache resolver so each tournament's AR-page
+  // fetch is skipped when we already know all its team names.
+  const results = await scrapeBatch(
+    tournamentIds,
+    season,
+    undefined,
+    teamNameArResolver,
+  );
 
-  // If the circuit broke mid-batch, leave a single audit breadcrumb so ops
-  // can tell "SAFF was down" apart from "individual tournaments failed".
+  // If the circuit broke mid-batch, write a single audit row so ops can
+  // correlate "all tournaments went dark from time T" with SAFF being down.
   const breakerState = getSaffBreakerState();
   if (breakerState === "open") {
-    await SeasonSync.upsert({
+    SaffScrapeRun.create({
       source: "saff",
-      competition: "(circuit-breaker)",
-      competitionId: null,
+      saffId: null,
       season,
-      dataType: "fixtures",
+      targetUrl: null,
+      triggerSource,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      durationMs: 0,
       status: "failed",
-      syncedAt: new Date(),
-      recordCount: 0,
       errorMessage:
-        "SAFF circuit breaker open — upstream marked unreachable; remaining tournaments skipped",
-    } as any).catch((err) =>
-      logger.warn("[SAFF] Failed to record breaker-open audit row", {
-        error: (err as Error).message,
+        "Circuit breaker open — SAFF upstream marked unreachable; batch aborted",
+    }).catch((err: Error) =>
+      logger.warn("[SAFF] Failed to write circuit-breaker audit row", {
+        error: err.message,
       }),
     );
   }
@@ -577,6 +638,104 @@ export async function fetchFromSaff(input: FetchRequest) {
   for (const result of results) {
     const tournament = tournamentMap.get(result.tournamentId);
     if (!tournament) continue;
+
+    const scrapeStartedAt = result.scrapedAt ?? new Date();
+    const targetUrl = `https://www.saff.com.sa/en/championship.php?id=${result.tournamentId}`;
+
+    // ── Detect fetch-level errors (scraper caught and packaged them) ──
+    const fetchError = result.validationWarnings.find(
+      (w) =>
+        w.entity === "standing" &&
+        typeof (w.raw as Record<string, unknown>)?.saffId === "number",
+    );
+    if (
+      fetchError &&
+      result.standings.length === 0 &&
+      result.fixtures.length === 0
+    ) {
+      const isCircuit =
+        (fetchError.raw as Record<string, unknown>)?.circuitOpen === true;
+      SaffScrapeRun.create({
+        source: "saff",
+        saffId: result.tournamentId,
+        season,
+        targetUrl,
+        triggerSource,
+        startedAt: scrapeStartedAt,
+        finishedAt: new Date(),
+        durationMs: Math.max(0, Date.now() - scrapeStartedAt.getTime()),
+        status: isCircuit ? "skipped" : "failed",
+        rowsStandings: 0,
+        rowsFixtures: 0,
+        rowsTeams: 0,
+        scraperVersion: result.scraperVersion,
+        validationWarnings: result.validationWarnings.length,
+        errorMessage: fetchError.reason ?? "Scrape error",
+      }).catch((err: Error) =>
+        logger.warn("[SAFF] Failed to write fetch-error audit row", {
+          error: err.message,
+        }),
+      );
+      continue;
+    }
+
+    // ── Sanity guard: refuse to overwrite good data with suspiciously sparse
+    // results. If SAFF changes their DOM structure, selectors silently return
+    // fewer rows — this catches the drift before it reaches the DB.
+    //
+    // Thresholds by agency tier:
+    //   Critical/High (Roshn/Yelo/King's Cup): league has ≥18 teams → expect ≥10
+    //   Medium/Low/Scouting/Niche: cups/youth groups can be small → expect ≥2
+    //
+    // We only check when the scrape returned *something* (non-empty result);
+    // total-zero is already caught by ScraperShapeError in the scraper itself.
+    const isMajorLeague = ["Critical", "High"].includes(tournament.agencyValue);
+    const minStandings = isMajorLeague ? 10 : 2;
+    const minFixtures = isMajorLeague ? 50 : 2;
+
+    const standingsSuspicious =
+      dataTypes.includes("standings") &&
+      result.standings.length > 0 &&
+      result.standings.length < minStandings;
+    const fixturesSuspicious =
+      dataTypes.includes("fixtures") &&
+      result.fixtures.length > 0 &&
+      result.fixtures.length < minFixtures;
+
+    if (standingsSuspicious || fixturesSuspicious) {
+      logger.warn(
+        `[SAFF Service] Sanity check failed for saffId=${result.tournamentId} ` +
+          `(${tournament.name}, agencyValue=${tournament.agencyValue}): ` +
+          `standings=${result.standings.length} (min ${minStandings}), ` +
+          `fixtures=${result.fixtures.length} (min ${minFixtures}). ` +
+          `Skipping DB write — SAFF DOM may have changed. ` +
+          `Bump SELECTOR_VERSION in saff.selectors.ts after fixing selectors.`,
+      );
+      SaffScrapeRun.create({
+        source: "saff",
+        saffId: result.tournamentId,
+        season,
+        targetUrl,
+        triggerSource,
+        startedAt: scrapeStartedAt,
+        finishedAt: new Date(),
+        durationMs: Math.max(0, Date.now() - scrapeStartedAt.getTime()),
+        status: "sanity_fail",
+        rowsStandings: result.standings.length,
+        rowsFixtures: result.fixtures.length,
+        rowsTeams: result.teams.length,
+        scraperVersion: result.scraperVersion,
+        validationWarnings: result.validationWarnings.length,
+        errorMessage:
+          `Sanity check failed: standings=${result.standings.length} (min ${minStandings}), ` +
+          `fixtures=${result.fixtures.length} (min ${minFixtures})`,
+      }).catch((err: Error) =>
+        logger.warn("[SAFF] Failed to write sanity-fail audit row", {
+          error: err.message,
+        }),
+      );
+      continue;
+    }
 
     // ─────────────────────────────────────────────────────────────────────
     // Per-data-type transactions:
@@ -598,6 +757,7 @@ export async function fetchFromSaff(input: FetchRequest) {
 
     if (dataTypes.includes("standings") && result.standings.length) {
       await runSaffUpsert(`${tag} standings`, async (txn) => {
+        const now = new Date();
         await SaffStanding.bulkCreate(
           result.standings.map((s) => ({
             tournamentId: tournament.id,
@@ -614,6 +774,7 @@ export async function fetchFromSaff(input: FetchRequest) {
             goalsAgainst: s.goalsAgainst,
             goalDifference: s.goalDifference,
             points: s.points,
+            lastSeenAt: now,
           })),
           {
             transaction: txn,
@@ -629,6 +790,7 @@ export async function fetchFromSaff(input: FetchRequest) {
               "goalsAgainst",
               "goalDifference",
               "points",
+              "lastSeenAt",
               "updatedAt",
             ],
           },
@@ -639,6 +801,7 @@ export async function fetchFromSaff(input: FetchRequest) {
 
     if (dataTypes.includes("fixtures") && result.fixtures.length) {
       await runSaffUpsert(`${tag} fixtures`, async (txn) => {
+        const now = new Date();
         await SaffFixture.bulkCreate(
           result.fixtures.map((f) => ({
             tournamentId: tournament.id,
@@ -659,6 +822,7 @@ export async function fetchFromSaff(input: FetchRequest) {
               f.homeScore !== null
                 ? ("completed" as const)
                 : ("upcoming" as const),
+            lastSeenAt: now,
           })),
           {
             transaction: txn,
@@ -674,6 +838,7 @@ export async function fetchFromSaff(input: FetchRequest) {
               "stadium",
               "city",
               "status",
+              "lastSeenAt",
               "updatedAt",
             ],
           },
@@ -682,6 +847,7 @@ export async function fetchFromSaff(input: FetchRequest) {
       });
     }
 
+    let newTeamMapIds: string[] = [];
     if (dataTypes.includes("teams") && result.teams.length) {
       await runSaffUpsert(`${tag} teams`, async (txn) => {
         const saffTeamIds = result.teams.map((t) => t.saffTeamId);
@@ -716,7 +882,11 @@ export async function fetchFromSaff(input: FetchRequest) {
         }
 
         if (toCreate.length) {
-          await SaffTeamMap.bulkCreate(toCreate, { transaction: txn });
+          const created = await SaffTeamMap.bulkCreate(toCreate, {
+            transaction: txn,
+            returning: true,
+          });
+          newTeamMapIds = created.map((m) => m.id);
         }
         for (const upd of arUpdates) {
           await SaffTeamMap.update(
@@ -726,6 +896,44 @@ export async function fetchFromSaff(input: FetchRequest) {
         }
         summary.teams += result.teams.length;
       });
+    }
+
+    // Auto-link fires after the teams transaction commits so new rows are visible.
+    // Fire-and-forget: a failed match must never abort a successful scrape.
+    if (newTeamMapIds.length > 0) {
+      autoLinkTeamsToClubs(newTeamMapIds).catch((err: Error) =>
+        logger.warn(`[SAFF] Auto-link failed (non-fatal): ${err.message}`),
+      );
+    }
+
+    // ── Rosters ──
+    // Opt-in only — not included in the default dataTypes set so existing
+    // cron jobs are unaffected. Scrapes each team seen in this tournament.
+    if (dataTypes.includes("rosters") && result.teams.length > 0) {
+      // Resolve saffTeamId → squadId for direct membership writes
+      const teamMapsForRosters = await SaffTeamMap.findAll({
+        where: {
+          saffTeamId: { [Op.in]: result.teams.map((t) => t.saffTeamId) },
+          season,
+          clubId: { [Op.ne]: null },
+        },
+        attributes: ["saffTeamId", "squadId"],
+      });
+      const squadByTeamId = new Map(
+        teamMapsForRosters.map((m) => [m.saffTeamId, m.squadId]),
+      );
+
+      for (const team of result.teams) {
+        syncTeamRoster(
+          team.saffTeamId,
+          season,
+          squadByTeamId.get(team.saffTeamId) ?? null,
+        ).catch((err: Error) =>
+          logger.warn(
+            `[SAFF] Roster sync failed for team ${team.saffTeamId}: ${err.message}`,
+          ),
+        );
+      }
     }
 
     // Tournament metadata is its own tiny transaction so it survives even
@@ -739,6 +947,28 @@ export async function fetchFromSaff(input: FetchRequest) {
       }
       await tournament.update(tournamentPatch, { transaction: txn });
     });
+
+    // Audit row — fire-and-forget so a write failure never blocks the sync loop
+    SaffScrapeRun.create({
+      source: "saff",
+      saffId: result.tournamentId,
+      season,
+      targetUrl,
+      triggerSource,
+      startedAt: scrapeStartedAt,
+      finishedAt: new Date(),
+      durationMs: Math.max(0, Date.now() - scrapeStartedAt.getTime()),
+      status: "success",
+      rowsStandings: result.standings.length,
+      rowsFixtures: result.fixtures.length,
+      rowsTeams: result.teams.length,
+      scraperVersion: result.scraperVersion,
+      validationWarnings: result.validationWarnings.length,
+    }).catch((err: Error) =>
+      logger.warn("[SAFF] Failed to write success audit row", {
+        error: err.message,
+      }),
+    );
   }
 
   return { results: results.length, ...summary };
@@ -946,6 +1176,196 @@ export async function mapTeamToClub(input: MapTeamInput) {
     await txn.rollback();
     throw error;
   }
+}
+
+// ══════════════════════════════════════════
+// AUTO-LINK TEAMS TO CLUBS (fuzzy matching)
+// ══════════════════════════════════════════
+
+interface AutoLinkCandidate {
+  teamMapId: string;
+  saffTeamId: number;
+  clubId: string;
+  similarity: number;
+}
+
+/**
+ * For each unmapped saff_team_map row in `saffTeamMapIds`, run trigram
+ * similarity against clubs.name_ar and clubs.name_en. Results:
+ *   ≥ HIGH_THRESHOLD → auto-link: set club_id + auto_link_confidence='high'
+ *   ≥ LOW_THRESHOLD  → suggest:   set suggested_club_id + confidence='medium'
+ *
+ * Runs outside any caller transaction so the auto-link commit is independent
+ * of the main upsert (a failed auto-link must never abort a successful scrape).
+ */
+export async function autoLinkTeamsToClubs(
+  saffTeamMapIds: string[],
+): Promise<{ autoLinked: number; suggested: number }> {
+  if (saffTeamMapIds.length === 0) return { autoLinked: 0, suggested: 0 };
+
+  const HIGH_THRESHOLD = 0.85;
+  const LOW_THRESHOLD = 0.6;
+
+  // Single query: for each unmapped team_map row find the best-matching club
+  // using pg_trgm word_similarity across both name columns. word_similarity is
+  // more forgiving than strict_word_similarity for partial name matches.
+  const rows = await sequelize.query<AutoLinkCandidate>(
+    `SELECT
+       tm.id          AS "teamMapId",
+       tm.saff_team_id AS "saffTeamId",
+       c.id           AS "clubId",
+       GREATEST(
+         word_similarity(tm.team_name_ar, c.name_ar),
+         word_similarity(tm.team_name_en, c.name),
+         word_similarity(tm.team_name_ar, c.name),
+         word_similarity(tm.team_name_en, COALESCE(c.name_ar, ''))
+       )              AS similarity
+     FROM saff_team_maps tm
+     CROSS JOIN LATERAL (
+       SELECT c.id, c.name, c.name_ar
+       FROM clubs c
+       WHERE c.type = 'Club'
+       ORDER BY GREATEST(
+         word_similarity(tm.team_name_ar, c.name_ar),
+         word_similarity(tm.team_name_en, c.name),
+         word_similarity(tm.team_name_ar, c.name),
+         word_similarity(tm.team_name_en, COALESCE(c.name_ar, ''))
+       ) DESC
+       LIMIT 1
+     ) c
+     WHERE tm.id = ANY(:ids)
+       AND tm.club_id IS NULL
+       AND tm.auto_link_confidence IS NULL`,
+    {
+      type: QueryTypes.SELECT,
+      replacements: { ids: saffTeamMapIds },
+    },
+  );
+
+  let autoLinked = 0;
+  let suggested = 0;
+
+  for (const row of rows) {
+    if (row.similarity >= HIGH_THRESHOLD) {
+      await SaffTeamMap.update(
+        { clubId: row.clubId, autoLinkConfidence: "high" },
+        { where: { id: row.teamMapId } },
+      );
+      // Mirror the update to standings/fixtures for this team
+      await SaffStanding.update(
+        { clubId: row.clubId },
+        { where: { saffTeamId: row.saffTeamId } },
+      );
+      await SaffFixture.update(
+        { homeClubId: row.clubId },
+        { where: { saffHomeTeamId: row.saffTeamId } },
+      );
+      await SaffFixture.update(
+        { awayClubId: row.clubId },
+        { where: { saffAwayTeamId: row.saffTeamId } },
+      );
+      autoLinked++;
+    } else if (row.similarity >= LOW_THRESHOLD) {
+      await SaffTeamMap.update(
+        { suggestedClubId: row.clubId, autoLinkConfidence: "medium" },
+        { where: { id: row.teamMapId } },
+      );
+      suggested++;
+    }
+  }
+
+  logger.info(
+    `[SAFF] Auto-link: ${autoLinked} high-confidence links, ${suggested} suggestions (of ${saffTeamMapIds.length} new teams)`,
+  );
+  return { autoLinked, suggested };
+}
+
+// ══════════════════════════════════════════
+// SYNC TEAM ROSTERS → player_match_review
+// ══════════════════════════════════════════
+
+/**
+ * Scrape the roster for a single SAFF team and push results to the
+ * player review queue. Reuses the same matchPlayer() + upsertPendingReview()
+ * pipeline as the SAFF+ roster sync so both sources land in one queue.
+ *
+ * squadId is optional — when provided (club already mapped + squad exists)
+ * high-confidence matches write squad_memberships directly.
+ */
+export async function syncTeamRoster(
+  saffTeamId: number,
+  season: string,
+  squadId: string | null = null,
+): Promise<{
+  membershipsUpserted: number;
+  reviewQueued: number;
+  errors: number;
+}> {
+  const result = { membershipsUpserted: 0, reviewQueued: 0, errors: 0 };
+  const players = await scrapeTeamRoster(saffTeamId);
+
+  for (const player of players) {
+    try {
+      // matchPlayer expects a SaffPlusRosterEntry-shaped object
+      const entry = {
+        name: player.nameEn,
+        nameAr: player.nameAr || null,
+        externalId:
+          player.saffPlayerId != null ? String(player.saffPlayerId) : null,
+        dob: null,
+        nationality: player.nationality,
+        jerseyNumber: player.jerseyNumber,
+        position: player.position,
+        raw: { rawRow: player.rawRow } as Record<string, unknown>,
+      };
+
+      const match: PlayerMatchResult = await matchPlayer(entry, "saff");
+
+      if (match.playerId && squadId) {
+        await SquadMembership.findOrCreate({
+          where: { squadId, playerId: match.playerId, season },
+          defaults: {
+            squadId,
+            playerId: match.playerId,
+            season,
+            jerseyNumber: player.jerseyNumber,
+            position: player.position,
+            externalMembershipId: entry.externalId,
+            providerSource: "saff",
+            joinedAt: null,
+            leftAt: null,
+          },
+        });
+        result.membershipsUpserted++;
+      } else if (!match.playerId || !squadId) {
+        await upsertPendingReview({
+          scrapedNameEn: player.nameEn,
+          scrapedNameAr: player.nameAr || null,
+          scrapedNationality: player.nationality,
+          scrapedJerseyNumber: player.jerseyNumber,
+          scrapedPosition: player.position,
+          squadId,
+          season,
+          suggestedPlayerIds: match.suggestions,
+          externalPlayerId: entry.externalId,
+          providerSource: "saff",
+          rawPayload: { saffTeamId, ...entry.raw },
+        });
+        result.reviewQueued++;
+      }
+    } catch (err) {
+      logger.warn(
+        `[SAFF] syncTeamRoster(${saffTeamId}) player "${player.nameEn}" error: ${(err as Error).message}`,
+      );
+      result.errors++;
+    }
+  }
+
+  logger.info(
+    `[SAFF] syncTeamRoster(saffTeamId=${saffTeamId}, season=${season}): ` +
+      `${result.membershipsUpserted} memberships, ${result.reviewQueued} queued, ${result.errors} errors`,
+  );
+  return result;
 }
 
 // ══════════════════════════════════════════
@@ -1414,29 +1834,76 @@ export async function fetchTeamLogos(season: string, force = false) {
 }
 
 // ══════════════════════════════════════════
-// BULK FETCH — 5 MEN'S PRO LEAGUES
+// BULK FETCH — MEN'S PRO LEAGUES
 // ══════════════════════════════════════════
 
-/** SAFF IDs for the 5 men's pro leagues (tier 1-5). */
-const MEN_LEAGUE_SAFF_IDS = [333, 334, 335, 336, 366];
+const MEN_SENIOR_DIVISIONS = [
+  "premier",
+  "1st-division",
+  "2nd-division",
+  "3rd-division",
+] as const;
+
+// In-process cache — refreshed on first call, stable for the process lifetime.
+// League IDs only change when a tournament is promoted/relegated, at which
+// point the admin updates saff_tournaments and the process restarts.
+let _menLeagueIdsCache: number[] | null = null;
 
 /**
- * One-shot bulk fetch for all 5 men's pro leagues (stage-only).
+ * Return the SAFF IDs of all active men's senior pro leagues, derived from
+ * saff_tournaments. Falls back to known 2025-2026 IDs if the DB query fails.
+ */
+export async function getMenLeagueSaffIds(): Promise<number[]> {
+  if (_menLeagueIdsCache !== null) return _menLeagueIdsCache;
+
+  try {
+    const rows = await SaffTournament.findAll({
+      where: {
+        ageCategory: "senior",
+        division: MEN_SENIOR_DIVISIONS,
+        isActive: true,
+      },
+      attributes: ["saffId"],
+      raw: true,
+    });
+    const ids = (rows as Array<{ saffId: number }>).map((r) => r.saffId);
+    if (ids.length > 0) {
+      _menLeagueIdsCache = ids;
+      logger.info(
+        `[SAFF Service] Men's league IDs loaded from DB: [${ids.join(", ")}]`,
+      );
+      return ids;
+    }
+  } catch (err) {
+    logger.warn(
+      `[SAFF Service] Could not load men's league IDs from DB — using fallback: ${(err as Error).message}`,
+    );
+  }
+
+  // Fallback: known Saudi Pro League + 1st/2nd/3rd division IDs (2025-2026 season)
+  const fallback = [333, 334, 335, 336, 366];
+  _menLeagueIdsCache = fallback;
+  return fallback;
+}
+
+/**
+ * One-shot bulk fetch for all men's pro leagues (stage-only).
  *
  * After the wizard redesign this only refreshes staging tables — clubs,
  * matches, and competitions are never mutated here. To commit the
  * fetched data, a human must run the wizard for each tournament.
  */
 export async function bulkFetchMenLeagues(season: string) {
+  const ids = await getMenLeagueSaffIds();
   const fetchResult = await fetchFromSaff({
-    tournamentIds: MEN_LEAGUE_SAFF_IDS,
+    tournamentIds: ids,
     season,
     dataTypes: ["standings", "fixtures", "teams"],
   });
 
   return {
     season,
-    leagues: MEN_LEAGUE_SAFF_IDS.length,
+    leagues: ids.length,
     fetch: fetchResult,
   };
 }
@@ -1953,6 +2420,7 @@ export async function writeStagingFromPayload(
   const txn = await sequelize.transaction();
 
   try {
+    const now = new Date();
     if (payload.standings.length) {
       await SaffStanding.bulkCreate(
         payload.standings.map((s) => ({
@@ -1970,6 +2438,7 @@ export async function writeStagingFromPayload(
           goalsAgainst: s.goalsAgainst,
           goalDifference: s.goalDifference,
           points: s.points,
+          lastSeenAt: now,
         })),
         {
           transaction: txn,
@@ -1985,6 +2454,7 @@ export async function writeStagingFromPayload(
             "goalsAgainst",
             "goalDifference",
             "points",
+            "lastSeenAt",
             "updatedAt",
           ],
         },
@@ -2013,6 +2483,7 @@ export async function writeStagingFromPayload(
             f.homeScore !== null
               ? ("completed" as const)
               : ("upcoming" as const),
+          lastSeenAt: now,
         })),
         {
           transaction: txn,
@@ -2027,6 +2498,7 @@ export async function writeStagingFromPayload(
             "stadium",
             "city",
             "status",
+            "lastSeenAt",
             "updatedAt",
           ],
         },
@@ -2688,4 +3160,25 @@ export async function runStageOnlySync(
     fixtures: result.fixtures,
     teams: result.teams,
   };
+}
+
+// ══════════════════════════════════════════
+// SCRAPE AUDIT LOG
+// ══════════════════════════════════════════
+
+export async function getScrapeRuns(opts: {
+  limit?: number;
+  saffId?: number;
+  status?: string;
+}): Promise<SaffScrapeRun[]> {
+  const { limit = 50, saffId, status } = opts;
+  const where: Record<string, unknown> = {};
+  if (saffId !== undefined) where.saffId = saffId;
+  if (status !== undefined) where.status = status;
+
+  return SaffScrapeRun.findAll({
+    where,
+    order: [["startedAt", "DESC"]],
+    limit: Math.min(limit, 200),
+  });
 }

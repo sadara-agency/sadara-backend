@@ -18,6 +18,11 @@ import {
   applySessionSchema,
 } from "@modules/saff/saff.validation";
 import * as saffController from "@modules/saff/saff.controller";
+import {
+  syncNationalTeams,
+  listNationalTeams,
+} from "@modules/saff/saff.nationalTeams.service";
+import { sendSuccess } from "@shared/utils/apiResponse";
 
 const router = Router();
 
@@ -134,6 +139,11 @@ router.get(
   authorizeModule("saff-data", "read"),
   asyncHandler(saffController.syncDebug),
 );
+router.get(
+  "/scrape-runs",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getScrapeRuns),
+);
 
 // ── Player-centric endpoints ──
 router.get(
@@ -213,6 +223,25 @@ router.post(
   authorizeModule("saff-data", "update"),
   validate(sessionIdParamSchema, "params"),
   asyncHandler(saffController.abortImportSession),
+);
+
+// ── National Teams ──
+router.get(
+  "/national-teams",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(async (_req, res) => {
+    const teams = await listNationalTeams();
+    sendSuccess(res, teams);
+  }),
+);
+router.post(
+  "/sync/national-teams",
+  authorizeModule("saff-data", "create"),
+  asyncHandler(async (req, res) => {
+    const includeRosters = req.body?.includeRosters !== false;
+    const result = await syncNationalTeams({ includeRosters });
+    sendSuccess(res, result, `Synced ${result.teams} national teams`);
+  }),
 );
 
 export default router;

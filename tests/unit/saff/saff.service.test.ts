@@ -104,9 +104,21 @@ jest.mock('../../../src/config/logger', () => ({
 jest.mock('../../../src/modules/squads/squad.model', () => ({
   Squad: { findOne: jest.fn(), findAll: jest.fn(), create: jest.fn(), name: 'Squad' },
 }));
+jest.mock('../../../src/modules/squads/squadMembership.model', () => ({
+  SquadMembership: { findOne: jest.fn(), findOrCreate: jest.fn(), create: jest.fn(), name: 'SquadMembership' },
+}));
 jest.mock('../../../src/modules/squads/squad.service', () => ({
   findOrCreateSquad: jest.fn().mockResolvedValue([{ id: 'squad-1', displayName: 'Al Hilal' }, true]),
   getByContext: jest.fn(),
+}));
+jest.mock('../../../src/modules/saffplus/playerReview.service', () => ({
+  upsertPendingReview: jest.fn().mockResolvedValue({}),
+}));
+jest.mock('../../../src/modules/matches/matchEvent.model', () => ({
+  MatchEvent: { findAll: jest.fn(), bulkCreate: jest.fn(), destroy: jest.fn(), name: 'MatchEvent' },
+}));
+jest.mock('../../../src/modules/matches/matchMedia.model', () => ({
+  MatchMedia: { findOrCreate: jest.fn(), findAll: jest.fn(), name: 'MatchMedia' },
 }));
 
 import * as saffService from '../../../src/modules/saff/saff.service';

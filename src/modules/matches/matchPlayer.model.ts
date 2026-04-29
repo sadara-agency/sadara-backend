@@ -13,13 +13,20 @@ export interface MatchPlayerAttributes {
   notes?: string | null;
   // Phase 3 — links the player call-up to a specific squad (migration 150)
   squadId?: string | null;
+  /** Provider that produced this row — "manual", "pulselive", "saffplus", etc. (migration 184) */
+  providerSource?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface MatchPlayerCreationAttributes extends Optional<
   MatchPlayerAttributes,
-  "id" | "availability" | "squadId" | "createdAt" | "updatedAt"
+  | "id"
+  | "availability"
+  | "squadId"
+  | "providerSource"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 // ── Model Class ──
@@ -41,6 +48,7 @@ export class MatchPlayer
   declare minutesPlayed: number | null;
   declare notes: string | null;
   declare squadId: string | null;
+  declare providerSource: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -96,6 +104,12 @@ MatchPlayer.init(
       allowNull: true,
       field: "squad_id",
       references: { model: "squads", key: "id" },
+    },
+    providerSource: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      defaultValue: "manual",
+      field: "provider_source",
     },
   },
   {

@@ -42,7 +42,7 @@ async function rateLimitedDelay(): Promise<void> {
   lastRequestTime = Date.now();
 }
 
-const client: AxiosInstance = axios.create({
+export const client: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: REQUEST_TIMEOUT,
   headers: {
@@ -75,7 +75,7 @@ export { CircuitOpenError };
  *  - Other failures → up to MAX_RETRIES retries with exponential backoff,
  *    all wrapped by the breaker so repeated outages short-circuit.
  */
-async function fetchJson<T>(
+export async function fetchJson<T>(
   label: string,
   request: () => Promise<AxiosResponse<T>>,
 ): Promise<T | null> {
@@ -280,6 +280,38 @@ export async function fetchAllRankedPlayers(
   }
 
   return allEntries.slice(0, maxEntries);
+}
+
+/**
+ * Fetch all gameweeks for a compSeason.
+ * Endpoint: GET /football/compseasons/{compSeasonId}/gameweeks
+ */
+export async function fetchGameweeks(seasonId?: number): Promise<
+  Array<{
+    id: number;
+    gameweek: number;
+    compSeason: { id: number; label: string };
+    startDate?: string;
+    endDate?: string;
+    gameweekPhase?: { gameweek: number; label?: string };
+  }>
+> {
+  const compSeasonId = seasonParam(seasonId);
+  const data = await fetchJson<{
+    content: Array<{
+      id: number;
+      gameweek: number;
+      compSeason: { id: number; label: string };
+      startDate?: string;
+      endDate?: string;
+      gameweekPhase?: { gameweek: number; label?: string };
+    }>;
+  }>(`fetchGameweeks(season=${compSeasonId})`, () =>
+    client.get(`/football/compseasons/${compSeasonId}/gameweeks`, {
+      params: { language: "en" },
+    }),
+  );
+  return data?.content ?? [];
 }
 
 // ── Exports for constants ──

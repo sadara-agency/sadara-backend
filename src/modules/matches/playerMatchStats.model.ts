@@ -39,13 +39,17 @@ export interface PlayerMatchStatsAttributes {
   goalsConceded?: number | null;
   penaltiesSaved?: number | null;
   shotMap?: ShotEvent[];
+  /** Provider that produced this row — "manual", "pulselive", "saffplus", etc. (migration 184) */
+  providerSource?: string | null;
+  /** External provider stats id for upsert idempotency (e.g. Pulselive `${fixtureId}:${playerId}`). */
+  externalStatsId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface PlayerMatchStatsCreationAttributes extends Optional<
   PlayerMatchStatsAttributes,
-  "id" | "createdAt" | "updatedAt"
+  "id" | "providerSource" | "externalStatsId" | "createdAt" | "updatedAt"
 > {}
 
 // ── Model Class ──
@@ -82,6 +86,8 @@ export class PlayerMatchStats
   declare goalsConceded: number | null;
   declare penaltiesSaved: number | null;
   declare shotMap: ShotEvent[];
+  declare providerSource: string | null;
+  declare externalStatsId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -143,6 +149,17 @@ PlayerMatchStats.init(
       allowNull: false,
       defaultValue: [],
     },
+    providerSource: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      defaultValue: "manual",
+      field: "provider_source",
+    },
+    externalStatsId: {
+      type: DataTypes.STRING(120),
+      allowNull: true,
+      field: "external_stats_id",
+    },
   },
   {
     sequelize,
@@ -150,7 +167,10 @@ PlayerMatchStats.init(
     underscored: true,
     timestamps: true,
     indexes: [
-      { unique: true, fields: ["player_id", "match_id"] }, // one stat row per player per match
+      // Migration 184 replaces the (player_id, match_id) unique with
+      // (player_id, match_id, provider_source) so multi-source stats
+      // can coexist. We don't list either constraint here — Sequelize's
+      // model-level indexes are advisory; the DB-level unique is canonical.
       { fields: ["player_id"] },
       { fields: ["match_id"] },
     ],

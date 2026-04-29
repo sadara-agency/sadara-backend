@@ -19,7 +19,7 @@ export const fetchRequestSchema = z.object({
     .min(1, "Select at least one tournament"),
   season: z.string().regex(/^\d{4}-\d{4}$/, "Season must be YYYY-YYYY format"),
   dataTypes: z
-    .array(z.enum(["standings", "fixtures", "teams"]))
+    .array(z.enum(["standings", "fixtures", "teams", "rosters"]))
     .min(1)
     .default(["standings", "fixtures", "teams"]),
 });

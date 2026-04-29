@@ -38,17 +38,13 @@ import {
   fetchFromSaff,
   importToSadara,
   getCurrentSeason,
+  getMenLeagueSaffIds,
 } from "@modules/saff/saff.service";
 import { Competition } from "@modules/competitions/competition.model";
 import { Club } from "@modules/clubs/club.model";
 import { Match } from "@modules/matches/match.model";
 import { SeasonSync } from "@modules/saff/seasonSync.model";
 import { sequelize } from "@config/database";
-
-// ── SAFF ID mapping (saffplus competition ID → saff.com.sa tournament ID) ──
-// These will be populated during discovery or manually configured.
-
-const MEN_LEAGUE_SAFF_IDS = [333, 334, 335, 336, 366];
 
 // ══════════════════════════════════════════
 // NORMALIZATION — Convert SAFF+ types to scraper-compatible format
@@ -230,10 +226,11 @@ export async function syncLeagues(
 }
 
 /**
- * Sync all 5 men's pro leagues.
+ * Sync all men's senior pro leagues (IDs derived from saff_tournaments).
  */
 export async function syncMenLeagues(season: string) {
-  return syncLeagues(MEN_LEAGUE_SAFF_IDS, season);
+  const ids = await getMenLeagueSaffIds();
+  return syncLeagues(ids, season);
 }
 
 // ══════════════════════════════════════════
