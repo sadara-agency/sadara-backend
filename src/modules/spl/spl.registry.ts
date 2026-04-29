@@ -1,11 +1,14 @@
 // ─────────────────────────────────────────────────────────────
 // src/modules/spl/spl.registry.ts
-// Static registry of all 18 SPL 2025/26 clubs.
+// Static registry of Roshn Saudi League (18) + Yelo First Division (9) clubs.
+// PulseLive team IDs verified from GET /football/fixtures (2025/26 season).
 // ─────────────────────────────────────────────────────────────
 
 import { SplClubEntry } from "@modules/spl/spl.types";
 
-export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
+// ── Roshn Saudi League clubs ──
+
+const ROSHN_CLUBS: SplClubEntry[] = [
   {
     splTeamId: "3093",
     splCode: "NSR",
@@ -14,6 +17,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "النصر",
     city: "Riyadh",
     pulseLiveTeamId: 3503,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3095",
@@ -23,6 +27,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الهلال",
     city: "Riyadh",
     pulseLiveTeamId: 3505,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3097",
@@ -32,6 +37,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الأهلي",
     city: "Jeddah",
     pulseLiveTeamId: 3507,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3081",
@@ -41,6 +47,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الاتحاد",
     city: "Jeddah",
     pulseLiveTeamId: 3492,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3094",
@@ -50,6 +57,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الشباب",
     city: "Riyadh",
     pulseLiveTeamId: 3494,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3087",
@@ -59,6 +67,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "التعاون",
     city: "Buraidah",
     pulseLiveTeamId: 3499,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3089",
@@ -68,6 +77,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "القادسية",
     city: "Khobar",
     pulseLiveTeamId: 3513,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3090",
@@ -76,7 +86,8 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Raed",
     nameAr: "الرائد",
     city: "Buraidah",
-    pulseLiveTeamId: 3500,
+    pulseLiveTeamId: 3506, // was incorrectly 3500 (Al Riyadh's ID) — fixed
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3096",
@@ -86,6 +97,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الفيحاء",
     city: "Al Majmaah",
     pulseLiveTeamId: 3496,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3086",
@@ -95,6 +107,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الاتفاق",
     city: "Dammam",
     pulseLiveTeamId: 3491,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3082",
@@ -104,6 +117,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الفتح",
     city: "Al-Hasa",
     pulseLiveTeamId: 3490,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3088",
@@ -113,6 +127,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الرياض",
     city: "Riyadh",
     pulseLiveTeamId: 3500,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3098",
@@ -122,6 +137,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الخليج",
     city: "Saihat",
     pulseLiveTeamId: 3498,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3084",
@@ -131,6 +147,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الخلود",
     city: "Al-Hasa",
     pulseLiveTeamId: 3521,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3083",
@@ -140,6 +157,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الأخدود",
     city: "Najran",
     pulseLiveTeamId: 3493,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3099",
@@ -149,6 +167,7 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameAr: "الحزم",
     city: "Ar Rass",
     pulseLiveTeamId: 3497,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3091",
@@ -157,16 +176,121 @@ export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
     nameEn: "Al Orubah",
     nameAr: "العروبة",
     city: "Al Jawf",
+    pulseLiveTeamId: 3517,
+    pulseLiveLeague: "roshn",
   },
   {
     splTeamId: "3092",
     splCode: "NJM",
     espnTeamId: "18977",
-    nameEn: "Al Najma",
+    nameEn: "Al Najmah",
     nameAr: "النجمة",
     city: "Unaizah",
     pulseLiveTeamId: 3522,
+    pulseLiveLeague: "roshn",
   },
+];
+
+// ── Yelo First Division clubs ──
+// PulseLive comp ID: 219, season ID: 863 (2025/26)
+// splTeamId / espnTeamId are placeholders — Yelo clubs are not in the SPL API
+
+const YELO_CLUBS: SplClubEntry[] = [
+  {
+    splTeamId: "",
+    splCode: "DMC",
+    espnTeamId: "",
+    nameEn: "Damac",
+    nameAr: "ضماك",
+    city: "Khamis Mushait",
+    pulseLiveTeamId: 3495,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "WHA",
+    espnTeamId: "",
+    nameEn: "Al Wehda",
+    nameAr: "الوحدة",
+    city: "Mecca",
+    pulseLiveTeamId: 3502,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "ANS",
+    espnTeamId: "",
+    nameEn: "Al-Ansar",
+    nameAr: "الأنصار",
+    city: "Medina",
+    pulseLiveTeamId: 3510,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "HAJ",
+    espnTeamId: "",
+    nameEn: "Hajer",
+    nameAr: "هجر",
+    city: "Hofuf",
+    pulseLiveTeamId: 3511,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "NJR",
+    espnTeamId: "",
+    nameEn: "Najran SC",
+    nameAr: "نجران",
+    city: "Najran",
+    pulseLiveTeamId: 3512,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "FSL",
+    espnTeamId: "",
+    nameEn: "Al-Faisaly",
+    nameAr: "الفيصلي",
+    city: "Harma",
+    pulseLiveTeamId: 3514,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "SHL",
+    espnTeamId: "",
+    nameEn: "Al-Shoalah",
+    nameAr: "الشعلة",
+    city: "Sakaka",
+    pulseLiveTeamId: 3515,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "NHD",
+    espnTeamId: "",
+    nameEn: "Al-Nahda",
+    nameAr: "النهضة",
+    city: "Riyadh",
+    pulseLiveTeamId: 3516,
+    pulseLiveLeague: "yelo",
+  },
+  {
+    splTeamId: "",
+    splCode: "NOM",
+    espnTeamId: "",
+    nameEn: "Neom SC",
+    nameAr: "نيوم",
+    city: "NEOM",
+    pulseLiveTeamId: 3523,
+    pulseLiveLeague: "yelo",
+  },
+];
+
+export const SPL_CLUB_REGISTRY: SplClubEntry[] = [
+  ...ROSHN_CLUBS,
+  ...YELO_CLUBS,
 ];
 
 export function findRegistryEntry(

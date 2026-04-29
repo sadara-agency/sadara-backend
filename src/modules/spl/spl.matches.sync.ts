@@ -30,7 +30,12 @@ import type {
   PulseLiveFixtureTeamLine,
 } from "@modules/spl/spl.fixtures.types";
 import { SPL_CLUB_REGISTRY } from "@modules/spl/spl.registry";
-import { DEFAULT_SEASON_ID } from "@modules/spl/spl.pulselive";
+import {
+  DEFAULT_SEASON_ID,
+  YELO_COMP_ID,
+  YELO_SEASON_ID,
+} from "@modules/spl/spl.pulselive";
+import { Competition } from "@modules/competitions/competition.model";
 
 const PROVIDER = "pulselive";
 
@@ -95,6 +100,7 @@ async function resolveClubByPulseLiveTeamId(
 async function upsertMatchByProvider(
   fx: PulseLiveFixture,
   seasonLabel: string,
+  competitionId: string | null = null,
 ): Promise<{ created: boolean; matchId: string | null; skipReason?: string }> {
   if (!Array.isArray(fx.teams) || fx.teams.length < 2) {
     return { created: false, matchId: null, skipReason: "missing_teams" };
@@ -107,6 +113,7 @@ async function upsertMatchByProvider(
   const matchDate = new Date(fx.kickoff?.millis ?? Date.now());
   const status = mapStatus(fx.status);
   const venue = fx.ground?.name ?? null;
+  const externalMatchId = `pulselive:${competitionId ?? "unknown"}:${fx.id}`;
 
   const where = {
     providerSource: PROVIDER,
@@ -127,6 +134,8 @@ async function upsertMatchByProvider(
       awayScore: typeof away.score === "number" ? away.score : null,
       season: seasonLabel,
       attendance: fx.attendance ?? null,
+      externalMatchId,
+      ...(competitionId && !existing.competitionId ? { competitionId } : {}),
     };
     // Don't clobber a manually-set referee with null
     await existing.update(update);
@@ -146,6 +155,8 @@ async function upsertMatchByProvider(
     season: seasonLabel,
     providerSource: PROVIDER,
     providerMatchId: String(fx.id),
+    externalMatchId,
+    competitionId,
     attendance: fx.attendance ?? null,
   });
   return { created: true, matchId: created.id };
@@ -219,6 +230,8 @@ export async function syncFixtures(
   opts: {
     statuses?: PulseLiveFixtureStatus[];
     pulseLiveTeamId?: number;
+    compId?: number;
+    competitionId?: string | null;
   } = {},
 ): Promise<{
   fetched: number;
@@ -229,6 +242,7 @@ export async function syncFixtures(
 }> {
   const fixtures = await fetchFixtures(seasonId, opts);
   const seasonLabel = seasonId ? String(seasonId) : String(DEFAULT_SEASON_ID);
+  const competitionId = opts.competitionId ?? null;
 
   let created = 0;
   let updated = 0;
@@ -237,7 +251,7 @@ export async function syncFixtures(
 
   for (const fx of fixtures) {
     try {
-      const r = await upsertMatchByProvider(fx, seasonLabel);
+      const r = await upsertMatchByProvider(fx, seasonLabel, competitionId);
       if (r.skipReason) skipped++;
       else if (r.created) created++;
       else updated++;
@@ -258,6 +272,57 @@ export async function syncFixtures(
     updated,
     skipped,
     errors,
+  };
+}
+
+/**
+ * Engine-callable sync for a single competition served by PulseLive.
+ * Reads `pulseLiveCompId` from the Competition row to determine which
+ * comp/season to fetch. Returns the same shape as saffplus syncCompetitionMatches().
+ */
+export async function syncSplCompetition(
+  competitionId: string,
+  _season: string,
+): Promise<{
+  upserted: number;
+  skipped: number;
+  unmapped: number;
+  errors: string[];
+}> {
+  const competition = await Competition.findByPk(competitionId, {
+    attributes: ["id", "name", "pulseLiveCompId"],
+  });
+
+  if (!competition?.pulseLiveCompId) {
+    return {
+      upserted: 0,
+      skipped: 0,
+      unmapped: 0,
+      errors: [`Competition ${competitionId} has no pulseLiveCompId set`],
+    };
+  }
+
+  const compId = competition.pulseLiveCompId;
+  // Use YELO_SEASON_ID for Yelo (comp 219); DEFAULT_SEASON_ID for Roshn (comp 72)
+  const seasonId = compId === YELO_COMP_ID ? YELO_SEASON_ID : undefined;
+
+  logger.info(
+    `[SPL] syncSplCompetition: ${competition.name} (pulseLiveCompId=${compId}, season=${seasonId ?? DEFAULT_SEASON_ID})`,
+  );
+
+  const result = await syncFixtures(seasonId, {
+    compId,
+    competitionId,
+  });
+
+  return {
+    upserted: result.created + result.updated,
+    skipped: result.skipped,
+    unmapped: 0,
+    errors:
+      result.errors > 0
+        ? [`${result.errors} fixture(s) failed — check logs`]
+        : [],
   };
 }
 

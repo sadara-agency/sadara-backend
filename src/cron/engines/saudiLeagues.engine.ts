@@ -22,6 +22,7 @@ import {
   projectFixturesToMatches,
   getCurrentSeason,
 } from "@modules/saff/saff.service";
+import { syncSplCompetition } from "@modules/spl/spl.matches.sync";
 
 // ── In-process mutex to prevent overlapping runs ──
 let isRunning = false;
@@ -75,7 +76,11 @@ async function getCompetitionIds(names: string[]): Promise<string[]> {
 }
 
 /**
- * Sync a batch of competitions: SAFF+ first, then SAFF bridge if saffId present.
+ * Sync a batch of competitions.
+ *
+ * Routing priority per competition:
+ *   1. pulseLiveCompId set → PulseLive API (Roshn, Yelo)
+ *   2. Otherwise           → SAFF+ primary, then SAFF bridge if saffId present
  */
 async function syncBatch(
   competitionIds: string[],
@@ -88,23 +93,31 @@ async function syncBatch(
 
   for (const competitionId of competitionIds) {
     try {
-      // SAFF+ primary
-      await syncCompetitionMatches(competitionId, season);
-
-      // SAFF secondary — only if tournament has a saffId
       const competition = await Competition.findByPk(competitionId, {
-        attributes: ["saffId", "name"],
+        attributes: ["id", "name", "pulseLiveCompId", "saffId"],
       });
-      if (competition?.saffId) {
-        // Find the SaffTournament row by saffId
-        const { sequelize } = await import("@config/database");
-        const [rows] = (await sequelize.query(
-          `SELECT id FROM saff_tournaments WHERE saff_id = :saffId LIMIT 1`,
-          { replacements: { saffId: competition.saffId } },
-        )) as [Array<{ id: string }>, unknown];
 
-        if (rows.length > 0) {
-          await projectFixturesToMatches(rows[0].id, season);
+      if (competition?.pulseLiveCompId) {
+        // PulseLive route — Roshn Saudi League and Yelo First Division
+        logger.info(
+          `[SaudiLeagues] ${competition.name}: using PulseLive (compId=${competition.pulseLiveCompId})`,
+        );
+        await syncSplCompetition(competitionId, season);
+      } else {
+        // SAFF+ primary
+        await syncCompetitionMatches(competitionId, season);
+
+        // SAFF secondary — only if tournament has a saffId
+        if (competition?.saffId) {
+          const { sequelize } = await import("@config/database");
+          const [rows] = (await sequelize.query(
+            `SELECT id FROM saff_tournaments WHERE saff_id = :saffId LIMIT 1`,
+            { replacements: { saffId: competition.saffId } },
+          )) as [Array<{ id: string }>, unknown];
+
+          if (rows.length > 0) {
+            await projectFixturesToMatches(rows[0].id, season);
+          }
         }
       }
     } catch (err) {
@@ -327,5 +340,17 @@ export async function runSingleCompetition(
   errors: string[];
 }> {
   logger.info(`[SaudiLeagues] Manual trigger for competition ${competitionId}`);
+
+  const competition = await Competition.findByPk(competitionId, {
+    attributes: ["id", "name", "pulseLiveCompId"],
+  });
+
+  if (competition?.pulseLiveCompId) {
+    logger.info(
+      `[SaudiLeagues] ${competition.name}: routing manual sync to PulseLive`,
+    );
+    return syncSplCompetition(competitionId, season);
+  }
+
   return syncCompetitionMatches(competitionId, season);
 }

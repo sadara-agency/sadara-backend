@@ -6,12 +6,9 @@ import { testConnection, sequelize } from "@config/database";
 import { initRedis, closeRedis } from "@config/redis";
 import { seedDatabase } from "./database/seed";
 import { seedProduction } from "./database/production.seed";
-// NOTE: migrations are run by CI's pre-deploy step (`.github/workflows/ci-cd.yml`),
-// NOT here. The container assumes the schema is already correct. A schema-version
-// check below logs a WARN (not a crash) if the DB lags behind the code's expected
-// migration. See plan: stop-cloudrun-crashloops.
 import fs from "fs/promises";
 import path from "path";
+import { migrator, setMigrationTimeouts } from "@config/migrator";
 import { startSaffScheduler } from "@modules/saff/saff.scheduler";
 import { startCronJobs } from "./cron/scheduler";
 import { loadTaskRuleConfigFromDB } from "@modules/matches/matchAutoTasks";
@@ -49,58 +46,32 @@ if (env.sentry?.dsn) {
 }
 
 // ─────────────────────────────────────────────
-// Schema-version sanity check (advisory)
+// Auto-migration on boot
 // ─────────────────────────────────────────────
 
 /**
- * Compare the DB's last-applied migration (from `sequelize_meta`) to the
- * highest-numbered migration file shipped with this build. Logs a WARN on
- * mismatch but never throws — migration-running has been delegated to CI
- * (`.github/workflows/ci-cd.yml`'s pre-deploy step), so a mismatch here
- * means CI was skipped or its migrate step failed silently. Either way,
- * crashing the container wouldn't help — the operator needs visibility,
- * not a crashloop.
+ * Run all pending Umzug migrations before the app starts serving traffic.
+ * Idempotent — migrations already applied are skipped by Umzug automatically.
+ * Fatal on failure: a schema mismatch would cause runtime errors anyway, so
+ * it's better to surface the problem immediately at boot than at first request.
  */
-async function checkSchemaVersion(): Promise<void> {
-  try {
-    // Filesystem expectation: highest-numbered migration file in src/database/migrations
-    // (resolved relative to this compiled file: dist/index.js → dist/database/migrations,
-    //  src/index.ts → src/database/migrations).
-    const migrationsDir = path.join(__dirname, "database", "migrations");
-    const files = await fs.readdir(migrationsDir);
-    const expected = files
-      .filter((f) => /^\d{3}_.*\.(ts|js)$/.test(f))
-      .sort()
-      .pop();
+async function runMigrations(): Promise<void> {
+  const migrationsDir = path.join(__dirname, "database", "migrations");
+  const files = await fs.readdir(migrationsDir).catch(() => [] as string[]);
+  const pending = files.filter((f) => /^\d{3}_.*\.(ts|js)$/.test(f)).length;
+  logger.info(
+    `[migrations] Found ${pending} migration file(s) — running pending...`,
+  );
 
-    // DB state: latest applied migration from sequelize_meta (created by Umzug).
-    const [rows] = await sequelize.query(
-      `SELECT name FROM sequelize_meta ORDER BY name DESC LIMIT 1`,
+  await setMigrationTimeouts();
+  const applied = await migrator.up();
+
+  if (applied.length === 0) {
+    logger.info("[migrations] Schema up to date — no migrations needed");
+  } else {
+    logger.info(
+      `[migrations] Applied ${applied.length} migration(s): ${applied.map((m) => m.name).join(", ")}`,
     );
-    const applied = (rows as Array<{ name: string }>)[0]?.name;
-
-    if (!applied) {
-      logger.warn(
-        "[boot] Schema check: no migrations applied yet — DB may be empty",
-      );
-      return;
-    }
-
-    // Compare ignoring extension (sequelize_meta stores `.js` in CI, `.ts` in dev).
-    const stripExt = (s: string) => s.replace(/\.(ts|js)$/, "");
-    if (expected && stripExt(applied) !== stripExt(expected)) {
-      logger.warn(
-        `[boot] Schema mismatch: code expects ${expected} but DB is at ${applied}. ` +
-          `CI's migrate step may have been skipped — verify before relying on new features.`,
-      );
-      return;
-    }
-    logger.info(`[boot] Schema OK: at ${applied}`);
-  } catch (err) {
-    // Never fatal — a missing sequelize_meta table on a brand-new DB, a
-    // permissions hiccup, or filesystem oddity shouldn't crashloop production.
-    const msg = err instanceof Error ? err.message : String(err);
-    logger.warn(`[boot] Schema check skipped: ${msg}`);
   }
 }
 
@@ -363,24 +334,18 @@ async function bootstrap(): Promise<void> {
   logger.info("[boot] Starting HTTP server...");
   await startServer();
 
-  // ── Mandatory pre-flight: DB connection ───────────────────────────────────
-  // DB connection is still fatal (no point starting an API that can't read
-  // its own data). Migrations are NOT run here — CI's pre-deploy step is the
-  // single source of truth. See plan: stop-cloudrun-crashloops.
-  //
+  // ── DB connection (fatal) ─────────────────────────────────────────────────
   // 90s timeout: Cloud SQL Auth Proxy sidecar may take up to ~30s to accept
-  // connections after container start; with connectTimeout=5s + 5s delay per
-  // retry, 90s allows ~6 attempts before giving up.
+  // connections after container start.
   logger.info("[boot] Connecting to database...");
   await withTimeout(testConnection(), 90_000, "testConnection");
 
-  // ── Schema-version sanity check (advisory, never fatal) ───────────────────
-  // Compares the latest applied migration in `sequelize_meta` to the highest-
-  // numbered migration file shipped with this build. A mismatch means CI's
-  // migrate step was skipped or partially applied — log loudly so the operator
-  // can investigate, but DO NOT crash the container (which would defeat the
-  // whole point of decoupling migrations from boot).
-  await checkSchemaVersion();
+  // ── Auto-migrate (fatal on failure) ───────────────────────────────────────
+  // Runs all pending Umzug migrations before serving traffic. Idempotent —
+  // already-applied migrations are skipped. Fails fast if a migration throws
+  // so schema errors surface immediately instead of at first request.
+  logger.info("[boot] Running migrations...");
+  await withTimeout(runMigrations(), 120_000, "runMigrations");
   // ──────────────────────────────────────────────────────────────────────────
 
   try {
