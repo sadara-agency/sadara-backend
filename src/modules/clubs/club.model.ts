@@ -34,6 +34,8 @@ interface ClubAttributes {
   espnTeamId?: number | null;
   sportmonksTeamId?: number | null;
   saffTeamId?: number | null;
+  /** Pulselive (Opta) team id — distinct from splTeamId. Added in migration 185. */
+  pulseLiveTeamId?: number | null;
   budgetSar?: number | null;
   foreignSlots?: number | null;
   keyContactName?: string | null;
@@ -75,6 +77,7 @@ export class Club
   declare espnTeamId: number | null;
   declare sportmonksTeamId: number | null;
   declare saffTeamId: number | null;
+  declare pulseLiveTeamId: number | null;
   declare budgetSar: number | null;
   declare foreignSlots: number | null;
   declare keyContactName: string | null;
@@ -169,6 +172,10 @@ Club.init(
       type: DataTypes.INTEGER,
       field: "saff_team_id",
       unique: true,
+    },
+    pulseLiveTeamId: {
+      type: DataTypes.INTEGER,
+      field: "pulse_live_team_id",
     },
     isActive: {
       type: DataTypes.BOOLEAN,

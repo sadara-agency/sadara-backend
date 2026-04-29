@@ -42,7 +42,7 @@ async function rateLimitedDelay(): Promise<void> {
   lastRequestTime = Date.now();
 }
 
-const client: AxiosInstance = axios.create({
+export const client: AxiosInstance = axios.create({
   baseURL: BASE_URL,
   timeout: REQUEST_TIMEOUT,
   headers: {
@@ -75,7 +75,7 @@ export { CircuitOpenError };
  *  - Other failures → up to MAX_RETRIES retries with exponential backoff,
  *    all wrapped by the breaker so repeated outages short-circuit.
  */
-async function fetchJson<T>(
+export async function fetchJson<T>(
   label: string,
   request: () => Promise<AxiosResponse<T>>,
 ): Promise<T | null> {

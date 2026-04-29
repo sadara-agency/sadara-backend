@@ -4,6 +4,7 @@ import {
   SaffStanding,
   SaffFixture,
   SaffTeamMap,
+  SaffScrapeRun,
 } from "@modules/saff/saff.model";
 import { Club } from "@modules/clubs/club.model";
 import { Match } from "@modules/matches/match.model";
@@ -579,7 +580,10 @@ export async function listTournaments(query: TournamentQuery) {
 // SCRAPE & STORE
 // ══════════════════════════════════════════
 
-export async function fetchFromSaff(input: FetchRequest) {
+export async function fetchFromSaff(
+  input: FetchRequest,
+  triggerSource: string = "api",
+) {
   const { tournamentIds, season, dataTypes } = input;
 
   // Resolve tournament UUIDs
@@ -598,24 +602,25 @@ export async function fetchFromSaff(input: FetchRequest) {
     teamNameArResolver,
   );
 
-  // If the circuit broke mid-batch, leave a single audit breadcrumb so ops
-  // can tell "SAFF was down" apart from "individual tournaments failed".
+  // If the circuit broke mid-batch, write a single audit row so ops can
+  // correlate "all tournaments went dark from time T" with SAFF being down.
   const breakerState = getSaffBreakerState();
   if (breakerState === "open") {
-    await SeasonSync.upsert({
+    SaffScrapeRun.create({
       source: "saff",
-      competition: "(circuit-breaker)",
-      competitionId: null,
+      saffId: null,
       season,
-      dataType: "fixtures",
+      targetUrl: null,
+      triggerSource,
+      startedAt: new Date(),
+      finishedAt: new Date(),
+      durationMs: 0,
       status: "failed",
-      syncedAt: new Date(),
-      recordCount: 0,
       errorMessage:
-        "SAFF circuit breaker open — upstream marked unreachable; remaining tournaments skipped",
-    } as any).catch((err) =>
-      logger.warn("[SAFF] Failed to record breaker-open audit row", {
-        error: (err as Error).message,
+        "Circuit breaker open — SAFF upstream marked unreachable; batch aborted",
+    }).catch((err: Error) =>
+      logger.warn("[SAFF] Failed to write circuit-breaker audit row", {
+        error: err.message,
       }),
     );
   }
@@ -626,6 +631,46 @@ export async function fetchFromSaff(input: FetchRequest) {
   for (const result of results) {
     const tournament = tournamentMap.get(result.tournamentId);
     if (!tournament) continue;
+
+    const scrapeStartedAt = result.scrapedAt ?? new Date();
+    const targetUrl = `https://www.saff.com.sa/en/championship.php?id=${result.tournamentId}`;
+
+    // ── Detect fetch-level errors (scraper caught and packaged them) ──
+    const fetchError = result.validationWarnings.find(
+      (w) =>
+        w.entity === "standing" &&
+        typeof (w.raw as Record<string, unknown>)?.saffId === "number",
+    );
+    if (
+      fetchError &&
+      result.standings.length === 0 &&
+      result.fixtures.length === 0
+    ) {
+      const isCircuit =
+        (fetchError.raw as Record<string, unknown>)?.circuitOpen === true;
+      SaffScrapeRun.create({
+        source: "saff",
+        saffId: result.tournamentId,
+        season,
+        targetUrl,
+        triggerSource,
+        startedAt: scrapeStartedAt,
+        finishedAt: new Date(),
+        durationMs: Math.max(0, Date.now() - scrapeStartedAt.getTime()),
+        status: isCircuit ? "skipped" : "failed",
+        rowsStandings: 0,
+        rowsFixtures: 0,
+        rowsTeams: 0,
+        scraperVersion: result.scraperVersion,
+        validationWarnings: result.validationWarnings.length,
+        errorMessage: fetchError.reason ?? "Scrape error",
+      }).catch((err: Error) =>
+        logger.warn("[SAFF] Failed to write fetch-error audit row", {
+          error: err.message,
+        }),
+      );
+      continue;
+    }
 
     // ── Sanity guard: refuse to overwrite good data with suspiciously sparse
     // results. If SAFF changes their DOM structure, selectors silently return
@@ -659,6 +704,29 @@ export async function fetchFromSaff(input: FetchRequest) {
           `Skipping DB write — SAFF DOM may have changed. ` +
           `Bump SELECTOR_VERSION in saff.selectors.ts after fixing selectors.`,
       );
+      SaffScrapeRun.create({
+        source: "saff",
+        saffId: result.tournamentId,
+        season,
+        targetUrl,
+        triggerSource,
+        startedAt: scrapeStartedAt,
+        finishedAt: new Date(),
+        durationMs: Math.max(0, Date.now() - scrapeStartedAt.getTime()),
+        status: "sanity_fail",
+        rowsStandings: result.standings.length,
+        rowsFixtures: result.fixtures.length,
+        rowsTeams: result.teams.length,
+        scraperVersion: result.scraperVersion,
+        validationWarnings: result.validationWarnings.length,
+        errorMessage:
+          `Sanity check failed: standings=${result.standings.length} (min ${minStandings}), ` +
+          `fixtures=${result.fixtures.length} (min ${minFixtures})`,
+      }).catch((err: Error) =>
+        logger.warn("[SAFF] Failed to write sanity-fail audit row", {
+          error: err.message,
+        }),
+      );
       continue;
     }
 
@@ -682,6 +750,7 @@ export async function fetchFromSaff(input: FetchRequest) {
 
     if (dataTypes.includes("standings") && result.standings.length) {
       await runSaffUpsert(`${tag} standings`, async (txn) => {
+        const now = new Date();
         await SaffStanding.bulkCreate(
           result.standings.map((s) => ({
             tournamentId: tournament.id,
@@ -698,6 +767,7 @@ export async function fetchFromSaff(input: FetchRequest) {
             goalsAgainst: s.goalsAgainst,
             goalDifference: s.goalDifference,
             points: s.points,
+            lastSeenAt: now,
           })),
           {
             transaction: txn,
@@ -713,6 +783,7 @@ export async function fetchFromSaff(input: FetchRequest) {
               "goalsAgainst",
               "goalDifference",
               "points",
+              "lastSeenAt",
               "updatedAt",
             ],
           },
@@ -723,6 +794,7 @@ export async function fetchFromSaff(input: FetchRequest) {
 
     if (dataTypes.includes("fixtures") && result.fixtures.length) {
       await runSaffUpsert(`${tag} fixtures`, async (txn) => {
+        const now = new Date();
         await SaffFixture.bulkCreate(
           result.fixtures.map((f) => ({
             tournamentId: tournament.id,
@@ -743,6 +815,7 @@ export async function fetchFromSaff(input: FetchRequest) {
               f.homeScore !== null
                 ? ("completed" as const)
                 : ("upcoming" as const),
+            lastSeenAt: now,
           })),
           {
             transaction: txn,
@@ -758,6 +831,7 @@ export async function fetchFromSaff(input: FetchRequest) {
               "stadium",
               "city",
               "status",
+              "lastSeenAt",
               "updatedAt",
             ],
           },
@@ -823,6 +897,28 @@ export async function fetchFromSaff(input: FetchRequest) {
       }
       await tournament.update(tournamentPatch, { transaction: txn });
     });
+
+    // Audit row — fire-and-forget so a write failure never blocks the sync loop
+    SaffScrapeRun.create({
+      source: "saff",
+      saffId: result.tournamentId,
+      season,
+      targetUrl,
+      triggerSource,
+      startedAt: scrapeStartedAt,
+      finishedAt: new Date(),
+      durationMs: Math.max(0, Date.now() - scrapeStartedAt.getTime()),
+      status: "success",
+      rowsStandings: result.standings.length,
+      rowsFixtures: result.fixtures.length,
+      rowsTeams: result.teams.length,
+      scraperVersion: result.scraperVersion,
+      validationWarnings: result.validationWarnings.length,
+    }).catch((err: Error) =>
+      logger.warn("[SAFF] Failed to write success audit row", {
+        error: err.message,
+      }),
+    );
   }
 
   return { results: results.length, ...summary };
@@ -2084,6 +2180,7 @@ export async function writeStagingFromPayload(
   const txn = await sequelize.transaction();
 
   try {
+    const now = new Date();
     if (payload.standings.length) {
       await SaffStanding.bulkCreate(
         payload.standings.map((s) => ({
@@ -2101,6 +2198,7 @@ export async function writeStagingFromPayload(
           goalsAgainst: s.goalsAgainst,
           goalDifference: s.goalDifference,
           points: s.points,
+          lastSeenAt: now,
         })),
         {
           transaction: txn,
@@ -2116,6 +2214,7 @@ export async function writeStagingFromPayload(
             "goalsAgainst",
             "goalDifference",
             "points",
+            "lastSeenAt",
             "updatedAt",
           ],
         },
@@ -2144,6 +2243,7 @@ export async function writeStagingFromPayload(
             f.homeScore !== null
               ? ("completed" as const)
               : ("upcoming" as const),
+          lastSeenAt: now,
         })),
         {
           transaction: txn,
@@ -2158,6 +2258,7 @@ export async function writeStagingFromPayload(
             "stadium",
             "city",
             "status",
+            "lastSeenAt",
             "updatedAt",
           ],
         },
@@ -2819,4 +2920,25 @@ export async function runStageOnlySync(
     fixtures: result.fixtures,
     teams: result.teams,
   };
+}
+
+// ══════════════════════════════════════════
+// SCRAPE AUDIT LOG
+// ══════════════════════════════════════════
+
+export async function getScrapeRuns(opts: {
+  limit?: number;
+  saffId?: number;
+  status?: string;
+}): Promise<SaffScrapeRun[]> {
+  const { limit = 50, saffId, status } = opts;
+  const where: Record<string, unknown> = {};
+  if (saffId !== undefined) where.saffId = saffId;
+  if (status !== undefined) where.status = status;
+
+  return SaffScrapeRun.findAll({
+    where,
+    order: [["startedAt", "DESC"]],
+    limit: Math.min(limit, 200),
+  });
 }

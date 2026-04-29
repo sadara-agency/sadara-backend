@@ -164,11 +164,14 @@ export async function runSync(
     );
 
     // 2. Fetch from SAFF
-    const result = await saffService.fetchFromSaff({
-      tournamentIds,
-      season,
-      dataTypes: ["standings", "fixtures", "teams"],
-    });
+    const result = await saffService.fetchFromSaff(
+      {
+        tournamentIds,
+        season,
+        dataTypes: ["standings", "fixtures", "teams"],
+      },
+      triggerSource,
+    );
 
     syncStatus.lastSuccess = new Date();
     syncStatus.lastError = null;

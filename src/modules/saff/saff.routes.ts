@@ -134,6 +134,11 @@ router.get(
   authorizeModule("saff-data", "read"),
   asyncHandler(saffController.syncDebug),
 );
+router.get(
+  "/scrape-runs",
+  authorizeModule("saff-data", "read"),
+  asyncHandler(saffController.getScrapeRuns),
+);
 
 // ── Player-centric endpoints ──
 router.get(

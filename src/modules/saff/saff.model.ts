@@ -179,13 +179,14 @@ interface SaffStandingAttributes {
   goalDifference: number;
   points: number;
   clubId?: string | null; // Mapped Sadara Club UUID
+  lastSeenAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface SaffStandingCreation extends Optional<
   SaffStandingAttributes,
-  "id" | "clubId" | "createdAt" | "updatedAt"
+  "id" | "clubId" | "lastSeenAt" | "createdAt" | "updatedAt"
 > {}
 
 export class SaffStanding
@@ -208,6 +209,7 @@ export class SaffStanding
   declare goalDifference: number;
   declare points: number;
   declare clubId: string | null;
+  declare lastSeenAt: Date | null;
 }
 
 SaffStanding.init(
@@ -261,6 +263,12 @@ SaffStanding.init(
       field: "club_id",
       references: { model: "clubs", key: "id" },
     },
+    lastSeenAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      field: "last_seen_at",
+    },
   },
   {
     sequelize,
@@ -304,6 +312,7 @@ interface SaffFixtureAttributes {
   homeClubId?: string | null; // Mapped Sadara Club UUID
   awayClubId?: string | null;
   matchId?: string | null; // Mapped Sadara Match UUID
+  lastSeenAt?: Date | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -315,6 +324,7 @@ interface SaffFixtureCreation extends Optional<
   | "homeClubId"
   | "awayClubId"
   | "matchId"
+  | "lastSeenAt"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -343,6 +353,7 @@ export class SaffFixture
   declare homeClubId: string | null;
   declare awayClubId: string | null;
   declare matchId: string | null;
+  declare lastSeenAt: Date | null;
 }
 
 SaffFixture.init(
@@ -418,6 +429,12 @@ SaffFixture.init(
       type: DataTypes.UUID,
       field: "match_id",
       references: { model: "matches", key: "id" },
+    },
+    lastSeenAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      field: "last_seen_at",
     },
   },
   {
@@ -551,6 +568,167 @@ SaffTeamMap.init(
       { fields: ["club_id"] },
       { fields: ["squad_id"] },
       { fields: ["tournament_id"] },
+    ],
+  },
+);
+
+// ══════════════════════════════════════════
+// SAFF SCRAPE RUN (audit log)
+// ══════════════════════════════════════════
+
+type ScrapeRunStatus =
+  | "pending"
+  | "success"
+  | "failed"
+  | "skipped"
+  | "sanity_fail";
+
+interface SaffScrapeRunAttributes {
+  id: string;
+  source: string;
+  saffId?: number | null;
+  season?: string | null;
+  targetUrl?: string | null;
+  triggerSource?: string | null;
+  startedAt: Date;
+  finishedAt?: Date | null;
+  durationMs?: number | null;
+  status: ScrapeRunStatus;
+  httpStatus?: number | null;
+  rowsStandings?: number | null;
+  rowsFixtures?: number | null;
+  rowsTeams?: number | null;
+  scraperVersion?: number | null;
+  validationWarnings?: number | null;
+  errorMessage?: string | null;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+interface SaffScrapeRunCreation extends Optional<
+  SaffScrapeRunAttributes,
+  | "id"
+  | "saffId"
+  | "season"
+  | "targetUrl"
+  | "triggerSource"
+  | "finishedAt"
+  | "durationMs"
+  | "httpStatus"
+  | "rowsStandings"
+  | "rowsFixtures"
+  | "rowsTeams"
+  | "scraperVersion"
+  | "validationWarnings"
+  | "errorMessage"
+  | "createdAt"
+  | "updatedAt"
+> {}
+
+export class SaffScrapeRun
+  extends Model<SaffScrapeRunAttributes, SaffScrapeRunCreation>
+  implements SaffScrapeRunAttributes
+{
+  declare id: string;
+  declare source: string;
+  declare saffId: number | null;
+  declare season: string | null;
+  declare targetUrl: string | null;
+  declare triggerSource: string | null;
+  declare startedAt: Date;
+  declare finishedAt: Date | null;
+  declare durationMs: number | null;
+  declare status: ScrapeRunStatus;
+  declare httpStatus: number | null;
+  declare rowsStandings: number | null;
+  declare rowsFixtures: number | null;
+  declare rowsTeams: number | null;
+  declare scraperVersion: number | null;
+  declare validationWarnings: number | null;
+  declare errorMessage: string | null;
+}
+
+SaffScrapeRun.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    source: { type: DataTypes.STRING(20), allowNull: false },
+    saffId: { type: DataTypes.INTEGER, allowNull: true, field: "saff_id" },
+    season: { type: DataTypes.STRING(20), allowNull: true },
+    targetUrl: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: "target_url",
+    },
+    triggerSource: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: "trigger_source",
+    },
+    startedAt: { type: DataTypes.DATE, allowNull: false, field: "started_at" },
+    finishedAt: { type: DataTypes.DATE, allowNull: true, field: "finished_at" },
+    durationMs: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "duration_ms",
+    },
+    status: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "pending",
+    },
+    httpStatus: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "http_status",
+    },
+    rowsStandings: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "rows_standings",
+    },
+    rowsFixtures: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "rows_fixtures",
+    },
+    rowsTeams: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "rows_teams",
+    },
+    scraperVersion: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "scraper_version",
+    },
+    validationWarnings: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      defaultValue: 0,
+      field: "validation_warnings",
+    },
+    errorMessage: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "error_message",
+    },
+  },
+  {
+    sequelize,
+    tableName: "saff_scrape_runs",
+    underscored: true,
+    timestamps: true,
+    indexes: [
+      {
+        fields: ["saff_id", "season"],
+        name: "idx_saff_scrape_runs_tournament",
+      },
+      { fields: ["started_at"], name: "idx_saff_scrape_runs_started_at" },
+      { fields: ["status"], name: "idx_saff_scrape_runs_status" },
     ],
   },
 );

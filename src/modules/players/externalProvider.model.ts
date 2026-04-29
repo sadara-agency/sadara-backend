@@ -16,12 +16,16 @@ export type ProviderName =
   | "ESPN"
   | "Other";
 
+export type ProviderEntityType = "player" | "team";
+
 interface EPMAttributes {
   id: string;
   playerId: string;
   providerName: ProviderName;
   externalPlayerId: string;
   externalTeamId?: string | null;
+  /** "player" (default) or "team" — added in migration 183 to allow team mappings. */
+  entityType: ProviderEntityType;
   apiBaseUrl?: string | null;
   notes?: string | null;
   isActive: boolean;
@@ -32,7 +36,7 @@ interface EPMAttributes {
 
 interface EPMCreation extends Optional<
   EPMAttributes,
-  "id" | "isActive" | "createdAt" | "updatedAt"
+  "id" | "isActive" | "entityType" | "createdAt" | "updatedAt"
 > {}
 
 export class ExternalProviderMapping
@@ -44,6 +48,7 @@ export class ExternalProviderMapping
   declare providerName: ProviderName;
   declare externalPlayerId: string;
   declare externalTeamId: string | null;
+  declare entityType: ProviderEntityType;
   declare apiBaseUrl: string | null;
   declare notes: string | null;
   declare isActive: boolean;
@@ -69,6 +74,12 @@ ExternalProviderMapping.init(
       field: "external_player_id",
     },
     externalTeamId: { type: DataTypes.STRING(100), field: "external_team_id" },
+    entityType: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "player",
+      field: "entity_type",
+    },
     apiBaseUrl: { type: DataTypes.STRING(500), field: "api_base_url" },
     notes: { type: DataTypes.TEXT },
     isActive: {
