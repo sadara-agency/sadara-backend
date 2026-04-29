@@ -1,5 +1,19 @@
 import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
 
+async function tableExists(
+  queryInterface: QueryInterface,
+  table: string,
+): Promise<boolean> {
+  const [row] = await queryInterface.sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = $1
+     ) AS exists`,
+    { type: QueryTypes.SELECT, bind: [table] },
+  );
+  return row?.exists === true;
+}
+
 async function indexExists(
   queryInterface: QueryInterface,
   indexName: string,
@@ -19,6 +33,10 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  // Fresh-DB guard: 000_baseline creates users via sync(); on a blank DB
+  // users won't exist yet when this migration runs, so skip safely.
+  if (!(await tableExists(queryInterface, "users"))) return;
+
   await queryInterface.createTable("personal_notes", {
     id: {
       type: DataTypes.UUID,
@@ -85,5 +103,6 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
+  if (!(await tableExists(queryInterface, "personal_notes"))) return;
   await queryInterface.dropTable("personal_notes");
 }
