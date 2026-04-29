@@ -202,10 +202,10 @@ export async function pollLiveMatches(): Promise<{
       const update: LiveMatchUpdate = {
         matchId,
         providerMatchId: match.getDataValue("providerMatchId") ?? String(fx.id),
-        homeTeamName: match.getDataValue("homeTeamName"),
-        awayTeamName: match.getDataValue("awayTeamName"),
-        homeScore: match.getDataValue("homeScore"),
-        awayScore: match.getDataValue("awayScore"),
+        homeTeamName: match.getDataValue("homeTeamName") ?? null,
+        awayTeamName: match.getDataValue("awayTeamName") ?? null,
+        homeScore: match.getDataValue("homeScore") ?? null,
+        awayScore: match.getDataValue("awayScore") ?? null,
         status: match.getDataValue("status") as "live" | "completed",
         newEvents,
       };
@@ -261,11 +261,11 @@ async function _finalizeJustCompletedMatches(): Promise<void> {
       if (!match || match.getDataValue("status") !== "completed") continue;
       broadcastToAll("live_match_update", {
         matchId,
-        providerMatchId: match.getDataValue("providerMatchId"),
-        homeTeamName: match.getDataValue("homeTeamName"),
-        awayTeamName: match.getDataValue("awayTeamName"),
-        homeScore: match.getDataValue("homeScore"),
-        awayScore: match.getDataValue("awayScore"),
+        providerMatchId: match.getDataValue("providerMatchId") ?? matchId,
+        homeTeamName: match.getDataValue("homeTeamName") ?? null,
+        awayTeamName: match.getDataValue("awayTeamName") ?? null,
+        homeScore: match.getDataValue("homeScore") ?? null,
+        awayScore: match.getDataValue("awayScore") ?? null,
         status: "completed",
         newEvents: [],
       } satisfies LiveMatchUpdate);
@@ -299,11 +299,11 @@ async function _finalizeJustCompletedMatches(): Promise<void> {
     if (!match || match.getDataValue("status") !== "completed") continue;
     broadcastToAll("live_match_update", {
       matchId,
-      providerMatchId: match.getDataValue("providerMatchId"),
-      homeTeamName: match.getDataValue("homeTeamName"),
-      awayTeamName: match.getDataValue("awayTeamName"),
-      homeScore: match.getDataValue("homeScore"),
-      awayScore: match.getDataValue("awayScore"),
+      providerMatchId: match.getDataValue("providerMatchId") ?? matchId,
+      homeTeamName: match.getDataValue("homeTeamName") ?? null,
+      awayTeamName: match.getDataValue("awayTeamName") ?? null,
+      homeScore: match.getDataValue("homeScore") ?? null,
+      awayScore: match.getDataValue("awayScore") ?? null,
       status: "completed",
       newEvents: [],
     } satisfies LiveMatchUpdate);
