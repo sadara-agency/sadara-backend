@@ -1,11 +1,17 @@
 import { QueryInterface, DataTypes } from "sequelize";
-import { addColumnIfMissing, removeColumnIfPresent } from "../migrationHelpers";
+import {
+  addColumnIfMissing,
+  removeColumnIfPresent,
+  tableExists,
+} from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  if (!(await tableExists(queryInterface, "saff_team_maps"))) return;
+
   const seq = queryInterface.sequelize;
 
   // pg_trgm is required for word_similarity() used by auto-link
