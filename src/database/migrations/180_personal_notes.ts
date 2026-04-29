@@ -1,4 +1,18 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
+
+async function indexExists(
+  queryInterface: QueryInterface,
+  indexName: string,
+): Promise<boolean> {
+  const [row] = await queryInterface.sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM pg_indexes
+       WHERE schemaname = 'public' AND indexname = $1
+     ) AS exists`,
+    { type: QueryTypes.SELECT, bind: [indexName] },
+  );
+  return row?.exists === true;
+}
 
 export async function up({
   context: queryInterface,
@@ -55,9 +69,11 @@ export async function up({
     },
   });
 
-  await queryInterface.addIndex("personal_notes", ["user_id"], {
-    name: "idx_personal_notes_user_id",
-  });
+  if (!(await indexExists(queryInterface, "idx_personal_notes_user_id"))) {
+    await queryInterface.addIndex("personal_notes", ["user_id"], {
+      name: "idx_personal_notes_user_id",
+    });
+  }
 
   await queryInterface.sequelize.query(
     `CREATE INDEX IF NOT EXISTS idx_personal_notes_tags ON personal_notes USING GIN(tags)`,
