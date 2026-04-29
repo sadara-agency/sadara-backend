@@ -9,7 +9,7 @@
  *   /clubs — list of all clubs
  *   /competitions/{slug} — competition detail (standings, fixtures)
  *
- * The Motto platform key: 5O1SNE9VGH62MA16F2G088VJSV33FLF6
+ * The Motto platform key is stored in SAFFPLUS_PLATFORM_KEY env var (see config/env.ts).
  */
 
 import * as cheerio from "cheerio";

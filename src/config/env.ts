@@ -125,6 +125,9 @@ const envSchema = z.object({
   // Puppeteer (optional — override Chromium binary path)
   PUPPETEER_EXECUTABLE_PATH: z.string().default(""),
 
+  // SAFF+ / Motto platform key (optional — for authenticating Motto CDA API calls)
+  SAFFPLUS_PLATFORM_KEY: z.string().default(""),
+
   // Anthropic LLM (optional — required for AI summary generation)
   ANTHROPIC_API_KEY: z.string().default(""),
 
@@ -279,6 +282,10 @@ export const env = {
 
   anthropic: {
     apiKey: validated.ANTHROPIC_API_KEY,
+  },
+
+  saffplus: {
+    platformKey: validated.SAFFPLUS_PLATFORM_KEY,
   },
 
   pagination: {

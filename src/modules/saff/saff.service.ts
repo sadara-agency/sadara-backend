@@ -1498,29 +1498,76 @@ export async function fetchTeamLogos(season: string, force = false) {
 }
 
 // ══════════════════════════════════════════
-// BULK FETCH — 5 MEN'S PRO LEAGUES
+// BULK FETCH — MEN'S PRO LEAGUES
 // ══════════════════════════════════════════
 
-/** SAFF IDs for the 5 men's pro leagues (tier 1-5). */
-const MEN_LEAGUE_SAFF_IDS = [333, 334, 335, 336, 366];
+const MEN_SENIOR_DIVISIONS = [
+  "premier",
+  "1st-division",
+  "2nd-division",
+  "3rd-division",
+] as const;
+
+// In-process cache — refreshed on first call, stable for the process lifetime.
+// League IDs only change when a tournament is promoted/relegated, at which
+// point the admin updates saff_tournaments and the process restarts.
+let _menLeagueIdsCache: number[] | null = null;
 
 /**
- * One-shot bulk fetch for all 5 men's pro leagues (stage-only).
+ * Return the SAFF IDs of all active men's senior pro leagues, derived from
+ * saff_tournaments. Falls back to known 2025-2026 IDs if the DB query fails.
+ */
+export async function getMenLeagueSaffIds(): Promise<number[]> {
+  if (_menLeagueIdsCache !== null) return _menLeagueIdsCache;
+
+  try {
+    const rows = await SaffTournament.findAll({
+      where: {
+        ageCategory: "senior",
+        division: MEN_SENIOR_DIVISIONS,
+        isActive: true,
+      },
+      attributes: ["saffId"],
+      raw: true,
+    });
+    const ids = (rows as Array<{ saffId: number }>).map((r) => r.saffId);
+    if (ids.length > 0) {
+      _menLeagueIdsCache = ids;
+      logger.info(
+        `[SAFF Service] Men's league IDs loaded from DB: [${ids.join(", ")}]`,
+      );
+      return ids;
+    }
+  } catch (err) {
+    logger.warn(
+      `[SAFF Service] Could not load men's league IDs from DB — using fallback: ${(err as Error).message}`,
+    );
+  }
+
+  // Fallback: known Saudi Pro League + 1st/2nd/3rd division IDs (2025-2026 season)
+  const fallback = [333, 334, 335, 336, 366];
+  _menLeagueIdsCache = fallback;
+  return fallback;
+}
+
+/**
+ * One-shot bulk fetch for all men's pro leagues (stage-only).
  *
  * After the wizard redesign this only refreshes staging tables — clubs,
  * matches, and competitions are never mutated here. To commit the
  * fetched data, a human must run the wizard for each tournament.
  */
 export async function bulkFetchMenLeagues(season: string) {
+  const ids = await getMenLeagueSaffIds();
   const fetchResult = await fetchFromSaff({
-    tournamentIds: MEN_LEAGUE_SAFF_IDS,
+    tournamentIds: ids,
     season,
     dataTypes: ["standings", "fixtures", "teams"],
   });
 
   return {
     season,
-    leagues: MEN_LEAGUE_SAFF_IDS.length,
+    leagues: ids.length,
     fetch: fetchResult,
   };
 }
