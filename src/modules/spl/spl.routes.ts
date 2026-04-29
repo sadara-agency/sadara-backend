@@ -25,6 +25,8 @@ import * as fx from "@modules/spl/spl.matches.controller";
 import * as ms from "@modules/spl/spl.matchStats.controller";
 import * as rs from "@modules/spl/spl.rosters.controller";
 import * as bf from "@modules/spl/spl.backfill.controller";
+import * as gw from "@modules/spl/spl.gameweeks.sync";
+import { sendSuccess } from "@shared/utils/apiResponse";
 
 const router = Router();
 router.use(authenticate);
@@ -189,6 +191,28 @@ router.get(
   "/backfill/runs",
   authorizeModule("spl-sync", "read"),
   asyncHandler(bf.listBackfillRuns),
+);
+
+// ── Gameweeks ──
+router.get(
+  "/gameweeks",
+  authorizeModule("spl-sync", "read"),
+  asyncHandler(async (req, res) => {
+    const seasonId = req.query.seasonId
+      ? Number(req.query.seasonId)
+      : undefined;
+    const rows = await gw.listGameweeks(seasonId);
+    sendSuccess(res, rows);
+  }),
+);
+router.post(
+  "/sync/gameweeks",
+  authorizeModule("spl-sync", "create"),
+  asyncHandler(async (req, res) => {
+    const { seasonId } = req.body as { seasonId?: number };
+    const result = await gw.syncGameweeks(seasonId);
+    sendSuccess(res, result, `Synced ${result.upserted} gameweeks`);
+  }),
 );
 
 export default router;

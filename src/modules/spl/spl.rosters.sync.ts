@@ -10,6 +10,7 @@
 import { logger } from "@config/logger";
 import { Op } from "sequelize";
 import { Club } from "@modules/clubs/club.model";
+import { Player } from "@modules/players/player.model";
 import { Squad } from "@modules/squads/squad.model";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
 import { findOrCreateSquad } from "@modules/squads/squad.service";
@@ -138,6 +139,20 @@ export async function syncTeamRoster(
         ...update,
       });
     }
+
+    // Backfill height/weight from Pulselive roster — never overwrite existing values
+    if (pl.height || pl.weight) {
+      const player = await Player.findByPk(sadaraPlayerId, {
+        attributes: ["id", "heightCm", "weightKg"],
+      });
+      if (player) {
+        const physUpdate: { heightCm?: number; weightKg?: number } = {};
+        if (pl.height && !player.heightCm) physUpdate.heightCm = pl.height;
+        if (pl.weight && !player.weightKg) physUpdate.weightKg = pl.weight;
+        if (Object.keys(physUpdate).length > 0) await player.update(physUpdate);
+      }
+    }
+
     members++;
   }
 

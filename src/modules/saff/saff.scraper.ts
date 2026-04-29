@@ -656,6 +656,151 @@ export async function scrapeTeamLogos(
 }
 
 // ══════════════════════════════════════════
+// SCRAPE TEAM ROSTER (team.php?id=N)
+// ══════════════════════════════════════════
+
+export interface ScrapedRosterPlayer {
+  /** saffPlayerId extracted from player.php?id=N href — null when no link present */
+  saffPlayerId: number | null;
+  nameEn: string;
+  /** Empty string when the AR page wasn't fetched */
+  nameAr: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  nationality: string | null;
+  /** Raw table row text for debugging */
+  rawRow: string;
+}
+
+/**
+ * Scrape the squad roster from team.php?id=N.
+ *
+ * SAFF renders each player as a table row. Columns vary by page but the
+ * most common layout is: jersey | name | position | nationality. We detect
+ * the header row to build a column map rather than relying on fixed offsets.
+ *
+ * Falls back to scanning anchor tags with player.php?id=N hrefs when the
+ * table parse yields nothing — some team pages don't use a table at all.
+ */
+export async function scrapeTeamRoster(
+  saffTeamId: number,
+): Promise<ScrapedRosterPlayer[]> {
+  await saffLimiter.acquire("saff.com.sa");
+  const url = `${BASE_URL_EN}/${URL_PATTERNS.team(saffTeamId)}`;
+  let $: cheerio.CheerioAPI;
+  try {
+    $ = await fetchPage(url, "en");
+  } catch (err) {
+    logger.warn(
+      `[SAFF Scraper] Team ${saffTeamId} page failed: ${(err as Error).message}`,
+    );
+    return [];
+  }
+
+  const players: ScrapedRosterPlayer[] = [];
+
+  // ── Primary: table-based roster ──
+  $(SELECTORS.rosterTable).each((_, table) => {
+    const rows = $(table).find(SELECTORS.rosterRow);
+    if (rows.length === 0) return;
+
+    // Detect header row to map column positions
+    const headerRow = $(table).find("thead tr, tr:first-child");
+    const headers: string[] = [];
+    headerRow.find("th, td").each((_, cell) => {
+      headers.push($(cell).text().trim().toLowerCase());
+    });
+
+    // Heuristic: skip tables that don't look like a player list
+    const looksLikeRoster =
+      headers.some((h) => /name|player|لاعب/i.test(h)) || rows.length >= 5;
+    if (!looksLikeRoster) return;
+
+    // Column index detection (fall back to 0-based if headers are absent)
+    const nameIdx = headers.findIndex((h) => /name|player|لاعب/i.test(h));
+    const posIdx = headers.findIndex((h) => /pos|position|مركز/i.test(h));
+    const natIdx = headers.findIndex((h) => /nat|country|جنسية/i.test(h));
+    const numIdx = headers.findIndex((h) => /^#|num|shirt|رقم/i.test(h));
+
+    rows.each((_, row) => {
+      const cells = $(row).find(SELECTORS.rosterCell);
+      if (cells.length === 0) return;
+
+      const cell = (i: number) =>
+        i >= 0 && i < cells.length ? $(cells[i]).text().trim() : "";
+
+      // Name: prefer the detected column; fall back to first non-numeric cell
+      let nameEn =
+        nameIdx >= 0
+          ? cell(nameIdx)
+          : (cells
+              .toArray()
+              .map((c) => $(c).text().trim())
+              .find((t) => t && !/^\d+$/.test(t)) ?? "");
+
+      nameEn = nameEn.replace(/\s+/g, " ").trim();
+      if (!nameEn) return;
+
+      // saffPlayerId from anchor href
+      const playerAnchor = $(row).find(SELECTORS.playerLink).first();
+      const hrefMatch = playerAnchor.attr("href")?.match(/id=(\d+)/);
+      const saffPlayerId = hrefMatch ? parseInt(hrefMatch[1], 10) : null;
+
+      const numRaw = numIdx >= 0 ? cell(numIdx) : "";
+      const jerseyNumber = numRaw ? parseInt(numRaw, 10) || null : null;
+      const position = posIdx >= 0 ? cell(posIdx) || null : null;
+      const nationality = natIdx >= 0 ? cell(natIdx) || null : null;
+
+      if (
+        !players.find((p) => p.saffPlayerId && p.saffPlayerId === saffPlayerId)
+      ) {
+        players.push({
+          saffPlayerId,
+          nameEn,
+          nameAr: "",
+          jerseyNumber,
+          position,
+          nationality,
+          rawRow: $(row).text().replace(/\s+/g, " ").trim(),
+        });
+      }
+    });
+
+    // Stop after the first table that yielded players
+    if (players.length > 0) return false;
+  });
+
+  // ── Fallback: anchor scan ──
+  if (players.length === 0) {
+    $(SELECTORS.playerLink).each((_, el) => {
+      const href = $(el).attr("href") || "";
+      const hrefMatch = href.match(/id=(\d+)/);
+      const saffPlayerId = hrefMatch ? parseInt(hrefMatch[1], 10) : null;
+      const nameEn = $(el).text().trim();
+      if (!nameEn) return;
+      if (
+        !players.find((p) => p.saffPlayerId && p.saffPlayerId === saffPlayerId)
+      ) {
+        players.push({
+          saffPlayerId,
+          nameEn,
+          nameAr: "",
+          jerseyNumber: null,
+          position: null,
+          nationality: null,
+          rawRow: nameEn,
+        });
+      }
+    });
+  }
+
+  logger.info(
+    `[SAFF Scraper] Team ${saffTeamId} roster: ${players.length} players`,
+  );
+  return players;
+}
+
+// ══════════════════════════════════════════
 // SCRAPE SPECIFIC WEEK (placeholder)
 // ══════════════════════════════════════════
 
@@ -835,4 +980,249 @@ export async function scrapeBatch(
   }
 
   return results;
+}
+
+// ══════════════════════════════════════════
+// NATIONAL TEAMS
+// ══════════════════════════════════════════
+
+export interface ScrapedNationalTeam {
+  saffId: number;
+  nameEn: string;
+  nameAr: string;
+  /** "senior" | "u23" | "u20" | "u17" | "u15" | "women" | "futsal" | "beach" | "other" */
+  ageGroup: string;
+  gender: "men" | "women";
+  logoUrl: string | null;
+}
+
+export interface ScrapedNationalRosterPlayer {
+  saffPlayerId: number | null;
+  nameEn: string;
+  nameAr: string;
+  jerseyNumber: number | null;
+  position: string | null;
+  nationality: string | null;
+  dateOfBirth: string | null;
+}
+
+function inferAgeGroup(name: string): {
+  ageGroup: string;
+  gender: "men" | "women";
+} {
+  const n = name.toLowerCase();
+  if (/women|female|سيدات/.test(n))
+    return { ageGroup: "senior", gender: "women" };
+  if (/u-?23|تحت 23/.test(n)) return { ageGroup: "u23", gender: "men" };
+  if (/u-?20|تحت 20/.test(n)) return { ageGroup: "u20", gender: "men" };
+  if (/u-?17|تحت 17/.test(n)) return { ageGroup: "u17", gender: "men" };
+  if (/u-?15|تحت 15/.test(n)) return { ageGroup: "u15", gender: "men" };
+  if (/futsal|صالات/.test(n)) return { ageGroup: "futsal", gender: "men" };
+  if (/beach|شاطئ/.test(n)) return { ageGroup: "beach", gender: "men" };
+  return { ageGroup: "senior", gender: "men" };
+}
+
+/**
+ * Scrape the national teams index — returns all national team entries with
+ * their SAFF IDs, names, and inferred metadata.
+ */
+export async function scrapeNationalTeamList(): Promise<ScrapedNationalTeam[]> {
+  const teams: ScrapedNationalTeam[] = [];
+
+  async function scrapeIndex(
+    lang: "en" | "ar",
+  ): Promise<Map<number, { name: string; logoUrl: string | null }>> {
+    const base = lang === "en" ? BASE_URL_EN : BASE_URL_AR;
+    const url = `${base}/${URL_PATTERNS.nationalTeams}`;
+    const map = new Map<number, { name: string; logoUrl: string | null }>();
+    try {
+      await saffLimiter.acquire("saff.com.sa");
+      const $ = await fetchPage(url, lang);
+      $(`a[href*="nationalteams.php?id="]`).each((_, el) => {
+        const href = $(el).attr("href") || "";
+        const match = href.match(/id=(\d+)/);
+        if (!match) return;
+        const id = parseInt(match[1], 10);
+        const name =
+          $(el).text().trim() || $(el).find("img").attr("alt")?.trim() || "";
+        if (!id || !name) return;
+        const imgEl = $(el).find("img").first();
+        let logoUrl: string | null = imgEl.attr("src") ?? null;
+        if (logoUrl && !logoUrl.startsWith("http")) {
+          logoUrl = `https://www.saff.com.sa/${logoUrl.replace(/^(\.\.\/)+/, "")}`;
+        }
+        if (!map.has(id)) map.set(id, { name, logoUrl });
+      });
+    } catch (err) {
+      logger.warn(
+        `[SAFF Scraper] national teams index (${lang}) failed: ${(err as Error).message}`,
+      );
+    }
+    return map;
+  }
+
+  const enMap = await scrapeIndex("en");
+  const arMap = await scrapeIndex("ar");
+
+  const allIds = new Set([...enMap.keys(), ...arMap.keys()]);
+  for (const id of allIds) {
+    const en = enMap.get(id);
+    const ar = arMap.get(id);
+    const nameEn = en?.name || ar?.name || "";
+    const nameAr = ar?.name || en?.name || "";
+    const { ageGroup, gender } = inferAgeGroup(nameEn || nameAr);
+    teams.push({
+      saffId: id,
+      nameEn,
+      nameAr,
+      ageGroup,
+      gender,
+      logoUrl: en?.logoUrl ?? ar?.logoUrl ?? null,
+    });
+  }
+
+  logger.info(`[SAFF Scraper] National teams: found ${teams.length}`);
+  return teams;
+}
+
+/**
+ * Scrape the squad roster for a national team (nationalteams.php?id=N).
+ * Reuses the same table-parsing logic as scrapeTeamRoster but also attempts
+ * to extract DOB from an extra column when present.
+ */
+export async function scrapeNationalTeamRoster(
+  saffId: number,
+): Promise<ScrapedNationalRosterPlayer[]> {
+  const players: ScrapedNationalRosterPlayer[] = [];
+
+  async function scrapePage(
+    lang: "en" | "ar",
+  ): Promise<Map<number | string, Partial<ScrapedNationalRosterPlayer>>> {
+    const base = lang === "en" ? BASE_URL_EN : BASE_URL_AR;
+    const url = `${base}/${URL_PATTERNS.nationalTeam(saffId)}`;
+    const map = new Map<
+      number | string,
+      Partial<ScrapedNationalRosterPlayer>
+    >();
+    try {
+      await saffLimiter.acquire("saff.com.sa");
+      const $ = await fetchPage(url, lang);
+
+      $(SELECTORS.rosterTable).each((_, table) => {
+        const headerRow = $(table).find("thead tr, tr:first-child");
+        const headers: string[] = [];
+        headerRow.find("th, td").each((_, cell) => {
+          headers.push($(cell).text().trim().toLowerCase());
+        });
+
+        const nameIdx = Math.max(
+          headers.findIndex((h) => /name|player|لاعب/i.test(h)),
+          0,
+        );
+        const posIdx = headers.findIndex((h) => /pos|position|مركز/i.test(h));
+        const natIdx = headers.findIndex((h) => /nat|country|جنسية/i.test(h));
+        const numIdx = headers.findIndex((h) => /^#|num|shirt|رقم/i.test(h));
+        const dobIdx = headers.findIndex((h) =>
+          /dob|birth|born|تاريخ/i.test(h),
+        );
+
+        $(table)
+          .find(SELECTORS.rosterRow)
+          .each((_, row) => {
+            const cells = $(row).find(SELECTORS.rosterCell);
+            if (cells.length === 0) return;
+
+            const cell = (i: number) =>
+              i >= 0 && i < cells.length ? $(cells[i]).text().trim() : "";
+
+            const nameRaw = cell(nameIdx);
+            if (!nameRaw || /^\d+$/.test(nameRaw)) return;
+
+            const anchor = $(row).find(SELECTORS.playerLink).first();
+            const hrefMatch = anchor.attr("href")?.match(/id=(\d+)/);
+            const saffPlayerId = hrefMatch ? parseInt(hrefMatch[1], 10) : null;
+
+            const key = saffPlayerId ?? nameRaw;
+            const jerseyNumber =
+              numIdx >= 0 ? parseInt(cell(numIdx), 10) || null : null;
+            const position = posIdx >= 0 ? cell(posIdx) || null : null;
+            const nationality = natIdx >= 0 ? cell(natIdx) || null : null;
+            const dobRaw = dobIdx >= 0 ? cell(dobIdx) : null;
+            // Attempt to normalise DOB to YYYY-MM-DD
+            let dateOfBirth: string | null = null;
+            if (dobRaw) {
+              const isoMatch = dobRaw.match(/(\d{4}[-/]\d{2}[-/]\d{2})/);
+              const dmyMatch = dobRaw.match(
+                /(\d{1,2})[/-](\d{1,2})[/-](\d{4})/,
+              );
+              if (isoMatch) dateOfBirth = isoMatch[1].replace(/\//g, "-");
+              else if (dmyMatch)
+                dateOfBirth = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, "0")}-${dmyMatch[1].padStart(2, "0")}`;
+            }
+
+            if (!map.has(key)) {
+              map.set(key, {
+                saffPlayerId,
+                [lang === "en" ? "nameEn" : "nameAr"]: nameRaw,
+                jerseyNumber,
+                position,
+                nationality,
+                dateOfBirth,
+              });
+            } else {
+              const existing = map.get(key)!;
+              if (lang === "ar" && !existing.nameAr) existing.nameAr = nameRaw;
+              if (lang === "en" && !existing.nameEn) existing.nameEn = nameRaw;
+            }
+          });
+
+        if (map.size > 0) return false; // stop after first valid table
+      });
+    } catch (err) {
+      logger.warn(
+        `[SAFF Scraper] National team ${saffId} (${lang}) failed: ${(err as Error).message}`,
+      );
+    }
+    return map;
+  }
+
+  const enMap = await scrapePage("en");
+  const arMap = await scrapePage("ar");
+
+  // Merge EN + AR maps
+  const merged = new Map<number | string, ScrapedNationalRosterPlayer>();
+  for (const [key, en] of enMap) {
+    const ar = arMap.get(key);
+    merged.set(key, {
+      saffPlayerId: en.saffPlayerId ?? ar?.saffPlayerId ?? null,
+      nameEn: en.nameEn ?? ar?.nameEn ?? "",
+      nameAr: ar?.nameAr ?? en.nameAr ?? "",
+      jerseyNumber: en.jerseyNumber ?? ar?.jerseyNumber ?? null,
+      position: en.position ?? ar?.position ?? null,
+      nationality: en.nationality ?? ar?.nationality ?? null,
+      dateOfBirth: en.dateOfBirth ?? ar?.dateOfBirth ?? null,
+    });
+  }
+  for (const [key, ar] of arMap) {
+    if (!merged.has(key)) {
+      merged.set(key, {
+        saffPlayerId: ar.saffPlayerId ?? null,
+        nameEn: ar.nameEn ?? "",
+        nameAr: ar.nameAr ?? "",
+        jerseyNumber: ar.jerseyNumber ?? null,
+        position: ar.position ?? null,
+        nationality: ar.nationality ?? null,
+        dateOfBirth: ar.dateOfBirth ?? null,
+      });
+    }
+  }
+
+  for (const p of merged.values()) {
+    if (p.nameEn || p.nameAr) players.push(p as ScrapedNationalRosterPlayer);
+  }
+
+  logger.info(
+    `[SAFF Scraper] National team ${saffId} roster: ${players.length} players`,
+  );
+  return players;
 }

@@ -27,11 +27,18 @@ import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import {
   scrapeBatch,
   scrapeTeamLogos,
+  scrapeTeamRoster,
   scrapeTournamentList,
   getSaffBreakerState,
   type ArNameResolver,
   type ArTournamentNameResolver,
 } from "@modules/saff/saff.scraper";
+import {
+  matchPlayer,
+  type PlayerMatchResult,
+} from "@modules/saffplus/saffplus.service";
+import { upsertPendingReview } from "@modules/saffplus/playerReview.service";
+import { SquadMembership } from "@modules/squads/squadMembership.model";
 import type {
   TournamentQuery,
   FetchRequest,
@@ -899,6 +906,36 @@ export async function fetchFromSaff(
       );
     }
 
+    // ── Rosters ──
+    // Opt-in only — not included in the default dataTypes set so existing
+    // cron jobs are unaffected. Scrapes each team seen in this tournament.
+    if (dataTypes.includes("rosters") && result.teams.length > 0) {
+      // Resolve saffTeamId → squadId for direct membership writes
+      const teamMapsForRosters = await SaffTeamMap.findAll({
+        where: {
+          saffTeamId: { [Op.in]: result.teams.map((t) => t.saffTeamId) },
+          season,
+          clubId: { [Op.ne]: null },
+        },
+        attributes: ["saffTeamId", "squadId"],
+      });
+      const squadByTeamId = new Map(
+        teamMapsForRosters.map((m) => [m.saffTeamId, m.squadId]),
+      );
+
+      for (const team of result.teams) {
+        syncTeamRoster(
+          team.saffTeamId,
+          season,
+          squadByTeamId.get(team.saffTeamId) ?? null,
+        ).catch((err: Error) =>
+          logger.warn(
+            `[SAFF] Roster sync failed for team ${team.saffTeamId}: ${err.message}`,
+          ),
+        );
+      }
+    }
+
     // Tournament metadata is its own tiny transaction so it survives even
     // when one of the data-type batches fails.
     await runSaffUpsert(`${tag} metadata`, async (txn) => {
@@ -1241,6 +1278,94 @@ export async function autoLinkTeamsToClubs(
     `[SAFF] Auto-link: ${autoLinked} high-confidence links, ${suggested} suggestions (of ${saffTeamMapIds.length} new teams)`,
   );
   return { autoLinked, suggested };
+}
+
+// ══════════════════════════════════════════
+// SYNC TEAM ROSTERS → player_match_review
+// ══════════════════════════════════════════
+
+/**
+ * Scrape the roster for a single SAFF team and push results to the
+ * player review queue. Reuses the same matchPlayer() + upsertPendingReview()
+ * pipeline as the SAFF+ roster sync so both sources land in one queue.
+ *
+ * squadId is optional — when provided (club already mapped + squad exists)
+ * high-confidence matches write squad_memberships directly.
+ */
+export async function syncTeamRoster(
+  saffTeamId: number,
+  season: string,
+  squadId: string | null = null,
+): Promise<{
+  membershipsUpserted: number;
+  reviewQueued: number;
+  errors: number;
+}> {
+  const result = { membershipsUpserted: 0, reviewQueued: 0, errors: 0 };
+  const players = await scrapeTeamRoster(saffTeamId);
+
+  for (const player of players) {
+    try {
+      // matchPlayer expects a SaffPlusRosterEntry-shaped object
+      const entry = {
+        name: player.nameEn,
+        nameAr: player.nameAr || null,
+        externalId:
+          player.saffPlayerId != null ? String(player.saffPlayerId) : null,
+        dob: null,
+        nationality: player.nationality,
+        jerseyNumber: player.jerseyNumber,
+        position: player.position,
+        raw: { rawRow: player.rawRow } as Record<string, unknown>,
+      };
+
+      const match: PlayerMatchResult = await matchPlayer(entry, "saff");
+
+      if (match.playerId && squadId) {
+        await SquadMembership.findOrCreate({
+          where: { squadId, playerId: match.playerId, season },
+          defaults: {
+            squadId,
+            playerId: match.playerId,
+            season,
+            jerseyNumber: player.jerseyNumber,
+            position: player.position,
+            externalMembershipId: entry.externalId,
+            providerSource: "saff",
+            joinedAt: null,
+            leftAt: null,
+          },
+        });
+        result.membershipsUpserted++;
+      } else if (!match.playerId || !squadId) {
+        await upsertPendingReview({
+          scrapedNameEn: player.nameEn,
+          scrapedNameAr: player.nameAr || null,
+          scrapedNationality: player.nationality,
+          scrapedJerseyNumber: player.jerseyNumber,
+          scrapedPosition: player.position,
+          squadId,
+          season,
+          suggestedPlayerIds: match.suggestions,
+          externalPlayerId: entry.externalId,
+          providerSource: "saff",
+          rawPayload: { saffTeamId, ...entry.raw },
+        });
+        result.reviewQueued++;
+      }
+    } catch (err) {
+      logger.warn(
+        `[SAFF] syncTeamRoster(${saffTeamId}) player "${player.nameEn}" error: ${(err as Error).message}`,
+      );
+      result.errors++;
+    }
+  }
+
+  logger.info(
+    `[SAFF] syncTeamRoster(saffTeamId=${saffTeamId}, season=${season}): ` +
+      `${result.membershipsUpserted} memberships, ${result.reviewQueued} queued, ${result.errors} errors`,
+  );
+  return result;
 }
 
 // ══════════════════════════════════════════

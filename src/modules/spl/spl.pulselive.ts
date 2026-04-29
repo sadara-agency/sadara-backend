@@ -282,6 +282,38 @@ export async function fetchAllRankedPlayers(
   return allEntries.slice(0, maxEntries);
 }
 
+/**
+ * Fetch all gameweeks for a compSeason.
+ * Endpoint: GET /football/compseasons/{compSeasonId}/gameweeks
+ */
+export async function fetchGameweeks(seasonId?: number): Promise<
+  Array<{
+    id: number;
+    gameweek: number;
+    compSeason: { id: number; label: string };
+    startDate?: string;
+    endDate?: string;
+    gameweekPhase?: { gameweek: number; label?: string };
+  }>
+> {
+  const compSeasonId = seasonParam(seasonId);
+  const data = await fetchJson<{
+    content: Array<{
+      id: number;
+      gameweek: number;
+      compSeason: { id: number; label: string };
+      startDate?: string;
+      endDate?: string;
+      gameweekPhase?: { gameweek: number; label?: string };
+    }>;
+  }>(`fetchGameweeks(season=${compSeasonId})`, () =>
+    client.get(`/football/compseasons/${compSeasonId}/gameweeks`, {
+      params: { language: "en" },
+    }),
+  );
+  return data?.content ?? [];
+}
+
 // ── Exports for constants ──
 
 export { COMP_ID, DEFAULT_SEASON_ID, statsArrayToMap };
