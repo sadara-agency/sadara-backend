@@ -1,10 +1,13 @@
 import { QueryInterface, DataTypes } from "sequelize";
+import { tableExists } from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  if (await tableExists(queryInterface, "saff_scrape_runs")) return;
+
   await queryInterface.createTable("saff_scrape_runs", {
     id: {
       type: DataTypes.UUID,
@@ -93,18 +96,15 @@ export async function up({
     },
   });
 
-  // migration-lint: disable-next-line
-  await queryInterface.addIndex("saff_scrape_runs", ["saff_id", "season"], {
-    name: "idx_saff_scrape_runs_tournament",
-  });
-  // migration-lint: disable-next-line
-  await queryInterface.addIndex("saff_scrape_runs", ["started_at"], {
-    name: "idx_saff_scrape_runs_started_at",
-  });
-  // migration-lint: disable-next-line
-  await queryInterface.addIndex("saff_scrape_runs", ["status"], {
-    name: "idx_saff_scrape_runs_status",
-  });
+  await queryInterface.sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_saff_scrape_runs_tournament ON saff_scrape_runs (saff_id, season)`,
+  );
+  await queryInterface.sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_saff_scrape_runs_started_at ON saff_scrape_runs (started_at)`,
+  );
+  await queryInterface.sequelize.query(
+    `CREATE INDEX IF NOT EXISTS idx_saff_scrape_runs_status ON saff_scrape_runs (status)`,
+  );
 }
 
 export async function down({
