@@ -16,7 +16,11 @@ import { Player } from "@modules/players/player.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
-import { notifyByRole } from "@modules/notifications/notification.service";
+import {
+  notifyByRole,
+  notifyUser,
+} from "@modules/notifications/notification.service";
+import { sendMail } from "@shared/utils/mail";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
 import {
@@ -31,6 +35,8 @@ import {
 } from "@shared/utils/rowScope";
 
 // ── Shared includes for player + assignee names ──
+// `assignee` exposes role + email so list endpoints can filter by role and
+// rejection emails can be sent without an extra query.
 const TASK_INCLUDES = [
   {
     model: Player,
@@ -40,13 +46,23 @@ const TASK_INCLUDES = [
   {
     model: User,
     as: "assignee",
-    attributes: ["id", "fullName", "fullNameAr"],
+    attributes: ["id", "fullName", "fullNameAr", "role", "email"],
   },
   {
     model: User,
     as: "assigner",
     attributes: ["id", "fullName", "fullNameAr"],
   },
+];
+
+// Whitelisted sort fields (snake_case to match the model's underscored columns).
+const ALLOWED_SORTS = [
+  "created_at",
+  "updated_at",
+  "due_date",
+  "priority",
+  "status",
+  "type",
 ];
 
 // ── Priority ordering (matches the old raw SQL CASE statement) ──
@@ -60,12 +76,49 @@ const PRIORITY_ORDER = literal(
 export async function listTasks(queryParams: any, user?: AuthUser) {
   const { limit, offset, page, sort, order, search } = parsePagination(
     queryParams,
-    "createdAt",
+    "created_at",
+    ALLOWED_SORTS,
   );
 
+  const where = buildTaskWhere(queryParams, search);
+
+  // Row-level scoping
+  const scope = await buildRowScope("tasks", user);
+  if (scope) mergeScope(where, scope);
+
+  // Sort: when frontend sends an explicit sort param, honor it with a
+  // deterministic tie-break (createdAt DESC) so paginated results don't shuffle.
+  // Otherwise: priority (critical first) → due_date ascending.
+  const explicitSort = typeof queryParams.sort === "string";
+  const orderClause = explicitSort
+    ? ([
+        [literal(`"Task"."${sort}" ${order} NULLS LAST`)],
+        ["createdAt", "DESC"],
+      ] as any)
+    : ([
+        [PRIORITY_ORDER, "ASC"],
+        [literal('"Task"."due_date" ASC NULLS LAST')],
+      ] as any);
+
+  const include = buildTaskIncludes(queryParams);
+
+  const { count, rows } = await Task.findAndCountAll({
+    where,
+    include,
+    limit,
+    offset,
+    order: orderClause,
+    distinct: true,
+    subQuery: false,
+  });
+
+  return { data: rows, meta: buildMeta(count, page, limit) };
+}
+
+// ── Shared filter builder used by both listTasks and getTaskStats ──
+function buildTaskWhere(queryParams: any, search?: string): any {
   const where: any = {};
 
-  // By default, only show top-level tasks (exclude sub-tasks)
   if (queryParams.parentTaskId) {
     where.parentTaskId = queryParams.parentTaskId;
   } else if (queryParams.topLevelOnly !== "false") {
@@ -82,8 +135,38 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
     where.mediaTaskType = queryParams.mediaTaskType;
   if (queryParams.isAutoCreated === "true") where.isAutoCreated = true;
 
-  if (search) {
-    const pattern = `%${search}%`;
+  if (queryParams.unassignedOnly === "true") {
+    where.assignedTo = { [Op.is]: null };
+  }
+  if (queryParams.pendingReviewOnly === "true") {
+    where.status = "PendingReview";
+  }
+  if (queryParams.overdueOnly === "true") {
+    where.dueDate = {
+      ...(where.dueDate ?? {}),
+      [Op.lt]: new Date(),
+      [Op.ne]: null as any,
+    };
+    where.status = {
+      [Op.notIn]: ["Completed", "Canceled", "PendingReview"],
+    };
+  }
+  if (queryParams.dueAfter) {
+    where.dueDate = {
+      ...(where.dueDate ?? {}),
+      [Op.gte]: queryParams.dueAfter,
+    };
+  }
+  if (queryParams.dueBefore) {
+    where.dueDate = {
+      ...(where.dueDate ?? {}),
+      [Op.lte]: queryParams.dueBefore,
+    };
+  }
+
+  const term = (search ?? queryParams.search)?.trim();
+  if (term) {
+    const pattern = `%${term}%`;
     where[Op.or] = [
       { title: { [Op.iLike]: pattern } },
       { titleAr: { [Op.iLike]: pattern } },
@@ -91,26 +174,21 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
     ];
   }
 
-  // Row-level scoping
-  const scope = await buildRowScope("tasks", user);
-  if (scope) mergeScope(where, scope);
+  return where;
+}
 
-  // Default sort: priority (critical first) → due_date ascending
-  // Unless the user explicitly requests a different sort
-  const isDefaultSort = sort === "createdAt" && order === "DESC";
-  const orderClause = isDefaultSort
-    ? [[PRIORITY_ORDER, "ASC"], [literal('"Task"."due_date" ASC NULLS LAST')]]
-    : [[sort, order]];
-
-  const { count, rows } = await Task.findAndCountAll({
-    where,
-    include: TASK_INCLUDES,
-    limit,
-    offset,
-    order: orderClause as any,
-  });
-
-  return { data: rows, meta: buildMeta(count, page, limit) };
+// ── Builds includes, swapping in a role-filtered assignee join when needed ──
+function buildTaskIncludes(queryParams: any) {
+  if (!queryParams.assigneeRole) return TASK_INCLUDES;
+  return TASK_INCLUDES.map((inc) =>
+    inc.as === "assignee"
+      ? {
+          ...inc,
+          where: { role: queryParams.assigneeRole },
+          required: true,
+        }
+      : inc,
+  );
 }
 
 // ────────────────────────────────────────────────────────────
@@ -119,53 +197,89 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
 // across the entire matching dataset, not a paginated slice.
 // ────────────────────────────────────────────────────────────
 export async function getTaskStats(queryParams: any, user?: AuthUser) {
-  const where: any = {};
-
-  if (queryParams.parentTaskId) {
-    where.parentTaskId = queryParams.parentTaskId;
-  } else if (queryParams.topLevelOnly !== "false") {
-    where.parentTaskId = { [Op.is]: null };
-  }
-
-  if (queryParams.status) where.status = queryParams.status;
-  if (queryParams.type) where.type = queryParams.type;
-  if (queryParams.priority) where.priority = queryParams.priority;
-  if (queryParams.assignedTo) where.assignedTo = queryParams.assignedTo;
-  if (queryParams.playerId) where.playerId = queryParams.playerId;
-  if (queryParams.referralId) where.referralId = queryParams.referralId;
-  if (queryParams.mediaTaskType)
-    where.mediaTaskType = queryParams.mediaTaskType;
-  if (queryParams.isAutoCreated === "true") where.isAutoCreated = true;
-
-  if (queryParams.search) {
-    const pattern = `%${queryParams.search}%`;
-    where[Op.or] = [
-      { title: { [Op.iLike]: pattern } },
-      { titleAr: { [Op.iLike]: pattern } },
-      { description: { [Op.iLike]: pattern } },
-    ];
-  }
+  const where = buildTaskWhere(queryParams);
 
   const scope = await buildRowScope("tasks", user);
   if (scope) mergeScope(where, scope);
 
+  const include = queryParams.assigneeRole
+    ? [
+        {
+          model: User,
+          as: "assignee",
+          attributes: [],
+          where: { role: queryParams.assigneeRole },
+          required: true,
+        },
+      ]
+    : undefined;
+
   const row = (await Task.findOne({
     where,
+    include,
+    subQuery: false,
     attributes: [
-      [literal("COUNT(*)"), "total"],
-      [literal("COUNT(*) FILTER (WHERE status = 'Open')"), "open"],
-      [literal("COUNT(*) FILTER (WHERE status = 'InProgress')"), "inProgress"],
-      [literal("COUNT(*) FILTER (WHERE status = 'Completed')"), "completed"],
-      [literal("COUNT(*) FILTER (WHERE status = 'Canceled')"), "canceled"],
+      [literal('COUNT(DISTINCT "Task"."id")'), "total"],
       [
         literal(
-          "COUNT(*) FILTER (WHERE status NOT IN ('Completed','Canceled') AND due_date IS NOT NULL AND due_date < CURRENT_DATE)",
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" = 'Open')`,
+        ),
+        "open",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" = 'InProgress')`,
+        ),
+        "inProgress",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" = 'PendingReview')`,
+        ),
+        "pendingReview",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" = 'NeedsRework')`,
+        ),
+        "needsRework",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" = 'Completed')`,
+        ),
+        "completed",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" = 'Canceled')`,
+        ),
+        "canceled",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" NOT IN ('Completed','Canceled','PendingReview') AND "Task"."due_date" IS NOT NULL AND "Task"."due_date" < CURRENT_DATE)`,
         ),
         "overdue",
       ],
-      [literal("COUNT(*) FILTER (WHERE is_auto_created = TRUE)"), "automated"],
-      [literal("COUNT(*) FILTER (WHERE priority = 'critical')"), "critical"],
-      [literal("COUNT(*) FILTER (WHERE assigned_to IS NULL)"), "unassigned"],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."is_auto_created" = TRUE)`,
+        ),
+        "automated",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."priority" = 'critical')`,
+        ),
+        "critical",
+      ],
+      [
+        literal(
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."assigned_to" IS NULL)`,
+        ),
+        "unassigned",
+      ],
     ],
     raw: true,
   })) as any;
@@ -181,6 +295,8 @@ export async function getTaskStats(queryParams: any, user?: AuthUser) {
     total,
     open: n(row?.open),
     inProgress: n(row?.inProgress),
+    pendingReview: n(row?.pendingReview),
+    needsRework: n(row?.needsRework),
     completed,
     canceled: n(row?.canceled),
     overdue: n(row?.overdue),
@@ -279,10 +395,15 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
 // ────────────────────────────────────────────────────────────
 // Update Status (dedicated — handles completedAt logic)
 // ────────────────────────────────────────────────────────────
-export async function updateTaskStatus(
-  id: string,
-  status: "Open" | "InProgress" | "Completed" | "Canceled",
-) {
+type TaskStatus =
+  | "Open"
+  | "InProgress"
+  | "PendingReview"
+  | "NeedsRework"
+  | "Completed"
+  | "Canceled";
+
+export async function updateTaskStatus(id: string, status: TaskStatus) {
   const task = await findOrThrow(Task, id, "Task");
 
   // Prevent completing a parent task that has open/in-progress sub-tasks
@@ -290,7 +411,7 @@ export async function updateTaskStatus(
     const openSubTasks = await Task.count({
       where: {
         parentTaskId: id,
-        status: { [Op.in]: ["Open", "InProgress"] },
+        status: { [Op.in]: ["Open", "InProgress", "PendingReview"] },
       },
     });
     if (openSubTasks > 0) {
@@ -309,6 +430,104 @@ export async function updateTaskStatus(
   // Sync parent status if this is a sub-task
   if (task.parentTaskId) {
     await syncParentStatus(task.parentTaskId);
+  }
+
+  return getTaskById(id);
+}
+
+// ────────────────────────────────────────────────────────────
+// Review Workflow
+//   - submitTaskForReview: assignee → "PendingReview"
+//   - approveTask: Admin/Manager approves → "Completed"
+//   - rejectTask:  Admin/Manager sends back with note → "NeedsRework"
+//   Approval/rejection records reviewer + timestamp on the task.
+// ────────────────────────────────────────────────────────────
+export async function submitTaskForReview(id: string) {
+  const task = await findOrThrow(Task, id, "Task");
+
+  if (!task.parentTaskId) {
+    const openSubTasks = await Task.count({
+      where: {
+        parentTaskId: id,
+        status: { [Op.in]: ["Open", "InProgress", "NeedsRework"] },
+      },
+    });
+    if (openSubTasks > 0) {
+      throw new AppError(
+        "Cannot submit a task for review while sub-tasks are still open",
+        400,
+      );
+    }
+  }
+
+  await task.update({ status: "PendingReview", completedAt: null });
+  return getTaskById(id);
+}
+
+export async function approveTask(id: string, reviewer: AuthUser) {
+  const task = await findOrThrow(Task, id, "Task");
+
+  if (task.status !== "PendingReview") {
+    throw new AppError("Only tasks awaiting review can be approved", 422);
+  }
+
+  await task.update({
+    status: "Completed",
+    completedAt: new Date(),
+    reviewedBy: reviewer.id,
+    reviewedAt: new Date(),
+    reviewNote: null,
+  });
+
+  if (task.parentTaskId) {
+    await syncParentStatus(task.parentTaskId);
+  }
+
+  return getTaskById(id);
+}
+
+export async function rejectTask(id: string, reviewer: AuthUser, note: string) {
+  const task = await findOrThrow(Task, id, "Task");
+
+  if (task.status !== "PendingReview") {
+    throw new AppError("Only tasks awaiting review can be sent back", 422);
+  }
+
+  await task.update({
+    status: "NeedsRework",
+    completedAt: null,
+    reviewedBy: reviewer.id,
+    reviewedAt: new Date(),
+    reviewNote: note,
+  });
+
+  // Notify the assignee — fire-and-forget so we never block the API response.
+  if (task.assignedTo) {
+    Promise.all([
+      notifyUser(task.assignedTo, {
+        type: "task" as any,
+        title: "Task sent back for rework",
+        titleAr: "تمت إعادة المهمة للمراجعة",
+        body: note,
+        link: `/dashboard/tasks?taskId=${id}`,
+        sourceType: "tasks",
+        sourceId: id,
+        priority: "high" as any,
+      }),
+      User.findByPk(task.assignedTo, {
+        attributes: ["email", "fullName"],
+      }).then((u) => {
+        if (!u?.email) return;
+        return sendMail({
+          to: u.email,
+          subject: "Your task needs rework",
+          text: `Hi ${u.fullName ?? ""},\n\nYour task "${task.title}" was sent back for rework.\n\nReviewer note:\n${note}`,
+          html: `<p>Hi ${u.fullName ?? ""},</p><p>Your task <strong>${task.title}</strong> was sent back for rework.</p><p><strong>Reviewer note:</strong></p><blockquote>${note.replace(/\n/g, "<br>")}</blockquote>`,
+        });
+      }),
+    ]).catch(() => {
+      // Notification/email failures must not break the API response.
+    });
   }
 
   return getTaskById(id);

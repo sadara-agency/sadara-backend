@@ -1,25 +1,28 @@
 import { Request } from "express";
 
 // ── Shared types (inlined from @sadara/shared) ──
-export type UserRole =
-  | "Admin"
-  | "Manager"
-  | "Analyst"
-  | "Scout"
-  | "Player"
-  | "Legal"
-  | "Finance"
-  | "Coach"
-  | "SkillCoach"
-  | "TacticalCoach"
-  | "FitnessCoach"
-  | "NutritionSpecialist"
-  | "GymCoach"
-  | "Media"
-  | "Executive"
-  | "GoalkeeperCoach"
-  | "MentalCoach"
-  | "SportingDirector";
+export const USER_ROLES = [
+  "Admin",
+  "Manager",
+  "Analyst",
+  "Scout",
+  "Player",
+  "Legal",
+  "Finance",
+  "Coach",
+  "SkillCoach",
+  "TacticalCoach",
+  "FitnessCoach",
+  "NutritionSpecialist",
+  "GymCoach",
+  "Media",
+  "Executive",
+  "GoalkeeperCoach",
+  "MentalCoach",
+  "SportingDirector",
+] as const;
+
+export type UserRole = (typeof USER_ROLES)[number];
 
 export interface ApiResponse<T = any> {
   success: boolean;

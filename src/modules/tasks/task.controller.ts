@@ -29,21 +29,66 @@ export async function getStats(req: AuthRequest, res: Response) {
 }
 
 // ── Update Status (custom) ──
+// Non-admin/manager users that mark a task "Completed" actually submit it
+// for review — Admin or Manager must then approve or reject.
 export async function updateStatus(req: AuthRequest, res: Response) {
-  const task = await taskService.updateTaskStatus(
-    req.params.id,
-    req.body.status,
-  );
+  const requestedStatus = req.body.status as string;
+  const reviewerRoles = ["Admin", "Manager"];
+  const isReviewer = reviewerRoles.includes(req.user!.role);
+
+  let task;
+  let effectiveStatus = requestedStatus;
+
+  if (requestedStatus === "Completed" && !isReviewer) {
+    task = await taskService.submitTaskForReview(req.params.id);
+    effectiveStatus = "PendingReview";
+  } else {
+    task = await taskService.updateTaskStatus(
+      req.params.id,
+      requestedStatus as any,
+    );
+  }
 
   await logAudit(
     "UPDATE",
     "tasks",
     req.params.id,
     buildAuditContext(req.user!, req.ip),
-    `Task status changed to: ${req.body.status}`,
+    `Task status changed to: ${effectiveStatus}`,
   );
 
   sendSuccess(res, task, "Task status updated");
+}
+
+// ── Approve a task pending review (Admin/Manager only) ──
+export async function approve(req: AuthRequest, res: Response) {
+  const task = await taskService.approveTask(req.params.id, req.user!);
+
+  await logAudit(
+    "UPDATE",
+    "tasks",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    "Task approved (review)",
+  );
+
+  sendSuccess(res, task, "Task approved");
+}
+
+// ── Reject a task pending review with a reason (Admin/Manager only) ──
+export async function reject(req: AuthRequest, res: Response) {
+  const note = req.body.note as string;
+  const task = await taskService.rejectTask(req.params.id, req.user!, note);
+
+  await logAudit(
+    "UPDATE",
+    "tasks",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    `Task sent back for rework: ${note}`,
+  );
+
+  sendSuccess(res, task, "Task sent back for rework");
 }
 
 // ── Create Sub-Task ──

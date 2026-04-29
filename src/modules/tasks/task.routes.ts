@@ -16,7 +16,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import { uploadSingle, verifyFileType } from "@middleware/upload";
@@ -25,6 +25,8 @@ import {
   updateTaskSchema,
   updateStatusSchema,
   taskQuerySchema,
+  approveTaskSchema,
+  rejectTaskSchema,
 } from "@modules/tasks/task.validation";
 import * as taskController from "@modules/tasks/task.controller";
 
@@ -77,6 +79,66 @@ router.patch(
   authorizeModule("tasks", "update"),
   validate(updateStatusSchema),
   asyncHandler(taskController.updateStatus),
+);
+
+// ── Review Workflow (Admin & Manager only) ──
+/**
+ * @swagger
+ * /tasks/{id}/approve:
+ *   post:
+ *     summary: Approve a task that is pending review
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200: { description: Task approved and marked Completed }
+ *       422: { description: Task is not in PendingReview state }
+ */
+router.post(
+  "/:id/approve",
+  authorize("Admin", "Manager"),
+  validate(taskIdParamSchema, "params"),
+  validate(approveTaskSchema),
+  asyncHandler(taskController.approve),
+);
+
+/**
+ * @swagger
+ * /tasks/{id}/reject:
+ *   post:
+ *     summary: Send a task back for rework with a reviewer note
+ *     tags: [Tasks]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [note]
+ *             properties:
+ *               note: { type: string, minLength: 1, maxLength: 2000 }
+ *     responses:
+ *       200: { description: Task moved to NeedsRework, assignee notified }
+ *       422: { description: Task is not in PendingReview state }
+ */
+router.post(
+  "/:id/reject",
+  authorize("Admin", "Manager"),
+  validate(taskIdParamSchema, "params"),
+  validate(rejectTaskSchema),
+  asyncHandler(taskController.reject),
 );
 
 // ── Sub-Tasks ──

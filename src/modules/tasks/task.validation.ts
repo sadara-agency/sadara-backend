@@ -7,6 +7,7 @@
 // pattern, with proper type exports.
 // ─────────────────────────────────────────────────────────────
 import { z } from "zod";
+import { USER_ROLES } from "@shared/types";
 
 // ── Shared constants ──
 const TASK_TYPES = [
@@ -43,7 +44,14 @@ export const MEDIA_PLATFORMS = [
 export const addDeliverableSchema = z.object({
   caption: z.string().max(200).optional(),
 });
-const TASK_STATUSES = ["Open", "InProgress", "Completed", "Canceled"] as const;
+const TASK_STATUSES = [
+  "Open",
+  "InProgress",
+  "PendingReview",
+  "NeedsRework",
+  "Completed",
+  "Canceled",
+] as const;
 const TASK_PRIORITIES = ["low", "medium", "high", "critical"] as const;
 
 // ── Create Task ──
@@ -95,9 +103,20 @@ export const updateTaskSchema = z.object({
 export const updateStatusSchema = z.object({
   status: z.enum(TASK_STATUSES, {
     errorMap: () => ({
-      message: "Status must be Open, InProgress, Completed, or Canceled",
+      message:
+        "Status must be Open, InProgress, PendingReview, NeedsRework, Completed, or Canceled",
     }),
   }),
+});
+
+// ── Review actions ──
+export const approveTaskSchema = z.object({}).strict();
+
+export const rejectTaskSchema = z.object({
+  note: z
+    .string()
+    .min(1, "A reason is required when sending the task back")
+    .max(2000),
 });
 
 // ── Query / List Tasks ──
@@ -126,6 +145,12 @@ export const taskQuerySchema = z.object({
   topLevelOnly: z.string().optional(),
   mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
   isAutoCreated: z.string().optional(),
+  assigneeRole: z.enum(USER_ROLES).optional(),
+  unassignedOnly: z.string().optional(),
+  overdueOnly: z.string().optional(),
+  pendingReviewOnly: z.string().optional(),
+  dueBefore: z.coerce.date().optional(),
+  dueAfter: z.coerce.date().optional(),
 });
 
 // ── Inferred types ──
@@ -133,3 +158,4 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;
 export type TaskQuery = z.infer<typeof taskQuerySchema>;
+export type RejectTaskInput = z.infer<typeof rejectTaskSchema>;
