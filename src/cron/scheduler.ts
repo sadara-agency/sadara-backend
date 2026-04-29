@@ -107,7 +107,7 @@ import {
   runLiveTier,
   runLiveEventsTier,
 } from "./engines/saudiLeagues.engine";
-import { pollLiveMatches } from "@modules/spl/spl.liveMatch.poller";
+
 import { runCloseIdleSessions } from "@modules/staffMonitoring/staffMonitoring.cron";
 
 /**
@@ -1200,8 +1200,6 @@ export async function startCronJobs() {
   schedule("*/10 * * * *", "staff-monitoring-close-idle"); // Every 10 min
 
   // ── SPL live match poller ──
-  registerJob("spl-live-match-poll", pollLiveMatches);
-  schedule("*/30 * * * * *", "spl-live-match-poll"); // Every 30 seconds
 
-  logger.info("[CRON] 69 jobs scheduled ✓");
+  logger.info("[CRON] 68 jobs scheduled ✓");
 }
