@@ -627,6 +627,41 @@ export async function fetchFromSaff(input: FetchRequest) {
     const tournament = tournamentMap.get(result.tournamentId);
     if (!tournament) continue;
 
+    // ── Sanity guard: refuse to overwrite good data with suspiciously sparse
+    // results. If SAFF changes their DOM structure, selectors silently return
+    // fewer rows — this catches the drift before it reaches the DB.
+    //
+    // Thresholds by agency tier:
+    //   Critical/High (Roshn/Yelo/King's Cup): league has ≥18 teams → expect ≥10
+    //   Medium/Low/Scouting/Niche: cups/youth groups can be small → expect ≥2
+    //
+    // We only check when the scrape returned *something* (non-empty result);
+    // total-zero is already caught by ScraperShapeError in the scraper itself.
+    const isMajorLeague = ["Critical", "High"].includes(tournament.agencyValue);
+    const minStandings = isMajorLeague ? 10 : 2;
+    const minFixtures = isMajorLeague ? 50 : 2;
+
+    const standingsSuspicious =
+      dataTypes.includes("standings") &&
+      result.standings.length > 0 &&
+      result.standings.length < minStandings;
+    const fixturesSuspicious =
+      dataTypes.includes("fixtures") &&
+      result.fixtures.length > 0 &&
+      result.fixtures.length < minFixtures;
+
+    if (standingsSuspicious || fixturesSuspicious) {
+      logger.warn(
+        `[SAFF Service] Sanity check failed for saffId=${result.tournamentId} ` +
+          `(${tournament.name}, agencyValue=${tournament.agencyValue}): ` +
+          `standings=${result.standings.length} (min ${minStandings}), ` +
+          `fixtures=${result.fixtures.length} (min ${minFixtures}). ` +
+          `Skipping DB write — SAFF DOM may have changed. ` +
+          `Bump SELECTOR_VERSION in saff.selectors.ts after fixing selectors.`,
+      );
+      continue;
+    }
+
     // ─────────────────────────────────────────────────────────────────────
     // Per-data-type transactions:
     //

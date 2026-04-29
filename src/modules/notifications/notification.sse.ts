@@ -172,6 +172,30 @@ export async function publishNotification(
   sendToUser(userId, payload);
 }
 
+// ── Broadcast to all active SSE connections ──
+//
+// Used for system-wide events where all currently connected users should be
+// notified — e.g., SAFF sync progress/completion that any watching admin tab
+// should reflect without polling. Does NOT go through Redis (in-memory only)
+// because these are ephemeral UI-state events, not durable notifications.
+
+export function broadcastToAll(event: string, data: unknown): void {
+  let totalSent = 0;
+  for (const [userId, conns] of connections) {
+    for (const res of conns) {
+      const ok = sendSSE(res, event, data);
+      if (!ok) {
+        conns.delete(res);
+        logger.debug(`Removed dead SSE connection for user ${userId}`);
+      } else {
+        totalSent++;
+      }
+    }
+    if (conns.size === 0) connections.delete(userId);
+  }
+  logger.debug(`[SSE] Broadcast '${event}' to ${totalSent} connection(s)`);
+}
+
 // ── Messaging Event Publisher ──
 
 export async function publishMessageEvent(
