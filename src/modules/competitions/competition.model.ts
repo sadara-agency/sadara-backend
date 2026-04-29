@@ -31,6 +31,7 @@ interface CompetitionAttributes {
   sportmonksLeagueId: number | null;
   saffId: number | null;
   saffplusSlug: string | null;
+  pulseLiveCompId: number | null;
   isActive: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -59,6 +60,7 @@ export class Competition
   declare sportmonksLeagueId: number | null;
   declare saffId: number | null;
   declare saffplusSlug: string | null;
+  declare pulseLiveCompId: number | null;
   declare isActive: boolean;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -120,6 +122,11 @@ Competition.init(
       type: DataTypes.STRING(120),
       unique: true,
       field: "saffplus_slug",
+    },
+    pulseLiveCompId: {
+      type: DataTypes.INTEGER,
+      unique: true,
+      field: "pulse_live_comp_id",
     },
     isActive: {
       type: DataTypes.BOOLEAN,

@@ -75,6 +75,8 @@ export interface SplClubEntry {
   city: string;
   /** PulseLive team ID (API integer, not same as splTeamId) */
   pulseLiveTeamId?: number;
+  /** Which PulseLive competition this club belongs to ("roshn" | "yelo") */
+  pulseLiveLeague?: "roshn" | "yelo";
 }
 
 // ═══════════════════════════════════════════
