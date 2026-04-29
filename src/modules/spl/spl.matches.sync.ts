@@ -30,12 +30,9 @@ import type {
   PulseLiveFixtureTeamLine,
 } from "@modules/spl/spl.fixtures.types";
 import { SPL_CLUB_REGISTRY } from "@modules/spl/spl.registry";
-import {
-  DEFAULT_SEASON_ID,
-  YELO_COMP_ID,
-  YELO_SEASON_ID,
-} from "@modules/spl/spl.pulselive";
+import { DEFAULT_SEASON_ID, COMP_ID } from "@modules/spl/spl.pulselive";
 import { Competition } from "@modules/competitions/competition.model";
+import { findByPulseLiveTeamId } from "@modules/spl/spl.registry";
 
 const PROVIDER = "pulselive";
 
@@ -58,6 +55,26 @@ for (const entry of SPL_CLUB_REGISTRY) {
   if (entry.pulseLiveTeamId) {
     _registryByPulseLiveId.set(entry.pulseLiveTeamId, entry.splTeamId);
   }
+}
+
+/**
+ * Determine which league a fixture belongs to based on its team IDs.
+ * Returns "roshn" if both teams are Roshn clubs, "yelo" if both are Yelo,
+ * "mixed" for promotion playoffs (cross-league), or "unknown".
+ */
+function detectFixtureLeague(
+  fx: PulseLiveFixture,
+): "roshn" | "yelo" | "mixed" | "unknown" {
+  if (!Array.isArray(fx.teams) || fx.teams.length < 2) return "unknown";
+  const teamIds = fx.teams.map((t) => t.team.id);
+  const leagues = teamIds.map(
+    (id) => findByPulseLiveTeamId(id)?.pulseLiveLeague ?? null,
+  );
+  if (leagues.every((l) => l === "roshn")) return "roshn";
+  if (leagues.every((l) => l === "yelo")) return "yelo";
+  if (leagues.some((l) => l === "roshn") && leagues.some((l) => l === "yelo"))
+    return "mixed";
+  return "unknown";
 }
 
 let _clubByPulseLiveTeamCache: Map<number, string> | null = null;
@@ -277,8 +294,13 @@ export async function syncFixtures(
 
 /**
  * Engine-callable sync for a single competition served by PulseLive.
- * Reads `pulseLiveCompId` from the Competition row to determine which
- * comp/season to fetch. Returns the same shape as saffplus syncCompetitionMatches().
+ *
+ * PulseLive serves Roshn and Yelo together under comp 215 / season DEFAULT_SEASON_ID.
+ * We fetch all fixtures once, then use detectFixtureLeague() to route each fixture
+ * to the correct Sadara competition row based on both teams' pulseLiveLeague field.
+ * Mixed fixtures (promotion playoffs) are written to the requesting competition.
+ *
+ * Returns the same shape as saffplus syncCompetitionMatches().
  */
 export async function syncSplCompetition(
   competitionId: string,
@@ -302,28 +324,60 @@ export async function syncSplCompetition(
     };
   }
 
-  const compId = competition.pulseLiveCompId;
-  // Use YELO_SEASON_ID for Yelo (comp 219); DEFAULT_SEASON_ID for Roshn (comp 72)
-  const seasonId = compId === YELO_COMP_ID ? YELO_SEASON_ID : undefined;
+  // Determine which league label this competition maps to
+  const isRoshn = competition.name.toLowerCase().includes("roshn");
+  const isYelo =
+    competition.name.toLowerCase().includes("yelo") ||
+    competition.name.toLowerCase().includes("first division");
+  const ownLeague: "roshn" | "yelo" | null = isRoshn
+    ? "roshn"
+    : isYelo
+      ? "yelo"
+      : null;
 
   logger.info(
-    `[SPL] syncSplCompetition: ${competition.name} (pulseLiveCompId=${compId}, season=${seasonId ?? DEFAULT_SEASON_ID})`,
+    `[SPL] syncSplCompetition: ${competition.name} (league=${ownLeague ?? "unknown"}, fetching comp=${COMP_ID} season=${DEFAULT_SEASON_ID})`,
   );
 
-  const result = await syncFixtures(seasonId, {
-    compId,
-    competitionId,
-  });
+  // Fetch all fixtures for the current season from the SA_SL aggregate comp
+  const fixtures = await fetchFixtures(undefined, { compId: COMP_ID });
+  const seasonLabel = String(DEFAULT_SEASON_ID);
 
-  return {
-    upserted: result.created + result.updated,
-    skipped: result.skipped,
-    unmapped: 0,
-    errors:
-      result.errors > 0
-        ? [`${result.errors} fixture(s) failed — check logs`]
-        : [],
-  };
+  let upserted = 0;
+  let skipped = 0;
+  let unmapped = 0;
+  const errors: string[] = [];
+
+  for (const fx of fixtures) {
+    try {
+      const league = detectFixtureLeague(fx);
+
+      // Skip fixtures that clearly belong to a different league
+      if (
+        ownLeague &&
+        league !== ownLeague &&
+        league !== "mixed" &&
+        league !== "unknown"
+      ) {
+        continue;
+      }
+
+      const r = await upsertMatchByProvider(fx, seasonLabel, competitionId);
+      if (r.skipReason === "missing_teams") unmapped++;
+      else if (r.skipReason) skipped++;
+      else upserted++;
+    } catch (err) {
+      const msg = (err as Error).message;
+      errors.push(`fixture ${fx.id}: ${msg}`);
+      logger.warn(`[SPL] upsert failed for fixture ${fx.id}: ${msg}`);
+    }
+  }
+
+  logger.info(
+    `[SPL] syncSplCompetition done — ${competition.name}: upserted=${upserted} skipped=${skipped} unmapped=${unmapped} errors=${errors.length}`,
+  );
+
+  return { upserted, skipped, unmapped, errors: errors.slice(0, 5) };
 }
 
 export async function syncFixtureDetail(pulselivefixtureId: number): Promise<{

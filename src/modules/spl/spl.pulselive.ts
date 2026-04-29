@@ -22,9 +22,10 @@ import type {
 // ── Constants ──
 
 const BASE_URL = "https://api.saudi-pro-league.pulselive.com";
-const COMP_ID = 72; // Roshn Saudi League
-const YELO_COMP_ID = 219; // Yelo First Division (Saudi Arabian First Division League)
-const YELO_SEASON_ID = 863; // 2025/2026 season — bump when Yelo rolls a new season
+// PulseLive exposes both Roshn and Yelo under a single aggregate competition (SA_SL).
+// Filtering by comp 72 or 219 returns 0 fixtures — the only working comp ID is 215.
+// League separation (Roshn vs Yelo) is done by team ID at upsert time in spl.matches.sync.ts.
+const COMP_ID = 215; // SA_SL aggregate — the only comp that returns fixtures
 // Season ID comes from SPL_DEFAULT_SEASON_ID env var (validated in config/env.ts).
 // Bump the env var when SPL rolls a new season — no code change required.
 const DEFAULT_SEASON_ID = env.spl.defaultSeasonId;
@@ -318,10 +319,4 @@ export async function fetchGameweeks(seasonId?: number): Promise<
 
 // ── Exports for constants ──
 
-export {
-  COMP_ID,
-  YELO_COMP_ID,
-  YELO_SEASON_ID,
-  DEFAULT_SEASON_ID,
-  statsArrayToMap,
-};
+export { COMP_ID, DEFAULT_SEASON_ID, statsArrayToMap };
