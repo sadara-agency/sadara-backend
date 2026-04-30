@@ -100,6 +100,7 @@ const TYPE_TO_PREF: Record<string, string> = {
   assignments: "assignments",
   calendar: "calendar",
   system: "system",
+  mental_alert: "mental",
 };
 
 // ── Notify all users with specific roles ──

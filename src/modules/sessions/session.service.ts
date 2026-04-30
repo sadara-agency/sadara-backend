@@ -140,6 +140,12 @@ export async function listSessions(query: SessionQuery, user?: AuthUser) {
   );
   const offset = (query.page - 1) * query.limit;
 
+  // MentalCoach sees only Mental-type sessions by default unless they explicitly
+  // pass a sessionType query param (which buildWhere already handles).
+  if (user?.role === "MentalCoach" && !query.sessionType) {
+    where.sessionType = "Mental";
+  }
+
   const scope = await buildRowScope("sessions", user);
   if (scope) mergeScope(where, scope);
 

@@ -10,7 +10,8 @@ export type NotificationType =
   | "document"
   | "task"
   | "calendar"
-  | "system";
+  | "system"
+  | "mental_alert";
 export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
 interface NotificationAttributes {
