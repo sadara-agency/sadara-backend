@@ -32,7 +32,14 @@ export async function listMine(req: AuthRequest, res: Response) {
     req.user!.id,
     req.query as unknown as MyAssignmentQuery,
   );
-  sendPaginated(res, result.data, result.meta);
+  // sendPaginated supports an `extras` bag for non-meta fields like `groups`.
+  sendPaginated(
+    res,
+    result.data,
+    result.meta,
+    undefined,
+    result.groups ? { groups: result.groups } : undefined,
+  );
 }
 
 export async function updateStatus(req: AuthRequest, res: Response) {

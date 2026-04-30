@@ -1202,7 +1202,7 @@ export async function startCronJobs() {
 
   // ── SPL live match poller ──
   registerJob("spl-live-match-poll", pollLiveMatches);
-  schedule("*/30 * * * * *", "spl-live-match-poll"); // Every 30 seconds
+  // schedule("*/30 * * * * *", "spl-live-match-poll"); // Every 30 seconds — disabled
 
-  logger.info("[CRON] 69 jobs scheduled ✓");
+  logger.info("[CRON] 68 jobs scheduled ✓");
 }

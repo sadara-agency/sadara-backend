@@ -55,6 +55,15 @@ export const assignmentQuerySchema = z.object({
   status: assignmentStatusEnum.optional(),
 });
 
+// Coerce ?status=Assigned&status=InProgress (Express parses repeated keys
+// as an array) OR ?status=Assigned (single string) into a typed array.
+const csvOrArray = <T extends z.ZodTypeAny>(itemSchema: T) =>
+  z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return undefined;
+    if (Array.isArray(v)) return v;
+    return [v];
+  }, z.array(itemSchema).optional());
+
 export const myAssignmentQuerySchema = z.object({
   page: z.coerce.number().min(1).default(1),
   limit: z.coerce.number().min(1).max(500).default(50),
@@ -62,7 +71,11 @@ export const myAssignmentQuerySchema = z.object({
     .enum(["created_at", "status", "priority", "due_at"])
     .default("created_at"),
   order: z.enum(["asc", "desc"]).default("desc"),
-  status: assignmentStatusEnum.optional(),
+  status: csvOrArray(assignmentStatusEnum),
+  priority: csvOrArray(assignmentPriorityEnum),
+  specialty: csvOrArray(staffRoleEnum),
+  search: z.string().trim().min(1).max(100).optional(),
+  groupBy: z.enum(["status", "priority", "none"]).default("none"),
 });
 
 export const updateAssignmentStatusSchema = z.object({

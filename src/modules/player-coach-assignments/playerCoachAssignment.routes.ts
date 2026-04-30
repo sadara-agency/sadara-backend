@@ -66,10 +66,34 @@ router.get(
  *       - in: query
  *         name: status
  *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *             enum: [Assigned, Acknowledged, InProgress, Completed]
+ *       - in: query
+ *         name: priority
+ *         schema:
+ *           type: array
+ *           items:
+ *             type: string
+ *             enum: [low, normal, high, critical]
+ *       - in: query
+ *         name: specialty
+ *         schema:
+ *           type: array
+ *           items: { type: string }
+ *       - in: query
+ *         name: search
+ *         schema: { type: string }
+ *         description: Matches against the player's first/last name (EN + AR).
+ *       - in: query
+ *         name: groupBy
+ *         schema:
  *           type: string
- *           enum: [Assigned, Acknowledged, InProgress, Completed]
+ *           enum: [status, priority, none]
+ *           default: none
  *     responses:
- *       200: { description: Paginated list of MyAssignmentRow }
+ *       200: { description: Paginated list of MyAssignmentRow; `groups` field present when groupBy != none }
  */
 router.get(
   "/me",

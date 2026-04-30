@@ -218,14 +218,46 @@ export async function listMyAssignments(
   );
 
   const where: Record<string, unknown> = { coachUserId: userId };
-  if (query.status) where.status = query.status;
+  if (query.status && query.status.length > 0) {
+    where.status =
+      query.status.length === 1 ? query.status[0] : { [Op.in]: query.status };
+  }
+  if (query.priority && query.priority.length > 0) {
+    where.priority =
+      query.priority.length === 1
+        ? query.priority[0]
+        : { [Op.in]: query.priority };
+  }
+  if (query.specialty && query.specialty.length > 0) {
+    where.specialty =
+      query.specialty.length === 1
+        ? query.specialty[0]
+        : { [Op.in]: query.specialty };
+  }
+
+  // Search hits the player's name in either locale. iLike works on Postgres;
+  // the service is Postgres-only (Sequelize + PG 17 per CLAUDE.md).
+  const playerInclude: any = { ...PLAYER_INCLUDE, required: false };
+  if (query.search) {
+    const term = `%${query.search}%`;
+    playerInclude.required = true;
+    playerInclude.where = {
+      [Op.or]: [
+        { firstName: { [Op.iLike]: term } },
+        { lastName: { [Op.iLike]: term } },
+        { firstNameAr: { [Op.iLike]: term } },
+        { lastNameAr: { [Op.iLike]: term } },
+      ],
+    };
+  }
 
   const { count, rows } = await PlayerCoachAssignment.findAndCountAll({
     where,
     limit,
     offset,
     order: [[sort, order.toUpperCase()]],
-    include: [PLAYER_INCLUDE as any],
+    include: [playerInclude],
+    distinct: true,
   });
 
   // Open task counts per assignment in one query
@@ -255,7 +287,20 @@ export async function listMyAssignments(
     };
   });
 
-  return { data, meta: buildMeta(count, page, limit) };
+  // Optional client-side grouping. Only the current page is grouped — the
+  // page is already a coherent slice ordered by `sort`/`order`. Total counts
+  // remain in `meta` for pagination.
+  let groups: Record<string, MyAssignmentRow[]> | undefined;
+  if (query.groupBy && query.groupBy !== "none") {
+    const key = query.groupBy === "status" ? "status" : "priority";
+    groups = data.reduce<Record<string, MyAssignmentRow[]>>((acc, row) => {
+      const k = String(row[key as keyof MyAssignmentRow] ?? "unknown");
+      (acc[k] ||= []).push(row);
+      return acc;
+    }, {});
+  }
+
+  return { data, meta: buildMeta(count, page, limit), groups };
 }
 
 const STATUS_TRANSITIONS: Record<AssignmentStatus, AssignmentStatus[]> = {
