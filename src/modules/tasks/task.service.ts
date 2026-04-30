@@ -342,7 +342,10 @@ export async function getTaskById(id: string, user?: AuthUser) {
 // ────────────────────────────────────────────────────────────
 // Create Task
 // ────────────────────────────────────────────────────────────
-export async function createTask(input: CreateTaskInput, assignedBy: string) {
+export async function createTask(
+  input: CreateTaskInput & { assignmentId?: string; isAutoCreated?: boolean },
+  assignedBy: string,
+) {
   // FK checks — catch invalid references before hitting the DB constraint
   await Promise.all([
     input.assignedTo
@@ -366,6 +369,8 @@ export async function createTask(input: CreateTaskInput, assignedBy: string) {
     dueDate: input.dueDate,
     notes: input.notes,
     displayId,
+    assignmentId: input.assignmentId ?? null,
+    isAutoCreated: input.isAutoCreated ?? false,
   });
 
   // Re-fetch with associations for the response

@@ -85,6 +85,10 @@ export async function createNotification(input: CreateNotificationInput) {
 
 // ── Notification type → preference key mapping ──
 
+// Maps notification.type → user notification-preference key.
+// `assignments` is a sub-key under the broader `task` type so users can
+// silence working-group notifications without losing match/contract task pings.
+// notifyByRole reads this map; targeted createNotification calls do not.
 const TYPE_TO_PREF: Record<string, string> = {
   contract: "contracts",
   injury: "injuries",
@@ -93,6 +97,7 @@ const TYPE_TO_PREF: Record<string, string> = {
   referral: "referrals",
   document: "documents",
   task: "tasks",
+  assignments: "assignments",
   calendar: "calendar",
   system: "system",
 };
