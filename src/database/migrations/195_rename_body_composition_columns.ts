@@ -1,4 +1,4 @@
-import { QueryInterface } from "sequelize";
+import { QueryInterface, QueryTypes } from "sequelize";
 
 const TABLE = "body_compositions";
 
@@ -18,13 +18,44 @@ const RENAMES: [string, string][] = [
   ["scan_device", "device_tag"],
 ];
 
+async function tableExists(queryInterface: QueryInterface): Promise<boolean> {
+  const rows = await queryInterface.sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = '${TABLE}'
+     ) AS exists`,
+    { type: QueryTypes.SELECT },
+  );
+  return rows[0]?.exists === true;
+}
+
+async function columnExists(
+  queryInterface: QueryInterface,
+  column: string,
+): Promise<boolean> {
+  const rows = await queryInterface.sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.columns
+       WHERE table_schema = 'public'
+         AND table_name   = '${TABLE}'
+         AND column_name  = '${column}'
+     ) AS exists`,
+    { type: QueryTypes.SELECT },
+  );
+  return rows[0]?.exists === true;
+}
+
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  if (!(await tableExists(queryInterface))) return;
+
   for (const [from, to] of RENAMES) {
-    await queryInterface.renameColumn(TABLE, from, to);
+    if (await columnExists(queryInterface, from)) {
+      await queryInterface.renameColumn(TABLE, from, to);
+    }
   }
 }
 
@@ -33,7 +64,11 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
+  if (!(await tableExists(queryInterface))) return;
+
   for (const [from, to] of RENAMES) {
-    await queryInterface.renameColumn(TABLE, to, from);
+    if (await columnExists(queryInterface, to)) {
+      await queryInterface.renameColumn(TABLE, to, from);
+    }
   }
 }
