@@ -47,6 +47,7 @@ interface TaskAttributes {
   referralId: string | null;
   triggerRuleId: string | null;
   parentTaskId: string | null;
+  assignmentId: string | null;
   sortOrder: number;
   notes: string | null;
   mediaTaskType: string | null;
@@ -80,6 +81,7 @@ interface TaskCreationAttributes extends Optional<
   | "referralId"
   | "triggerRuleId"
   | "parentTaskId"
+  | "assignmentId"
   | "sortOrder"
   | "notes"
   | "mediaTaskType"
@@ -129,6 +131,7 @@ export class Task
   declare referralId: string | null;
   declare triggerRuleId: string | null;
   declare parentTaskId: string | null;
+  declare assignmentId: string | null;
   declare sortOrder: number;
   declare notes: string | null;
   declare mediaTaskType: string | null;
@@ -242,6 +245,13 @@ Task.init(
       type: DataTypes.UUID,
       field: "parent_task_id",
       references: { model: "tasks", key: "id" },
+    },
+    assignmentId: {
+      type: DataTypes.UUID,
+      field: "assignment_id",
+      allowNull: true,
+      references: { model: "player_coach_assignments", key: "id" },
+      onDelete: "SET NULL",
     },
     sortOrder: {
       type: DataTypes.INTEGER,

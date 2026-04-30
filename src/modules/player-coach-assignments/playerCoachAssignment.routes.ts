@@ -6,6 +6,8 @@ import { validate } from "@middleware/validate";
 import {
   createAssignmentSchema,
   assignmentQuerySchema,
+  myAssignmentQuerySchema,
+  updateAssignmentStatusSchema,
 } from "./playerCoachAssignment.validation";
 import * as assignmentController from "./playerCoachAssignment.controller";
 
@@ -18,11 +20,6 @@ router.use(dynamicFieldAccess("player-coach-assignments"));
  * /player-coach-assignments:
  *   get:
  *     summary: List player-coach assignments
- *     description: |
- *       Multi-specialty coach assignments. Each row pairs a player with a coach user
- *       and a specialty (Coach, GymCoach, MentalCoach, etc.). Used by row-scope logic
- *       so specialty coaches can access data for players they're specifically assigned to,
- *       independent of the primary `players.coach_id`.
  *     tags: [Player Coach Assignments]
  *     security:
  *       - bearerAuth: []
@@ -35,9 +32,12 @@ router.use(dynamicFieldAccess("player-coach-assignments"));
  *         schema: { type: string, format: uuid }
  *       - in: query
  *         name: specialty
+ *         schema: { type: string }
+ *       - in: query
+ *         name: status
  *         schema:
  *           type: string
- *           enum: [Coach, SkillCoach, TacticalCoach, FitnessCoach, NutritionSpecialist, GymCoach, GoalkeeperCoach, MentalCoach]
+ *           enum: [Assigned, Acknowledged, InProgress, Completed]
  *     responses:
  *       200:
  *         description: Paginated list with eager-loaded player and coachUser
@@ -47,6 +47,34 @@ router.get(
   authorizeModule("player-coach-assignments", "read"),
   validate(assignmentQuerySchema, "query"),
   asyncHandler(assignmentController.list),
+);
+
+/**
+ * @swagger
+ * /player-coach-assignments/me:
+ *   get:
+ *     summary: List the current user's assignments ("My Players")
+ *     description: |
+ *       Returns assignments where coachUserId = current user. Each row includes
+ *       the player summary (name, photo, position) and the count of open tasks
+ *       linked to the assignment. The single read API every portal uses for the
+ *       My Assignments dashboard widget.
+ *     tags: [Player Coach Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *           enum: [Assigned, Acknowledged, InProgress, Completed]
+ *     responses:
+ *       200: { description: Paginated list of MyAssignmentRow }
+ */
+router.get(
+  "/me",
+  validate(myAssignmentQuerySchema, "query"),
+  asyncHandler(assignmentController.listMine),
 );
 
 /**
@@ -76,7 +104,7 @@ router.get(
  * @swagger
  * /player-coach-assignments:
  *   post:
- *     summary: Assign a coach to a player with a specialty
+ *     summary: Assign staff to a player with a specialty
  *     tags: [Player Coach Assignments]
  *     security:
  *       - bearerAuth: []
@@ -90,14 +118,17 @@ router.get(
  *             properties:
  *               playerId: { type: string, format: uuid }
  *               coachUserId: { type: string, format: uuid }
- *               specialty:
+ *               specialty: { type: string }
+ *               priority:
  *                 type: string
- *                 enum: [Coach, SkillCoach, TacticalCoach, FitnessCoach, NutritionSpecialist, GymCoach, GoalkeeperCoach, MentalCoach]
+ *                 enum: [low, normal, high, critical]
+ *               dueAt: { type: string, format: date-time }
+ *               notes: { type: string }
  *     responses:
- *       201: { description: Created }
- *       404: { description: Player or coach user not found }
- *       409: { description: Duplicate (player, coach, specialty) }
- *       422: { description: Target user is not a coach role }
+ *       201: { description: Created — assignment created, notification + auto-task spawned for the assignee }
+ *       404: { description: Player or staff user not found }
+ *       409: { description: Person already in this player's working group }
+ *       422: { description: Target user is a Player role }
  */
 router.post(
   "/",
@@ -108,9 +139,49 @@ router.post(
 
 /**
  * @swagger
+ * /player-coach-assignments/{id}/status:
+ *   patch:
+ *     summary: Update assignment lifecycle status
+ *     description: |
+ *       Moves an assignment through Assigned → Acknowledged → InProgress → Completed.
+ *       Allowed for the assignee themselves or any Admin/Manager/Executive.
+ *       On Acknowledged or Completed, leadership receives a notification.
+ *     tags: [Player Coach Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [Assigned, Acknowledged, InProgress, Completed]
+ *     responses:
+ *       200: { description: Updated }
+ *       403: { description: Not assignee or leadership }
+ *       404: { description: Not found }
+ *       422: { description: Illegal status transition }
+ */
+router.patch(
+  "/:id/status",
+  validate(updateAssignmentStatusSchema),
+  asyncHandler(assignmentController.updateStatus),
+);
+
+/**
+ * @swagger
  * /player-coach-assignments/{id}:
  *   delete:
- *     summary: Unassign a coach from a player
+ *     summary: Unassign staff from a player
  *     tags: [Player Coach Assignments]
  *     security:
  *       - bearerAuth: []

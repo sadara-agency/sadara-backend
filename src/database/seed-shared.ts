@@ -817,6 +817,13 @@ const RAW_PERMISSIONS: Perm[] = [
       "GymCoach",
       "GoalkeeperCoach",
       "MentalCoach",
+      // Non-coach assignable staff also need read access so the My
+      // Assignments dashboard widget renders for them.
+      "Analyst",
+      "Scout",
+      "Legal",
+      "Finance",
+      "Media",
     ],
     { canRead: true },
   ),
