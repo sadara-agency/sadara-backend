@@ -9,6 +9,8 @@ import {
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
+import { notifyByRole } from "@modules/notifications/notification.service";
+import { logger } from "@config/logger";
 import type { AuthUser } from "@shared/types";
 import type {
   CreateTemplateDTO,
@@ -201,7 +203,7 @@ export async function createAssessment(
     ? scoreSeverity(totalScore, template.scoringRanges)
     : null;
 
-  return MentalAssessment.create({
+  const assessment = await MentalAssessment.create({
     ...data,
     totalScore,
     severityLevel,
@@ -210,6 +212,25 @@ export async function createAssessment(
     isConfidential: data.isConfidential ?? true,
     recommendedActions: data.recommendedActions ?? [],
   });
+
+  // Crisis notification: alert Admin + Manager when severity is severe or critical
+  if (severityLevel && ["severe", "critical"].includes(severityLevel)) {
+    notifyByRole(["Admin", "Manager"], {
+      type: "mental_alert",
+      title: "Mental Health Alert",
+      titleAr: "تنبيه الصحة النفسية",
+      body: `A ${severityLevel} assessment has been recorded for a player.`,
+      bodyAr: `تم تسجيل تقييم ${severityLevel === "severe" ? "حاد" : "بالغ الحدة"} للاعب.`,
+      priority: "high",
+      sourceType: "mental",
+      sourceId: assessment.id,
+      link: `/dashboard/mental`,
+    }).catch((err: Error) =>
+      logger.warn("mental_alert notification failed", { error: err.message }),
+    );
+  }
+
+  return assessment;
 }
 
 export async function updateAssessment(
