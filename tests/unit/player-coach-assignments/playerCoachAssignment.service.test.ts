@@ -344,6 +344,138 @@ describe("PlayerCoachAssignment Service", () => {
     });
   });
 
+  describe("listMyAssignments", () => {
+    const userId = "user-1";
+
+    function rowFor(overrides: Partial<any> = {}) {
+      const data = {
+        id: overrides.id ?? "a1",
+        playerId: "p1",
+        coachUserId: userId,
+        specialty: "Coach",
+        status: "Assigned",
+        priority: "normal",
+        dueAt: null,
+        acknowledgedAt: null,
+        completedAt: null,
+        notes: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        player: null,
+        ...overrides,
+      };
+      return { id: data.id, get: ({ plain: _ }: any) => data };
+    }
+
+    it("filters by a single status value (string form)", async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      mockTaskFindAll.mockResolvedValue([]);
+
+      await service.listMyAssignments(userId, {
+        page: 1,
+        limit: 50,
+        sort: "created_at",
+        order: "desc",
+        status: ["Assigned"],
+        groupBy: "none",
+      } as any);
+
+      const call = mockFindAndCountAll.mock.calls[0][0];
+      expect(call.where).toMatchObject({
+        coachUserId: userId,
+        status: "Assigned",
+      });
+    });
+
+    it("filters by multiple statuses using Op.in", async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      mockTaskFindAll.mockResolvedValue([]);
+
+      await service.listMyAssignments(userId, {
+        page: 1,
+        limit: 50,
+        sort: "created_at",
+        order: "desc",
+        status: ["Assigned", "InProgress"],
+        groupBy: "none",
+      } as any);
+
+      const call = mockFindAndCountAll.mock.calls[0][0];
+      // status becomes an Op.in symbol-keyed object — we just assert it isn't a string.
+      expect(typeof call.where.status).toBe("object");
+    });
+
+    it("attaches an iLike OR clause when search is provided", async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      mockTaskFindAll.mockResolvedValue([]);
+
+      await service.listMyAssignments(userId, {
+        page: 1,
+        limit: 50,
+        sort: "created_at",
+        order: "desc",
+        search: "ahmed",
+        groupBy: "none",
+      } as any);
+
+      const call = mockFindAndCountAll.mock.calls[0][0];
+      const playerInclude = call.include[0];
+      expect(playerInclude.required).toBe(true);
+      expect(playerInclude.where).toBeDefined();
+    });
+
+    it("groups page results by status when groupBy=status", async () => {
+      const r1 = rowFor({ id: "a1", status: "Assigned" });
+      const r2 = rowFor({ id: "a2", status: "InProgress" });
+      const r3 = rowFor({ id: "a3", status: "Assigned" });
+      mockFindAndCountAll.mockResolvedValue({ count: 3, rows: [r1, r2, r3] });
+      mockTaskFindAll.mockResolvedValue([]);
+
+      const result = await service.listMyAssignments(userId, {
+        page: 1,
+        limit: 50,
+        sort: "created_at",
+        order: "desc",
+        groupBy: "status",
+      } as any);
+
+      expect(result.groups).toBeDefined();
+      expect(result.groups!.Assigned).toHaveLength(2);
+      expect(result.groups!.InProgress).toHaveLength(1);
+    });
+
+    it("returns no groups field when groupBy=none", async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      mockTaskFindAll.mockResolvedValue([]);
+
+      const result = await service.listMyAssignments(userId, {
+        page: 1,
+        limit: 50,
+        sort: "created_at",
+        order: "desc",
+        groupBy: "none",
+      } as any);
+
+      expect(result.groups).toBeUndefined();
+    });
+
+    it("returns empty data + zero meta when user has no assignments", async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      mockTaskFindAll.mockResolvedValue([]);
+
+      const result = await service.listMyAssignments(userId, {
+        page: 1,
+        limit: 50,
+        sort: "created_at",
+        order: "desc",
+        groupBy: "none",
+      } as any);
+
+      expect(result.data).toEqual([]);
+      expect(result.meta.total).toBe(0);
+    });
+  });
+
   describe("deleteAssignment", () => {
     it("throws 404 when assignment does not exist", async () => {
       mockFindByPk.mockResolvedValue(null);
