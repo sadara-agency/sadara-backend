@@ -15,9 +15,15 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  // CASCADE: these tables form an interconnected media-module subgraph
+  // (e.g. media_requests.media_contact_id → media_contacts) and are all
+  // being retired together. Dropping with CASCADE removes dependent FKs
+  // without needing to enumerate the constraint graph by hand.
   for (const table of TABLES_TO_DROP) {
     if (await tableExists(queryInterface, table)) {
-      await queryInterface.dropTable(table);
+      await queryInterface.sequelize.query(
+        `DROP TABLE IF EXISTS "${table}" CASCADE`,
+      );
     }
   }
 }
