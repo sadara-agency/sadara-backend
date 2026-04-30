@@ -5,6 +5,7 @@ import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { authorizePlayerPackage } from "@middleware/packageAccess";
 import { validate } from "@middleware/validate";
 import { cacheRoute } from "@middleware/cache.middleware";
+import { documentUploadChain } from "@middleware/upload";
 import { CacheTTL } from "@shared/utils/cache";
 import * as ctrl from "./bodyComposition.controller";
 import {
@@ -145,6 +146,43 @@ router.get(
   dynamicFieldAccess("wellness"),
   cacheRoute("body-composition", CacheTTL.MEDIUM),
   asyncHandler(ctrl.getById),
+);
+
+/**
+ * @swagger
+ * /body-compositions/extract:
+ *   post:
+ *     tags: [BodyCompositions]
+ *     summary: Extract InBody fields from an uploaded PDF / PNG / JPEG
+ *     description: |
+ *       Read-only endpoint. Accepts a multipart upload of an InBody report
+ *       and returns the values it could parse. The frontend uses the result
+ *       to pre-fill the manual scan form so the coach can review and submit
+ *       — no scan is written by this endpoint.
+ *     security: [{ bearerAuth: [] }]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Extracted values
+ *       400: { description: No file or invalid upload }
+ *       401: { description: Unauthorized }
+ *       403: { description: Forbidden }
+ *       422: { description: File could not be read }
+ */
+router.post(
+  "/extract",
+  authorizeModule("wellness", "create"),
+  ...documentUploadChain,
+  asyncHandler(ctrl.extract),
 );
 
 /**
