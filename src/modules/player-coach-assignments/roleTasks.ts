@@ -83,10 +83,10 @@ const ROLE_TASK_MAP: Record<StaffRole, RoleTaskTemplate> = {
     title: "Verify payment schedule",
     titleAr: "التحقق من جدول المدفوعات",
   },
-  Media: {
+  GraphicDesigner: {
     type: "Media",
-    title: "Plan content slot",
-    titleAr: "تخطيط محتوى إعلامي",
+    title: "Plan design deliverable",
+    titleAr: "تخطيط مهمة تصميمية",
   },
   Manager: {
     type: "General",

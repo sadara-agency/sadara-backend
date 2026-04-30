@@ -16,7 +16,7 @@ const ROLES = [
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
-  "Media",
+  "GraphicDesigner",
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",

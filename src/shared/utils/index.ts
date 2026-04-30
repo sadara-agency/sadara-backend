@@ -119,6 +119,12 @@ export type { CoverKind, CoverOpts } from "./pdfCover";
 // Row scope
 export { buildRowScope, mergeScope, checkRowAccess } from "./rowScope";
 
+// Safe upload path
+export { safeUploadPath } from "./safeUploadPath";
+
+// Safe outbound URL
+export { assertSafeOutboundUrl } from "./safeOutboundUrl";
+
 // Service helpers
 export {
   findOrThrow,

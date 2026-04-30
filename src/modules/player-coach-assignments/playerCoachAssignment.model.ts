@@ -14,7 +14,7 @@ export type StaffRole =
   | "FitnessCoach"
   | "NutritionSpecialist"
   | "GymCoach"
-  | "Media"
+  | "GraphicDesigner"
   | "Executive"
   | "GoalkeeperCoach"
   | "MentalCoach";

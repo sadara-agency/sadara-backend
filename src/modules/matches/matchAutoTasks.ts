@@ -972,7 +972,7 @@ export async function generateMatchCoverTask(match: {
   const rc = cfg("media_match_cover");
   if (!rc.enabled) return;
 
-  const mediaUser = await findUserByRole("Media");
+  const mediaUser = await findUserByRole("GraphicDesigner");
 
   const homeEn = (match.homeClub as any)?.name ?? "Home";
   const awayEn = (match.awayClub as any)?.name ?? "Away";
@@ -1000,7 +1000,7 @@ export async function generateMatchCoverTask(match: {
     },
     {
       roles: ["Admin", "Manager"],
-      link: "/dashboard/media/tasks",
+      link: "/dashboard/designs",
     },
   );
 }

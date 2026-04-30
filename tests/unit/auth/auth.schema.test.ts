@@ -48,7 +48,7 @@ describe('Auth Schemas', () => {
       expect(inviteSchema.safeParse({ ...valid, role: 'SuperAdmin' }).success).toBe(false);
     });
     it('should accept all valid roles', () => {
-      for (const role of ['Admin', 'Manager', 'Analyst', 'Scout', 'Player', 'Legal', 'Finance', 'Coach', 'Media', 'Executive']) {
+      for (const role of ['Admin', 'Manager', 'Analyst', 'Scout', 'Player', 'Legal', 'Finance', 'Coach', 'GraphicDesigner', 'Executive']) {
         expect(inviteSchema.safeParse({ ...valid, role }).success).toBe(true);
       }
     });

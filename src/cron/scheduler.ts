@@ -860,7 +860,7 @@ async function checkUpcomingMatches() {
     // Send notification for matches 2 days out (existing behavior)
     if (daysUntil === 2) {
       await notifyByRole(
-        ["Admin", "Manager", "Analyst", "Scout", "Coach", "Media"],
+        ["Admin", "Manager", "Analyst", "Scout", "Coach", "GraphicDesigner"],
         {
           type: "match",
           title: `Match in 2 days: ${m.home_team} vs ${m.away_team}`,

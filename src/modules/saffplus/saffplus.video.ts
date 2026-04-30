@@ -22,6 +22,12 @@
 import puppeteer, { type Browser, type Page } from "puppeteer";
 import { logger } from "@config/logger";
 import { env } from "@config/env";
+import { assertSafeOutboundUrl } from "@shared/utils/safeOutboundUrl";
+
+// Puppeteer always navigates to the configured saffplus.sa host. Asserting
+// here means a future caller mistake (e.g. `path = "https://attacker.com"`)
+// fails closed instead of being silently navigated to in a real browser.
+const SAFFPLUS_ALLOWED_HOSTS = ["saffplus.sa", "*.saffplus.sa"] as const;
 
 // ── Types ──
 
@@ -325,6 +331,7 @@ export async function renderSaffPlusPage(
     });
 
     const url = `${BASE_URL}${path}`;
+    assertSafeOutboundUrl(url, SAFFPLUS_ALLOWED_HOSTS);
     await page.goto(url, {
       waitUntil: waitForNetworkIdle ? "networkidle0" : "domcontentloaded",
       timeout: renderTimeoutMs,

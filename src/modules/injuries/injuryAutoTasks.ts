@@ -174,7 +174,7 @@ export async function generateInjuryUpdateMediaTask(injury: {
   const rc = cfg("media_injury_update");
   if (!rc.enabled) return;
 
-  const mediaUser = await findUserByRole("Media");
+  const mediaUser = await findUserByRole("GraphicDesigner");
 
   const playerEn = injury.player
     ? `${injury.player.firstName ?? ""} ${injury.player.lastName ?? ""}`.trim()
@@ -199,7 +199,7 @@ export async function generateInjuryUpdateMediaTask(injury: {
     },
     {
       roles: ["Admin", "Manager"],
-      link: "/dashboard/media/tasks",
+      link: "/dashboard/designs",
     },
   );
 }
@@ -218,7 +218,7 @@ export async function generateReturnFromInjuryMediaTask(injury: {
   const rc = cfg("media_return_from_injury");
   if (!rc.enabled) return;
 
-  const mediaUser = await findUserByRole("Media");
+  const mediaUser = await findUserByRole("GraphicDesigner");
 
   const playerEn = injury.player
     ? `${injury.player.firstName ?? ""} ${injury.player.lastName ?? ""}`.trim()
@@ -243,7 +243,7 @@ export async function generateReturnFromInjuryMediaTask(injury: {
     },
     {
       roles: ["Admin", "Manager"],
-      link: "/dashboard/media/tasks",
+      link: "/dashboard/designs",
     },
   );
 }

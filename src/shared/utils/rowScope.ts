@@ -5,10 +5,9 @@
  * Other roles see only rows they're authorized to access,
  * defined by the SCOPE_RULES config below.
  */
-import { Op, literal, QueryTypes } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { AuthUser } from "@shared/types";
 import { sequelize } from "@config/database";
-import { AppError } from "@middleware/errorHandler";
 import { verifyUserRole } from "@shared/utils/verifyRole";
 
 // ── Helpers ──
@@ -27,20 +26,10 @@ const COACH_ROLES = [
   "MentalCoach",
 ];
 
-const UUID_RE =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-/** Validate UUID format to prevent SQL injection in literal() calls */
-function safeId(value: string): string {
-  if (!UUID_RE.test(value))
-    throw new AppError("Invalid UUID in row scope filter", 400);
-  return value;
-}
-
 // ── Types ──
 
 type WhereClause = Record<string | symbol, any>;
-type ScopeBuilder = (user: AuthUser) => WhereClause;
+type ScopeBuilder = (user: AuthUser) => WhereClause | Promise<WhereClause>;
 
 /** "own assigned" — tasks, etc. where assignedTo or assignedBy = user.id */
 const ownAssigned: ScopeBuilder = (u) => ({
@@ -61,23 +50,26 @@ const ownPlayerSelf: ScopeBuilder = (u) => ({ id: u.playerId });
  * Coach's players: playerId IN (SELECT player_id FROM player_coach_assignments WHERE coach_user_id = ?)
  * Uses the join table so all 8 specialty roles can be independently assigned to players,
  * replacing the old single-column players.coach_id approach.
+ *
+ * Resolves the subquery to an ID list using a parameterized query, then returns
+ * a plain Op.in clause. Empty list → `IN (NULL)` → no rows (fail-closed).
  */
-const coachPlayers: ScopeBuilder = (u) => ({
-  playerId: {
-    [Op.in]: literal(
-      `(SELECT player_id FROM player_coach_assignments WHERE coach_user_id = '${safeId(u.id)}')`,
-    ),
-  },
-});
+const coachPlayers: ScopeBuilder = async (u) => {
+  const rows = await sequelize.query<{ player_id: string }>(
+    `SELECT player_id FROM player_coach_assignments WHERE coach_user_id = :userId`,
+    { replacements: { userId: u.id }, type: QueryTypes.SELECT },
+  );
+  return { playerId: { [Op.in]: rows.map((r) => r.player_id) } };
+};
 
 /** Analyst's players: playerId IN (SELECT id FROM players WHERE analyst_id = ?) */
-const analystPlayers: ScopeBuilder = (u) => ({
-  playerId: {
-    [Op.in]: literal(
-      `(SELECT id FROM players WHERE analyst_id = '${safeId(u.id)}')`,
-    ),
-  },
-});
+const analystPlayers: ScopeBuilder = async (u) => {
+  const rows = await sequelize.query<{ id: string }>(
+    `SELECT id FROM players WHERE analyst_id = :userId`,
+    { replacements: { userId: u.id }, type: QueryTypes.SELECT },
+  );
+  return { playerId: { [Op.in]: rows.map((r) => r.id) } };
+};
 
 /**
  * Restricted-referral scope: a referral is visible if any of
@@ -267,7 +259,7 @@ export async function buildRowScope(
   const scopeBuilder = moduleRules[user.role];
   if (!scopeBuilder) return null; // role not in config = full access
 
-  return scopeBuilder(user);
+  return await scopeBuilder(user);
 }
 
 /**

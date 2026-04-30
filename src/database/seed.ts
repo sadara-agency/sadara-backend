@@ -155,12 +155,12 @@ async function seedAllData(tx: Transaction): Promise<void> {
         isActive: true,
       },
       {
-        id: IDS.users.media,
-        email: "media@sadara.com",
+        id: IDS.users.designer,
+        email: "designer@sadara.com",
         passwordHash: hash,
         fullName: "Reem Al-Qahtani",
         fullNameAr: "ريم القحطاني",
-        role: "Media",
+        role: "GraphicDesigner",
         isActive: true,
       },
       {
