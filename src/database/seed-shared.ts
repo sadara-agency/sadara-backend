@@ -38,7 +38,7 @@ export const ALL_ROLES = [
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
-  "Media",
+  "GraphicDesigner",
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",
@@ -110,7 +110,7 @@ const RAW_PERMISSIONS: Perm[] = [
       "MentalCoach",
       "Finance",
       "Legal",
-      "Media",
+      "GraphicDesigner",
       "Executive",
     ],
     { canRead: true },
@@ -134,7 +134,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("matches", ["FitnessCoach"], { canRead: true }),
   ...forRoles("matches", ["Analyst"], { canRead: true, canUpdate: true }),
-  ...forRoles("matches", ["Scout", "Player", "Media", "Executive"], {
+  ...forRoles("matches", ["Scout", "Player", "GraphicDesigner", "Executive"], {
     canRead: true,
   }),
 
@@ -265,7 +265,7 @@ const RAW_PERMISSIONS: Perm[] = [
       "NutritionSpecialist",
       "Analyst",
       "Executive",
-      "Media",
+      "GraphicDesigner",
     ],
     { canRead: true },
   ),
@@ -337,7 +337,7 @@ const RAW_PERMISSIONS: Perm[] = [
       "TacticalCoach",
       "FitnessCoach",
       "NutritionSpecialist",
-      "Media",
+      "GraphicDesigner",
       "Executive",
     ],
     { canRead: true },
@@ -420,7 +420,7 @@ const RAW_PERMISSIONS: Perm[] = [
       "TacticalCoach",
       "FitnessCoach",
       "NutritionSpecialist",
-      "Media",
+      "GraphicDesigner",
       "Executive",
     ],
     { canRead: true },
@@ -617,54 +617,21 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("injury-financials", ["Executive"], { canRead: true }),
 
-  ...forRoles("media_requests", ["Admin", "Manager", "Media"], {
+  // ── Designs (Graphic Designer module) ──
+  ...forRoles("designs", ["Admin", "GraphicDesigner"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("media_requests", ["Executive"], { canRead: true }),
-
-  ...forRoles("media_contacts", ["Admin", "Manager", "Media"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-
-  ...forRoles("press_releases", ["Admin", "Media"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("press_releases", ["Manager"], {
+  ...forRoles("designs", ["Manager"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
   }),
-  ...forRoles("press_releases", ["Executive", "Analyst"], { canRead: true }),
-
-  ...forRoles("media_kits", ["Admin", "Manager", "Media"], {
-    canCreate: true,
+  ...forRoles("designs", ["Executive", "Analyst", "Scout", "Coach", "Player"], {
     canRead: true,
   }),
-  ...forRoles("media_kits", ["Executive", "Analyst", "Scout"], {
-    canRead: true,
-  }),
-
-  ...forRoles("social_media", ["Admin", "Media"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("social_media", ["Manager"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-  }),
-  ...forRoles("social_media", ["Executive"], { canRead: true }),
 
   // ── Training Plans ──
   ...forRoles("training-plans", ["Admin", "Manager"], {
@@ -773,7 +740,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles(
     "transfer-windows",
-    ["Analyst", "Scout", "Legal", "Finance", "Media"],
+    ["Analyst", "Scout", "Legal", "Finance", "GraphicDesigner"],
     {
       canRead: true,
     },
@@ -790,9 +757,13 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canUpdate: true,
   }),
-  ...forRoles("club-needs", ["Analyst", "Scout", "Legal", "Finance", "Media"], {
-    canRead: true,
-  }),
+  ...forRoles(
+    "club-needs",
+    ["Analyst", "Scout", "Legal", "Finance", "GraphicDesigner"],
+    {
+      canRead: true,
+    },
+  ),
 
   // Player-Coach Assignments (multi-specialty row-scope join table)
   ...forRoles("player-coach-assignments", ["Admin"], {
@@ -823,7 +794,7 @@ const RAW_PERMISSIONS: Perm[] = [
       "Scout",
       "Legal",
       "Finance",
-      "Media",
+      "GraphicDesigner",
     ],
     { canRead: true },
   ),

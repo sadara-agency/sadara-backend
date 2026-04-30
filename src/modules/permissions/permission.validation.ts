@@ -14,7 +14,7 @@ const ROLES = [
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
-  "Media",
+  "GraphicDesigner",
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",
@@ -49,11 +49,6 @@ const MODULES = [
   "wellness",
   "calendar",
   "competitions",
-  "media_requests",
-  "press_releases",
-  "media_contacts",
-  "media_kits",
-  "social_media",
   "journey",
   "tickets",
   "messaging",
@@ -72,6 +67,7 @@ const MODULES = [
   "club-needs",
   "player-coach-assignments",
   "staffMonitoring",
+  "designs",
 ] as const;
 
 export const updatePermissionsSchema = z.object({

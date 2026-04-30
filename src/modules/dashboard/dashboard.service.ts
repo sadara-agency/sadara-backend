@@ -22,7 +22,7 @@ const MATCH_VIEW_ALL_ROLES: UserRole[] = [
   "Executive",
   "Finance",
   "Legal",
-  "Media",
+  "GraphicDesigner",
 ];
 
 /**

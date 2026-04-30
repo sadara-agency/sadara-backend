@@ -13,7 +13,7 @@ export const staffRoleEnum = z.enum([
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
-  "Media",
+  "GraphicDesigner",
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",

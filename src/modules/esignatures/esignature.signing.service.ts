@@ -12,6 +12,12 @@ import { UPLOAD_DIR_PATH } from "@middleware/upload";
 import { AppError } from "@middleware/errorHandler";
 import { SignatureRequest } from "./esignature.model";
 import { resolveFileUrl, uploadFile } from "@shared/utils/storage";
+import { assertSafeOutboundUrl } from "@shared/utils/safeOutboundUrl";
+
+// Hosts allowed for the legacy `fileUrl.startsWith("http")` branch — only
+// fully-qualified GCS URLs that pre-date the GCS-key migration. New uploads
+// write a relative key and go through the resolveFileUrl signed-URL path.
+const DOC_FETCH_ALLOWED_HOSTS = ["storage.googleapis.com"] as const;
 
 const SIGNED_DIR = path.resolve(UPLOAD_DIR_PATH, "..", "signed-documents");
 if (!fs.existsSync(SIGNED_DIR)) {
@@ -45,8 +51,11 @@ export async function generateSignedDocument(
     );
     originalPdfBytes = await fs.promises.readFile(localPath);
   } else if (fileUrl.startsWith("http")) {
-    // Remote URL (legacy full GCS URLs or external URLs)
-    const res = await fetch(fileUrl);
+    // Remote URL (legacy full GCS URLs). New uploads write GCS keys instead,
+    // so this branch should be vanishing — guard it with an SSRF check until
+    // backfill removes the last legacy rows.
+    const safe = assertSafeOutboundUrl(fileUrl, DOC_FETCH_ALLOWED_HOSTS);
+    const res = await fetch(safe.toString());
     if (!res.ok)
       throw new AppError(`Failed to fetch document: ${res.statusText}`, 502);
     originalPdfBytes = Buffer.from(await res.arrayBuffer());

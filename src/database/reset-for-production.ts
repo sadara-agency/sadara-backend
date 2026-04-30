@@ -19,7 +19,7 @@ import { env } from "@config/env";
 import { logger } from "@config/logger";
 import { setupAssociations } from "../models/associations";
 import { seedProduction } from "./production.seed";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import path from "path";
 
 const CONFIRM_FLAG = "--confirm";
@@ -143,20 +143,28 @@ async function main() {
         `backup_${env.db.name}_${timestamp}.dump`,
       );
 
-      const pgDumpCmd = [
+      // Pass args as an array via execFileSync so credentials never enter a
+      // shell-parsed command string. PGPASSWORD via env is fine for a
+      // short-lived child process and is the documented pg_dump pattern.
+      execFileSync(
         "pg_dump",
-        `-h ${env.db.host}`,
-        `-p ${env.db.port}`,
-        `-U ${env.db.user}`,
-        `-Fc`,
-        `-f "${backupFile}"`,
-        env.db.name,
-      ].join(" ");
-
-      execSync(pgDumpCmd, {
-        env: { ...process.env, PGPASSWORD: env.db.password },
-        stdio: "inherit",
-      });
+        [
+          "-h",
+          String(env.db.host),
+          "-p",
+          String(env.db.port),
+          "-U",
+          String(env.db.user),
+          "-Fc",
+          "-f",
+          backupFile,
+          String(env.db.name),
+        ],
+        {
+          env: { ...process.env, PGPASSWORD: env.db.password },
+          stdio: "inherit",
+        },
+      );
 
       console.log(`  Backup saved: ${backupFile}\n`);
     } catch (err) {

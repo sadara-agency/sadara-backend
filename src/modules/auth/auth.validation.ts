@@ -34,7 +34,7 @@ export const inviteSchema = z.object({
     "FitnessCoach",
     "NutritionSpecialist",
     "GymCoach",
-    "Media",
+    "GraphicDesigner",
     "Executive",
     "GoalkeeperCoach",
     "MentalCoach",

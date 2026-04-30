@@ -67,11 +67,6 @@ import {
   SignatureSigner,
   SignatureAuditTrail,
 } from "@modules/esignatures/esignature.model";
-import { MediaRequest } from "@modules/media/media-requests/mediaRequest.model";
-import { MediaContact } from "@modules/media/media-contacts/mediaContact.model";
-import { PressRelease } from "@modules/media/press-releases/pressRelease.model";
-import { MediaKitGeneration } from "@modules/media/media-kits/mediaKit.model";
-import { SocialPost } from "@modules/media/social-media/socialPost.model";
 import { ApprovalStep } from "@modules/approvals/approvalStep.model";
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
 import {
@@ -89,6 +84,7 @@ import { Squad } from "@modules/squads/squad.model";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
 import { PlayerMatchReview } from "@modules/saffplus/playerReview.model";
 import { CaseAssignee } from "@modules/referrals/caseAssignee.model";
+import { Design } from "@modules/designs/design.model";
 
 let associationsReady = false;
 
@@ -548,45 +544,6 @@ export function setupAssociations() {
     as: "request",
   });
 
-  // ── Media Requests ──
-  MediaRequest.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  MediaRequest.belongsTo(Club, { foreignKey: "clubId", as: "club" });
-  MediaRequest.belongsTo(Match, { foreignKey: "matchId", as: "match" });
-  MediaRequest.belongsTo(User, { foreignKey: "assignedTo", as: "assignee" });
-  MediaRequest.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
-  MediaRequest.belongsTo(MediaContact, {
-    foreignKey: "mediaContactId",
-    as: "mediaContact",
-  });
-
-  // ── Media Contacts ──
-  MediaContact.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
-
-  // ── Press Releases ──
-  PressRelease.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  PressRelease.belongsTo(Club, { foreignKey: "clubId", as: "club" });
-  PressRelease.belongsTo(Match, { foreignKey: "matchId", as: "match" });
-  PressRelease.belongsTo(User, { foreignKey: "createdBy", as: "author" });
-  PressRelease.belongsTo(User, { foreignKey: "reviewedBy", as: "reviewer" });
-  PressRelease.belongsTo(User, { foreignKey: "approvedBy", as: "approver" });
-
-  // ── Media Kit Generations ──
-  MediaKitGeneration.belongsTo(Player, {
-    foreignKey: "playerId",
-    as: "player",
-  });
-  MediaKitGeneration.belongsTo(Club, { foreignKey: "clubId", as: "club" });
-  MediaKitGeneration.belongsTo(User, {
-    foreignKey: "generatedBy",
-    as: "generator",
-  });
-
-  // ── Social Media Posts ──
-  SocialPost.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  SocialPost.belongsTo(Club, { foreignKey: "clubId", as: "club" });
-  SocialPost.belongsTo(Match, { foreignKey: "matchId", as: "match" });
-  SocialPost.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
-
   // ── SPL Intelligence ──
   SplInsight.belongsTo(SplCompetition, {
     foreignKey: "competitionId",
@@ -619,6 +576,12 @@ export function setupAssociations() {
 
   TransferWindow.hasMany(ClubNeed, { foreignKey: "windowId", as: "needs" });
   ClubNeed.belongsTo(TransferWindow, { foreignKey: "windowId", as: "window" });
+
+  // ── Designs (Graphic Designer module) ─────────────────────
+  Design.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  Design.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  Design.belongsTo(Club, { foreignKey: "clubId", as: "club" });
+  Design.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
 
   // ── Player-Coach Assignments (multi-specialty) ─────────────
   Player.hasMany(PlayerCoachAssignment, {

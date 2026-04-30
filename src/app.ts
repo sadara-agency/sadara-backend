@@ -14,6 +14,8 @@ import { apiLimiter, authLimiter } from "@middleware/rateLimiter";
 import { csrfProtection } from "@middleware/csrf";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { safeUploadPath } from "@shared/utils/safeUploadPath";
+import { checkRowAccess } from "@shared/utils/rowScope";
 import type { AuthRequest } from "@shared/types";
 import { sequelize } from "@config/database";
 import { isRedisConnected, getRedisClient } from "@config/redis";
@@ -62,7 +64,7 @@ import bodyCompositionRoutes from "@modules/wellness/bodyComposition.routes";
 import trainingBlockRoutes from "@modules/wellness/trainingBlock.routes";
 import nutritionPrescriptionRoutes from "@modules/wellness/nutritionPrescription.routes";
 import developmentProgramRoutes from "@modules/wellness/developmentProgram.routes";
-import mediaRoutes from "@modules/media/media.routes";
+import designRoutes from "@modules/designs/design.routes";
 import journeyRoutes from "@modules/journey/journey.routes";
 import evolutionCycleRoutes from "@modules/evolution-cycles/evolution-cycle.routes";
 import voiceMemoRoutes from "@modules/voice-memos/voice-memo.routes";
@@ -160,14 +162,20 @@ app.use("/api/v1", apiLimiter);
 const UPLOADS_ROOT = path.resolve(process.cwd(), "uploads");
 
 // Public images: photos + avatars (no auth — profile pictures are not confidential)
+const PUBLIC_IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp", ".jfif"] as const;
 for (const folder of ["photos", "avatars"] as const) {
   app.get(`/uploads/${folder}/:filename`, (req, res) => {
-    const filename = path.basename(req.params.filename);
-    const ext = path.extname(filename).toLowerCase();
-    if (![".jpg", ".jpeg", ".png", ".webp", ".jfif"].includes(ext)) {
-      return res.status(403).json({ success: false, message: "Not allowed" });
+    const filePath = safeUploadPath(
+      UPLOADS_ROOT,
+      folder,
+      req.params.filename,
+      PUBLIC_IMAGE_EXTS,
+    );
+    if (!filePath) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid filename" });
     }
-    const filePath = path.join(UPLOADS_ROOT, folder, filename);
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ success: false, message: "Not found" });
     }
@@ -178,19 +186,42 @@ for (const folder of ["photos", "avatars"] as const) {
 }
 
 // Authenticated documents
+const DOCUMENT_EXTS = [".pdf", ".png", ".jpg", ".jpeg", ".webp"] as const;
 app.get(
   "/uploads/documents/:filename",
   authenticate,
   authorizeModule("documents", "read"),
   async (req, res) => {
     const authReq = req as AuthRequest;
-    const filename = path.basename(authReq.params.filename);
+    const filePath = safeUploadPath(
+      UPLOADS_ROOT,
+      "documents",
+      authReq.params.filename,
+      DOCUMENT_EXTS,
+    );
+    if (!filePath) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid filename" });
+    }
+    const filename = path.basename(filePath);
 
-    // Row-level check: filename must correspond to a DB record (prevents IDOR)
-    type Row = { id: string };
+    // Row-level check: filename must correspond to a DB record the user can access (prevents IDOR).
+    // Anchored equality on the basename — no LIKE wildcards. Stored URLs are either
+    // a GCS key ("documents/<uuid>.pdf") or a full URL; match the trailing path component.
+    type Row = { id: string; uploadedBy: string | null };
     const [record] = await sequelize.query<Row>(
-      "SELECT id FROM documents WHERE file_url LIKE :pattern LIMIT 1",
-      { replacements: { pattern: `%${filename}` }, type: QueryTypes.SELECT },
+      `SELECT id, uploaded_by AS "uploadedBy"
+         FROM documents
+        WHERE file_url = :keyForm OR file_url LIKE :urlForm
+        LIMIT 1`,
+      {
+        replacements: {
+          keyForm: `documents/${filename}`,
+          urlForm: `%/documents/${filename}`,
+        },
+        type: QueryTypes.SELECT,
+      },
     );
     if (!record) {
       return res
@@ -198,7 +229,15 @@ app.get(
         .json({ success: false, message: "File not found" });
     }
 
-    const filePath = path.join(UPLOADS_ROOT, "documents", filename);
+    if (
+      authReq.user &&
+      !(await checkRowAccess("documents", record, authReq.user))
+    ) {
+      return res
+        .status(404)
+        .json({ success: false, message: "File not found" });
+    }
+
     if (!fs.existsSync(filePath)) {
       return res
         .status(404)
@@ -218,22 +257,49 @@ app.get(
 );
 
 // Signed contracts
+const CONTRACT_EXTS = [".pdf"] as const;
 app.get(
   "/uploads/signed-contracts/:filename",
   authenticate,
   authorizeModule("contracts", "read"),
   async (req, res) => {
     const authReq = req as AuthRequest;
-    const filename = path.basename(authReq.params.filename);
+    const filePath = safeUploadPath(
+      UPLOADS_ROOT,
+      "signed-contracts",
+      authReq.params.filename,
+      CONTRACT_EXTS,
+    );
+    if (!filePath) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid filename" });
+    }
+    const filename = path.basename(filePath);
 
-    // Row-level check: filename must correspond to a DB record (prevents IDOR)
-    type Row = { id: string };
+    // Row-level check: anchored to the trailing path segment of stored URLs.
+    type Row = {
+      id: string;
+      playerId: string | null;
+      createdBy: string | null;
+    };
     const [record] = await sequelize.query<Row>(
-      `SELECT id FROM contracts
-       WHERE signed_document_url LIKE :pattern
-          OR document_url LIKE :pattern
-       LIMIT 1`,
-      { replacements: { pattern: `%${filename}` }, type: QueryTypes.SELECT },
+      `SELECT id, player_id AS "playerId", created_by AS "createdBy"
+         FROM contracts
+        WHERE signed_document_url = :signedKey
+           OR signed_document_url LIKE :signedUrl
+           OR document_url = :docKey
+           OR document_url LIKE :docUrl
+        LIMIT 1`,
+      {
+        replacements: {
+          signedKey: `signed-contracts/${filename}`,
+          signedUrl: `%/signed-contracts/${filename}`,
+          docKey: `contracts/${filename}`,
+          docUrl: `%/contracts/${filename}`,
+        },
+        type: QueryTypes.SELECT,
+      },
     );
     if (!record) {
       return res
@@ -241,7 +307,15 @@ app.get(
         .json({ success: false, message: "File not found" });
     }
 
-    const filePath = path.join(UPLOADS_ROOT, "signed-contracts", filename);
+    if (
+      authReq.user &&
+      !(await checkRowAccess("contracts", record, authReq.user))
+    ) {
+      return res
+        .status(404)
+        .json({ success: false, message: "File not found" });
+    }
+
     if (!fs.existsSync(filePath)) {
       return res
         .status(404)
@@ -363,22 +437,7 @@ app.use("/api/v1/body-compositions", bodyCompositionRoutes);
 app.use("/api/v1/training-blocks", trainingBlockRoutes);
 app.use("/api/v1/nutrition-prescriptions", nutritionPrescriptionRoutes);
 app.use("/api/v1/development-programs", developmentProgramRoutes);
-app.use("/api/v1/media", mediaRoutes);
-
-// ── Public press release portal (no auth) ──
-app.get("/api/v1/public/press-releases/:slug", async (req, res, next) => {
-  try {
-    const { getPressReleaseBySlug } =
-      await import("@modules/media/press-releases/pressRelease.service");
-    const release = await getPressReleaseBySlug(req.params.slug);
-    if (release.status !== "published") {
-      return res.status(404).json({ success: false, message: "Not found" });
-    }
-    res.json({ success: true, data: release });
-  } catch (err) {
-    next(err);
-  }
-});
+app.use("/api/v1/designs", designRoutes);
 app.use("/api/v1/journey", journeyRoutes);
 app.use("/api/v1/evolution-cycles", evolutionCycleRoutes);
 app.use("/api/v1/tickets", ticketRoutes);
@@ -401,19 +460,23 @@ app.use("/api/v1/personal-notes", personalNoteRoutes);
 app.use("/api/v1/personal-todos", personalTodoRoutes);
 
 // ── Signed documents — authenticated serving ──
+const SIGNED_DOCUMENT_EXTS = [".pdf", ".png", ".jpg", ".jpeg"] as const;
 app.get(
   "/uploads/signed-documents/:filename",
   authenticate,
   authorizeModule("documents", "read"),
-  (req: AuthRequest, res, next) => {
-    const { filename } = req.params;
-    // Prevent path traversal: allow only safe filenames
-    if (!/^[\w-]+\.(pdf|png|jpg|jpeg)$/i.test(filename)) {
+  (req: AuthRequest, res) => {
+    const filePath = safeUploadPath(
+      UPLOADS_ROOT,
+      "signed-documents",
+      req.params.filename,
+      SIGNED_DOCUMENT_EXTS,
+    );
+    if (!filePath) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid filename" });
     }
-    const filePath = path.resolve("uploads/signed-documents", filename);
     if (!fs.existsSync(filePath)) {
       return res
         .status(404)

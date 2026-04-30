@@ -23,7 +23,7 @@ const USER_ROLES = [
   "FitnessCoach",
   "NutritionSpecialist",
   "GymCoach",
-  "Media",
+  "GraphicDesigner",
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",

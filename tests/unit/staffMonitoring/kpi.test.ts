@@ -143,7 +143,7 @@ describe("computeKpiScores", () => {
 
     it("should use 80% self-comparison for single-member bucket", () => {
       const [out] = computeKpiScores([
-        makeRow({ userId: "u1", role: "Media", priorityWeightedCompleted: 10 }),
+        makeRow({ userId: "u1", role: "GraphicDesigner", priorityWeightedCompleted: 10 }),
       ]);
       // 80% self-comparison means medianC = 8, target ceiling = 8 × 1.5 = 12
       // 10/12 × 100 = 83.3 → productivityScore ≈ 83
@@ -177,7 +177,7 @@ describe("computeKpiScores", () => {
 
       const [out] = computeKpiScores([
         makeRow({
-          role: "Media", // single-member bucket for isolated test
+          role: "GraphicDesigner", // single-member bucket for isolated test
           priorityWeightedCompleted: 50, // tuned for ~80 productivity
           overdue: 0,
           completed: 20,

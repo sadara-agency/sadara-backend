@@ -5,6 +5,12 @@ import { logger } from "@config/logger";
 import { env } from "@config/env";
 import { createBreaker, CircuitOpenError } from "@shared/utils/circuitBreaker";
 import { DomainRateLimiter } from "@shared/utils/rateLimiter";
+import { assertSafeOutboundUrl } from "@shared/utils/safeOutboundUrl";
+
+// SAFF scraper only ever talks to saff.com.sa — assert this on every fetch
+// so a future code path can't accidentally feed an attacker-controlled URL
+// through the scraper into the backend's network.
+const SAFF_ALLOWED_HOSTS = ["www.saff.com.sa", "saff.com.sa"] as const;
 import {
   scrapedStandingSchema,
   scrapedFixtureSchema,
@@ -152,6 +158,7 @@ async function fetchOnce(
   url: string,
   lang: "en" | "ar",
 ): Promise<cheerio.CheerioAPI> {
+  assertSafeOutboundUrl(url, SAFF_ALLOWED_HOSTS);
   const response = await axios.get(url, {
     responseType: "arraybuffer",
     timeout: 30000,

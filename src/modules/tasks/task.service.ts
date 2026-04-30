@@ -750,10 +750,10 @@ export async function addDeliverable(
 
   notifyByRole(["Admin", "Manager"], {
     type: "task",
-    title: "Media deliverable uploaded",
-    titleAr: "تم رفع عمل إعلامي",
+    title: "Design deliverable uploaded",
+    titleAr: "تم رفع عمل تصميمي",
     body: task.title,
-    link: "/dashboard/media/tasks",
+    link: "/dashboard/designs",
     sourceType: "task",
     sourceId: task.id,
   } as any).catch(() => {});

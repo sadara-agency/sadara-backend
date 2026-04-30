@@ -41,7 +41,7 @@ export const updateUserSchema = z.object({
       "FitnessCoach",
       "NutritionSpecialist",
       "GymCoach",
-      "Media",
+      "GraphicDesigner",
       "Executive",
       "GoalkeeperCoach",
       "MentalCoach",
