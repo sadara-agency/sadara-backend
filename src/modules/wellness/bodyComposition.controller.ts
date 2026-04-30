@@ -1,9 +1,14 @@
 import type { Response } from "express";
 import { createCrudController } from "@shared/utils/crudController";
-import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
+import {
+  sendSuccess,
+  sendPaginated,
+  sendError,
+} from "@shared/utils/apiResponse";
 import { CachePrefix } from "@shared/utils/cache";
 import type { AuthRequest } from "@shared/types";
 import * as bodyCompositionService from "./bodyComposition.service";
+import { parseInBodyBuffer } from "./inbodyExtract.service";
 import type { ListScansQueryDTO } from "./bodyComposition.validation";
 
 const crud = createCrudController({
@@ -43,4 +48,38 @@ export async function getLatest(
     req.user,
   );
   sendSuccess(res, scan);
+}
+
+/**
+ * Read an uploaded InBody report (PDF / PNG / JPEG) and return the extracted
+ * field values for the form to pre-fill. Read-only — never writes a scan.
+ */
+export async function extract(req: AuthRequest, res: Response): Promise<void> {
+  const file = req.file;
+  if (!file) {
+    sendError(res, "No file uploaded", 400);
+    return;
+  }
+
+  const result = await parseInBodyBuffer(file.buffer, file.mimetype);
+
+  if (result.extractedCount === 0) {
+    res.status(422).json({
+      success: false,
+      message: "Couldn't read this file",
+      data: {
+        extracted: {},
+        source: result.source,
+        extractedCount: 0,
+        failReason: result.failReason ?? "unknown",
+      },
+    });
+    return;
+  }
+
+  sendSuccess(res, {
+    extracted: result.extracted,
+    source: result.source,
+    extractedCount: result.extractedCount,
+  });
 }
