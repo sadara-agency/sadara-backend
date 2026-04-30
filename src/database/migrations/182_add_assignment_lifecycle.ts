@@ -1,5 +1,9 @@
 import { QueryInterface, DataTypes } from "sequelize";
-import { addColumnIfMissing, removeColumnIfPresent } from "../migrationHelpers";
+import {
+  addColumnIfMissing,
+  removeColumnIfPresent,
+  tableExists,
+} from "../migrationHelpers";
 
 /**
  * Adds lifecycle metadata to `player_coach_assignments` so an assignment
@@ -72,11 +76,15 @@ export async function up({
   );
 
   // Index on (coach_user_id, status) — primary read path is "my assignments
-  // filtered by status" from the dashboard widget.
-  await queryInterface.sequelize.query(
-    `CREATE INDEX IF NOT EXISTS idx_pca_coach_status
-     ON player_coach_assignments(coach_user_id, status)`,
-  );
+  // filtered by status" from the dashboard widget. Guarded against fresh-DB
+  // runs where the parent table hasn't been created yet (addColumnIfMissing
+  // short-circuits on its own; the raw CREATE INDEX does not).
+  if (await tableExists(queryInterface, "player_coach_assignments")) {
+    await queryInterface.sequelize.query(
+      `CREATE INDEX IF NOT EXISTS idx_pca_coach_status
+       ON player_coach_assignments(coach_user_id, status)`,
+    );
+  }
 }
 
 export async function down({
