@@ -49,6 +49,9 @@ jest.mock('../../../src/modules/contracts/contract.model', () => ({
 jest.mock('../../../src/modules/matches/match.model', () => ({
   Match: { findAll: (...a: unknown[]) => mockMatchFindAll(...a), name: 'Match' },
 }));
+jest.mock('../../../src/modules/sessions/session.model', () => ({
+  Session: { findAll: jest.fn() },
+}));
 jest.mock('../../../src/modules/documents/document.model', () => ({
   Document: { findAll: (...a: unknown[]) => mockDocumentFindAll(...a), name: 'Document' },
 }));
@@ -65,6 +68,18 @@ jest.mock('../../../src/modules/injuries/injury.model', () => ({
 }));
 jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: { name: 'Club' },
+}));
+jest.mock('../../../src/modules/wellness/fitness.model', () => ({
+  WellnessExercise: { name: 'WellnessExercise' },
+  FitnessTest: { name: 'FitnessTest' },
+}));
+jest.mock('../../../src/modules/wellness/developmentProgram.model', () => ({
+  DevelopmentProgram: { findAll: jest.fn(), name: 'DevelopmentProgram' },
+  ProgramExercise: { name: 'ProgramExercise' },
+}));
+jest.mock('../../../src/modules/wellness/trainingBlock.model', () => ({
+  TrainingBlock: { findAll: jest.fn(), name: 'TrainingBlock' },
+  TrainingBlockExercise: { name: 'TrainingBlockExercise' },
 }));
 jest.mock('../../../src/modules/portal/playerAccount.model', () => ({
   PlayerAccount: {

@@ -37,6 +37,11 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyUser: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/modules/calendar/calendarScope', () => ({
+  upsertSourceAttendees: jest.fn(),
+  evictCalendarScope: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as taskService from '../../../src/modules/tasks/task.service';
 
 describe('Task Service', () => {

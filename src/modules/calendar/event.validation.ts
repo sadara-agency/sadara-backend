@@ -98,8 +98,18 @@ export const eventQuerySchema = z.object({
   sourceType: z.enum(SOURCE_TYPES).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  playerId: z.string().uuid().optional(),
-  userId: z.string().uuid().optional(),
+  viewMode: z
+    .enum([
+      "player",
+      "coach",
+      "scout",
+      "analyst",
+      "executive",
+      "legal",
+      "finance",
+      "mental",
+    ])
+    .optional(),
 });
 
 // ── Inferred types ──

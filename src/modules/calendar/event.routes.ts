@@ -3,6 +3,7 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
+import { attachCalendarScope } from "@middleware/calendarScope";
 import {
   createEventSchema,
   updateEventSchema,
@@ -18,8 +19,17 @@ router.get(
   "/",
   authorizeModule("calendar", "read"),
   validate(eventQuerySchema, "query"),
+  asyncHandler(attachCalendarScope),
   asyncHandler(eventController.list),
 );
+// ── Admin debug: inspect resolved scope for a user ──
+router.get(
+  "/scope",
+  authorizeModule("calendar", "read"),
+  asyncHandler(attachCalendarScope),
+  asyncHandler(eventController.getScope),
+);
+
 router.get(
   "/source/:sourceType/:sourceId",
   authorizeModule("calendar", "read"),

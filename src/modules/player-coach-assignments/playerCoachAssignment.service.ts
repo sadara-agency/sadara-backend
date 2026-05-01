@@ -22,6 +22,7 @@ import type {
   MyAssignmentQuery,
   UpdateAssignmentStatusInput,
 } from "./playerCoachAssignment.validation";
+import { evictCalendarScope } from "@modules/calendar/calendarScope";
 
 const PLAYER_INCLUDE = {
   model: Player,
@@ -115,6 +116,9 @@ export async function createAssignment(
   // Fan out fire-and-forget — never block the API response on these.
   // Mirrors the audit pattern in shared/utils/crudController.ts.
   void fanOutNewAssignment(assignment, player, coach, creator);
+
+  // Evict calendar scope so the coach sees newly assigned player events immediately
+  evictCalendarScope(data.coachUserId).catch(() => void 0);
 
   return assignment;
 }
@@ -373,11 +377,17 @@ export async function updateAssignmentStatus(
     );
   }
 
+  // Evict calendar scope so the new status is reflected immediately
+  evictCalendarScope(assignment.coachUserId).catch(() => void 0);
+
   return assignment;
 }
 
 export async function deleteAssignment(id: string) {
   const item = await getAssignmentById(id);
+  const { coachUserId } = item;
   await item.destroy();
+  // Evict calendar scope so removed player no longer appears
+  evictCalendarScope(coachUserId).catch(() => void 0);
   return { id };
 }

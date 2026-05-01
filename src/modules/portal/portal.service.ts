@@ -10,10 +10,13 @@ import { isEncrypted, decrypt } from "@shared/utils/encryption";
 import { logger } from "@config/logger";
 import { Contract } from "@modules/contracts/contract.model";
 import { Match } from "@modules/matches/match.model";
+import { Session } from "@modules/sessions/session.model";
 import { Document } from "@modules/documents/document.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Task } from "@modules/tasks/task.model";
 import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { DevelopmentProgram } from "@modules/wellness/developmentProgram.model";
+import { TrainingBlock } from "@modules/wellness/trainingBlock.model";
 import { AppError } from "@middleware/errorHandler";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { PlayerAccount } from "@modules/portal/playerAccount.model";
@@ -221,6 +224,47 @@ export async function getMySchedule(userId: string, query: any = {}) {
   });
 
   return { upcoming, past, tasks };
+}
+
+// ══════════════════════════════════════════
+// MY SESSIONS (1-on-1s with staff)
+// ══════════════════════════════════════════
+
+export async function getMySessions(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+  const now = new Date();
+
+  const sessions = await Session.findAll({
+    where: { playerId } as any,
+    include: [
+      {
+        model: User,
+        as: "responsible",
+        attributes: ["id", "fullName", "fullNameAr"],
+      },
+    ],
+    order: [["sessionDate", "DESC"]],
+    limit: 100,
+  });
+
+  const upcoming: Session[] = [];
+  const past: Session[] = [];
+
+  for (const s of sessions) {
+    const sd = (s as any).sessionDate ? new Date((s as any).sessionDate) : null;
+    const isUpcoming =
+      (s as any).completionStatus === "Scheduled" && sd && sd >= now;
+    if (isUpcoming) upcoming.push(s);
+    else past.push(s);
+  }
+
+  upcoming.sort(
+    (a: any, b: any) =>
+      new Date(a.sessionDate).getTime() - new Date(b.sessionDate).getTime(),
+  );
+
+  return { upcoming, past, total: sessions.length };
 }
 
 // ══════════════════════════════════════════
@@ -1262,4 +1306,43 @@ export async function requestProfileLink(userId: string) {
     target: playerByEmail?.agentId ? "agent" : "admins",
     cooldownSeconds: REQUEST_LINK_COOLDOWN_SEC,
   };
+}
+
+// ══════════════════════════════════════════
+// MY PROGRAMS (development programs)
+// ══════════════════════════════════════════
+
+export async function getMyPrograms(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  // Get all training blocks for this player (for block-linked programs)
+  const blocks = await TrainingBlock.findAll({
+    where: { playerId },
+    attributes: ["id", "goal", "status", "startedAt", "plannedEndAt"],
+    order: [["startedAt", "DESC"]],
+  });
+  const blockIds = blocks.map((b) => b.id);
+
+  // Programs linked directly via player_id OR via a training block owned by this player
+  const whereClause =
+    blockIds.length > 0
+      ? { [Op.or]: [{ playerId }, { trainingBlockId: { [Op.in]: blockIds } }] }
+      : { playerId };
+
+  const programs = await DevelopmentProgram.findAll({
+    where: whereClause,
+    order: [["createdAt", "DESC"]],
+  });
+
+  // Attach block metadata to each program for the timeline view
+  const blockMap = new Map(blocks.map((b) => [b.id, b]));
+  const programsWithBlock = programs.map((p) => {
+    const block = p.trainingBlockId ? blockMap.get(p.trainingBlockId) : null;
+    return { ...p.toJSON(), trainingBlock: block ? block.toJSON() : null };
+  });
+
+  const active = programs.filter((p) => p.isActive).length;
+
+  return { programs: programsWithBlock, total: programs.length, active };
 }

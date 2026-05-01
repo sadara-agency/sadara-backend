@@ -48,6 +48,11 @@ jest.mock("@shared/utils/pagination", () => ({
   buildMeta: jest.fn(),
 }));
 
+jest.mock("@modules/calendar/calendarScope", () => ({
+  upsertSourceAttendees: jest.fn(),
+  evictCalendarScope: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { updateReferralStatus } from "@modules/referrals/referral.service";
 import { Referral } from "@modules/referrals/referral.model";
 import { Injury } from "@modules/injuries/injury.model";

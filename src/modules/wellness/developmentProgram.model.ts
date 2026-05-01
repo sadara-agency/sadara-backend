@@ -32,6 +32,7 @@ interface DevelopmentProgramAttributes {
   phase?: ProgramPhase | null;
   programType: ProgramType;
   trainingBlockId?: string | null;
+  playerId?: string | null;
   isActive: boolean;
   createdBy: string;
   createdAt?: Date;
@@ -62,6 +63,7 @@ export class DevelopmentProgram
   declare phase: ProgramPhase | null;
   declare programType: ProgramType;
   declare trainingBlockId: string | null;
+  declare playerId: string | null;
   declare isActive: boolean;
   declare createdBy: string;
   declare readonly createdAt: Date;
@@ -116,6 +118,10 @@ DevelopmentProgram.init(
     trainingBlockId: {
       type: DataTypes.UUID,
       field: "training_block_id",
+    },
+    playerId: {
+      type: DataTypes.UUID,
+      field: "player_id",
     },
     isActive: {
       type: DataTypes.BOOLEAN,

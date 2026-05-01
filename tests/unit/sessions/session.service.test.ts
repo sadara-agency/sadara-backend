@@ -43,6 +43,11 @@ jest.mock('../../../src/modules/matches/match.model', () => ({
   Match: { findByPk: jest.fn(), name: 'Match' },
 }));
 
+jest.mock('../../../src/modules/calendar/calendarScope', () => ({
+  upsertSourceAttendees: jest.fn(),
+  evictCalendarScope: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as sessionService from '../../../src/modules/sessions/session.service';
 
 const mockSession = (overrides: Record<string, any> = {}) => ({
