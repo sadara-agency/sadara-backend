@@ -54,6 +54,9 @@ jest.mock("@modules/clubs/club.model", () => ({ Club: {} }));
 jest.mock("@modules/matches/match.model", () => ({
   Match: { findAll: jest.fn() },
 }));
+jest.mock("@modules/sessions/session.model", () => ({
+  Session: { findAll: jest.fn() },
+}));
 jest.mock("@modules/documents/document.model", () => ({
   Document: { findAll: jest.fn() },
 }));
@@ -69,9 +72,10 @@ jest.mock("@modules/injuries/injury.model", () => ({
   InjuryUpdate: {},
 }));
 
-import { requestProfileLink } from "./portal.service";
+import { requestProfileLink, getMySessions } from "./portal.service";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
+import { Session } from "@modules/sessions/session.model";
 import {
   notifyByRole,
   notifyUser,
@@ -209,5 +213,62 @@ describe("requestProfileLink", () => {
     });
     expect(notifyUser).not.toHaveBeenCalled();
     expect(notifyByRole).not.toHaveBeenCalled();
+  });
+});
+
+describe("getMySessions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("splits sessions into upcoming (Scheduled + future) and past (everything else)", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-s1",
+      email: "p@example.com",
+      role: "Player",
+      playerId: "p-s1",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-s1",
+      getDataValue: (k: string) => (k === "id" ? "p-s1" : undefined),
+    });
+
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    const past = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    (Session.findAll as jest.Mock).mockResolvedValue([
+      { id: "s1", sessionDate: future, completionStatus: "Scheduled" },
+      { id: "s2", sessionDate: past, completionStatus: "Completed" },
+      { id: "s3", sessionDate: past, completionStatus: "Cancelled" },
+      { id: "s4", sessionDate: past, completionStatus: "Scheduled" },
+    ]);
+
+    const result = await getMySessions("user-s1");
+
+    expect(result.total).toBe(4);
+    expect(result.upcoming.map((s: any) => s.id)).toEqual(["s1"]);
+    expect(result.past.map((s: any) => s.id).sort()).toEqual([
+      "s2",
+      "s3",
+      "s4",
+    ]);
+  });
+
+  it("returns empty arrays when player has no sessions", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-s2",
+      email: "p2@example.com",
+      role: "Player",
+      playerId: "p-s2",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-s2",
+      getDataValue: (k: string) => (k === "id" ? "p-s2" : undefined),
+    });
+    (Session.findAll as jest.Mock).mockResolvedValue([]);
+
+    const result = await getMySessions("user-s2");
+
+    expect(result).toEqual({ upcoming: [], past: [], total: 0 });
   });
 });

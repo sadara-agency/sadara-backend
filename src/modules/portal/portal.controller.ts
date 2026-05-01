@@ -22,6 +22,13 @@ export async function getMySchedule(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+// ── My Sessions ──
+
+export async function getMySessions(req: AuthRequest, res: Response) {
+  const data = await portalService.getMySessions(req.user!.id);
+  sendSuccess(res, data);
+}
+
 // ── My Documents ──
 
 export async function getMyDocuments(req: AuthRequest, res: Response) {

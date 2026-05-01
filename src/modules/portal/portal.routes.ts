@@ -97,6 +97,12 @@ router.get(
   asyncHandler(portalController.getMySchedule),
 );
 router.get(
+  "/sessions",
+  authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
+  asyncHandler(portalController.getMySessions),
+);
+router.get(
   "/documents",
   authorize("Player"),
   cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),

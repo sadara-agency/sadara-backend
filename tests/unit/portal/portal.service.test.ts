@@ -49,6 +49,9 @@ jest.mock('../../../src/modules/contracts/contract.model', () => ({
 jest.mock('../../../src/modules/matches/match.model', () => ({
   Match: { findAll: (...a: unknown[]) => mockMatchFindAll(...a), name: 'Match' },
 }));
+jest.mock('../../../src/modules/sessions/session.model', () => ({
+  Session: { findAll: jest.fn() },
+}));
 jest.mock('../../../src/modules/documents/document.model', () => ({
   Document: { findAll: (...a: unknown[]) => mockDocumentFindAll(...a), name: 'Document' },
 }));
