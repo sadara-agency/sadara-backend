@@ -7,6 +7,8 @@ import { tableExists } from "../migrationHelpers";
  * each source table every time.
  *
  * All INSERTs use ON CONFLICT DO NOTHING — safe to re-run.
+ * All UUID comparisons cast both sides to ::text to avoid uuid = text type errors
+ * when the attendee_id column is stored as VARCHAR rather than native UUID.
  */
 export async function up({
   context: queryInterface,
@@ -17,16 +19,13 @@ export async function up({
 
   // Sessions: backfill responsible user + player
   if (await tableExists(queryInterface, "sessions")) {
-    // responsible user → 'user' attendee on the parent calendar event (if one exists)
-    // For virtual sessions there is no calendar_event row, so we insert a
-    // sentinel attendee row using sourceType='session' for lookup.
     await queryInterface.sequelize.query(`
       INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
         ce.id,
         'user',
-        s.responsible_id,
+        s.responsible_id::text,
         'accepted',
         NOW()
       FROM sessions s
@@ -37,19 +36,18 @@ export async function up({
           SELECT 1 FROM event_attendees ea
           WHERE ea.event_id = ce.id
             AND ea.attendee_type = 'user'
-            AND ea.attendee_id = s.responsible_id
+            AND ea.attendee_id::text = s.responsible_id::text
         )
       ON CONFLICT DO NOTHING
     `);
 
-    // player attendee on calendar_events linked to sessions
     await queryInterface.sequelize.query(`
       INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
         ce.id,
         'player',
-        s.player_id,
+        s.player_id::text,
         'accepted',
         NOW()
       FROM sessions s
@@ -60,7 +58,7 @@ export async function up({
           SELECT 1 FROM event_attendees ea
           WHERE ea.event_id = ce.id
             AND ea.attendee_type = 'player'
-            AND ea.attendee_id = s.player_id
+            AND ea.attendee_id::text = s.player_id::text
         )
       ON CONFLICT DO NOTHING
     `);
@@ -74,7 +72,7 @@ export async function up({
         gen_random_uuid(),
         ce.id,
         'user',
-        t.assigned_to,
+        t.assigned_to::text,
         'accepted',
         NOW()
       FROM tasks t
@@ -85,7 +83,7 @@ export async function up({
           SELECT 1 FROM event_attendees ea
           WHERE ea.event_id = ce.id
             AND ea.attendee_type = 'user'
-            AND ea.attendee_id = t.assigned_to
+            AND ea.attendee_id::text = t.assigned_to::text
         )
       ON CONFLICT DO NOTHING
     `);
@@ -99,7 +97,7 @@ export async function up({
         gen_random_uuid(),
         ce.id,
         'user',
-        r.assigned_to,
+        r.assigned_to::text,
         'accepted',
         NOW()
       FROM referrals r
@@ -110,7 +108,7 @@ export async function up({
           SELECT 1 FROM event_attendees ea
           WHERE ea.event_id = ce.id
             AND ea.attendee_type = 'user'
-            AND ea.attendee_id = r.assigned_to
+            AND ea.attendee_id::text = r.assigned_to::text
         )
       ON CONFLICT DO NOTHING
     `);
@@ -122,9 +120,6 @@ export async function down({
 }: {
   context: QueryInterface;
 }) {
-  // The backfilled rows can be identified by their join pattern.
-  // For safety, we only remove rows that were produced by this migration:
-  // those where the calendar_event's source_type matches the attendee's source.
   if (!(await tableExists(queryInterface, "event_attendees"))) return;
 
   await queryInterface.sequelize.query(`
