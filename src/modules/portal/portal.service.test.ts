@@ -71,6 +71,14 @@ jest.mock("@modules/injuries/injury.model", () => ({
   Injury: { findAll: jest.fn() },
   InjuryUpdate: {},
 }));
+jest.mock("@modules/wellness/fitness.model", () => ({
+  WellnessExercise: { name: "WellnessExercise" },
+  FitnessTest: { name: "FitnessTest" },
+}));
+jest.mock("@modules/wellness/developmentProgram.model", () => ({
+  DevelopmentProgram: { findAll: jest.fn(), name: "DevelopmentProgram" },
+  ProgramExercise: { name: "ProgramExercise" },
+}));
 
 import { requestProfileLink, getMySessions } from "./portal.service";
 import { User } from "@modules/users/user.model";

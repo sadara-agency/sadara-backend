@@ -69,6 +69,14 @@ jest.mock('../../../src/modules/injuries/injury.model', () => ({
 jest.mock('../../../src/modules/clubs/club.model', () => ({
   Club: { name: 'Club' },
 }));
+jest.mock('../../../src/modules/wellness/fitness.model', () => ({
+  WellnessExercise: { name: 'WellnessExercise' },
+  FitnessTest: { name: 'FitnessTest' },
+}));
+jest.mock('../../../src/modules/wellness/developmentProgram.model', () => ({
+  DevelopmentProgram: { findAll: jest.fn(), name: 'DevelopmentProgram' },
+  ProgramExercise: { name: 'ProgramExercise' },
+}));
 jest.mock('../../../src/modules/portal/playerAccount.model', () => ({
   PlayerAccount: {
     findOne: jest.fn(),
