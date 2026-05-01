@@ -263,7 +263,18 @@ export async function getMyDocuments(userId: string) {
     ),
   };
 
-  return { documents, grouped, total: documents.length };
+  const hasIdentity = documents.some((d: any) =>
+    ["ID", "Passport", "id", "passport"].includes(d.type),
+  );
+  const hasMedical = documents.some((d: any) =>
+    ["Medical", "medical", "Fitness"].includes(d.type),
+  );
+
+  const missingRequired: string[] = [];
+  if (!hasIdentity) missingRequired.push("identity");
+  if (!hasMedical) missingRequired.push("medical");
+
+  return { documents, grouped, total: documents.length, missingRequired };
 }
 
 // ══════════════════════════════════════════
