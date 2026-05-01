@@ -84,6 +84,16 @@ jest.mock('../../../src/config/env', () => ({
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
+jest.mock('../../../src/modules/notifications/notification.service', () => ({
+  notifyByRole: jest.fn().mockResolvedValue(0),
+  notifyUser: jest.fn().mockResolvedValue(null),
+}));
+jest.mock('../../../src/shared/utils/cache', () => ({
+  cacheGet: jest.fn().mockResolvedValue(null),
+  cacheSet: jest.fn().mockResolvedValue(true),
+  CacheTTL: { SHORT: 60, MEDIUM: 300, LONG: 900, HOUR: 3600, DAY: 86400 },
+  CachePrefix: { PORTAL: 'portal' },
+}));
 
 import * as portalService from '../../../src/modules/portal/portal.service';
 import { PlayerAccount } from '../../../src/modules/portal/playerAccount.model';
