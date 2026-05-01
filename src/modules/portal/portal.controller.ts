@@ -17,6 +17,10 @@ export async function getMyProfile(req: AuthRequest, res: Response) {
 
 // ── My Schedule ──
 
+/**
+ * @deprecated Use GET /calendar/aggregated with viewMode=player instead.
+ * This endpoint will be removed once all player-portal pages migrate to the unified calendar.
+ */
 export async function getMySchedule(req: AuthRequest, res: Response) {
   const data = await portalService.getMySchedule(req.user!.id, req.query);
   sendSuccess(res, data);
@@ -24,6 +28,10 @@ export async function getMySchedule(req: AuthRequest, res: Response) {
 
 // ── My Sessions ──
 
+/**
+ * @deprecated Use GET /calendar/aggregated with viewMode=player instead.
+ * This endpoint will be removed once all player-portal pages migrate to the unified calendar.
+ */
 export async function getMySessions(req: AuthRequest, res: Response) {
   const data = await portalService.getMySessions(req.user!.id);
   sendSuccess(res, data);
@@ -251,6 +259,13 @@ export async function uploadSignedContractFile(
   );
 
   sendCreated(res, { url: result.url, key: result.key });
+}
+
+// ── My Programs ──
+
+export async function getMyPrograms(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyPrograms(req.user!.id);
+  sendSuccess(res, data);
 }
 
 // ── Admin: Resend Invite ──

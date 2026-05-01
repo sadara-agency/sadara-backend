@@ -90,12 +90,40 @@ router.get(
   cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMyInjuries),
 );
+/**
+ * @swagger
+ * /portal/schedule:
+ *   get:
+ *     summary: "[DEPRECATED] Get player schedule"
+ *     description: "Deprecated — use GET /calendar/aggregated?viewMode=player instead. Will be removed after player portal migrates to the unified calendar."
+ *     deprecated: true
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Player schedule
+ */
 router.get(
   "/schedule",
   authorize("Player"),
   cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMySchedule),
 );
+/**
+ * @swagger
+ * /portal/sessions:
+ *   get:
+ *     summary: "[DEPRECATED] Get player sessions"
+ *     description: "Deprecated — use GET /calendar/aggregated?viewMode=player instead. Will be removed after player portal migrates to the unified calendar."
+ *     deprecated: true
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Player sessions
+ */
 router.get(
   "/sessions",
   authorize("Player"),
@@ -156,6 +184,12 @@ router.get(
   authorize("Player"),
   cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyStats),
+);
+router.get(
+  "/programs",
+  authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
+  asyncHandler(portalController.getMyPrograms),
 );
 
 // ── Admin/Manager routes: generate invite links ──

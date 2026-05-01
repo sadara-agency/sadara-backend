@@ -21,14 +21,13 @@ export async function up({
     // For virtual sessions there is no calendar_event row, so we insert a
     // sentinel attendee row using sourceType='session' for lookup.
     await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at, updated_at)
+      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
         ce.id,
         'user',
         s.responsible_id,
         'accepted',
-        NOW(),
         NOW()
       FROM sessions s
       JOIN calendar_events ce
@@ -45,14 +44,13 @@ export async function up({
 
     // player attendee on calendar_events linked to sessions
     await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at, updated_at)
+      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
         ce.id,
         'player',
         s.player_id,
         'accepted',
-        NOW(),
         NOW()
       FROM sessions s
       JOIN calendar_events ce
@@ -71,14 +69,13 @@ export async function up({
   // Tasks: backfill assignedTo user on calendar_events linked to tasks
   if (await tableExists(queryInterface, "tasks")) {
     await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at, updated_at)
+      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
         ce.id,
         'user',
         t.assigned_to,
         'accepted',
-        NOW(),
         NOW()
       FROM tasks t
       JOIN calendar_events ce
@@ -97,14 +94,13 @@ export async function up({
   // Referrals: backfill assignedTo user on calendar_events linked to referrals
   if (await tableExists(queryInterface, "referrals")) {
     await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at, updated_at)
+      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
         ce.id,
         'user',
         r.assigned_to,
         'accepted',
-        NOW(),
         NOW()
       FROM referrals r
       JOIN calendar_events ce

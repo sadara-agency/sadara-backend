@@ -15,6 +15,8 @@ import { Document } from "@modules/documents/document.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Task } from "@modules/tasks/task.model";
 import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
+import { DevelopmentProgram } from "@modules/wellness/developmentProgram.model";
+import { TrainingBlock } from "@modules/wellness/trainingBlock.model";
 import { AppError } from "@middleware/errorHandler";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { PlayerAccount } from "@modules/portal/playerAccount.model";
@@ -1304,4 +1306,43 @@ export async function requestProfileLink(userId: string) {
     target: playerByEmail?.agentId ? "agent" : "admins",
     cooldownSeconds: REQUEST_LINK_COOLDOWN_SEC,
   };
+}
+
+// ══════════════════════════════════════════
+// MY PROGRAMS (development programs)
+// ══════════════════════════════════════════
+
+export async function getMyPrograms(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  // Get all training blocks for this player (for block-linked programs)
+  const blocks = await TrainingBlock.findAll({
+    where: { playerId },
+    attributes: ["id", "goal", "status", "startedAt", "plannedEndAt"],
+    order: [["startedAt", "DESC"]],
+  });
+  const blockIds = blocks.map((b) => b.id);
+
+  // Programs linked directly via player_id OR via a training block owned by this player
+  const whereClause =
+    blockIds.length > 0
+      ? { [Op.or]: [{ playerId }, { trainingBlockId: { [Op.in]: blockIds } }] }
+      : { playerId };
+
+  const programs = await DevelopmentProgram.findAll({
+    where: whereClause,
+    order: [["createdAt", "DESC"]],
+  });
+
+  // Attach block metadata to each program for the timeline view
+  const blockMap = new Map(blocks.map((b) => [b.id, b]));
+  const programsWithBlock = programs.map((p) => {
+    const block = p.trainingBlockId ? blockMap.get(p.trainingBlockId) : null;
+    return { ...p.toJSON(), trainingBlock: block ? block.toJSON() : null };
+  });
+
+  const active = programs.filter((p) => p.isActive).length;
+
+  return { programs: programsWithBlock, total: programs.length, active };
 }
