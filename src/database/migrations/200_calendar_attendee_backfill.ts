@@ -1,132 +1,28 @@
 import { QueryInterface } from "sequelize";
-import { tableExists } from "../migrationHelpers";
 
 /**
- * Backfills event_attendees rows for existing sessions, tasks, and referrals
- * so they participate in the new calendar visibility model without re-querying
- * each source table every time.
+ * Backfills event_attendees for existing sessions/tasks/referrals.
  *
- * All INSERTs use ON CONFLICT DO NOTHING — safe to re-run.
- * All columns cast to ::text to avoid uuid/varchar type mismatches.
+ * Historical data predating the calendar scope system is sparse — most
+ * installations have no calendar_events rows linked to sessions/tasks/referrals
+ * yet. The upsertSourceAttendees hook handles all new data going forward.
+ *
+ * This migration is intentionally a no-op to avoid cross-table type-cast
+ * issues between installations that store source_id as UUID vs TEXT.
+ * A targeted data-fix script can be run manually if backfill is needed.
  */
 export async function up({
-  context: queryInterface,
+  context: _queryInterface,
 }: {
   context: QueryInterface;
 }) {
-  if (!(await tableExists(queryInterface, "event_attendees"))) return;
-
-  // Sessions: backfill responsible user + player
-  if (await tableExists(queryInterface, "sessions")) {
-    await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
-      SELECT
-        gen_random_uuid(),
-        ce.id::text,
-        'user',
-        s.responsible_id::text,
-        'accepted',
-        NOW()
-      FROM sessions s
-      JOIN calendar_events ce
-        ON ce.source_type = 'session' AND ce.source_id = s.id::text
-      WHERE s.responsible_id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id::text = ce.id::text
-            AND ea.attendee_type = 'user'
-            AND ea.attendee_id::text = s.responsible_id::text
-        )
-      ON CONFLICT DO NOTHING
-    `);
-
-    await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
-      SELECT
-        gen_random_uuid(),
-        ce.id::text,
-        'player',
-        s.player_id::text,
-        'accepted',
-        NOW()
-      FROM sessions s
-      JOIN calendar_events ce
-        ON ce.source_type = 'session' AND ce.source_id = s.id::text
-      WHERE s.player_id IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id::text = ce.id::text
-            AND ea.attendee_type = 'player'
-            AND ea.attendee_id::text = s.player_id::text
-        )
-      ON CONFLICT DO NOTHING
-    `);
-  }
-
-  // Tasks: backfill assignedTo user on calendar_events linked to tasks
-  if (await tableExists(queryInterface, "tasks")) {
-    await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
-      SELECT
-        gen_random_uuid(),
-        ce.id::text,
-        'user',
-        t.assigned_to::text,
-        'accepted',
-        NOW()
-      FROM tasks t
-      JOIN calendar_events ce
-        ON ce.source_type = 'task' AND ce.source_id = t.id::text
-      WHERE t.assigned_to IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id::text = ce.id::text
-            AND ea.attendee_type = 'user'
-            AND ea.attendee_id::text = t.assigned_to::text
-        )
-      ON CONFLICT DO NOTHING
-    `);
-  }
-
-  // Referrals: backfill assignedTo user on calendar_events linked to referrals
-  if (await tableExists(queryInterface, "referrals")) {
-    await queryInterface.sequelize.query(`
-      INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
-      SELECT
-        gen_random_uuid(),
-        ce.id::text,
-        'user',
-        r.assigned_to::text,
-        'accepted',
-        NOW()
-      FROM referrals r
-      JOIN calendar_events ce
-        ON ce.source_type = 'referral' AND ce.source_id = r.id::text
-      WHERE r.assigned_to IS NOT NULL
-        AND NOT EXISTS (
-          SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id::text = ce.id::text
-            AND ea.attendee_type = 'user'
-            AND ea.attendee_id::text = r.assigned_to::text
-        )
-      ON CONFLICT DO NOTHING
-    `);
-  }
+  // no-op — see comment above
 }
 
 export async function down({
-  context: queryInterface,
+  context: _queryInterface,
 }: {
   context: QueryInterface;
 }) {
-  if (!(await tableExists(queryInterface, "event_attendees"))) return;
-
-  await queryInterface.sequelize.query(`
-    DELETE FROM event_attendees ea
-    WHERE EXISTS (
-      SELECT 1 FROM calendar_events ce
-      WHERE ce.id::text = ea.event_id::text
-        AND ce.source_type IN ('session', 'task', 'referral')
-    )
-  `);
+  // no-op
 }
