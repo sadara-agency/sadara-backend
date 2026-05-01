@@ -4,6 +4,7 @@ import { authenticate, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import { cacheRoute } from "@middleware/cache.middleware";
+import { uploadSingle, verifyFileType } from "@middleware/upload";
 import { CachePrefix, CacheTTL } from "@shared/utils/cache";
 import {
   createDesignSchema,
@@ -171,6 +172,60 @@ router.post(
   "/:id/publish",
   authorizeModule("designs", "update"),
   asyncHandler(designController.publish),
+);
+
+/**
+ * @swagger
+ * /designs/{id}/asset:
+ *   post:
+ *     summary: Upload the asset (image/PDF) for a design
+ *     description: |
+ *       Accepts a multipart/form-data field named `file`. Pushes the buffer
+ *       through the shared storage util (GCS in prod, local disk in dev) and
+ *       updates the design's asset_url/asset_width/asset_height columns.
+ *     tags: [Designs]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Updated design with assetUrl set
+ *       400:
+ *         description: No file uploaded or unsupported MIME type
+ *       404:
+ *         description: Design not found
+ */
+router.post(
+  "/:id/asset",
+  authorizeModule("designs", "update"),
+  (req, res, next) => {
+    uploadSingle(req, res, (err: any) => {
+      if (err) {
+        const msg =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "File too large. Maximum size is 25MB."
+            : err.message || "Upload failed";
+        return res.status(400).json({ success: false, message: msg });
+      }
+      next();
+    });
+  },
+  verifyFileType,
+  asyncHandler(designController.uploadAsset),
 );
 
 /**

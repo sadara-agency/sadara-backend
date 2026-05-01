@@ -71,6 +71,25 @@ jest.mock("../../../src/config/logger", () => ({
   },
 }));
 
+// Storage util — dynamically imported by uploadDesignAsset
+const mockUploadFile = jest.fn();
+jest.mock("../../../src/shared/utils/storage", () => ({
+  uploadFile: (...a: unknown[]) => mockUploadFile(...a),
+}));
+
+// sharp — dynamically imported by uploadDesignAsset for dimensions
+const mockSharpMetadata = jest.fn();
+jest.mock(
+  "sharp",
+  () => {
+    return Object.assign(
+      jest.fn(() => ({ metadata: mockSharpMetadata })),
+      { default: jest.fn(() => ({ metadata: mockSharpMetadata })) },
+    );
+  },
+  { virtual: false },
+);
+
 import * as designService from "../../../src/modules/designs/design.service";
 import type { CreateDesignInput } from "../../../src/modules/designs/design.validation";
 
@@ -345,6 +364,112 @@ describe("Design Service", () => {
       await expect(designService.publishDesign("missing")).rejects.toThrow(
         "Design not found",
       );
+    });
+  });
+
+  // ────────────────────────────────────────────────────────
+  // uploadDesignAsset
+  // ────────────────────────────────────────────────────────
+  describe("uploadDesignAsset", () => {
+    const file = {
+      buffer: Buffer.from("fake-png-bytes"),
+      originalname: "poster.png",
+      mimetype: "image/png",
+    };
+
+    it("uploads the asset and updates assetUrl + dimensions for an image", async () => {
+      const inst = mockModelInstance(designRow());
+      mockDesignFindByPk.mockResolvedValue(inst);
+      mockSharpMetadata.mockResolvedValue({ width: 1080, height: 1080 });
+      mockUploadFile.mockResolvedValue({
+        url: "https://storage.googleapis.com/bucket/designs/abc.webp",
+        thumbnailUrl: "https://storage.googleapis.com/bucket/designs/thumb_abc.webp",
+        key: "designs/abc.webp",
+        size: 12345,
+        mimeType: "image/webp",
+      });
+
+      await designService.uploadDesignAsset(
+        "design-001",
+        file,
+        "https://api.sadara.local",
+      );
+
+      expect(mockUploadFile).toHaveBeenCalledWith(
+        expect.objectContaining({
+          folder: "designs",
+          originalName: "poster.png",
+          mimeType: "image/png",
+        }),
+      );
+      expect(inst.update).toHaveBeenCalledWith({
+        assetUrl: "https://storage.googleapis.com/bucket/designs/abc.webp",
+        assetWidth: 1080,
+        assetHeight: 1080,
+      });
+    });
+
+    it("prefixes the request base URL when storage returns a relative path (local mode)", async () => {
+      const inst = mockModelInstance(designRow());
+      mockDesignFindByPk.mockResolvedValue(inst);
+      mockSharpMetadata.mockResolvedValue({ width: 800, height: 600 });
+      mockUploadFile.mockResolvedValue({
+        url: "/uploads/designs/local.webp",
+        thumbnailUrl: null,
+        key: "designs/local.webp",
+        size: 100,
+        mimeType: "image/webp",
+      });
+
+      await designService.uploadDesignAsset(
+        "design-001",
+        file,
+        "https://api.sadara.local",
+      );
+
+      expect(inst.update).toHaveBeenCalledWith({
+        assetUrl: "https://api.sadara.local/uploads/designs/local.webp",
+        assetWidth: 800,
+        assetHeight: 600,
+      });
+    });
+
+    it("leaves dimensions null for non-image (PDF) uploads", async () => {
+      const inst = mockModelInstance(designRow());
+      mockDesignFindByPk.mockResolvedValue(inst);
+      mockUploadFile.mockResolvedValue({
+        url: "https://cdn/designs/x.pdf",
+        thumbnailUrl: null,
+        key: "designs/x.pdf",
+        size: 200,
+        mimeType: "application/pdf",
+      });
+
+      await designService.uploadDesignAsset(
+        "design-001",
+        {
+          buffer: Buffer.from("pdf"),
+          originalname: "kit.pdf",
+          mimetype: "application/pdf",
+        },
+        "https://api",
+      );
+
+      expect(mockSharpMetadata).not.toHaveBeenCalled();
+      expect(inst.update).toHaveBeenCalledWith({
+        assetUrl: "https://cdn/designs/x.pdf",
+        assetWidth: null,
+        assetHeight: null,
+      });
+    });
+
+    it("throws 404 when the design does not exist", async () => {
+      mockDesignFindByPk.mockResolvedValue(null);
+
+      await expect(
+        designService.uploadDesignAsset("missing", file, "https://api"),
+      ).rejects.toThrow("Design not found");
+      expect(mockUploadFile).not.toHaveBeenCalled();
     });
   });
 });

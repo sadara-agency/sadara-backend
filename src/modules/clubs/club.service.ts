@@ -15,6 +15,7 @@ import { Op, Sequelize, QueryTypes } from "sequelize";
 import https from "https";
 import http from "http";
 import { Club } from "@modules/clubs/club.model";
+import { ClubCompetition } from "@modules/competitions/competition.model";
 import { sequelize } from "@config/database";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -68,8 +69,14 @@ const CLUB_AGGREGATES = [
 // the League dropdown when a club is selected first. If the list is already
 // filtered by a competitionId, that competition wins; otherwise the
 // highest-tier active league the club is enrolled in.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 function buildLeagueAggregates(competitionIdHint?: string) {
-  const safeId = competitionIdHint ? competitionIdHint.replace(/'/g, "") : null;
+  const safeId =
+    competitionIdHint && UUID_RE.test(competitionIdHint)
+      ? competitionIdHint
+      : null;
   const preferClause = safeId ? `(cc.competition_id = '${safeId}') DESC,` : "";
   const leagueSubquery = (selectExpr: string) => `(
     SELECT ${selectExpr}
@@ -104,14 +111,16 @@ export async function listClubs(queryParams: any, user?: AuthUser) {
   if (queryParams.type) where.type = queryParams.type;
   if (queryParams.league) where.league = queryParams.league;
   if (queryParams.competitionId) {
-    const seasonClause = queryParams.season
-      ? ` AND season = '${queryParams.season.replace(/'/g, "")}'`
-      : "";
+    const ccWhere: any = { competitionId: queryParams.competitionId };
+    if (queryParams.season) ccWhere.season = queryParams.season;
+    const ccRows = (await ClubCompetition.findAll({
+      where: ccWhere,
+      attributes: ["clubId"],
+      raw: true,
+    })) as unknown as { clubId: string }[];
     where.id = {
       ...(where.id || {}),
-      [Op.in]: Sequelize.literal(
-        `(SELECT DISTINCT club_id FROM club_competitions WHERE competition_id = '${queryParams.competitionId.replace(/'/g, "")}'${seasonClause})`,
-      ),
+      [Op.in]: ccRows.map((r) => r.clubId),
     };
   }
   if (queryParams.country)
