@@ -1,4 +1,4 @@
-import { Op } from "sequelize";
+import { Op, WhereOptions } from "sequelize";
 import { CalendarEvent, EventAttendee } from "@modules/calendar/event.model";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
@@ -7,6 +7,7 @@ import { Match } from "@modules/matches/match.model";
 import { Task } from "@modules/tasks/task.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Club } from "@modules/clubs/club.model";
+import { Contract } from "@modules/contracts/contract.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { findOrThrow, destroyById } from "@shared/utils/serviceHelpers";
@@ -17,6 +18,11 @@ import type {
   UpdateEventInput,
   EventQuery,
 } from "@modules/calendar/event.validation";
+import type { CalendarScope } from "@modules/calendar/calendarScope";
+import {
+  resolveTypesForRoles,
+  ALL_TYPES,
+} from "@modules/calendar/calendarRoleConfig";
 
 // ── Shared includes ──
 const EVENT_INCLUDES = [
@@ -267,10 +273,221 @@ function toISODate(d: string, endOfDay = false): string {
   return endOfDay ? `${d}T23:59:59` : `${d}T00:00:00`;
 }
 
+// ── Per-source scope predicates ──
+
+function buildCalendarEventWhere(
+  scope: CalendarScope,
+  startRange: Date,
+  endRange: Date,
+  wantType?: string,
+): WhereOptions {
+  const base: WhereOptions = {
+    startDate: { [Op.lte]: endRange },
+    endDate: { [Op.gte]: startRange },
+    ...(wantType &&
+    !["Session", "Match", "TaskDeadline", "ReferralDeadline"].includes(wantType)
+      ? { eventType: wantType }
+      : {}),
+  };
+
+  if (scope.isPrivileged) return base;
+
+  // Visibility: creator OR user attendee OR attendee is an assigned player
+  const visibilityClause: WhereOptions = {
+    [Op.or]: [
+      { createdBy: scope.userId },
+      sequelize.literal(
+        `EXISTS (
+          SELECT 1 FROM event_attendees ea
+          WHERE ea.event_id = "CalendarEvent"."id"
+            AND ea.attendee_type = 'user'
+            AND ea.attendee_id = '${scope.userId}'
+        )`,
+      ),
+      ...(scope.assignedPlayerIds.length > 0
+        ? [
+            sequelize.literal(
+              `EXISTS (
+                SELECT 1 FROM event_attendees ea
+                WHERE ea.event_id = "CalendarEvent"."id"
+                  AND ea.attendee_type = 'player'
+                  AND ea.attendee_id IN (${scope.assignedPlayerIds.map((id) => `'${id}'`).join(",")})
+              )`,
+            ),
+          ]
+        : []),
+      ...(scope.linkedPlayerId
+        ? [
+            sequelize.literal(
+              `EXISTS (
+                SELECT 1 FROM event_attendees ea
+                WHERE ea.event_id = "CalendarEvent"."id"
+                  AND ea.attendee_type = 'player'
+                  AND ea.attendee_id = '${scope.linkedPlayerId}'
+              )`,
+            ),
+          ]
+        : []),
+    ],
+  };
+
+  return { [Op.and]: [base, visibilityClause] };
+}
+
+function buildSessionWhere(
+  scope: CalendarScope,
+  startStr: string,
+  endStr: string,
+): WhereOptions | null {
+  const base: WhereOptions = {
+    sessionDate: { [Op.gte]: startStr, [Op.lte]: endStr },
+  };
+
+  if (scope.isPrivileged) return base;
+
+  // Player role: see only their own sessions
+  if (scope.linkedPlayerId) {
+    return { ...base, playerId: scope.linkedPlayerId };
+  }
+
+  // Staff with assigned players
+  if (scope.assignedPlayerIds.length > 0) {
+    return {
+      ...base,
+      [Op.or]: [
+        { responsibleId: scope.userId },
+        { playerId: { [Op.in]: scope.assignedPlayerIds } },
+      ],
+    };
+  }
+
+  // Staff without any assigned players — only sessions they're responsible for
+  return { ...base, responsibleId: scope.userId };
+}
+
+function buildMatchWhere(
+  scope: CalendarScope,
+  startRange: Date,
+  endRange: Date,
+): WhereOptions | null {
+  const base: WhereOptions = {
+    matchDate: { [Op.gte]: startRange, [Op.lte]: endRange },
+    status: { [Op.ne]: "cancelled" },
+  };
+
+  if (scope.isPrivileged) return base;
+
+  const lens = resolveTypesForRoles(scope.roles);
+  // Roles that should see matches
+  const matchVisibleRoles = [
+    "Player",
+    "Coach",
+    "SkillCoach",
+    "TacticalCoach",
+    "FitnessCoach",
+    "GoalkeeperCoach",
+    "GymCoach",
+    "Analyst",
+    "Scout",
+    "MentalCoach",
+    "NutritionSpecialist",
+  ];
+  const canSeeMatches =
+    lens === ALL_TYPES ||
+    (Array.isArray(lens) && lens.includes("Match")) ||
+    scope.roles.some((r) => matchVisibleRoles.includes(r));
+
+  if (!canSeeMatches) return null;
+
+  return base;
+}
+
+function buildTaskWhere(
+  scope: CalendarScope,
+  startStr: string,
+  endStr: string,
+): WhereOptions {
+  const base: WhereOptions = {
+    dueDate: {
+      [Op.ne]: null as unknown as string,
+      [Op.gte]: startStr,
+      [Op.lte]: endStr,
+    },
+    status: { [Op.notIn]: ["Completed", "Canceled"] },
+  };
+
+  if (scope.isPrivileged) return base;
+
+  return {
+    ...base,
+    [Op.or]: [{ assignedTo: scope.userId }, { assignedBy: scope.userId }],
+  };
+}
+
+function buildReferralWhere(
+  scope: CalendarScope,
+  startStr: string,
+  endStr: string,
+): WhereOptions {
+  const base: WhereOptions = {
+    dueDate: {
+      [Op.ne]: null as unknown as string,
+      [Op.gte]: startStr,
+      [Op.lte]: endStr,
+    },
+    status: { [Op.ne]: "Closed" },
+  };
+
+  if (scope.isPrivileged) return base;
+
+  return {
+    ...base,
+    [Op.or]: [
+      { isRestricted: false },
+      { restrictedTo: { [Op.contains]: [scope.userId] } },
+      { assignedTo: scope.userId },
+      { createdBy: scope.userId },
+    ],
+  };
+}
+
+function buildContractWhere(
+  scope: CalendarScope,
+  startRange: Date,
+  endRange: Date,
+): WhereOptions | null {
+  // Contracts visible only to Legal, Finance, and privileged roles
+  const contractVisibleRoles = [
+    "Legal",
+    "Finance",
+    "Admin",
+    "Manager",
+    "Executive",
+    "SportingDirector",
+  ];
+  const canSeeContracts =
+    scope.isPrivileged ||
+    scope.roles.some((r) => contractVisibleRoles.includes(r));
+
+  if (!canSeeContracts) {
+    // Coaches can see contracts for their assigned players
+    if (scope.assignedPlayerIds.length === 0) return null;
+    return {
+      endDate: { [Op.gte]: startRange, [Op.lte]: endRange },
+      status: { [Op.notIn]: ["Terminated", "Expired"] },
+      playerId: { [Op.in]: scope.assignedPlayerIds },
+    };
+  }
+
+  return {
+    endDate: { [Op.gte]: startRange, [Op.lte]: endRange },
+    status: { [Op.notIn]: ["Terminated", "Expired"] },
+  };
+}
+
 export async function listAggregatedEvents(
   queryParams: any,
-  userId: string,
-  userRole: string,
+  scope: CalendarScope,
 ) {
   const now = new Date();
   const startRange = queryParams.startDate
@@ -289,24 +506,58 @@ export async function listAggregatedEvents(
   const wantType = queryParams.eventType as string | undefined;
   const search = (queryParams.search as string | undefined)?.toLowerCase();
 
-  // Decide which sources to query based on filters
+  // Resolve role-based type lens and apply it on top of any explicit wantType
+  const typeLens = resolveTypesForRoles(scope.roles);
+
+  // Decide which sources to query based on filters + role lens
+  const lensAllows = (type: string): boolean =>
+    typeLens === ALL_TYPES ||
+    (Array.isArray(typeLens) && typeLens.includes(type as any));
+
   const queryCalendar =
-    !wantSource ||
-    wantSource === "calendar" ||
-    wantSource === "contract" ||
-    wantSource === "gate";
+    (!wantSource ||
+      wantSource === "calendar" ||
+      wantSource === "contract" ||
+      wantSource === "gate") &&
+    (!wantType ||
+      [
+        "Training",
+        "Medical",
+        "ContractDeadline",
+        "GateTimeline",
+        "Meeting",
+        "Custom",
+      ].includes(wantType));
   const querySessions =
     (!wantSource || wantSource === "session") &&
-    (!wantType || wantType === "Session");
+    (!wantType || wantType === "Session") &&
+    lensAllows("Session");
   const queryMatches =
     (!wantSource || wantSource === "match") &&
-    (!wantType || wantType === "Match");
+    (!wantType || wantType === "Match") &&
+    lensAllows("Match");
   const queryTasks =
     (!wantSource || wantSource === "task") &&
-    (!wantType || wantType === "TaskDeadline");
+    (!wantType || wantType === "TaskDeadline") &&
+    lensAllows("TaskDeadline");
   const queryReferrals =
     (!wantSource || wantSource === "referral") &&
-    (!wantType || wantType === "ReferralDeadline");
+    (!wantType || wantType === "ReferralDeadline") &&
+    lensAllows("ReferralDeadline");
+  const queryContracts =
+    (!wantSource || wantSource === "contract") &&
+    (!wantType || wantType === "ContractDeadline") &&
+    lensAllows("ContractDeadline");
+
+  const sessionWhere = querySessions
+    ? buildSessionWhere(scope, startStr, endStr)
+    : null;
+  const matchWhere = queryMatches
+    ? buildMatchWhere(scope, startRange, endRange)
+    : null;
+  const contractWhere = queryContracts
+    ? buildContractWhere(scope, startRange, endRange)
+    : null;
 
   // Use allSettled so a single failing source degrades gracefully instead
   // of collapsing the whole aggregation to zero results.
@@ -314,27 +565,16 @@ export async function listAggregatedEvents(
     // 1. Calendar events
     queryCalendar
       ? CalendarEvent.findAll({
-          where: {
-            startDate: { [Op.lte]: endRange },
-            endDate: { [Op.gte]: startRange },
-            ...(wantType &&
-            !["Session", "Match", "TaskDeadline", "ReferralDeadline"].includes(
-              wantType,
-            )
-              ? { eventType: wantType }
-              : {}),
-          },
+          where: buildCalendarEventWhere(scope, startRange, endRange, wantType),
           include: EVENT_INCLUDES,
           order: [["startDate", "asc"]],
         })
       : Promise.resolve([]),
 
     // 2. Sessions
-    querySessions
+    querySessions && sessionWhere
       ? Session.findAll({
-          where: {
-            sessionDate: { [Op.gte]: startStr, [Op.lte]: endStr },
-          },
+          where: sessionWhere,
           include: [
             { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
             {
@@ -347,12 +587,9 @@ export async function listAggregatedEvents(
       : Promise.resolve([]),
 
     // 3. Matches
-    queryMatches
+    queryMatches && matchWhere
       ? Match.findAll({
-          where: {
-            matchDate: { [Op.gte]: startRange, [Op.lte]: endRange },
-            status: { [Op.ne]: "cancelled" },
-          },
+          where: matchWhere,
           attributes: [
             "id",
             "matchDate",
@@ -369,14 +606,7 @@ export async function listAggregatedEvents(
     // 4. Tasks (with dueDate)
     queryTasks
       ? Task.findAll({
-          where: {
-            dueDate: {
-              [Op.ne]: null as unknown as string,
-              [Op.gte]: startStr,
-              [Op.lte]: endStr,
-            },
-            status: { [Op.notIn]: ["Completed", "Canceled"] },
-          },
+          where: buildTaskWhere(scope, startStr, endStr),
           include: [
             { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
             {
@@ -391,25 +621,7 @@ export async function listAggregatedEvents(
     // 5. Referrals (with dueDate, not Closed)
     queryReferrals
       ? Referral.findAll({
-          where: {
-            dueDate: {
-              [Op.ne]: null as unknown as string,
-              [Op.gte]: startStr,
-              [Op.lte]: endStr,
-            },
-            status: { [Op.ne]: "Closed" },
-            // Access control: non-privileged users only see unrestricted
-            ...(["Admin", "Manager", "Executive"].includes(userRole)
-              ? {}
-              : {
-                  [Op.or]: [
-                    { isRestricted: false },
-                    { restrictedTo: { [Op.contains]: [userId] } },
-                    { assignedTo: userId },
-                    { createdBy: userId },
-                  ],
-                }),
-          },
+          where: buildReferralWhere(scope, startStr, endStr),
           include: [
             { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
             {
@@ -420,6 +632,17 @@ export async function listAggregatedEvents(
           ],
         })
       : Promise.resolve([]),
+
+    // 6. Contracts (deadline: endDate in range)
+    queryContracts && contractWhere
+      ? Contract.findAll({
+          where: contractWhere,
+          include: [
+            { model: Player, as: "player", attributes: [...PLAYER_ATTRS] },
+          ],
+          attributes: ["id", "startDate", "endDate", "status", "playerId"],
+        })
+      : Promise.resolve([]),
   ]);
 
   const sourceNames = [
@@ -428,6 +651,7 @@ export async function listAggregatedEvents(
     "matches",
     "tasks",
     "referrals",
+    "contracts",
   ] as const;
   const unwrap = <T>(idx: number): T[] => {
     const r = settledResults[idx];
@@ -448,6 +672,7 @@ export async function listAggregatedEvents(
   const matches = unwrap<any>(2);
   const tasks = unwrap<any>(3);
   const referrals = unwrap<any>(4);
+  const contracts = unwrap<any>(5);
 
   // ── Transform into unified CalendarItem[] ──
   let items: CalendarItem[] = [];
@@ -659,6 +884,41 @@ export async function listAggregatedEvents(
       creator: null,
       attendees: [],
       createdAt: r.createdAt?.toISOString?.() ?? "",
+    });
+  }
+
+  // Contracts → CalendarItem (contract expiry deadline)
+  for (const c of contracts as any[]) {
+    const pn = playerName(c.player);
+    const endDateStr =
+      c.endDate instanceof Date
+        ? c.endDate.toISOString().split("T")[0]
+        : String(c.endDate ?? "");
+    items.push({
+      id: `contract-${c.id}`,
+      title: `Contract Expiry: ${pn.en}`,
+      titleAr: `انتهاء عقد: ${pn.ar}`,
+      description: null,
+      descriptionAr: null,
+      eventType: "ContractDeadline",
+      startDate: toISODate(endDateStr),
+      endDate: toISODate(endDateStr, true),
+      allDay: true,
+      location: null,
+      locationAr: null,
+      color: "#8B5CF6",
+      sourceType: "contract",
+      sourceId: c.id,
+      isAutoCreated: true,
+      isReadOnly: true,
+      isVirtual: true,
+      reminderMinutes: null,
+      timezone: "Asia/Riyadh",
+      createdBy: null,
+      meta: { status: c.status, playerId: c.playerId },
+      creator: null,
+      attendees: [],
+      createdAt: c.createdAt?.toISOString?.() ?? "",
     });
   }
 

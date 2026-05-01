@@ -869,6 +869,40 @@ const RAW_PERMISSIONS: Perm[] = [
     { canCreate: true, canRead: true },
   ),
 
+  // ── Calendar ──
+  // All roles can read; only staff roles can create/update/delete.
+  // Actual visibility is enforced at service level via CalendarScope.
+  ...forRoles(
+    "calendar",
+    ["Admin", "Manager", "Executive", "SportingDirector"],
+    { canCreate: true, canRead: true, canUpdate: true, canDelete: true },
+  ),
+  ...forRoles(
+    "calendar",
+    [
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GoalkeeperCoach",
+      "GymCoach",
+      "NutritionSpecialist",
+      "MentalCoach",
+    ],
+    { canCreate: true, canRead: true, canUpdate: true, canDelete: false },
+  ),
+  ...forRoles(
+    "calendar",
+    ["Analyst", "Scout", "Legal", "Finance", "GraphicDesigner"],
+    { canCreate: true, canRead: true, canUpdate: false, canDelete: false },
+  ),
+  ...forRoles("calendar", ["Player"], {
+    canCreate: false,
+    canRead: true,
+    canUpdate: false,
+    canDelete: false,
+  }),
+
   // ── Personal Workspace (Notes + Todos) ──
   // Every role gets full CRUD — user_id scoping in the service is the
   // actual security boundary; no user can access another user's data.
