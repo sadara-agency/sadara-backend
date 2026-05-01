@@ -62,6 +62,11 @@ router.patch(
   asyncHandler(portalController.updateMyProfile),
 );
 router.post(
+  "/me/request-link",
+  authorize("Player"),
+  asyncHandler(portalController.requestProfileLink),
+);
+router.post(
   "/me/avatar",
   authorize("Player"),
   (req, res, next) => {
@@ -109,6 +114,24 @@ router.get(
   authorize("Player"),
   cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
   asyncHandler(portalController.getMyContracts),
+);
+router.post(
+  "/contracts/:id/sign/upload",
+  authorize("Player"),
+  (req, res, next) => {
+    uploadSingle(req, res, (err: any) => {
+      if (err) {
+        const msg =
+          err.code === "LIMIT_FILE_SIZE"
+            ? "File too large. Maximum size is 25MB."
+            : err.message || "Upload failed";
+        return res.status(400).json({ success: false, message: msg });
+      }
+      next();
+    });
+  },
+  verifyFileType,
+  asyncHandler(portalController.uploadSignedContractFile),
 );
 router.post(
   "/contracts/:id/sign",
