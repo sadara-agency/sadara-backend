@@ -7,8 +7,7 @@ import { tableExists } from "../migrationHelpers";
  * each source table every time.
  *
  * All INSERTs use ON CONFLICT DO NOTHING — safe to re-run.
- * All UUID comparisons cast both sides to ::text to avoid uuid = text type errors
- * when the attendee_id column is stored as VARCHAR rather than native UUID.
+ * All columns cast to ::text to avoid uuid/varchar type mismatches.
  */
 export async function up({
   context: queryInterface,
@@ -23,7 +22,7 @@ export async function up({
       INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
-        ce.id,
+        ce.id::text,
         'user',
         s.responsible_id::text,
         'accepted',
@@ -34,7 +33,7 @@ export async function up({
       WHERE s.responsible_id IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id = ce.id
+          WHERE ea.event_id::text = ce.id::text
             AND ea.attendee_type = 'user'
             AND ea.attendee_id::text = s.responsible_id::text
         )
@@ -45,7 +44,7 @@ export async function up({
       INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
-        ce.id,
+        ce.id::text,
         'player',
         s.player_id::text,
         'accepted',
@@ -56,7 +55,7 @@ export async function up({
       WHERE s.player_id IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id = ce.id
+          WHERE ea.event_id::text = ce.id::text
             AND ea.attendee_type = 'player'
             AND ea.attendee_id::text = s.player_id::text
         )
@@ -70,7 +69,7 @@ export async function up({
       INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
-        ce.id,
+        ce.id::text,
         'user',
         t.assigned_to::text,
         'accepted',
@@ -81,7 +80,7 @@ export async function up({
       WHERE t.assigned_to IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id = ce.id
+          WHERE ea.event_id::text = ce.id::text
             AND ea.attendee_type = 'user'
             AND ea.attendee_id::text = t.assigned_to::text
         )
@@ -95,7 +94,7 @@ export async function up({
       INSERT INTO event_attendees (id, event_id, attendee_type, attendee_id, status, created_at)
       SELECT
         gen_random_uuid(),
-        ce.id,
+        ce.id::text,
         'user',
         r.assigned_to::text,
         'accepted',
@@ -106,7 +105,7 @@ export async function up({
       WHERE r.assigned_to IS NOT NULL
         AND NOT EXISTS (
           SELECT 1 FROM event_attendees ea
-          WHERE ea.event_id = ce.id
+          WHERE ea.event_id::text = ce.id::text
             AND ea.attendee_type = 'user'
             AND ea.attendee_id::text = r.assigned_to::text
         )
@@ -126,7 +125,7 @@ export async function down({
     DELETE FROM event_attendees ea
     WHERE EXISTS (
       SELECT 1 FROM calendar_events ce
-      WHERE ce.id = ea.event_id
+      WHERE ce.id::text = ea.event_id::text
         AND ce.source_type IN ('session', 'task', 'referral')
     )
   `);
