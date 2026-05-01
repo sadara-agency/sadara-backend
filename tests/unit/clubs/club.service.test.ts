@@ -28,6 +28,14 @@ jest.mock('../../../src/modules/clubs/club.model', () => ({
   },
 }));
 
+const mockCCFindAll = jest.fn().mockResolvedValue([]);
+jest.mock('../../../src/modules/competitions/competition.model', () => ({
+  Competition: { name: 'Competition' },
+  ClubCompetition: {
+    findAll: (...a: unknown[]) => mockCCFindAll(...a),
+  },
+}));
+
 jest.mock('../../../src/modules/players/player.model', () => ({
   Player: { name: 'Player' },
 }));
@@ -78,6 +86,28 @@ describe('Club Service', () => {
       await clubService.listClubs({ search: 'Hilal', page: 1, limit: 10 });
 
       expect(mockFindAndCountAll).toHaveBeenCalled();
+    });
+
+    it('should filter by competitionId using ClubCompetition.findAll (no SQL injection)', async () => {
+      mockCCFindAll.mockResolvedValue([{ clubId: 'club-a' }, { clubId: 'club-b' }]);
+      mockFindAndCountAll.mockResolvedValue({ count: 2, rows: [] });
+
+      await clubService.listClubs({ competitionId: 'some-uuid', page: 1, limit: 10 });
+
+      expect(mockCCFindAll).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { competitionId: 'some-uuid' } }),
+      );
+      expect(mockFindAndCountAll).toHaveBeenCalled();
+    });
+
+    it('should not inject SQL when competitionId contains quotes', async () => {
+      mockCCFindAll.mockResolvedValue([]);
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await expect(
+        clubService.listClubs({ competitionId: "'; DROP TABLE clubs;--", page: 1, limit: 10 }),
+      ).resolves.not.toThrow();
+      expect(mockCCFindAll).toHaveBeenCalled();
     });
   });
 

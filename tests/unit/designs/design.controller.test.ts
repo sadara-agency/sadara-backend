@@ -134,4 +134,42 @@ describe("Design Controller", () => {
       expect(res.status).toHaveBeenCalledWith(200);
     });
   });
+
+  describe("uploadAsset", () => {
+    it("delegates to the service with the file buffer and base URL", async () => {
+      (designService.uploadDesignAsset as jest.Mock).mockResolvedValue({
+        id: "d1",
+        title: "Match",
+        assetUrl: "https://cdn/x.webp",
+      });
+      const res = mockRes();
+      const req = mockReq({
+        params: { id: "d1" },
+        file: {
+          buffer: Buffer.from("png"),
+          originalname: "poster.png",
+          mimetype: "image/png",
+        },
+      });
+      await controller.uploadAsset(req, res);
+
+      expect(designService.uploadDesignAsset).toHaveBeenCalledWith(
+        "d1",
+        expect.objectContaining({
+          originalname: "poster.png",
+          mimetype: "image/png",
+        }),
+        "https://localhost",
+      );
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
+
+    it("throws 400 when no file is attached", async () => {
+      const res = mockRes();
+      await expect(
+        controller.uploadAsset(mockReq({ params: { id: "d1" } }), res),
+      ).rejects.toThrow("No file uploaded");
+      expect(designService.uploadDesignAsset).not.toHaveBeenCalled();
+    });
+  });
 });

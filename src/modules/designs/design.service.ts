@@ -94,6 +94,52 @@ export async function deleteDesign(id: string) {
   return { id };
 }
 
+export async function uploadDesignAsset(
+  id: string,
+  file: { buffer: Buffer; originalname: string; mimetype: string },
+  baseUrl: string,
+) {
+  const item = await getDesignById(id);
+
+  // Read original dimensions before storage util resizes/transcodes.
+  // `sharp().metadata()` is image-only — for non-image files (e.g. PDF) we
+  // fall back to null dimensions.
+  let width: number | null = null;
+  let height: number | null = null;
+  if (file.mimetype.startsWith("image/")) {
+    try {
+      const sharp = (await import("sharp")).default;
+      const meta = await sharp(file.buffer).metadata();
+      width = meta.width ?? null;
+      height = meta.height ?? null;
+    } catch {
+      // sharp can fail on HEIC without libheif — leave dims null
+    }
+  }
+
+  const { uploadFile } = await import("@shared/utils/storage");
+  const result = await uploadFile({
+    folder: "designs",
+    originalName: file.originalname,
+    mimeType: file.mimetype,
+    buffer: file.buffer,
+    generateThumbnail: true,
+  });
+
+  // Local-disk results return a relative path like "/uploads/..." — make it
+  // absolute so the frontend can render <img src> directly. GCS results are
+  // already full https:// URLs.
+  const assetUrl = result.url.startsWith("http")
+    ? result.url
+    : `${baseUrl}${result.url}`;
+
+  return item.update({
+    assetUrl,
+    assetWidth: width,
+    assetHeight: height,
+  });
+}
+
 export async function publishDesign(id: string) {
   const item = await getDesignById(id);
   if (!item.assetUrl) {

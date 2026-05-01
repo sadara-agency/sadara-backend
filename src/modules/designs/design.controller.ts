@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
+import { AppError } from "@middleware/errorHandler";
 import { createCrudController } from "@shared/utils/crudController";
 import { CachePrefix, invalidateMultiple } from "@shared/utils/cache";
 import { sendSuccess } from "@shared/utils/apiResponse";
@@ -40,4 +41,41 @@ export async function publish(req: AuthRequest, res: Response): Promise<void> {
       `Published "${design.title}"`,
     ),
   ]).catch((err) => logger.warn("design.publish side-effects failed", { err }));
+}
+
+// ── Custom: upload asset ──
+
+export async function uploadAsset(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  if (!req.file) throw new AppError("No file uploaded", 400);
+
+  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  const design = await designService.uploadDesignAsset(
+    req.params.id,
+    {
+      buffer: req.file.buffer,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+    },
+    baseUrl,
+  );
+
+  sendSuccess(res, design, "Asset uploaded");
+
+  if (!req.user) return;
+  const ctx = buildAuditContext(req.user, req.ip);
+  Promise.all([
+    invalidateMultiple([CachePrefix.DESIGNS, CachePrefix.DASHBOARD]),
+    logAudit(
+      "UPDATE",
+      "designs",
+      design.id,
+      ctx,
+      `Uploaded asset for "${design.title}"`,
+    ),
+  ]).catch((err) =>
+    logger.warn("design.uploadAsset side-effects failed", { err }),
+  );
 }
