@@ -494,6 +494,24 @@ export async function getMyContracts(userId: string) {
   return { contracts };
 }
 
+/**
+ * Lightweight ownership check — throws 404/403 without locking the row.
+ * Use before a file-upload step that must happen before the atomic sign transaction.
+ */
+export async function verifyContractOwnership(
+  playerId: string,
+  contractId: string,
+): Promise<void> {
+  const contract = await Contract.findByPk(contractId);
+  if (!contract) throw new AppError("Contract not found", 404);
+  if (contract.playerId !== playerId) {
+    throw new AppError("You are not authorized for this contract", 403);
+  }
+  if (contract.status !== "AwaitingPlayer") {
+    throw new AppError("This contract is not awaiting your signature", 400);
+  }
+}
+
 export async function signMyContract(
   userId: string,
   contractId: string,

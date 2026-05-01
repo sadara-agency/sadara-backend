@@ -4,6 +4,7 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AppError } from "@middleware/errorHandler";
 import { AuthRequest } from "@shared/types";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { uploadFile } from "@shared/utils/storage";
 import * as portalService from "@modules/portal/portal.service";
 import * as documentService from "@modules/documents/document.service";
 
@@ -211,6 +212,38 @@ export async function requestProfileLink(req: AuthRequest, res: Response) {
     `Player portal: profile-link request notified ${data.notified} ${data.target}`,
   );
   sendSuccess(res, data, "Request sent");
+}
+
+// ── Upload Signed Contract document (Player only, step before sign/upload) ──
+
+export async function uploadSignedContractFile(
+  req: AuthRequest,
+  res: Response,
+) {
+  const { id } = req.params;
+  if (!req.file) throw new AppError("No file provided", 400);
+
+  // Verify contract belongs to this player before accepting the upload
+  const player = await portalService.getLinkedPlayer(req.user!.id);
+  await portalService.verifyContractOwnership(player.id, id);
+
+  const result = await uploadFile({
+    folder: "signed-contracts",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: false,
+  });
+
+  await logAudit(
+    "UPDATE",
+    "contracts",
+    id,
+    buildAuditContext(req.user!, req.ip),
+    `Player uploaded signed contract document (${req.file.originalname})`,
+  );
+
+  sendCreated(res, { url: result.url, key: result.key });
 }
 
 // ── Admin: Resend Invite ──
