@@ -62,6 +62,11 @@ router.patch(
   asyncHandler(portalController.updateMyProfile),
 );
 router.post(
+  "/me/request-link",
+  authorize("Player"),
+  asyncHandler(portalController.requestProfileLink),
+);
+router.post(
   "/me/avatar",
   authorize("Player"),
   (req, res, next) => {

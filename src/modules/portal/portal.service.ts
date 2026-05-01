@@ -17,6 +17,11 @@ import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
 import { AppError } from "@middleware/errorHandler";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { PlayerAccount } from "@modules/portal/playerAccount.model";
+import {
+  notifyByRole,
+  notifyUser,
+} from "@modules/notifications/notification.service";
+import { cacheGet, cacheSet } from "@shared/utils/cache";
 
 // ══════════════════════════════════════════
 // RESOLVE: User → Player
@@ -1140,5 +1145,92 @@ export async function resendPlayerInvite(accountId: string) {
     expiresAt: expiry,
     email: account.email,
     fullName: account.fullName,
+  };
+}
+
+// ══════════════════════════════════════════
+// REQUEST PROFILE LINK
+// (Player taps "Notify my agent" from the unlinked empty state)
+// ══════════════════════════════════════════
+
+const REQUEST_LINK_COOLDOWN_SEC = 24 * 60 * 60;
+
+export async function requestProfileLink(userId: string) {
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "email", "fullName", "fullNameAr", "role", "playerId"],
+  });
+  if (!user) throw new AppError("User not found", 404);
+  if (user.role !== "Player") {
+    throw new AppError("Only players can request profile linking", 403);
+  }
+  if (user.playerId) {
+    throw new AppError("Your profile is already linked", 400);
+  }
+
+  const cooldownKey = `portal:link-request:${userId}`;
+  const recent = await cacheGet<{ at: string }>(cooldownKey);
+  if (recent) {
+    throw new AppError(
+      "A link request was already sent recently. Try again tomorrow.",
+      429,
+    );
+  }
+
+  // Try to find a Player row matching the user's email — that gives us the agent.
+  const playerByEmail = user.email
+    ? await Player.findOne({
+        where: { email: user.email },
+        attributes: ["id", "agentId", "firstName", "lastName"],
+      })
+    : null;
+
+  const playerLabel = playerByEmail
+    ? `${playerByEmail.firstName ?? ""} ${playerByEmail.lastName ?? ""}`.trim()
+    : user.fullName || user.email;
+
+  const title = `Player wants to link their profile`;
+  const titleAr = `لاعب يطلب ربط ملفه`;
+  const body = `${playerLabel} (${user.email}) is signed in but their portal account is not linked to a player profile yet.`;
+  const bodyAr = `${playerLabel} (${user.email}) سجّل الدخول، لكن حسابه غير مرتبط بملف لاعب.`;
+  const link = `/dashboard/settings?tab=playerAccounts`;
+
+  let notified = 0;
+  if (playerByEmail?.agentId) {
+    const created = await notifyUser(playerByEmail.agentId, {
+      type: "system",
+      title,
+      titleAr,
+      body,
+      bodyAr,
+      link,
+      sourceType: "portal-link-request",
+      sourceId: userId,
+      priority: "high",
+    });
+    notified = created ? 1 : 0;
+  } else {
+    notified = await notifyByRole(["Admin", "Manager"], {
+      type: "system",
+      title,
+      titleAr,
+      body,
+      bodyAr,
+      link,
+      sourceType: "portal-link-request",
+      sourceId: userId,
+      priority: "normal",
+    });
+  }
+
+  await cacheSet(
+    cooldownKey,
+    { at: new Date().toISOString() },
+    REQUEST_LINK_COOLDOWN_SEC,
+  );
+
+  return {
+    notified,
+    target: playerByEmail?.agentId ? "agent" : "admins",
+    cooldownSeconds: REQUEST_LINK_COOLDOWN_SEC,
   };
 }

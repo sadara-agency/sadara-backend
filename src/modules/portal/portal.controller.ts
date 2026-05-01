@@ -199,6 +199,20 @@ export async function deletePlayerAccount(req: AuthRequest, res: Response) {
   sendSuccess(res, data, "Player account deleted");
 }
 
+// ── Request Profile Link (Player taps "Notify my agent") ──
+
+export async function requestProfileLink(req: AuthRequest, res: Response) {
+  const data = await portalService.requestProfileLink(req.user!.id);
+  await logAudit(
+    "CREATE",
+    "notifications",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `Player portal: profile-link request notified ${data.notified} ${data.target}`,
+  );
+  sendSuccess(res, data, "Request sent");
+}
+
 // ── Admin: Resend Invite ──
 
 export async function resendInvite(req: AuthRequest, res: Response) {
