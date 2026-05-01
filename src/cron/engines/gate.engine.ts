@@ -6,6 +6,7 @@
 // progression nudges, and clearance follow-up tracking.
 // ═══════════════════════════════════════════════════════════════
 
+import { Op } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import { Task } from "@modules/tasks/task.model";
@@ -112,13 +113,13 @@ async function createGateTask(opts: {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const existing = await Task.findOne({
-    where: sequelize.literal(`
-      player_id = '${opts.playerId}'
-      AND trigger_rule_id = '${opts.triggerRuleId}'
-      AND is_auto_created = true
-      AND created_at > '${sevenDaysAgo.toISOString()}'
-      AND status NOT IN ('Completed', 'Canceled')
-    `),
+    where: {
+      playerId: opts.playerId,
+      triggerRuleId: opts.triggerRuleId,
+      isAutoCreated: true,
+      createdAt: { [Op.gt]: sevenDaysAgo },
+      status: { [Op.notIn]: ["Completed", "Canceled"] },
+    },
   });
   if (existing) return false;
 

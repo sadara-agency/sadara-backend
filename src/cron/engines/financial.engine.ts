@@ -7,6 +7,7 @@
 // staleness tracking.
 // ═══════════════════════════════════════════════════════════════
 
+import { Op } from "sequelize";
 import { sequelize } from "@config/database";
 import { logger } from "@config/logger";
 import { Task } from "@modules/tasks/task.model";
@@ -110,18 +111,14 @@ async function createFinanceTask(opts: {
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   // Dedup: same rule + player (or just rule if no player) within 7 days
-  const playerClause = opts.playerId
-    ? `AND player_id = '${opts.playerId}'`
-    : `AND player_id IS NULL`;
-
   const existing = await Task.findOne({
-    where: sequelize.literal(`
-      trigger_rule_id = '${opts.triggerRuleId}'
-      ${playerClause}
-      AND is_auto_created = true
-      AND created_at > '${sevenDaysAgo.toISOString()}'
-      AND status NOT IN ('Completed', 'Canceled')
-    `),
+    where: {
+      triggerRuleId: opts.triggerRuleId,
+      playerId: opts.playerId ?? null,
+      isAutoCreated: true,
+      createdAt: { [Op.gt]: sevenDaysAgo },
+      status: { [Op.notIn]: ["Completed", "Canceled"] },
+    },
   });
   if (existing) return false;
 
