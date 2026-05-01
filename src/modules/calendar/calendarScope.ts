@@ -1,7 +1,50 @@
 import { PlayerCoachAssignment } from "@modules/player-coach-assignments/playerCoachAssignment.model";
+import { EventAttendee } from "@modules/calendar/event.model";
 import { cacheGet, cacheSet, CacheTTL, CachePrefix } from "@shared/utils/cache";
 import { logger } from "@config/logger";
 import type { UserRole } from "@shared/types";
+
+// ── Attendee sync helpers ──
+
+type AttendeeRow = { type: "user" | "player"; id: string };
+
+/**
+ * Fire-and-forget: insert attendee rows on any calendar_event linked to this
+ * source. Safe after create OR update — ignoreDuplicates prevents double-inserts.
+ */
+export function upsertSourceAttendees(
+  sourceType: "session" | "task" | "referral",
+  sourceId: string,
+  attendees: AttendeeRow[],
+): void {
+  if (!attendees.length) return;
+
+  void (async () => {
+    try {
+      const { CalendarEvent } = await import("@modules/calendar/event.model");
+      const events = await CalendarEvent.findAll({
+        where: { sourceType, sourceId },
+        attributes: ["id"],
+      });
+      if (!events.length) return;
+
+      const rows = events.flatMap((ev) =>
+        attendees.map((a) => ({
+          eventId: ev.id,
+          attendeeType: a.type,
+          attendeeId: a.id,
+        })),
+      );
+      await EventAttendee.bulkCreate(rows, { ignoreDuplicates: true });
+    } catch (err) {
+      logger.warn("upsertSourceAttendees: failed", {
+        sourceType,
+        sourceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  })();
+}
 
 export const PRIVILEGED_ROLES: UserRole[] = [
   "Admin",

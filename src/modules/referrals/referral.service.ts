@@ -27,6 +27,7 @@ import { logger } from "@config/logger";
 import { logAudit } from "@shared/utils/audit";
 import { generateCriticalReferralTask } from "@modules/referrals/referralAutoTasks";
 import { generateDisplayId } from "@shared/utils/displayId";
+import { upsertSourceAttendees } from "@modules/calendar/calendarScope";
 
 const PLAYER_ATTRS = [
   "id",
@@ -193,6 +194,15 @@ export async function createReferral(
     assignedAt: input.assignedTo ? new Date() : null,
   });
 
+  // Sync attendees for calendar visibility
+  const referralAttendees = [
+    ...(referral.assignedTo
+      ? [{ type: "user" as const, id: referral.assignedTo }]
+      : []),
+    ...(userId ? [{ type: "user" as const, id: userId }] : []),
+  ];
+  upsertSourceAttendees("referral", referral.id, referralAttendees);
+
   // ── Push notification (non-blocking) ──
   const playerName = `${player.firstName} ${player.lastName}`.trim();
   const playerNameAr = (player as any).firstNameAr
@@ -274,6 +284,23 @@ export async function updateReferral(id: string, input: any, user?: AuthUser) {
   }
 
   await referral.update(input);
+
+  // Re-sync attendees if assignee changed
+  if (input.assignedTo !== undefined) {
+    const updated = await refetchWithIncludes(id);
+    const currentAssignedTo = (updated as any).assignedTo;
+    const currentCreatedBy = (updated as any).createdBy;
+    const syncAttendees = [
+      ...(currentAssignedTo
+        ? [{ type: "user" as const, id: currentAssignedTo }]
+        : []),
+      ...(currentCreatedBy
+        ? [{ type: "user" as const, id: currentCreatedBy }]
+        : []),
+    ];
+    upsertSourceAttendees("referral", id, syncAttendees);
+  }
+
   return refetchWithIncludes(id);
 }
 

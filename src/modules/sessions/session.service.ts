@@ -11,6 +11,7 @@ import { Match } from "@modules/matches/match.model";
 import { AppError } from "@middleware/errorHandler";
 import { findOrThrow } from "@shared/utils/serviceHelpers";
 import { generateDisplayId } from "@shared/utils/displayId";
+import { upsertSourceAttendees } from "@modules/calendar/calendarScope";
 import {
   buildRowScope,
   mergeScope,
@@ -217,6 +218,17 @@ export async function createSession(body: CreateSessionInput, userId: string) {
     createdBy: userId,
   });
 
+  // Sync attendees for calendar visibility
+  const attendees = [
+    ...(session.playerId
+      ? [{ type: "player" as const, id: session.playerId }]
+      : []),
+    ...(session.responsibleId
+      ? [{ type: "user" as const, id: session.responsibleId }]
+      : []),
+  ];
+  upsertSourceAttendees("session", session.id, attendees);
+
   return Session.findByPk(session.id, { include: sessionIncludes() });
 }
 
@@ -227,6 +239,23 @@ export async function updateSession(id: string, body: UpdateSessionInput) {
   if (!session) throw new AppError("Session not found", 404);
 
   await session.update(body);
+
+  // Re-sync attendees if ownership fields changed
+  if (body.responsibleId !== undefined) {
+    const updated = await Session.findByPk(id);
+    if (updated) {
+      const attendees = [
+        ...(updated.playerId
+          ? [{ type: "player" as const, id: updated.playerId }]
+          : []),
+        ...(updated.responsibleId
+          ? [{ type: "user" as const, id: updated.responsibleId }]
+          : []),
+      ];
+      upsertSourceAttendees("session", id, attendees);
+    }
+  }
+
   return Session.findByPk(id, { include: sessionIncludes() });
 }
 

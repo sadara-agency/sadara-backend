@@ -73,6 +73,11 @@ jest.mock("../../../src/config/logger", () => ({
   },
 }));
 
+jest.mock("../../../src/modules/calendar/calendarScope", () => ({
+  upsertSourceAttendees: jest.fn(),
+  evictCalendarScope: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as service from "../../../src/modules/player-coach-assignments/playerCoachAssignment.service";
 
 const flushPromises = () =>

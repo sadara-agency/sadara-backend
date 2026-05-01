@@ -58,6 +58,11 @@ jest.mock('../../../src/shared/utils/verifyRole', () => ({
   verifyUserRole: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/modules/calendar/calendarScope', () => ({
+  upsertSourceAttendees: jest.fn(),
+  evictCalendarScope: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as referralService from '../../../src/modules/referrals/referral.service';
 
 const adminUser = { id: 'user-001', email: 'a@s.io', fullName: 'Admin', role: 'Admin' as const };

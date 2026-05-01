@@ -89,25 +89,7 @@ export async function listEvents(queryParams: EventQuery) {
     ];
   }
 
-  // Filter by attendee (player or user)
   const includesForQuery = [...EVENT_INCLUDES];
-  if (queryParams.playerId || queryParams.userId) {
-    const attendeeWhere: any = {};
-    if (queryParams.playerId) {
-      attendeeWhere.attendeeType = "player";
-      attendeeWhere.attendeeId = queryParams.playerId;
-    } else {
-      attendeeWhere.attendeeType = "user";
-      attendeeWhere.attendeeId = queryParams.userId;
-    }
-
-    // Replace the attendees include to add a where clause
-    includesForQuery[1] = {
-      ...includesForQuery[1],
-      where: attendeeWhere,
-      required: true,
-    } as any;
-  }
 
   const { count, rows } = await CalendarEvent.findAndCountAll({
     where,

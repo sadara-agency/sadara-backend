@@ -33,6 +33,7 @@ import {
   mergeScope,
   checkRowAccess,
 } from "@shared/utils/rowScope";
+import { upsertSourceAttendees } from "@modules/calendar/calendarScope";
 
 // ── Shared includes for player + assignee names ──
 // `assignee` exposes role + email so list endpoints can filter by role and
@@ -373,6 +374,17 @@ export async function createTask(
     isAutoCreated: input.isAutoCreated ?? false,
   });
 
+  // Sync attendees for calendar visibility
+  const taskAttendees = [
+    ...(task.assignedTo
+      ? [{ type: "user" as const, id: task.assignedTo }]
+      : []),
+    ...(task.assignedBy
+      ? [{ type: "user" as const, id: task.assignedBy }]
+      : []),
+  ];
+  upsertSourceAttendees("task", task.id, taskAttendees);
+
   // Re-fetch with associations for the response
   return getTaskById(task.id);
 }
@@ -392,6 +404,22 @@ export async function updateTask(id: string, input: UpdateTaskInput) {
   ]);
 
   await task.update(input);
+
+  // Re-sync attendees if assignee changed
+  if (input.assignedTo !== undefined) {
+    const updated = await Task.findByPk(id);
+    if (updated) {
+      const attendees = [
+        ...(updated.assignedTo
+          ? [{ type: "user" as const, id: updated.assignedTo }]
+          : []),
+        ...(updated.assignedBy
+          ? [{ type: "user" as const, id: updated.assignedBy }]
+          : []),
+      ];
+      upsertSourceAttendees("task", id, attendees);
+    }
+  }
 
   // Re-fetch with associations
   return getTaskById(id);
