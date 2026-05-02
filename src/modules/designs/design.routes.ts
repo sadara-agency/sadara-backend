@@ -10,6 +10,9 @@ import {
   createDesignSchema,
   updateDesignSchema,
   designQuerySchema,
+  quickContentSchema,
+  reviewNotesSchema,
+  markPublishedSchema,
 } from "./design.validation";
 import * as designController from "./design.controller";
 
@@ -20,7 +23,7 @@ router.use(authenticate);
  * @swagger
  * /designs:
  *   get:
- *     summary: List graphic designs
+ *     summary: List content items (designs)
  *     tags: [Designs]
  *     security:
  *       - bearerAuth: []
@@ -29,24 +32,23 @@ router.use(authenticate);
  *         name: status
  *         schema:
  *           type: string
- *           enum: [draft, in_progress, review, approved, published, archived]
+ *           enum: [Idea, Drafting, DesignNeeded, PendingApproval, Approved, Scheduled, Published, Postponed, Rejected]
  *       - in: query
  *         name: type
  *         schema:
  *           type: string
- *           enum: [pre_match, post_match, profile_card, match_day_poster, social_post, motm, quote, milestone]
+ *           enum: [Tweet, InstagramPost, Story, Reel, Video, PlayerAnnouncement, News, Thread, Design]
  *       - in: query
- *         name: playerId
- *         schema: { type: string, format: uuid }
+ *         name: scheduledDate
+ *         schema: { type: string, format: date }
+ *         description: Filter by scheduled date (YYYY-MM-DD) — used for Today's Publishing
  *       - in: query
- *         name: matchId
- *         schema: { type: string, format: uuid }
- *       - in: query
- *         name: clubId
- *         schema: { type: string, format: uuid }
+ *         name: isLate
+ *         schema: { type: boolean }
+ *         description: Return overdue unpublished items
  *     responses:
  *       200:
- *         description: Paginated list with player, match, club and creator eager-loaded
+ *         description: Paginated list
  */
 router.get(
   "/",
@@ -57,25 +59,6 @@ router.get(
   asyncHandler(designController.list),
 );
 
-/**
- * @swagger
- * /designs/{id}:
- *   get:
- *     summary: Get a design by ID
- *     tags: [Designs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: Design detail
- *       404:
- *         description: Not found
- */
 router.get(
   "/:id",
   authorizeModule("designs", "read"),
@@ -88,31 +71,10 @@ router.get(
  * @swagger
  * /designs:
  *   post:
- *     summary: Create a graphic design
+ *     summary: Create a content item
  *     tags: [Designs]
  *     security:
  *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [title, type]
- *             properties:
- *               title: { type: string }
- *               type: { type: string }
- *               format: { type: string }
- *               playerId: { type: string, format: uuid, nullable: true }
- *               matchId: { type: string, format: uuid, nullable: true }
- *               clubId: { type: string, format: uuid, nullable: true }
- *               description: { type: string, nullable: true }
- *               tags: { type: array, items: { type: string } }
- *     responses:
- *       201:
- *         description: Created
- *       404:
- *         description: Referenced player/match/club not found
  */
 router.post(
   "/",
@@ -123,23 +85,20 @@ router.post(
 
 /**
  * @swagger
- * /designs/{id}:
- *   patch:
- *     summary: Update a design
+ * /designs/quick:
+ *   post:
+ *     summary: Quick Content — create in under a minute (5 required fields)
  *     tags: [Designs]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: Updated
- *       404:
- *         description: Not found
  */
+router.post(
+  "/quick",
+  authorizeModule("designs", "create"),
+  validate(quickContentSchema),
+  asyncHandler(designController.quickCreate),
+);
+
 router.patch(
   "/:id",
   authorizeModule("designs", "update"),
@@ -147,78 +106,108 @@ router.patch(
   asyncHandler(designController.update),
 );
 
+// ── Workflow transitions ──
+
 /**
  * @swagger
- * /designs/{id}/publish:
+ * /designs/{id}/submit-for-approval:
  *   post:
- *     summary: Publish a design (sets status=published, stamps published_at)
+ *     summary: Submit content for approval → status = PendingApproval
  *     tags: [Designs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: Published
- *       404:
- *         description: Not found
- *       422:
- *         description: Cannot publish without an asset
  */
+router.post(
+  "/:id/submit-for-approval",
+  authorizeModule("designs", "update"),
+  asyncHandler(designController.submitForApproval),
+);
+
+/**
+ * @swagger
+ * /designs/{id}/approve:
+ *   post:
+ *     summary: Approve content → status = Approved
+ *     tags: [Designs]
+ */
+router.post(
+  "/:id/approve",
+  authorizeModule("designs", "update"),
+  asyncHandler(designController.approve),
+);
+
+/**
+ * @swagger
+ * /designs/{id}/request-changes:
+ *   post:
+ *     summary: Request edits → status = Drafting + reviewNotes required
+ *     tags: [Designs]
+ */
+router.post(
+  "/:id/request-changes",
+  authorizeModule("designs", "update"),
+  validate(reviewNotesSchema),
+  asyncHandler(designController.requestChanges),
+);
+
+/**
+ * @swagger
+ * /designs/{id}/reject:
+ *   post:
+ *     summary: Reject content → status = Rejected + reviewNotes required
+ *     tags: [Designs]
+ */
+router.post(
+  "/:id/reject",
+  authorizeModule("designs", "update"),
+  validate(reviewNotesSchema),
+  asyncHandler(designController.reject),
+);
+
+/**
+ * @swagger
+ * /designs/{id}/mark-published:
+ *   post:
+ *     summary: Mark as published → status = Published, stamps publishedAt
+ *     tags: [Designs]
+ */
+router.post(
+  "/:id/mark-published",
+  authorizeModule("designs", "update"),
+  validate(markPublishedSchema),
+  asyncHandler(designController.markPublished),
+);
+
+/**
+ * @swagger
+ * /designs/{id}/postpone:
+ *   post:
+ *     summary: Postpone content → status = Postponed
+ *     tags: [Designs]
+ */
+router.post(
+  "/:id/postpone",
+  authorizeModule("designs", "update"),
+  asyncHandler(designController.postpone),
+);
+
+// ── Legacy alias ──
 router.post(
   "/:id/publish",
   authorizeModule("designs", "update"),
   asyncHandler(designController.publish),
 );
 
-/**
- * @swagger
- * /designs/{id}/asset:
- *   post:
- *     summary: Upload the asset (image/PDF) for a design
- *     description: |
- *       Accepts a multipart/form-data field named `file`. Pushes the buffer
- *       through the shared storage util (GCS in prod, local disk in dev) and
- *       updates the design's asset_url/asset_width/asset_height columns.
- *     tags: [Designs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *     responses:
- *       200:
- *         description: Updated design with assetUrl set
- *       400:
- *         description: No file uploaded or unsupported MIME type
- *       404:
- *         description: Design not found
- */
+// ── Asset upload ──
 router.post(
   "/:id/asset",
   authorizeModule("designs", "update"),
   (req, res, next) => {
-    uploadSingle(req, res, (err: any) => {
+    uploadSingle(req, res, (err: unknown) => {
       if (err) {
+        const e = err as { code?: string; message?: string };
         const msg =
-          err.code === "LIMIT_FILE_SIZE"
+          e.code === "LIMIT_FILE_SIZE"
             ? "File too large. Maximum size is 25MB."
-            : err.message || "Upload failed";
+            : e.message || "Upload failed";
         return res.status(400).json({ success: false, message: msg });
       }
       next();
@@ -228,25 +217,6 @@ router.post(
   asyncHandler(designController.uploadAsset),
 );
 
-/**
- * @swagger
- * /designs/{id}:
- *   delete:
- *     summary: Delete a design
- *     tags: [Designs]
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: Deleted
- *       404:
- *         description: Not found
- */
 router.delete(
   "/:id",
   authorizeModule("designs", "delete"),

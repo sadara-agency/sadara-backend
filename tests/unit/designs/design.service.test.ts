@@ -62,6 +62,11 @@ jest.mock("../../../src/modules/users/user.model", () => ({
   User: { name: "User" },
 }));
 
+jest.mock("../../../src/modules/notifications/notification.service", () => ({
+  createNotification: jest.fn().mockResolvedValue(undefined),
+  notifyByRole: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("../../../src/config/logger", () => ({
   logger: {
     info: jest.fn(),
@@ -95,8 +100,8 @@ import type { CreateDesignInput } from "../../../src/modules/designs/design.vali
 
 const baseCreate: CreateDesignInput = {
   title: "Match Day vs Al-Nassr",
-  type: "match_day_poster",
-  status: "draft",
+  type: "Design",
+  status: "Drafting",
   format: "square_1080",
   description: null,
   assetUrl: null,
@@ -111,8 +116,8 @@ const baseCreate: CreateDesignInput = {
 const designRow = (overrides: Record<string, any> = {}) => ({
   id: "design-001",
   title: "Match Day vs Al-Nassr",
-  type: "match_day_poster",
-  status: "draft" as const,
+  type: "Design",
+  status: "Drafting",
   format: "square_1080" as const,
   playerId: null,
   matchId: null,
@@ -222,6 +227,7 @@ describe("Design Service", () => {
       expect(result).toBeDefined();
       expect(mockDesignCreate).toHaveBeenCalledWith({
         ...baseCreate,
+        scheduledAt: null,
         createdBy: "user-001",
       });
       // None of the FK lookups should fire because all FKs are null
@@ -333,29 +339,30 @@ describe("Design Service", () => {
   describe("publishDesign", () => {
     it("publishes a design that has an asset", async () => {
       const inst = mockModelInstance(
-        designRow({ status: "approved", assetUrl: "https://cdn/x.png" }),
+        designRow({ status: "Approved", assetUrl: "https://cdn/x.png" }),
       );
       mockDesignFindByPk.mockResolvedValue(inst);
 
       await designService.publishDesign("design-001");
 
       expect(inst.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: "published" }),
+        expect.objectContaining({ status: "Published" }),
       );
       const updateArg = (inst.update as jest.Mock).mock.calls[0][0];
       expect(updateArg.publishedAt).toBeInstanceOf(Date);
     });
 
-    it("throws 422 when the design has no asset", async () => {
+    it("marks as published even without an asset (copy-only content)", async () => {
       const inst = mockModelInstance(
-        designRow({ status: "approved", assetUrl: null }),
+        designRow({ status: "Approved", assetUrl: null }),
       );
       mockDesignFindByPk.mockResolvedValue(inst);
 
-      await expect(designService.publishDesign("design-001")).rejects.toThrow(
-        "Cannot publish a design without an uploaded asset",
+      await designService.publishDesign("design-001");
+
+      expect(inst.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "Published" }),
       );
-      expect(inst.update).not.toHaveBeenCalled();
     });
 
     it("throws 404 when the design does not exist", async () => {

@@ -111,6 +111,10 @@ import { refreshExpiringManifests } from "@modules/saffplus/saffplus.service";
 
 import { runCloseIdleSessions } from "@modules/staffMonitoring/staffMonitoring.cron";
 import { pollLiveMatches } from "@modules/spl/spl.liveMatch.poller";
+import {
+  getLatePublishingItems,
+  getUpcomingScheduled,
+} from "@modules/designs/design.service";
 
 /**
  * Get today's date as YYYY-MM-DD in the server's local timezone.
@@ -892,6 +896,53 @@ async function cleanup() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// JOB: Media — 2-hour pre-publish reminder
+// ══════════════════════════════════════════════════════════════
+
+async function checkMediaPrePublish() {
+  const items = await getUpcomingScheduled(120);
+  if (items.length === 0) return { notified: 0 };
+
+  await Promise.all(
+    items.map((item) => {
+      const notifyId = item.ownerId ?? item.createdBy;
+      return notifyUser(notifyId, {
+        type: "task",
+        title: `Publishing in 2 hours: ${item.title}`,
+        titleAr: `نشر خلال ساعتين: ${item.title}`,
+        link: `/designer-hub/today`,
+        sourceType: "designs",
+        sourceId: item.id,
+        priority: "high",
+      });
+    }),
+  );
+
+  return { notified: items.length };
+}
+
+// ══════════════════════════════════════════════════════════════
+// JOB: Media — Late Publishing detector
+// ══════════════════════════════════════════════════════════════
+
+async function checkMediaLatePublishing() {
+  const items = await getLatePublishingItems();
+  if (items.length === 0) return { late: 0 };
+
+  await notifyByRole(["Admin", "Manager", "ContentManager"], {
+    type: "task",
+    title: `${items.length} content item(s) are overdue for publishing`,
+    titleAr: `${items.length} محتوى متأخر عن موعد النشر`,
+    link: `/designer-hub/board`,
+    sourceType: "designs",
+    sourceId: items[0]?.id,
+    priority: "high",
+  });
+
+  return { late: items.length };
+}
+
+// ══════════════════════════════════════════════════════════════
 // REGISTER ALL JOBS
 // ══════════════════════════════════════════════════════════════
 
@@ -1199,6 +1250,12 @@ export async function startCronJobs() {
   schedule("*/5 * * * *", "saudi-leagues-live-events"); // Every 5 min — SAFF+ event timeline ticker
   schedule("*/15 * * * *", "saffplus-manifest-refresh"); // Every 15 min — renew expiring HLS manifests
 
+  // ── Media Publishing ──
+  registerJob("media-pre-publish-reminder", checkMediaPrePublish);
+  registerJob("media-late-publishing", checkMediaLatePublishing);
+  schedule("*/15 * * * *", "media-pre-publish-reminder"); // Every 15 min
+  schedule("*/15 * * * *", "media-late-publishing"); // Every 15 min
+
   // ── Staff Monitoring — idle session closer ──
   registerJob("staff-monitoring-close-idle", runCloseIdleSessions);
   schedule("*/10 * * * *", "staff-monitoring-close-idle"); // Every 10 min
@@ -1207,5 +1264,5 @@ export async function startCronJobs() {
   registerJob("spl-live-match-poll", pollLiveMatches);
   // schedule("*/30 * * * * *", "spl-live-match-poll"); // Every 30 seconds — disabled
 
-  logger.info("[CRON] 69 jobs scheduled ✓");
+  logger.info("[CRON] 71 jobs scheduled ✓");
 }

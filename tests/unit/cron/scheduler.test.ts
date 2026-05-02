@@ -151,6 +151,10 @@ jest.mock('../../../src/cron/engines/saudiLeagues.engine', () => ({
 jest.mock('../../../src/modules/spl/spl.liveMatch.poller', () => ({
   pollLiveMatches: jest.fn(),
 }));
+jest.mock('../../../src/modules/designs/design.service', () => ({
+  getLatePublishingItems: jest.fn().mockResolvedValue([]),
+  getUpcomingScheduled: jest.fn().mockResolvedValue([]),
+}));
 
 // Mock appSettings to prevent DB call in syncDisabledJobsToRedis
 jest.mock('../../../src/shared/utils/appSettings', () => ({
@@ -268,7 +272,7 @@ describe('Cron Scheduler', () => {
     it('should schedule all 69 cron jobs', async () => {
       await startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(69);
+      expect(cron.schedule).toHaveBeenCalledTimes(71);
     });
 
     it('should log initialization', async () => {
