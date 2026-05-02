@@ -2,28 +2,56 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
 export type DesignType =
-  | "pre_match"
-  | "post_match"
-  | "profile_card"
-  | "match_day_poster"
-  | "social_post"
-  | "motm"
-  | "quote"
-  | "milestone";
+  | "Tweet"
+  | "InstagramPost"
+  | "Story"
+  | "Reel"
+  | "Video"
+  | "PlayerAnnouncement"
+  | "News"
+  | "Thread"
+  | "Design";
 
 export type DesignStatus =
-  | "draft"
-  | "in_progress"
-  | "review"
-  | "approved"
-  | "published"
-  | "archived";
+  | "Idea"
+  | "Drafting"
+  | "DesignNeeded"
+  | "PendingApproval"
+  | "Approved"
+  | "Scheduled"
+  | "Published"
+  | "Postponed"
+  | "Rejected";
 
 export type DesignFormat =
   | "square_1080"
   | "portrait_1080x1350"
   | "landscape_1920x1080"
   | "custom";
+
+export type DesignPriority = "High" | "Medium" | "Low";
+
+export type DesignPlatform =
+  | "X"
+  | "Instagram"
+  | "TikTok"
+  | "LinkedIn"
+  | "Snapchat"
+  | "YouTubeShorts";
+
+export type ContentPillar =
+  | "Brand"
+  | "Players"
+  | "Commercial"
+  | "Community"
+  | "Announcements"
+  | "Media";
+
+export interface MediaLink {
+  kind: "figma" | "drive" | "upload" | "url";
+  url: string;
+  label?: string;
+}
 
 interface DesignAttributes {
   id: string;
@@ -41,6 +69,21 @@ interface DesignAttributes {
   tags: string[] | null;
   createdBy: string;
   publishedAt: Date | null;
+  // New media-publishing fields
+  platforms: DesignPlatform[] | null;
+  copyAr: string | null;
+  copyEn: string | null;
+  mediaLinks: MediaLink[] | null;
+  scheduledAt: Date | null;
+  ownerId: string | null;
+  approverId: string | null;
+  priority: DesignPriority | null;
+  contentPillar: ContentPillar | null;
+  publishedLink: string | null;
+  reviewNotes: string | null;
+  eventId: string | null;
+  contractId: string | null;
+  campaignId: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -59,6 +102,20 @@ interface DesignCreationAttributes extends Optional<
   | "description"
   | "tags"
   | "publishedAt"
+  | "platforms"
+  | "copyAr"
+  | "copyEn"
+  | "mediaLinks"
+  | "scheduledAt"
+  | "ownerId"
+  | "approverId"
+  | "priority"
+  | "contentPillar"
+  | "publishedLink"
+  | "reviewNotes"
+  | "eventId"
+  | "contractId"
+  | "campaignId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -82,6 +139,20 @@ export class Design
   declare tags: string[] | null;
   declare createdBy: string;
   declare publishedAt: Date | null;
+  declare platforms: DesignPlatform[] | null;
+  declare copyAr: string | null;
+  declare copyEn: string | null;
+  declare mediaLinks: MediaLink[] | null;
+  declare scheduledAt: Date | null;
+  declare ownerId: string | null;
+  declare approverId: string | null;
+  declare priority: DesignPriority | null;
+  declare contentPillar: ContentPillar | null;
+  declare publishedLink: string | null;
+  declare reviewNotes: string | null;
+  declare eventId: string | null;
+  declare contractId: string | null;
+  declare campaignId: string | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -98,7 +169,7 @@ Design.init(
     status: {
       type: DataTypes.STRING(50),
       allowNull: false,
-      defaultValue: "draft",
+      defaultValue: "Drafting",
     },
     format: {
       type: DataTypes.STRING(30),
@@ -131,6 +202,40 @@ Design.init(
       allowNull: true,
       field: "published_at",
     },
+    platforms: { type: DataTypes.JSONB, allowNull: true },
+    copyAr: { type: DataTypes.TEXT, allowNull: true, field: "copy_ar" },
+    copyEn: { type: DataTypes.TEXT, allowNull: true, field: "copy_en" },
+    mediaLinks: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: "media_links",
+    },
+    scheduledAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "scheduled_at",
+    },
+    ownerId: { type: DataTypes.UUID, allowNull: true, field: "owner_id" },
+    approverId: { type: DataTypes.UUID, allowNull: true, field: "approver_id" },
+    priority: { type: DataTypes.STRING(10), allowNull: true },
+    contentPillar: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      field: "content_pillar",
+    },
+    publishedLink: {
+      type: DataTypes.STRING(500),
+      allowNull: true,
+      field: "published_link",
+    },
+    reviewNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "review_notes",
+    },
+    eventId: { type: DataTypes.UUID, allowNull: true, field: "event_id" },
+    contractId: { type: DataTypes.UUID, allowNull: true, field: "contract_id" },
+    campaignId: { type: DataTypes.UUID, allowNull: true, field: "campaign_id" },
   },
   {
     sequelize,

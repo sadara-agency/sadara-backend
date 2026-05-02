@@ -617,14 +617,14 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("injury-financials", ["Executive"], { canRead: true }),
 
-  // ── Designs (Graphic Designer module) ──
-  ...forRoles("designs", ["Admin", "GraphicDesigner"], {
+  // ── Designs / Media & Publishing ──
+  ...forRoles("designs", ["Admin", "GraphicDesigner", "ContentManager"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("designs", ["Manager"], {
+  ...forRoles("designs", ["Manager", "Approver", "Publisher"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,

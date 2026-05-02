@@ -20,6 +20,9 @@ export const USER_ROLES = [
   "GoalkeeperCoach",
   "MentalCoach",
   "SportingDirector",
+  "ContentManager",
+  "Approver",
+  "Publisher",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -67,6 +70,9 @@ export const ROLES = {
   GOALKEEPER_COACH: "GoalkeeperCoach",
   MENTAL_COACH: "MentalCoach",
   SPORTING_DIRECTOR: "SportingDirector",
+  CONTENT_MANAGER: "ContentManager",
+  APPROVER: "Approver",
+  PUBLISHER: "Publisher",
 } as const satisfies Record<string, UserRole>;
 
 // ── Authenticated Request (Express-specific, stays in backend) ──
