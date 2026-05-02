@@ -6,7 +6,7 @@ import {
 
 const validBody = {
   title: "Match Day vs Al-Nassr",
-  type: "match_day_poster",
+  type: "Design",
 };
 
 describe("Design Schemas", () => {
@@ -15,8 +15,8 @@ describe("Design Schemas", () => {
       expect(createDesignSchema.safeParse(validBody).success).toBe(true);
     });
 
-    it("defaults status to draft", () => {
-      expect(createDesignSchema.parse(validBody).status).toBe("draft");
+    it("defaults status to Drafting", () => {
+      expect(createDesignSchema.parse(validBody).status).toBe("Drafting");
     });
 
     it("defaults format to square_1080", () => {
@@ -67,7 +67,7 @@ describe("Design Schemas", () => {
 
   describe("updateDesignSchema", () => {
     it("accepts a partial update", () => {
-      expect(updateDesignSchema.safeParse({ status: "approved" }).success).toBe(
+      expect(updateDesignSchema.safeParse({ status: "Approved" }).success).toBe(
         true,
       );
     });

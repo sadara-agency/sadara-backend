@@ -62,6 +62,11 @@ jest.mock("../../../src/modules/users/user.model", () => ({
   User: { name: "User" },
 }));
 
+jest.mock("../../../src/modules/notifications/notification.service", () => ({
+  createNotification: jest.fn().mockResolvedValue(undefined),
+  notifyByRole: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("../../../src/config/logger", () => ({
   logger: {
     info: jest.fn(),
@@ -111,8 +116,8 @@ const baseCreate: CreateDesignInput = {
 const designRow = (overrides: Record<string, any> = {}) => ({
   id: "design-001",
   title: "Match Day vs Al-Nassr",
-  type: "match_day_poster",
-  status: "draft" as const,
+  type: "Design",
+  status: "Drafting",
   format: "square_1080" as const,
   playerId: null,
   matchId: null,
@@ -222,6 +227,7 @@ describe("Design Service", () => {
       expect(result).toBeDefined();
       expect(mockDesignCreate).toHaveBeenCalledWith({
         ...baseCreate,
+        scheduledAt: null,
         createdBy: "user-001",
       });
       // None of the FK lookups should fire because all FKs are null
@@ -333,14 +339,14 @@ describe("Design Service", () => {
   describe("publishDesign", () => {
     it("publishes a design that has an asset", async () => {
       const inst = mockModelInstance(
-        designRow({ status: "approved", assetUrl: "https://cdn/x.png" }),
+        designRow({ status: "Approved", assetUrl: "https://cdn/x.png" }),
       );
       mockDesignFindByPk.mockResolvedValue(inst);
 
       await designService.publishDesign("design-001");
 
       expect(inst.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: "published" }),
+        expect.objectContaining({ status: "Published" }),
       );
       const updateArg = (inst.update as jest.Mock).mock.calls[0][0];
       expect(updateArg.publishedAt).toBeInstanceOf(Date);
@@ -348,7 +354,7 @@ describe("Design Service", () => {
 
     it("throws 422 when the design has no asset", async () => {
       const inst = mockModelInstance(
-        designRow({ status: "approved", assetUrl: null }),
+        designRow({ status: "Approved", assetUrl: null }),
       );
       mockDesignFindByPk.mockResolvedValue(inst);
 

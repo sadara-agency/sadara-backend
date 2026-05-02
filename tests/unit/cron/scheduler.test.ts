@@ -151,6 +151,10 @@ jest.mock('../../../src/cron/engines/saudiLeagues.engine', () => ({
 jest.mock('../../../src/modules/spl/spl.liveMatch.poller', () => ({
   pollLiveMatches: jest.fn(),
 }));
+jest.mock('../../../src/modules/designs/design.service', () => ({
+  getLatePublishingItems: jest.fn().mockResolvedValue([]),
+  getUpcomingScheduled: jest.fn().mockResolvedValue([]),
+}));
 
 // Mock appSettings to prevent DB call in syncDisabledJobsToRedis
 jest.mock('../../../src/shared/utils/appSettings', () => ({
