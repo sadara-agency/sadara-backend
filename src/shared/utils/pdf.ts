@@ -197,6 +197,36 @@ export interface MergeOptions {
   requireBrandPages?: boolean;
 }
 
+const A4_WIDTH = 595;
+const A4_HEIGHT = 842;
+
+async function addPageNormalizedToA4(
+  merged: PDFDocument,
+  sourceBytes: Uint8Array,
+  pageIndex: number,
+): Promise<void> {
+  const sourceDoc = await PDFDocument.load(sourceBytes);
+  const [srcPage] = await merged.copyPages(sourceDoc, [pageIndex]);
+  const { width, height } = srcPage.getSize();
+
+  if (Math.abs(width - A4_WIDTH) < 0.5 && Math.abs(height - A4_HEIGHT) < 0.5) {
+    merged.addPage(srcPage);
+    return;
+  }
+
+  const [embedded] = await merged.embedPdf(sourceBytes, [pageIndex]);
+  const a4 = merged.addPage([A4_WIDTH, A4_HEIGHT]);
+  const scale = Math.min(A4_WIDTH / width, A4_HEIGHT / height);
+  const drawW = width * scale;
+  const drawH = height * scale;
+  a4.drawPage(embedded, {
+    x: (A4_WIDTH - drawW) / 2,
+    y: (A4_HEIGHT - drawH) / 2,
+    xScale: scale,
+    yScale: scale,
+  });
+}
+
 export async function mergeWithBrandPages(
   contentBuffers: Uint8Array[],
   opts?: MergeOptions,
@@ -208,27 +238,22 @@ export async function mergeWithBrandPages(
   const merged = await PDFDocument.create();
 
   if (opts?.coverBuffer) {
-    const coverDoc = await PDFDocument.load(opts.coverBuffer);
-    const [coverPage] = await merged.copyPages(coverDoc, [0]);
-    merged.addPage(coverPage);
+    await addPageNormalizedToA4(merged, opts.coverBuffer, 0);
   } else if (fs.existsSync(coverPath)) {
-    const coverDoc = await PDFDocument.load(fs.readFileSync(coverPath));
-    const [coverPage] = await merged.copyPages(coverDoc, [0]);
-    merged.addPage(coverPage);
+    await addPageNormalizedToA4(merged, fs.readFileSync(coverPath), 0);
   } else if (required) {
     throw new AppError(`Brand asset not found: ${coverPath}`, 500);
   }
 
   for (const buf of contentBuffers) {
     const doc = await PDFDocument.load(buf);
-    const docPages = await merged.copyPages(doc, doc.getPageIndices());
-    docPages.forEach((p) => merged.addPage(p));
+    for (const i of doc.getPageIndices()) {
+      await addPageNormalizedToA4(merged, buf, i);
+    }
   }
 
   if (fs.existsSync(backPath)) {
-    const backDoc = await PDFDocument.load(fs.readFileSync(backPath));
-    const [backPage] = await merged.copyPages(backDoc, [0]);
-    merged.addPage(backPage);
+    await addPageNormalizedToA4(merged, fs.readFileSync(backPath), 0);
   } else if (required) {
     throw new AppError(`Brand asset not found: ${backPath}`, 500);
   }
