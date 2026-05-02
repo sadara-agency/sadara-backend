@@ -202,42 +202,100 @@ const ROLE_PORTAL: Record<string, string> = {
 
 export async function getSidebarConfig(req: AuthRequest, res: Response) {
   const requested = req.query.portalId as string | undefined;
-  // Admin can fetch any portal's config; others always get their own.
+  const role = req.query.role as string | undefined;
+  const isAdmin = req.user!.role === "Admin";
+  // Non-admins can only read their own portal default (no role override exposure).
   const portalId =
-    requested && req.user!.role === "Admin"
+    requested && isAdmin
       ? requested
       : (ROLE_PORTAL[req.user!.role] ?? "dashboard");
-  const config = await settingsService.getSidebarConfig(portalId);
+  const effectiveRole = isAdmin ? role : undefined;
+  const config = await settingsService.getSidebarConfig(
+    portalId,
+    effectiveRole,
+  );
   sendSuccess(res, config);
 }
 
 export async function updateSidebarConfig(req: AuthRequest, res: Response) {
-  const { portalId, config } = req.body as {
+  const { portalId, role, config } = req.body as {
     portalId: string;
+    role?: string;
     config: Record<string, unknown>;
   };
-  const saved = await settingsService.updateSidebarConfig(portalId, config);
+  const saved = await settingsService.updateSidebarConfig(
+    portalId,
+    config,
+    role,
+  );
   await logAudit(
     "UPDATE",
     "settings",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Updated sidebar navigation for portal: ${portalId}`,
+    role
+      ? `Updated sidebar for portal:${portalId} role:${role}`
+      : `Updated sidebar for portal:${portalId}`,
   );
   sendSuccess(res, saved, "Sidebar configuration updated");
 }
 
 export async function resetSidebarConfig(req: AuthRequest, res: Response) {
-  const portalId = (req.body as { portalId?: string } | undefined)?.portalId;
-  const config = await settingsService.resetSidebarConfig(portalId);
+  const body = (req.body ?? {}) as { portalId?: string; role?: string };
+  const config = await settingsService.resetSidebarConfig(
+    body.portalId,
+    body.role,
+  );
   await logAudit(
     "UPDATE",
     "settings",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Reset sidebar navigation for portal: ${portalId ?? "all"}`,
+    `Reset sidebar for portal:${body.portalId ?? "all"}${body.role ? ` role:${body.role}` : ""}`,
   );
   sendSuccess(res, config, "Sidebar reset to defaults");
+}
+
+// ── Personal sidebar (per-user override) ──
+
+export async function getMySidebar(req: AuthRequest, res: Response) {
+  const portalId = ROLE_PORTAL[req.user!.role] ?? "dashboard";
+  const merged = await settingsService.getMergedSidebarForUser(
+    portalId,
+    req.user!.role,
+    req.user!.id,
+  );
+  sendSuccess(res, merged);
+}
+
+export async function getMySidebarOverride(req: AuthRequest, res: Response) {
+  const config = await settingsService.getUserSidebar(req.user!.id);
+  sendSuccess(res, config);
+}
+
+export async function updateMySidebar(req: AuthRequest, res: Response) {
+  const { config } = req.body as { config: Record<string, unknown> };
+  const saved = await settingsService.saveUserSidebar(req.user!.id, config);
+  await logAudit(
+    "UPDATE",
+    "settings",
+    req.user!.id,
+    buildAuditContext(req.user!, req.ip),
+    "Saved personal sidebar override",
+  );
+  sendSuccess(res, saved, "Personal sidebar saved");
+}
+
+export async function resetMySidebar(req: AuthRequest, res: Response) {
+  const config = await settingsService.clearUserSidebar(req.user!.id);
+  await logAudit(
+    "UPDATE",
+    "settings",
+    req.user!.id,
+    buildAuditContext(req.user!, req.ip),
+    "Cleared personal sidebar override",
+  );
+  sendSuccess(res, config, "Personal sidebar reset");
 }
 
 // ── CSV Import ──

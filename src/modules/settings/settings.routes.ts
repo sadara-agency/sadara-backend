@@ -17,6 +17,7 @@ import {
   testConnectionSchema,
   sidebarUpdateByPortalSchema,
   sidebarResetSchema,
+  sidebarUpdateMeSchema,
 } from "./settings.validation";
 
 const router = Router();
@@ -195,6 +196,22 @@ router.put(
   validate(sidebarResetSchema),
   asyncHandler(settingsController.resetSidebarConfig),
 );
+
+// Personal sidebar (per-user override). Available to every authenticated user.
+router.get("/sidebar/me", asyncHandler(settingsController.getMySidebar));
+
+router.get(
+  "/sidebar/me/override",
+  asyncHandler(settingsController.getMySidebarOverride),
+);
+
+router.patch(
+  "/sidebar/me",
+  validate(sidebarUpdateMeSchema),
+  asyncHandler(settingsController.updateMySidebar),
+);
+
+router.delete("/sidebar/me", asyncHandler(settingsController.resetMySidebar));
 
 // ══════════════════════════════════════════
 // CSV IMPORT

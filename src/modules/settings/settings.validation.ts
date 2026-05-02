@@ -146,11 +146,17 @@ export type SidebarPortalId = (typeof SIDEBAR_PORTALS)[number];
 
 export const sidebarUpdateByPortalSchema = z.object({
   portalId: z.enum(SIDEBAR_PORTALS),
+  role: z.string().min(1).max(50).optional(),
   config: sidebarConfigSchema,
 });
 
 export const sidebarResetSchema = z.object({
   portalId: z.enum([...SIDEBAR_PORTALS, "all"]).optional(),
+  role: z.string().min(1).max(50).optional(),
+});
+
+export const sidebarUpdateMeSchema = z.object({
+  config: sidebarConfigSchema,
 });
 
 // ── Inferred Types ──
@@ -169,3 +175,4 @@ export type SidebarUpdateByPortalInput = z.infer<
   typeof sidebarUpdateByPortalSchema
 >;
 export type SidebarResetInput = z.infer<typeof sidebarResetSchema>;
+export type SidebarUpdateMeInput = z.infer<typeof sidebarUpdateMeSchema>;
