@@ -1,4 +1,4 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
 import { addColumnIfMissing, removeColumnIfPresent } from "../migrationHelpers";
 
 export async function up({
@@ -99,14 +99,16 @@ export async function up({
   );
 
   // 4. Add FK for owner_id and approver_id (guarded)
-  const [tableRows] = await queryInterface.sequelize.query(
+  const tableRows = await queryInterface.sequelize.query(
     `SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='users'`,
+    { type: QueryTypes.SELECT },
   );
-  if ((tableRows as unknown[]).length > 0) {
-    const [ownerFkRows] = await queryInterface.sequelize.query(
+  if (tableRows.length > 0) {
+    const ownerFkRows = await queryInterface.sequelize.query(
       `SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='designs_owner_id_fkey'`,
+      { type: QueryTypes.SELECT },
     );
-    if ((ownerFkRows as unknown[]).length === 0) {
+    if (ownerFkRows.length === 0) {
       await queryInterface.addConstraint("designs", {
         type: "foreign key",
         fields: ["owner_id"],
@@ -116,10 +118,11 @@ export async function up({
         onDelete: "SET NULL",
       });
     }
-    const [approverFkRows] = await queryInterface.sequelize.query(
+    const approverFkRows = await queryInterface.sequelize.query(
       `SELECT 1 FROM information_schema.table_constraints WHERE constraint_name='designs_approver_id_fkey'`,
+      { type: QueryTypes.SELECT },
     );
-    if ((approverFkRows as unknown[]).length === 0) {
+    if (approverFkRows.length === 0) {
       await queryInterface.addConstraint("designs", {
         type: "foreign key",
         fields: ["approver_id"],
@@ -132,10 +135,11 @@ export async function up({
   }
 
   // 5. Index on scheduled_at for the Late Publishing cron query
-  const [idxRows] = await queryInterface.sequelize.query(
+  const idxRows = await queryInterface.sequelize.query(
     `SELECT 1 FROM pg_indexes WHERE schemaname='public' AND indexname='idx_designs_scheduled_at'`,
+    { type: QueryTypes.SELECT },
   );
-  if ((idxRows as unknown[]).length === 0) {
+  if (idxRows.length === 0) {
     await queryInterface.addIndex("designs", ["scheduled_at"], {
       name: "idx_designs_scheduled_at",
     });
