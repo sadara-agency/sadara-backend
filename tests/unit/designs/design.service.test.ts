@@ -95,8 +95,8 @@ import type { CreateDesignInput } from "../../../src/modules/designs/design.vali
 
 const baseCreate: CreateDesignInput = {
   title: "Match Day vs Al-Nassr",
-  type: "match_day_poster",
-  status: "draft",
+  type: "Design",
+  status: "Drafting",
   format: "square_1080",
   description: null,
   assetUrl: null,

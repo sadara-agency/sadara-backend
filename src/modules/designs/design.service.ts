@@ -113,7 +113,11 @@ export async function createDesign(data: CreateDesignInput, createdBy: string) {
     if (!club) throw new AppError("Club not found", 404);
   }
 
-  return Design.create({ ...data, createdBy });
+  return Design.create({
+    ...data,
+    scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+    createdBy,
+  });
 }
 
 export async function createQuickContent(
@@ -137,7 +141,15 @@ export async function createQuickContent(
 
 export async function updateDesign(id: string, data: UpdateDesignInput) {
   const item = await getDesignById(id);
-  return item.update(data);
+  return item.update({
+    ...data,
+    scheduledAt:
+      data.scheduledAt !== undefined
+        ? data.scheduledAt
+          ? new Date(data.scheduledAt)
+          : null
+        : undefined,
+  });
 }
 
 export async function deleteDesign(id: string) {
