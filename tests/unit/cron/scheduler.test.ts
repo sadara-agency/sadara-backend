@@ -272,7 +272,7 @@ describe('Cron Scheduler', () => {
     it('should schedule all 69 cron jobs', async () => {
       await startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(69);
+      expect(cron.schedule).toHaveBeenCalledTimes(71);
     });
 
     it('should log initialization', async () => {

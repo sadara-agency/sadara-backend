@@ -352,16 +352,17 @@ describe("Design Service", () => {
       expect(updateArg.publishedAt).toBeInstanceOf(Date);
     });
 
-    it("throws 422 when the design has no asset", async () => {
+    it("marks as published even without an asset (copy-only content)", async () => {
       const inst = mockModelInstance(
         designRow({ status: "Approved", assetUrl: null }),
       );
       mockDesignFindByPk.mockResolvedValue(inst);
 
-      await expect(designService.publishDesign("design-001")).rejects.toThrow(
-        "Cannot publish a design without an uploaded asset",
+      await designService.publishDesign("design-001");
+
+      expect(inst.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: "Published" }),
       );
-      expect(inst.update).not.toHaveBeenCalled();
     });
 
     it("throws 404 when the design does not exist", async () => {
