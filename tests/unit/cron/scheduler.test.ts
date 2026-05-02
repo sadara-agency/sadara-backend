@@ -23,9 +23,14 @@ jest.mock('node-cron', () => ({
   schedule: jest.fn(),
 }));
 
-// Mock database
+// Mock database with full Sequelize interface for model initialization
 jest.mock('../../../src/config/database', () => ({
-  sequelize: { query: jest.fn() },
+  sequelize: {
+    query: jest.fn(),
+    define: jest.fn(() => ({})),
+    models: {},
+    addModels: jest.fn(),
+  },
 }));
 
 // Mock logger
@@ -153,6 +158,11 @@ jest.mock('../../../src/shared/utils/appSettings', () => ({
   setAppSetting: jest.fn().mockResolvedValue(undefined),
 }));
 
+// Mock saffplus service to prevent model initialization via scheduler imports
+jest.mock('../../../src/modules/saffplus/saffplus.service', () => ({
+  // Empty mock - saffplus jobs aren't run in this test
+}));
+
 import { getJobNames, runJob, runAllJobs, startCronJobs } from '../../../src/cron/scheduler';
 import { isRedisConnected } from '../../../src/config/redis';
 import { logger } from '../../../src/config/logger';
@@ -255,10 +265,10 @@ describe('Cron Scheduler', () => {
   });
 
   describe('startCronJobs', () => {
-    it('should schedule all 68 cron jobs', async () => {
+    it('should schedule all 69 cron jobs', async () => {
       await startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(68);
+      expect(cron.schedule).toHaveBeenCalledTimes(69);
     });
 
     it('should log initialization', async () => {
