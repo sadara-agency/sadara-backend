@@ -340,71 +340,186 @@ export async function testMatchAnalysisConnection() {
 }
 
 // ══════════════════════════════════════════
-// SIDEBAR CONFIG (v3 — per-portal)
+// SIDEBAR CONFIG (v4 — portal × role × user)
 // ══════════════════════════════════════════
+//
+// Resolution order at runtime: portal default → role override → user override.
+// Each layer's `tree` (v2 schema) wholly replaces the prior layer's tree if
+// present and non-empty; `customLabels` shallow-merge layer-by-layer so deeper
+// layers can rename items without losing labels from upper layers.
 
-interface SidebarV3 {
-  version: 3;
-  default: Record<string, unknown>;
-  byPortal: Record<string, Record<string, unknown>>;
+type SidebarConfigPayload = Record<string, unknown>;
+
+interface SidebarV4 {
+  version: 4;
+  default: Record<string, SidebarConfigPayload>;
+  byRole: Record<string, Record<string, SidebarConfigPayload>>;
+  byUser: Record<string, SidebarConfigPayload>;
 }
 
+const V4_KEY = "sidebar_config_v4";
 const V3_KEY = "sidebar_config_v3";
 const V2_KEY = "sidebar_config";
 
-async function loadSidebarV3(): Promise<SidebarV3> {
-  const stored = await getAppSetting(V3_KEY);
-  if (stored?.version === 3) {
-    // Tolerate older v3 envelopes that used `byRole` (now ignored).
+const EMPTY_CONFIG: SidebarConfigPayload = { hiddenItems: [] };
+
+async function loadSidebarV4(): Promise<SidebarV4> {
+  const stored = await getAppSetting(V4_KEY);
+  if (stored?.version === 4) {
     return {
-      version: 3,
-      default: stored.default ?? { hiddenItems: [] },
-      byPortal: stored.byPortal ?? {},
+      version: 4,
+      default: stored.default ?? {},
+      byRole: stored.byRole ?? {},
+      byUser: stored.byUser ?? {},
     };
   }
-  // First read: migrate v2 → v3 (existing global config becomes default)
-  const v2 = (await getAppSetting(V2_KEY)) ?? { hiddenItems: [] };
-  const migrated: SidebarV3 = { version: 3, default: v2, byPortal: {} };
-  await setAppSetting(V3_KEY, migrated);
+  // First read: migrate v3 → v4 (per-portal map becomes `default`).
+  const v3 = await getAppSetting(V3_KEY);
+  if (v3?.version === 3) {
+    const migrated: SidebarV4 = {
+      version: 4,
+      default: v3.byPortal ?? {},
+      byRole: {},
+      byUser: {},
+    };
+    await setAppSetting(V4_KEY, migrated);
+    return migrated;
+  }
+  // No v3 either: try v2 single-blob → seed as the dashboard default.
+  const v2 = await getAppSetting(V2_KEY);
+  const migrated: SidebarV4 = {
+    version: 4,
+    default: v2 ? { dashboard: v2 } : {},
+    byRole: {},
+    byUser: {},
+  };
+  await setAppSetting(V4_KEY, migrated);
   return migrated;
 }
 
-export async function getSidebarConfig(portalId?: string) {
-  const v3 = await loadSidebarV3();
-  if (portalId === "default") return v3.default;
-  if (portalId && v3.byPortal[portalId]) return v3.byPortal[portalId];
-  // No override for this portal yet → return default as a template
-  return v3.default;
+function hasTree(c: SidebarConfigPayload | undefined): boolean {
+  return Boolean(
+    c &&
+    Array.isArray((c as { tree?: unknown[] }).tree) &&
+    (c as { tree: unknown[] }).tree.length > 0,
+  );
+}
+
+function mergeLayers(
+  ...layers: (SidebarConfigPayload | undefined)[]
+): SidebarConfigPayload {
+  // Find the deepest layer that actually defines a tree — that becomes the
+  // base structure. Each shallower layer merges its customLabels on top.
+  let base: SidebarConfigPayload | undefined;
+  for (let i = layers.length - 1; i >= 0; i--) {
+    if (hasTree(layers[i])) {
+      base = layers[i];
+      break;
+    }
+  }
+  const customLabels: Record<string, unknown> = {};
+  const hiddenSet = new Set<string>();
+  for (const layer of layers) {
+    if (!layer) continue;
+    const labels = (layer as { customLabels?: Record<string, unknown> })
+      .customLabels;
+    if (labels) Object.assign(customLabels, labels);
+    const hidden = (layer as { hiddenItems?: string[] }).hiddenItems;
+    if (Array.isArray(hidden)) hidden.forEach((h) => hiddenSet.add(h));
+  }
+  if (!base) {
+    return { hiddenItems: Array.from(hiddenSet), customLabels };
+  }
+  return {
+    ...base,
+    customLabels: {
+      ...((base as { customLabels?: object }).customLabels ?? {}),
+      ...customLabels,
+    },
+    hiddenItems: Array.from(hiddenSet),
+  };
+}
+
+/** Admin editor: read the raw layer for a (portal, role?) pair. */
+export async function getSidebarConfig(portalId: string, role?: string) {
+  const v4 = await loadSidebarV4();
+  if (role) {
+    return v4.byRole[portalId]?.[role] ?? EMPTY_CONFIG;
+  }
+  return v4.default[portalId] ?? EMPTY_CONFIG;
+}
+
+/** Runtime: returns the merged config a specific user should see. */
+export async function getMergedSidebarForUser(
+  portalId: string,
+  role: string,
+  userId: string,
+) {
+  const v4 = await loadSidebarV4();
+  return mergeLayers(
+    v4.default[portalId],
+    v4.byRole[portalId]?.[role],
+    v4.byUser[userId],
+  );
+}
+
+/** Personal editor: read the user's own override (raw, not merged). */
+export async function getUserSidebar(userId: string) {
+  const v4 = await loadSidebarV4();
+  return v4.byUser[userId] ?? EMPTY_CONFIG;
+}
+
+export async function saveUserSidebar(
+  userId: string,
+  config: SidebarConfigPayload,
+) {
+  const v4 = await loadSidebarV4();
+  v4.byUser[userId] = config;
+  await setAppSetting(V4_KEY, v4);
+  return config;
+}
+
+export async function clearUserSidebar(userId: string) {
+  const v4 = await loadSidebarV4();
+  delete v4.byUser[userId];
+  await setAppSetting(V4_KEY, v4);
+  return EMPTY_CONFIG;
 }
 
 export async function updateSidebarConfig(
   portalId: string,
-  config: Record<string, unknown>,
+  config: SidebarConfigPayload,
+  role?: string,
 ) {
-  const v3 = await loadSidebarV3();
-  if (portalId === "default") {
-    v3.default = config;
+  const v4 = await loadSidebarV4();
+  if (role) {
+    if (!v4.byRole[portalId]) v4.byRole[portalId] = {};
+    v4.byRole[portalId][role] = config;
   } else {
-    v3.byPortal[portalId] = config;
+    v4.default[portalId] = config;
   }
-  await setAppSetting(V3_KEY, v3);
+  await setAppSetting(V4_KEY, v4);
   return config;
 }
 
-export async function resetSidebarConfig(portalId?: string) {
-  const empty = { hiddenItems: [] };
+export async function resetSidebarConfig(portalId?: string, role?: string) {
   if (!portalId || portalId === "all") {
-    await setAppSetting(V3_KEY, { version: 3, default: empty, byPortal: {} });
-    return empty;
+    await setAppSetting(V4_KEY, {
+      version: 4,
+      default: {},
+      byRole: {},
+      byUser: {},
+    });
+    return EMPTY_CONFIG;
   }
-  const v3 = await loadSidebarV3();
-  if (portalId === "default") {
-    v3.default = empty;
+  const v4 = await loadSidebarV4();
+  if (role) {
+    if (v4.byRole[portalId]) delete v4.byRole[portalId][role];
   } else {
-    delete v3.byPortal[portalId];
+    delete v4.default[portalId];
   }
-  await setAppSetting(V3_KEY, v3);
-  return empty;
+  await setAppSetting(V4_KEY, v4);
+  return EMPTY_CONFIG;
 }
 
 // ══════════════════════════════════════════
