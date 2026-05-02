@@ -1065,6 +1065,51 @@ export async function syncMatchMedia(matchId: string): Promise<{
   return result;
 }
 
+// ── Expiring-manifest refresh ──
+
+/**
+ * Find all match_media rows whose manifest URL expires within `windowMinutes`
+ * and re-run syncMatchMedia for each distinct match. Called by a cron job
+ * every 15 minutes so live-stream manifests never silently expire mid-watch.
+ */
+export async function refreshExpiringManifests(
+  windowMinutes = 60,
+): Promise<{ checked: number; refreshed: number; errors: string[] }> {
+  const result = { checked: 0, refreshed: 0, errors: [] as string[] };
+
+  const cutoff = new Date(Date.now() + windowMinutes * 60 * 1000);
+
+  const rows = await MatchMedia.findAll({
+    attributes: ["matchId"],
+    where: {
+      expiresAt: { [Op.ne]: null, [Op.lte]: cutoff },
+      streamProtocol: { [Op.ne]: "iframe_embed" },
+    },
+    group: ["matchId"],
+  });
+
+  result.checked = rows.length;
+  if (rows.length === 0) return result;
+
+  for (const row of rows) {
+    try {
+      await syncMatchMedia(row.matchId);
+      result.refreshed++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      logger.warn(
+        `[SAFF+] refreshExpiringManifests: failed for match ${row.matchId}: ${msg}`,
+      );
+      result.errors.push(msg);
+    }
+  }
+
+  logger.info(
+    `[SAFF+] refreshExpiringManifests: checked=${result.checked}, refreshed=${result.refreshed}, errors=${result.errors.length}`,
+  );
+  return result;
+}
+
 // ── Read endpoints ──
 
 export async function getMatchEvents(matchId: string) {
