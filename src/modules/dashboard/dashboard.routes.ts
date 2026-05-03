@@ -6,13 +6,9 @@ import { CacheTTL } from "@shared/utils/cache";
 import * as dashboardController from "@modules/dashboard/dashboard.controller";
 import * as configController from "@modules/dashboard/dashboardConfig.controller";
 import * as transferPortfolioController from "@modules/dashboard/transferPortfolio.controller";
-import coachRouter from "@modules/dashboard/coach.routes";
 
 const router = Router();
 router.use(authenticate);
-
-// ── Coach Dashboard sub-router ──
-router.use("/coach", coachRouter);
 
 // ── Batched: all dashboard data in one request (15 → 1) ──
 router.get(
