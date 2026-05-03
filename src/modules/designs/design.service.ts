@@ -74,6 +74,16 @@ export async function listDesigns(query: DesignQuery, _user?: AuthUser) {
     where.scheduledAt = { [Op.between]: [start, end] };
   }
 
+  // Published Archive: date range on publishedAt
+  if (query.publishedFrom || query.publishedTo) {
+    const range: Record<symbol, Date> = {};
+    if (query.publishedFrom)
+      range[Op.gte] = new Date(`${query.publishedFrom}T00:00:00.000Z`);
+    if (query.publishedTo)
+      range[Op.lte] = new Date(`${query.publishedTo}T23:59:59.999Z`);
+    where.publishedAt = range;
+  }
+
   // Late Publishing: scheduledAt in the past and not yet Published
   if (query.isLate) {
     where.scheduledAt = { [Op.lt]: new Date() };

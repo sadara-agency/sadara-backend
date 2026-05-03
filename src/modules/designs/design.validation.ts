@@ -125,6 +125,8 @@ export const designQuerySchema = z.object({
   approverId: z.string().uuid().optional(),
   contentPillar: contentPillarEnum.optional(),
   scheduledDate: z.string().optional(), // YYYY-MM-DD for Today's Publishing
+  publishedFrom: z.string().optional(), // YYYY-MM-DD inclusive start for archive
+  publishedTo: z.string().optional(), // YYYY-MM-DD inclusive end for archive
   isLate: z.coerce.boolean().optional(),
 });
 
