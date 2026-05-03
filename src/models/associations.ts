@@ -582,6 +582,8 @@ export function setupAssociations() {
   Design.belongsTo(Match, { foreignKey: "matchId", as: "match" });
   Design.belongsTo(Club, { foreignKey: "clubId", as: "club" });
   Design.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  Design.belongsTo(User, { foreignKey: "ownerId", as: "owner" });
+  Design.belongsTo(User, { foreignKey: "approverId", as: "approver" });
 
   // ── Player-Coach Assignments (multi-specialty) ─────────────
   Player.hasMany(PlayerCoachAssignment, {
