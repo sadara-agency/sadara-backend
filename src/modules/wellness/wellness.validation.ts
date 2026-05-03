@@ -120,6 +120,7 @@ export const createExerciseSchema = z.object({
   muscleGroup: z.enum(muscleGroups),
   equipment: z.enum(equipmentTypes).default("none"),
   videoUrl: z.string().url().max(500).optional(),
+  photoUrl: z.string().url().max(500).optional(),
   instructions: z.string().optional(),
   instructionsAr: z.string().optional(),
 });

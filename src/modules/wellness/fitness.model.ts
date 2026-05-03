@@ -45,6 +45,7 @@ interface ExerciseAttributes {
   equipment: Equipment;
   videoUrl?: string | null;
   videoThumbnail?: string | null;
+  photoUrl?: string | null;
   instructions?: string | null;
   instructionsAr?: string | null;
   isActive: boolean;
@@ -69,6 +70,7 @@ export class WellnessExercise
   declare equipment: Equipment;
   declare videoUrl: string | null;
   declare videoThumbnail: string | null;
+  declare photoUrl: string | null;
   declare instructions: string | null;
   declare instructionsAr: string | null;
   declare isActive: boolean;
@@ -96,6 +98,7 @@ WellnessExercise.init(
     },
     videoUrl: { type: DataTypes.STRING(500), field: "video_url" },
     videoThumbnail: { type: DataTypes.STRING(500), field: "video_thumbnail" },
+    photoUrl: { type: DataTypes.STRING(500), field: "photo_url" },
     instructions: { type: DataTypes.TEXT },
     instructionsAr: { type: DataTypes.TEXT, field: "instructions_ar" },
     isActive: {
