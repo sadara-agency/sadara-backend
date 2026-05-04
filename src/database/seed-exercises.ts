@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────
 
 import { sequelize } from "@config/database";
+import { QueryTypes } from "sequelize";
 import { WellnessExercise } from "@modules/wellness/fitness.model";
 import type { MuscleGroup, Equipment } from "@modules/wellness/fitness.model";
 
@@ -112,6 +113,17 @@ async function main() {
   await sequelize.authenticate();
   console.log("DB connected — fetching exercises from free-exercise-db...");
 
+  const admins = await sequelize.query<{ id: string }>(
+    `SELECT id FROM users WHERE role = 'Admin' LIMIT 1`,
+    { type: QueryTypes.SELECT },
+  );
+  if (!admins.length)
+    throw new Error(
+      "No Admin user found — cannot seed exercises (created_by is NOT NULL)",
+    );
+  const adminId = admins[0].id;
+  console.log(`Using admin user: ${adminId}`);
+
   const response = await fetch(EXERCISES_JSON_URL);
   if (!response.ok) {
     throw new Error(
@@ -134,8 +146,7 @@ async function main() {
     primaryMuscles: ex.primaryMuscles.length ? ex.primaryMuscles : null,
     secondaryMuscles: ex.secondaryMuscles.length ? ex.secondaryMuscles : null,
     isActive: true,
-    // createdBy is nullable in DB — leave null for seeded system exercises
-    createdBy: null as unknown as string,
+    createdBy: adminId,
   }));
 
   // ignoreDuplicates makes this idempotent; Sequelize uses ON CONFLICT DO NOTHING
