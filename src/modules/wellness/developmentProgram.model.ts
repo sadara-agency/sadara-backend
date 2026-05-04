@@ -102,11 +102,6 @@ DevelopmentProgram.init(
     phase: {
       type: DataTypes.STRING(30),
       field: "phase",
-      validate: {
-        isIn: [
-          ["accumulation", "intensification", "realization", "mixed", null],
-        ],
-      },
     },
     programType: {
       type: DataTypes.STRING(30),
