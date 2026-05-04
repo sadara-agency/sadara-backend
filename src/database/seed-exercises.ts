@@ -150,21 +150,9 @@ async function main() {
   }));
 
   // ignoreDuplicates makes this idempotent; Sequelize uses ON CONFLICT DO NOTHING
+  // Do NOT pass an explicit `fields` list — omitting `id` prevents UUIDV4 generation.
   const result = await WellnessExercise.bulkCreate(records, {
     ignoreDuplicates: true,
-    fields: [
-      "name",
-      "muscleGroup",
-      "equipment",
-      "instructions",
-      "photoUrl",
-      "level",
-      "force",
-      "mechanic",
-      "primaryMuscles",
-      "secondaryMuscles",
-      "isActive",
-    ],
   });
 
   const inserted = result.length;
