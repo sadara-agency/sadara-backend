@@ -300,6 +300,6 @@ export const env = {
 
   pagination: {
     defaultLimit: 20,
-    maxLimit: 100,
+    maxLimit: 1000,
   },
 } as const;
