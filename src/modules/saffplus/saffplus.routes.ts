@@ -7,6 +7,8 @@ import {
   clubIdParamSchema,
   syncClubSquadsBodySchema,
   matchIdParamSchema,
+  syncPlayerSchema,
+  saffPlayerIdParamSchema,
 } from "./saffplus.validation";
 import {
   playerReviewQuerySchema,
@@ -139,6 +141,22 @@ router.post(
   authorizeModule("saff-data", "create"),
   validate(matchIdParamSchema, "params"),
   asyncHandler(ctrl.syncMatchMediaCtrl),
+);
+
+// ── Phase 4: Player profile enrichment ──
+
+router.get(
+  "/players/:saffPlayerId/preview",
+  authorizeModule("saff-data", "read"),
+  validate(saffPlayerIdParamSchema, "params"),
+  asyncHandler(ctrl.getPlayerProfilePreviewCtrl),
+);
+
+router.post(
+  "/players/sync",
+  authorizeModule("saff-data", "create"),
+  validate(syncPlayerSchema),
+  asyncHandler(ctrl.syncPlayerCtrl),
 );
 
 export default router;

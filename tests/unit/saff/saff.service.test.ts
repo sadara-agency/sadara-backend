@@ -120,6 +120,21 @@ jest.mock('../../../src/modules/matches/matchEvent.model', () => ({
 jest.mock('../../../src/modules/matches/matchMedia.model', () => ({
   MatchMedia: { findOrCreate: jest.fn(), findAll: jest.fn(), name: 'MatchMedia' },
 }));
+jest.mock('../../../src/modules/players/externalProvider.model', () => ({
+  ExternalProviderMapping: { upsert: jest.fn(), findOne: jest.fn(), findAll: jest.fn(), name: 'ExternalProviderMapping' },
+}));
+jest.mock('../../../src/modules/players/playerClubHistory.model', () => ({
+  PlayerClubHistory: { findOne: jest.fn(), create: jest.fn(), name: 'PlayerClubHistory' },
+}));
+jest.mock('../../../src/modules/player-coach-assignments/playerCoachAssignment.model', () => ({
+  PlayerCoachAssignment: { findAll: jest.fn(), name: 'PlayerCoachAssignment' },
+  default: { findAll: jest.fn(), name: 'PlayerCoachAssignment' },
+}));
+jest.mock('../../../src/modules/notifications/notification.service', () => ({
+  notifyUser: jest.fn().mockResolvedValue(null),
+  notifyByRole: jest.fn().mockResolvedValue(0),
+  createNotification: jest.fn().mockResolvedValue(null),
+}));
 
 import * as saffService from '../../../src/modules/saff/saff.service';
 

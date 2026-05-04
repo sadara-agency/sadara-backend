@@ -205,3 +205,40 @@ export async function syncMatchMediaCtrl(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, result, `${result.upserted} media rows (${result.reason})`);
 }
+
+// ── Phase 4: Player profile enrichment ──
+
+export async function syncPlayerCtrl(req: AuthRequest, res: Response) {
+  const { sadaraPlayerId, saffPlayerId, overwrite } = req.body as {
+    sadaraPlayerId: string;
+    saffPlayerId: string;
+    overwrite?: boolean;
+  };
+  const result = await saffPlusService.syncPlayerFromSaffPlus(
+    sadaraPlayerId,
+    saffPlayerId,
+    { overwrite: overwrite ?? false },
+    req.user!,
+  );
+  await logAudit(
+    "UPDATE",
+    "players",
+    sadaraPlayerId,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ player profile sync: saffPlayerId=${saffPlayerId} enriched=[${result.enriched.join(",")}]`,
+  );
+  sendSuccess(
+    res,
+    result,
+    `Enriched ${result.enriched.length} fields; ${result.matchesLinked} matches linked`,
+  );
+}
+
+export async function getPlayerProfilePreviewCtrl(
+  req: AuthRequest,
+  res: Response,
+) {
+  const { saffPlayerId } = req.params;
+  const profile = await saffPlusService.previewPlayerProfile(saffPlayerId);
+  sendSuccess(res, profile);
+}
