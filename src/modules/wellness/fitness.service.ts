@@ -34,6 +34,8 @@ export async function listExercises(queryParams: any) {
 
   if (queryParams.muscleGroup) where.muscleGroup = queryParams.muscleGroup;
   if (queryParams.equipment) where.equipment = queryParams.equipment;
+  if (queryParams.level) where.level = queryParams.level;
+  if (queryParams.mechanic) where.mechanic = queryParams.mechanic;
   if (queryParams.active !== undefined)
     where.isActive = queryParams.active === "true";
   if (queryParams.search)

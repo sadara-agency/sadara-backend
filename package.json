@@ -18,6 +18,7 @@
     "migrate:fresh": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts fresh",
     "migrate:lint": "ts-node -r tsconfig-paths/register scripts/lint-migrations.ts",
     "lint": "eslint src && npm run migrate:lint",
+    "seed:exercises": "ts-node -r tsconfig-paths/register src/database/seed-exercises.ts",
     "prepare": "husky || true"
   },
   "dependencies": {
