@@ -38,9 +38,9 @@ export async function getProgramById(id: string): Promise<DevelopmentProgram> {
         model: ProgramExercise,
         as: "exercises",
         include: [{ model: WellnessExercise, as: "exercise" }],
-        order: [["orderIndex", "ASC"]],
       },
     ],
+    order: [[{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"]],
   });
   if (!program) throw new AppError("Program not found", 404);
   return program;
