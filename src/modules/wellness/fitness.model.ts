@@ -37,6 +37,10 @@ export type Equipment =
   | "other"
   | "none";
 
+export type ExerciseLevel = "beginner" | "intermediate" | "expert";
+export type ExerciseForce = "push" | "pull" | "static";
+export type ExerciseMechanic = "compound" | "isolation";
+
 interface ExerciseAttributes {
   id: string;
   name: string;
@@ -45,10 +49,16 @@ interface ExerciseAttributes {
   equipment: Equipment;
   videoUrl?: string | null;
   videoThumbnail?: string | null;
+  photoUrl?: string | null;
   instructions?: string | null;
   instructionsAr?: string | null;
   isActive: boolean;
   createdBy: string;
+  level?: ExerciseLevel | null;
+  force?: ExerciseForce | null;
+  mechanic?: ExerciseMechanic | null;
+  primaryMuscles?: string[] | null;
+  secondaryMuscles?: string[] | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -69,10 +79,16 @@ export class WellnessExercise
   declare equipment: Equipment;
   declare videoUrl: string | null;
   declare videoThumbnail: string | null;
+  declare photoUrl: string | null;
   declare instructions: string | null;
   declare instructionsAr: string | null;
   declare isActive: boolean;
   declare createdBy: string;
+  declare level: ExerciseLevel | null;
+  declare force: ExerciseForce | null;
+  declare mechanic: ExerciseMechanic | null;
+  declare primaryMuscles: string[] | null;
+  declare secondaryMuscles: string[] | null;
 }
 
 WellnessExercise.init(
@@ -96,6 +112,7 @@ WellnessExercise.init(
     },
     videoUrl: { type: DataTypes.STRING(500), field: "video_url" },
     videoThumbnail: { type: DataTypes.STRING(500), field: "video_thumbnail" },
+    photoUrl: { type: DataTypes.STRING(500), field: "photo_url" },
     instructions: { type: DataTypes.TEXT },
     instructionsAr: { type: DataTypes.TEXT, field: "instructions_ar" },
     isActive: {
@@ -105,6 +122,11 @@ WellnessExercise.init(
       field: "is_active",
     },
     createdBy: { type: DataTypes.UUID, allowNull: false, field: "created_by" },
+    level: { type: DataTypes.STRING(20), field: "level" },
+    force: { type: DataTypes.STRING(20), field: "force" },
+    mechanic: { type: DataTypes.STRING(20), field: "mechanic" },
+    primaryMuscles: { type: DataTypes.JSONB, field: "primary_muscles" },
+    secondaryMuscles: { type: DataTypes.JSONB, field: "secondary_muscles" },
   },
   {
     sequelize,
