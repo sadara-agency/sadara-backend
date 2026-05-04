@@ -19,6 +19,8 @@
     "migrate:lint": "ts-node -r tsconfig-paths/register scripts/lint-migrations.ts",
     "lint": "eslint src && npm run migrate:lint",
     "seed:exercises": "ts-node -r tsconfig-paths/register src/database/seed-exercises.ts",
+    "migrate:prod": "node dist/database/migrate-cli.js up",
+    "seed:exercises:prod": "node dist/database/seed-exercises.js",
     "prepare": "husky || true"
   },
   "dependencies": {
