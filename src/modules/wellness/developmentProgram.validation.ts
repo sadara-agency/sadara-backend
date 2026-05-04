@@ -26,11 +26,11 @@ export const programTypeEnum = z.enum([
 export const createProgramSchema = z.object({
   name: z.string().min(1).max(255),
   nameAr: z.string().max(255).optional(),
-  description: z.string().max(2000).optional(),
+  description: z.string().max(2000).nullish(),
   category: programCategoryEnum,
   estimatedMinutes: z.number().int().positive().optional(),
   durationWeeks: z.number().int().min(1).max(16).default(4),
-  phase: programPhaseEnum.optional(),
+  phase: programPhaseEnum.nullish(),
   programType: programTypeEnum.default("gym"),
   trainingBlockId: z.string().uuid().optional(),
   isActive: z.boolean().default(true),
