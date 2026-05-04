@@ -114,14 +114,24 @@ const equipmentTypes = [
   "none",
 ] as const;
 
+const exerciseLevels = ["beginner", "intermediate", "expert"] as const;
+const exerciseForces = ["push", "pull", "static"] as const;
+const exerciseMechanics = ["compound", "isolation"] as const;
+
 export const createExerciseSchema = z.object({
   name: z.string().min(1).max(255),
   nameAr: z.string().max(255).optional(),
   muscleGroup: z.enum(muscleGroups),
   equipment: z.enum(equipmentTypes).default("none"),
   videoUrl: z.string().url().max(500).optional(),
+  photoUrl: z.string().url().max(500).optional(),
   instructions: z.string().optional(),
   instructionsAr: z.string().optional(),
+  level: z.enum(exerciseLevels).optional(),
+  force: z.enum(exerciseForces).optional(),
+  mechanic: z.enum(exerciseMechanics).optional(),
+  primaryMuscles: z.array(z.string()).optional(),
+  secondaryMuscles: z.array(z.string()).optional(),
 });
 
 export const updateExerciseSchema = createExerciseSchema.partial().extend({
