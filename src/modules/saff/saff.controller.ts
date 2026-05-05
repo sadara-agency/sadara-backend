@@ -150,8 +150,8 @@ export async function importToSadara(req: AuthRequest, res: Response) {
 // ── Fetch Team Logos ──
 
 export async function fetchTeamLogos(req: AuthRequest, res: Response) {
-  const { season = getCurrentSeason() } = req.body;
-  const result = await saffService.fetchTeamLogos(season);
+  const { season = getCurrentSeason(), force = false } = req.body;
+  const result = await saffService.fetchTeamLogos(season, force);
   await logAudit(
     "UPDATE",
     "saff_team_maps",
@@ -159,7 +159,11 @@ export async function fetchTeamLogos(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Fetched ${result.fetched} team logos out of ${result.total}`,
   );
-  sendSuccess(res, result, `Fetched ${result.fetched} logos`);
+  sendSuccess(
+    res,
+    result,
+    `Fetched ${result.fetched} logos for season ${season}`,
+  );
 }
 
 // ── Bulk Fetch Men's Leagues (stage-only) ──
