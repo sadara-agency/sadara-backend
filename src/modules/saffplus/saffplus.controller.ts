@@ -234,11 +234,27 @@ export async function syncPlayerCtrl(req: AuthRequest, res: Response) {
   );
 }
 
+export async function getLiveProfileBySadaraIdCtrl(
+  req: AuthRequest,
+  res: Response,
+) {
+  const { sadaraPlayerId } = req.params;
+  const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+  const profile = await saffPlusService.getLiveProfileBySadaraId(
+    sadaraPlayerId,
+    { fresh },
+  );
+  sendSuccess(res, profile);
+}
+
 export async function getPlayerProfilePreviewCtrl(
   req: AuthRequest,
   res: Response,
 ) {
   const { saffPlayerId } = req.params;
-  const profile = await saffPlusService.previewPlayerProfile(saffPlayerId);
+  const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+  const profile = await saffPlusService.previewPlayerProfile(saffPlayerId, {
+    fresh,
+  });
   sendSuccess(res, profile);
 }

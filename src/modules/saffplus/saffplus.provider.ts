@@ -16,6 +16,7 @@ import * as cheerio from "cheerio";
 import { logger } from "@config/logger";
 import { env } from "@config/env";
 import { DomainRateLimiter } from "@shared/utils/rateLimiter";
+import { cacheGet, cacheSet, CachePrefix } from "@shared/utils/cache";
 import type {
   SaffPlusCompetition,
   SaffPlusTeam,
@@ -2310,9 +2311,22 @@ function extractMatchList(raw: unknown): SaffPlusMatchWithLineup[] {
  *
  * Returns null when the player cannot be found on SAFF+.
  */
+const PLAYER_PROFILE_TTL = 6 * 3600; // 6 hours
+
 export async function fetchPlayerProfile(
   saffPlayerId: string,
+  { fresh = false }: { fresh?: boolean } = {},
 ): Promise<SaffPlusPlayerProfile | null> {
+  const cacheKey = `${CachePrefix.SAFFPLUS_PLAYER}:${saffPlayerId}`;
+
+  if (!fresh) {
+    const cached = await cacheGet<SaffPlusPlayerProfile>(cacheKey);
+    if (cached) {
+      logger.info(`[SAFF+] fetchPlayerProfile(${saffPlayerId}): cache hit`);
+      return cached;
+    }
+  }
+
   // ── Tier A: CDA direct ──
   const [arEntity, enEntity] = await Promise.all([
     getMottoCdaEntity(saffPlayerId, "ar"),
@@ -2370,7 +2384,7 @@ export async function fetchPlayerProfile(
         `teams=${teams.length} recent=${recentMatches.length} upcoming=${upcomingMatches.length}`,
     );
 
-    return {
+    const profile: SaffPlusPlayerProfile = {
       saffPlayerId,
       nameEn,
       nameAr,
@@ -2382,6 +2396,8 @@ export async function fetchPlayerProfile(
       recentMatches,
       upcomingMatches,
     };
+    void cacheSet(cacheKey, profile, PLAYER_PROFILE_TTL);
+    return profile;
   }
 
   // ── Tier B: Puppeteer fallback ──
@@ -2579,7 +2595,7 @@ export async function fetchPlayerProfile(
     `[SAFF+] fetchPlayerProfile(${saffPlayerId}): Puppeteer hit — nameAr="${nameAr}" nameEn="${nameEn}"`,
   );
 
-  return {
+  const puppeteerProfile: SaffPlusPlayerProfile = {
     saffPlayerId,
     nameEn,
     nameAr,
@@ -2623,4 +2639,6 @@ export async function fetchPlayerProfile(
         playerObj.upcoming_matches,
     ),
   };
+  void cacheSet(cacheKey, puppeteerProfile, PLAYER_PROFILE_TTL);
+  return puppeteerProfile;
 }
