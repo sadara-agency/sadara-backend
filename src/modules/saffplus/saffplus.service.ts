@@ -1340,10 +1340,22 @@ export async function syncPlayerFromSaffPlus(
       await player.update(updates, { transaction: t });
     }
 
-    // Step 5: Link to clubs (existing Sadara clubs only)
+    // Step 5: Link to clubs (existing Sadara clubs only).
+    // Club.saffTeamId is typed as number | null. Motto-sourced ids are
+    // alphanumeric strings — coerce when numeric, skip otherwise (those
+    // clubs aren't in the legacy SAFF-scraped table and need a separate
+    // backfill before they can be linked).
     for (const team of profile.teams) {
+      const numericTeamId =
+        typeof team.saffTeamId === "number"
+          ? team.saffTeamId
+          : Number(team.saffTeamId);
+      if (!Number.isFinite(numericTeamId)) {
+        result.clubsSkipped++;
+        continue;
+      }
       const club = await Club.findOne({
-        where: { saffTeamId: team.saffTeamId },
+        where: { saffTeamId: numericTeamId },
         attributes: ["id"],
         transaction: t,
       });

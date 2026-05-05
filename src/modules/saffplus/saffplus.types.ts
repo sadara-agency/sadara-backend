@@ -119,7 +119,10 @@ export interface SaffPlusMatchWithLineup extends SaffPlusMatch {
 }
 
 export interface SaffPlusPlayerTeam {
-  saffTeamId: number;
+  // Motto issues alphanumeric ids (e.g. "X1g7ZnvonEaF6_Z0C1FzC"); legacy SAFF
+  // scraper paths still emit numeric ids. Accept both — call sites coerce
+  // via String() before persistence.
+  saffTeamId: number | string;
   name: string;
   nameAr: string;
   logoUrl: string | null;

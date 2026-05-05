@@ -220,6 +220,21 @@ function findArrayInJson(
 const MOTTO_CDA_LIST =
   "https://cda.mottostreaming.com/motto.cda.cms.entity.v1.EntityService/ListEntities";
 
+const MOTTO_CDA_EVENTS =
+  "https://cda.mottostreaming.com/motto.cda.cms.event.v1.EventService/ListEvents";
+
+/**
+ * Headers used on every Motto CDA request. The CDA returns 400
+ * `INVALID_AUTHORIZATION` without a Bearer token — the value is the
+ * platform identifier shipped in saffplus.sa's public JS bundle.
+ */
+function mottoCdaHeaders(): Record<string, string> {
+  return {
+    Accept: "application/json",
+    Authorization: `Bearer ${env.saffplus.mottoBearerToken}`,
+  };
+}
+
 /**
  * Call the Motto CDA ListEntities endpoint directly. Returns the `entities`
  * array from the response, or [] on error. Does not throw — callers should
@@ -237,7 +252,7 @@ async function listMottoCdaEntities(
   const url = `${MOTTO_CDA_LIST}?encoding=json&message=${encodeURIComponent(message)}`;
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers: mottoCdaHeaders(),
       signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) {
@@ -255,6 +270,48 @@ async function listMottoCdaEntities(
     return Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
   } catch (err) {
     logger.info(`[SAFF+ CDA] ${filter} → error: ${(err as Error).message}`);
+    return [];
+  }
+}
+
+/**
+ * Call the Motto CDA EventService.ListEvents endpoint. The Event service
+ * is where match data lives — the EntityService player/team payload does
+ * NOT contain a match list, only summary metadata. saffplus.sa's frontend
+ * makes 2 ListEvents calls per player page: one for finished matches
+ * filtered by player id, one for upcoming matches filtered by team id.
+ *
+ * Returns the `events` array from the response, or [] on error.
+ */
+async function listMottoCdaEvents(
+  filter: string,
+  options: { locale?: string; pageSize?: number; orderBy?: string } = {},
+): Promise<Record<string, unknown>[]> {
+  const message = JSON.stringify({
+    pageSize: String(options.pageSize ?? 25),
+    filter,
+    orderBy: options.orderBy ?? "start_time desc",
+    locale: options.locale ?? "ar",
+  });
+  const url = `${MOTTO_CDA_EVENTS}?encoding=json&message=${encodeURIComponent(message)}`;
+  try {
+    const res = await fetch(url, {
+      headers: mottoCdaHeaders(),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      logger.info(`[SAFF+ CDA Events] ${filter} → HTTP ${res.status}`);
+      return [];
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    const list = data.events ?? data.items ?? data.results ?? data.data;
+    const count = Array.isArray(list) ? list.length : 0;
+    logger.info(`[SAFF+ CDA Events] ${filter.slice(0, 100)} → count: ${count}`);
+    return Array.isArray(list) ? (list as Record<string, unknown>[]) : [];
+  } catch (err) {
+    logger.info(
+      `[SAFF+ CDA Events] ${filter.slice(0, 100)} → error: ${(err as Error).message}`,
+    );
     return [];
   }
 }
@@ -2172,12 +2229,13 @@ async function getMottoCdaEntity(
     }
   }
 
-  // Strategy 2: GetEntity with id (works if id is a numeric CDA internal ID)
-  const message = JSON.stringify({ id, locale });
+  // Strategy 2: GetEntity with entityId — saffplus.sa's frontend uses this exact
+  // message shape (camelCase entityId, not id) for player slugs.
+  const message = JSON.stringify({ entityId: id, locale });
   const url = `${MOTTO_CDA_GET}?encoding=json&message=${encodeURIComponent(message)}`;
   try {
     const res = await fetch(url, {
-      headers: { Accept: "application/json" },
+      headers: mottoCdaHeaders(),
       signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) {
@@ -2190,7 +2248,12 @@ async function getMottoCdaEntity(
     const entity = data.entity ?? data.data ?? data;
     if (entity && typeof entity === "object" && !Array.isArray(entity)) {
       logger.info(`[SAFF+ CDA] GetEntity(${id}, ${locale}): hit`);
-      return entity as Record<string, unknown>;
+      // Flatten `entity.fields` onto the top level so callers can read
+      // `o.teams` / `o.birthday` / `o.nationality` directly without
+      // having to know whether the data came from ListEntities or GetEntity.
+      const e = entity as Record<string, unknown>;
+      const fields = e.fields as Record<string, unknown> | undefined;
+      return fields ? { ...fields, ...e } : e;
     }
     return null;
   } catch (err) {
@@ -2247,19 +2310,239 @@ function extractTeams(entity: Record<string, unknown>): SaffPlusPlayerTeam[] {
   for (const t of teamsRaw) {
     if (t == null || typeof t !== "object") continue;
     const o = t as Record<string, unknown>;
-    const rawId = o.teamId ?? o.clubId ?? o.id ?? o.saffTeamId;
-    const saffTeamId = rawId ? Number(rawId) : NaN;
-    if (isNaN(saffTeamId)) continue;
+    // Motto entity-link shape: { base_type: "entity", id, type_id, item: {...} }.
+    // Flatten the nested `item` so name/thumbnail_url are reachable via pickStr.
+    const item =
+      o.item && typeof o.item === "object"
+        ? (o.item as Record<string, unknown>)
+        : {};
+    const merged: Record<string, unknown> = { ...item, ...o };
+
+    const rawId =
+      merged.teamId ?? merged.clubId ?? merged.id ?? merged.saffTeamId;
+    if (rawId == null) continue;
+    // Accept both numeric and alphanumeric ids (Motto issues strings like
+    // "X1g7ZnvonEaF6_Z0C1FzC"). Reject only empty / non-string-non-number values.
+    let saffTeamId: string | number;
+    if (typeof rawId === "number" && !isNaN(rawId)) {
+      saffTeamId = rawId;
+    } else if (typeof rawId === "string" && rawId.length > 0) {
+      saffTeamId = rawId;
+    } else {
+      continue;
+    }
+
     teams.push({
       saffTeamId,
-      name: pickStr(o, "name", "teamName", "clubName") ?? "",
-      nameAr: pickStr(o, "nameAr", "teamNameAr", "clubNameAr") ?? "",
-      logoUrl: pickStr(o, "logo", "logoUrl", "teamLogo") ?? null,
-      from: parseDob(o.from ?? o.startDate ?? o.joinedAt) ?? null,
-      to: parseDob(o.to ?? o.endDate ?? o.leftAt) ?? null,
+      name: pickStr(merged, "name", "teamName", "clubName") ?? "",
+      nameAr: pickStr(merged, "nameAr", "teamNameAr", "clubNameAr") ?? "",
+      logoUrl:
+        pickStr(merged, "thumbnail_url", "logo", "logoUrl", "teamLogo") ?? null,
+      from:
+        parseDob(merged.from ?? merged.startDate ?? merged.joinedAt) ?? null,
+      to: parseDob(merged.to ?? merged.endDate ?? merged.leftAt) ?? null,
     });
   }
   return teams;
+}
+
+// ── Motto Event payload mapping ──
+//
+// `EventService.ListEvents` returns objects like:
+//   { id, typeId, status: "EVENT_STATUS_FINISHED" | ..., startTime,
+//     fields: { home_score, away_score, competition: {id,item}, season,
+//       round, home_team: {id,item:{name,thumbnail_url,fields:{...}}},
+//       away_team: {...}, home_club: {...}, away_club: {...},
+//       stadium: {item:{name}} | string,
+//       home_starting_players: [{id,...}], home_bench_players: [...],
+//       away_starting_players: [...], away_bench_players: [...] } }
+//
+// extractMatchFromEvent maps that into our SaffPlusMatchWithLineup shape,
+// inferring lineupRole by checking which lineup array contains playerId.
+
+function pickEntityRef(
+  o: Record<string, unknown> | null | undefined,
+): { id: string; name: string; logoUrl?: string } | null {
+  if (!o || typeof o !== "object") return null;
+  const id =
+    typeof o.id === "string"
+      ? o.id
+      : typeof o.id === "number"
+        ? String(o.id)
+        : undefined;
+  if (!id) return null;
+  const item =
+    o.item && typeof o.item === "object"
+      ? (o.item as Record<string, unknown>)
+      : {};
+  return {
+    id,
+    name: pickStr(item, "name") ?? "",
+    logoUrl: pickStr(item, "thumbnail_url", "logo") ?? undefined,
+  };
+}
+
+function findPlayerLineupRole(
+  fields: Record<string, unknown>,
+  playerId: string,
+): SaffPlusLineupRole | undefined {
+  const inList = (key: string): boolean => {
+    const list = fields[key];
+    if (!Array.isArray(list)) return false;
+    return list.some((p) => {
+      if (!p || typeof p !== "object") return false;
+      const id = (p as Record<string, unknown>).id;
+      return id === playerId;
+    });
+  };
+  if (inList("home_starting_players") || inList("away_starting_players")) {
+    return "starter";
+  }
+  if (inList("home_bench_players") || inList("away_bench_players")) {
+    return "bench";
+  }
+  return undefined;
+}
+
+function extractMatchFromEvent(
+  event: Record<string, unknown>,
+  playerId: string,
+): SaffPlusMatchWithLineup | null {
+  const id =
+    typeof event.id === "string"
+      ? event.id
+      : typeof event.id === "number"
+        ? String(event.id)
+        : "";
+  if (!id) return null;
+  const fields = (event.fields as Record<string, unknown> | undefined) ?? {};
+
+  const homeTeam = pickEntityRef(
+    fields.home_team as Record<string, unknown> | undefined,
+  );
+  const awayTeam = pickEntityRef(
+    fields.away_team as Record<string, unknown> | undefined,
+  );
+  const competition = pickEntityRef(
+    fields.competition as Record<string, unknown> | undefined,
+  );
+
+  // startTime examples: "2025-05-31T13:30:00Z" or numeric seconds. Tolerate both.
+  const startTimeRaw = event.startTime ?? event.start_time;
+  let date = "";
+  let time: string | undefined;
+  if (typeof startTimeRaw === "string" && startTimeRaw.length >= 10) {
+    date = startTimeRaw.slice(0, 10);
+    const m = startTimeRaw.match(/T(\d{2}:\d{2})/);
+    if (m) time = m[1];
+  } else if (typeof startTimeRaw === "number") {
+    const d = new Date(
+      startTimeRaw > 1e12 ? startTimeRaw : startTimeRaw * 1000,
+    );
+    if (!isNaN(d.getTime())) {
+      date = d.toISOString().slice(0, 10);
+      time = d.toISOString().slice(11, 16);
+    }
+  }
+
+  // Stadium can be either an entity ref or a plain string.
+  let stadium: string | undefined;
+  const stadiumRaw = fields.stadium;
+  if (typeof stadiumRaw === "string") {
+    stadium = stadiumRaw;
+  } else if (stadiumRaw && typeof stadiumRaw === "object") {
+    const ref = pickEntityRef(stadiumRaw as Record<string, unknown>);
+    stadium = ref?.name || undefined;
+  }
+
+  // Status mapping: Motto uses "EVENT_STATUS_FINISHED" / "EVENT_STATUS_SCHEDULED" /
+  // "EVENT_STATUS_PRESCHEDULED" / "EVENT_STATUS_STARTED". Map to our short form.
+  const rawStatus =
+    typeof event.status === "string" ? event.status.toLowerCase() : "";
+  let status: string | undefined;
+  if (rawStatus.includes("finished")) status = "finished";
+  else if (rawStatus.includes("started")) status = "live";
+  else if (rawStatus.includes("scheduled")) status = "scheduled";
+
+  return {
+    id,
+    competitionId: competition?.id ?? 0,
+    date,
+    time,
+    homeTeamId: homeTeam?.id ?? 0,
+    homeTeamName: homeTeam?.name ?? "",
+    homeTeamLogo: homeTeam?.logoUrl,
+    awayTeamId: awayTeam?.id ?? 0,
+    awayTeamName: awayTeam?.name ?? "",
+    awayTeamLogo: awayTeam?.logoUrl,
+    homeScore: typeof fields.home_score === "number" ? fields.home_score : null,
+    awayScore: typeof fields.away_score === "number" ? fields.away_score : null,
+    status,
+    stadium,
+    lineupRole: findPlayerLineupRole(fields, playerId),
+  };
+}
+
+/**
+ * Merge the `ar` and `en` locale Event lists from Motto so each match carries
+ * both Arabic and English team names. Keyed by event id; the `ar` payload is
+ * the primary source (we render the AR site by default), and the `en` payload
+ * fills `homeTeamName` / `awayTeamName` (English).
+ */
+function mergeBilingualEvents(
+  arEvents: Record<string, unknown>[],
+  enEvents: Record<string, unknown>[],
+  playerId: string,
+): SaffPlusMatchWithLineup[] {
+  const enById = new Map<string, SaffPlusMatchWithLineup>();
+  for (const e of enEvents) {
+    const m = extractMatchFromEvent(e, playerId);
+    if (m && typeof m.id === "string") enById.set(m.id, m);
+  }
+  const out: SaffPlusMatchWithLineup[] = [];
+  for (const e of arEvents) {
+    const ar = extractMatchFromEvent(e, playerId);
+    if (!ar) continue;
+    const en = typeof ar.id === "string" ? enById.get(ar.id) : undefined;
+    if (en) {
+      // Use AR names as nameAr, EN names as the canonical name.
+      out.push({
+        ...ar,
+        homeTeamNameAr: ar.homeTeamName || undefined,
+        homeTeamName: en.homeTeamName || ar.homeTeamName,
+        awayTeamNameAr: ar.awayTeamName || undefined,
+        awayTeamName: en.awayTeamName || ar.awayTeamName,
+      });
+    } else {
+      // No English equivalent — keep AR name in both fields for safety.
+      out.push({
+        ...ar,
+        homeTeamNameAr: ar.homeTeamName || undefined,
+        awayTeamNameAr: ar.awayTeamName || undefined,
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Build the EventService filter strings used by the SAFF+ frontend on
+ * the player detail page. Captured live from saffplus.sa network traffic.
+ */
+function buildFinishedMatchesFilter(playerId: string): string {
+  return (
+    `status:EVENT_STATUS_FINISHED and type_id:(match OR international_match) and ` +
+    `(fields.home_starting_players.id:${playerId} OR fields.home_bench_players.id:${playerId} OR ` +
+    `fields.away_starting_players.id:${playerId} OR fields.away_bench_players.id:${playerId})`
+  );
+}
+
+function buildUpcomingMatchesFilter(teamId: string): string {
+  return (
+    `status:(EVENT_STATUS_STARTED or EVENT_STATUS_SCHEDULED or EVENT_STATUS_PRESCHEDULED) and ` +
+    `type_id:(match OR international_match) and time>=now-6h and ` +
+    `(fields.home_team.id:${teamId} OR fields.away_team.id:${teamId})`
+  );
 }
 
 /** Extract a match list from CDA entity payload, tagging with lineupRole if present. */
@@ -2352,39 +2635,100 @@ export async function fetchPlayerProfile(
     cdaNameAr = nameAr;
     cdaNameEn = nameEn;
 
+    // Position: live Motto entity exposes `positions: [{item:{name},...}]`.
+    // Older code paths used a flat `position` string; tolerate both.
+    const positionFromArray = (
+      entity: Record<string, unknown>,
+    ): string | null => {
+      const list = entity.positions;
+      if (!Array.isArray(list) || list.length === 0) return null;
+      const first = list[0];
+      if (!first || typeof first !== "object") return null;
+      const item = (first as Record<string, unknown>).item;
+      if (item && typeof item === "object") {
+        return pickStr(item as Record<string, unknown>, "name") ?? null;
+      }
+      return null;
+    };
     const position =
-      pickStr(ar, "position", "positionAr") ?? pickStr(en, "position") ?? null;
+      positionFromArray(ar) ??
+      positionFromArray(en) ??
+      pickStr(ar, "position", "positionAr") ??
+      pickStr(en, "position") ??
+      null;
+
+    // DOB: Motto exposes `birthday` (ISO timestamp); legacy paths use dateOfBirth/dob.
     const dateOfBirth = parseDob(
-      ar.dateOfBirth ?? ar.dob ?? en.dateOfBirth ?? en.dob,
+      ar.birthday ??
+        ar.dateOfBirth ??
+        ar.dob ??
+        en.birthday ??
+        en.dateOfBirth ??
+        en.dob,
     );
     const nationality =
       pickStr(ar, "nationality", "nationalityCode", "country") ??
       pickStr(en, "nationality", "nationalityCode", "country") ??
       null;
     const photoUrl =
-      pickStr(ar, "photo", "photoUrl", "avatar", "image") ??
-      pickStr(en, "photo", "photoUrl", "avatar", "image") ??
+      pickStr(ar, "thumbnail_url", "photo", "photoUrl", "avatar", "image") ??
+      pickStr(en, "thumbnail_url", "photo", "photoUrl", "avatar", "image") ??
       null;
 
-    const teams =
-      extractTeams(ar).length > 0 ? extractTeams(ar) : extractTeams(en);
+    // Merge teams from both locales so each team carries both names.
+    const teamsAr = extractTeams(ar);
+    const teamsEn = extractTeams(en);
+    const teams: SaffPlusPlayerTeam[] = [];
+    const enTeamById = new Map<string, SaffPlusPlayerTeam>();
+    for (const t of teamsEn) enTeamById.set(String(t.saffTeamId), t);
+    for (const t of teamsAr) {
+      const enTeam = enTeamById.get(String(t.saffTeamId));
+      teams.push({
+        ...t,
+        nameAr: t.name || t.nameAr,
+        name: enTeam?.name || t.name,
+      });
+    }
+    if (teams.length === 0) teams.push(...teamsEn);
 
-    const recentMatches = extractMatchList(
-      ar.recentMatches ??
-        ar.lastMatches ??
-        ar.playedMatches ??
-        en.recentMatches ??
-        en.lastMatches ??
-        en.playedMatches,
+    // Match data lives on a different Motto service (EventService.ListEvents),
+    // not on the player entity. We replicate the two queries the SAFF+ frontend
+    // makes on every player page: finished matches by player id, upcoming
+    // matches by team id (Motto doesn't index upcoming matches by player).
+    const finishedFilter = buildFinishedMatchesFilter(saffPlayerId);
+    const eventCalls: Array<Promise<Record<string, unknown>[]>> = [
+      listMottoCdaEvents(finishedFilter, {
+        locale: "ar",
+        orderBy: "start_time desc",
+      }),
+      listMottoCdaEvents(finishedFilter, {
+        locale: "en",
+        orderBy: "start_time desc",
+      }),
+    ];
+    const primaryTeamId = teams[0]?.saffTeamId;
+    if (primaryTeamId) {
+      const upcomingFilter = buildUpcomingMatchesFilter(String(primaryTeamId));
+      eventCalls.push(
+        listMottoCdaEvents(upcomingFilter, {
+          locale: "ar",
+          orderBy: "start_time asc",
+        }),
+        listMottoCdaEvents(upcomingFilter, {
+          locale: "en",
+          orderBy: "start_time asc",
+        }),
+      );
+    }
+    const eventResults = await Promise.all(eventCalls);
+    const recentMatches = mergeBilingualEvents(
+      eventResults[0],
+      eventResults[1],
+      saffPlayerId,
     );
-    const upcomingMatches = extractMatchList(
-      ar.upcomingMatches ??
-        ar.nextMatches ??
-        ar.fixtures ??
-        en.upcomingMatches ??
-        en.nextMatches ??
-        en.fixtures,
-    );
+    const upcomingMatches = primaryTeamId
+      ? mergeBilingualEvents(eventResults[2], eventResults[3], saffPlayerId)
+      : [];
 
     const cdaHasRichData =
       teams.length > 0 ||

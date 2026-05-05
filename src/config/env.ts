@@ -128,6 +128,15 @@ const envSchema = z.object({
   // SAFF+ / Motto platform key (optional — for authenticating Motto CDA API calls)
   SAFFPLUS_PLATFORM_KEY: z.string().default(""),
 
+  // SAFF+ / Motto CDA bearer token. The Motto Streaming CDA API rejects
+  // unauthenticated requests with 400 INVALID_AUTHORIZATION. The default below
+  // is the token currently shipped in saffplus.sa's public JS bundle (it's a
+  // platform identifier, not a secret). Override via env if Motto rotates it.
+  SAFFPLUS_MOTTO_BEARER_TOKEN: z
+    .string()
+    .min(8)
+    .default("5O1SNE9VGH62MA16F2G088VJSV33FLF6"),
+
   // SAFF scraper rate limits — milliseconds between requests per domain.
   // Lower = faster scrapes but higher risk of 429 / WAF blocks.
   SAFF_REQUEST_DELAY_MS: z.coerce.number().int().min(0).default(1500),
@@ -291,6 +300,7 @@ export const env = {
 
   saffplus: {
     platformKey: validated.SAFFPLUS_PLATFORM_KEY,
+    mottoBearerToken: validated.SAFFPLUS_MOTTO_BEARER_TOKEN,
   },
 
   saff: {
