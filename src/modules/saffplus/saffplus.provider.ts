@@ -235,6 +235,77 @@ function mottoCdaHeaders(): Record<string, string> {
   };
 }
 
+export interface SaffPlusPlayerSearchResult {
+  saffPlayerId: string;
+  nameAr: string;
+  nameEn: string;
+  dateOfBirth: string | null;
+  currentTeamSaffId: string | number | null;
+}
+
+/**
+ * Search SAFF+ players by name and return lightweight candidates suitable
+ * for matching against a Sadara player. Does NOT fetch full profiles —
+ * list response has enough fields (name, DOB, current team) to confirm a match.
+ */
+export async function searchSaffPlusPlayersByName(
+  name: string,
+  opts: { pageSize?: number } = {},
+): Promise<SaffPlusPlayerSearchResult[]> {
+  const message = JSON.stringify({
+    pageSize: String(opts.pageSize ?? 10),
+    filter: "type_id:player",
+    search: name,
+    locale: "ar",
+  });
+  const url = `${MOTTO_CDA_LIST}?encoding=json&message=${encodeURIComponent(message)}`;
+  try {
+    const res = await fetch(url, {
+      headers: mottoCdaHeaders(),
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      logger.info(`[SAFF+ CDA] searchPlayers("${name}") → HTTP ${res.status}`);
+      return [];
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    const list = data.entities ?? data.items ?? data.results ?? data.data;
+    if (!Array.isArray(list)) return [];
+
+    return (list as Record<string, unknown>[])
+      .map((e) => {
+        const fields =
+          e.fields && typeof e.fields === "object"
+            ? (e.fields as Record<string, unknown>)
+            : {};
+        const merged: Record<string, unknown> = { ...fields, ...e };
+
+        const teams = extractTeams(merged);
+        const currentTeam =
+          teams.find((t) => t.to === null) ?? teams[0] ?? null;
+
+        return {
+          saffPlayerId: String(e.id ?? ""),
+          nameAr:
+            pickStr(merged, "nameAr", "name_ar") ??
+            pickStr(merged, "name") ??
+            "",
+          nameEn: pickStr(merged, "name") ?? "",
+          dateOfBirth: parseDob(
+            merged.birthday ?? merged.dateOfBirth ?? merged.dob,
+          ),
+          currentTeamSaffId: currentTeam?.saffTeamId ?? null,
+        };
+      })
+      .filter((r) => r.saffPlayerId.length > 0);
+  } catch (err) {
+    logger.info(
+      `[SAFF+ CDA] searchPlayers("${name}") → error: ${(err as Error).message}`,
+    );
+    return [];
+  }
+}
+
 /**
  * Call the Motto CDA ListEntities endpoint directly. Returns the `entities`
  * array from the response, or [] on error. Does not throw — callers should

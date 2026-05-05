@@ -70,4 +70,9 @@ export const sadaraPlayerIdParamSchema = z.object({
   sadaraPlayerId: z.string().uuid(),
 });
 
+export const autoLinkAllBodySchema = z.object({
+  limit: z.number().int().min(1).max(2000).optional(),
+  dryRun: z.boolean().optional(),
+});
+
 export type SyncPlayerInput = z.infer<typeof syncPlayerSchema>;

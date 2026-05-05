@@ -91,6 +91,19 @@ export async function linkReviewToPlayer(
         [row.providerSource]: row.externalPlayerId,
       };
       await player.save();
+
+      // Auto-enrich with full SAFF+ profile now that we have the external id.
+      // Lazy require breaks the circular dependency (playerReview ↔ saffplus.service).
+      if (row.providerSource === "saffplus") {
+        const { autoEnrichPlayerFromSaffPlus } =
+          require("./saffplus.service") as typeof import("./saffplus.service");
+        autoEnrichPlayerFromSaffPlus(player.id, row.externalPlayerId).catch(
+          (err) =>
+            logger.warn(
+              `[SAFF+ review] autoEnrich failed (${player.id}): ${(err as Error).message}`,
+            ),
+        );
+      }
     }
   }
 
