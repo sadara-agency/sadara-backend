@@ -646,7 +646,9 @@ describe("autoLinkPlayerToSaffPlus", () => {
     (Player.findByPk as jest.Mock).mockResolvedValue(player);
     (Club.findByPk as jest.Mock).mockResolvedValue({ saffTeamId: 99 }); // different club
     (provider.searchSaffPlusPlayersByName as jest.Mock).mockResolvedValue([
-      mockCandidate({ currentTeamSaffId: 10 }), // club 10 ≠ 99 → no auto-link
+      // Similar name but not identical (extra surname) → score ~0.7, below 0.92 name-alone threshold
+      // Club mismatch (10 ≠ 99) prevents auto-link → queued for review
+      mockCandidate({ nameAr: "فهد سالم العتيبي", currentTeamSaffId: 10 }),
     ]);
 
     const result = await autoLinkPlayerToSaffPlus("player-uuid");
