@@ -2333,6 +2333,10 @@ export async function fetchPlayerProfile(
     getMottoCdaEntity(saffPlayerId, "en"),
   ]);
 
+  // Names from CDA summary — used as fallbacks if Puppeteer tier runs
+  let cdaNameAr = "";
+  let cdaNameEn = "";
+
   if (arEntity ?? enEntity) {
     const ar = arEntity ?? {};
     const en = enEntity ?? {};
@@ -2345,6 +2349,9 @@ export async function fetchPlayerProfile(
       pickStr(en, "name", "nameEn", "fullName") ??
       pickStr(ar, "nameEn", "name") ??
       "";
+    cdaNameAr = nameAr;
+    cdaNameEn = nameEn;
+
     const position =
       pickStr(ar, "position", "positionAr") ?? pickStr(en, "position") ?? null;
     const dateOfBirth = parseDob(
@@ -2379,25 +2386,33 @@ export async function fetchPlayerProfile(
         en.fixtures,
     );
 
+    const cdaHasRichData =
+      teams.length > 0 ||
+      recentMatches.length > 0 ||
+      upcomingMatches.length > 0;
+
     logger.info(
       `[SAFF+] fetchPlayerProfile(${saffPlayerId}): CDA hit — ` +
-        `teams=${teams.length} recent=${recentMatches.length} upcoming=${upcomingMatches.length}`,
+        `teams=${teams.length} recent=${recentMatches.length} upcoming=${upcomingMatches.length}` +
+        (cdaHasRichData ? "" : " — summary-only, falling through to Puppeteer"),
     );
 
-    const profile: SaffPlusPlayerProfile = {
-      saffPlayerId,
-      nameEn,
-      nameAr,
-      position,
-      dateOfBirth,
-      nationality,
-      photoUrl,
-      teams,
-      recentMatches,
-      upcomingMatches,
-    };
-    void cacheSet(cacheKey, profile, PLAYER_PROFILE_TTL);
-    return profile;
+    if (cdaHasRichData) {
+      const profile: SaffPlusPlayerProfile = {
+        saffPlayerId,
+        nameEn,
+        nameAr,
+        position,
+        dateOfBirth,
+        nationality,
+        photoUrl,
+        teams,
+        recentMatches,
+        upcomingMatches,
+      };
+      void cacheSet(cacheKey, profile, PLAYER_PROFILE_TTL);
+      return profile;
+    }
   }
 
   // ── Tier B: Puppeteer fallback ──
@@ -2585,11 +2600,11 @@ export async function fetchPlayerProfile(
   const nameAr =
     pickStr(playerObj, "nameAr", "fullNameAr", "name_ar", "full_name_ar") ??
     pickStr(playerObj, "name", "fullName") ??
-    "";
+    (cdaNameAr || "");
   const nameEn =
     pickStr(playerObj, "nameEn", "fullNameEn", "name_en", "full_name_en") ??
     pickStr(playerObj, "name", "fullName") ??
-    "";
+    (cdaNameEn || "");
 
   logger.info(
     `[SAFF+] fetchPlayerProfile(${saffPlayerId}): Puppeteer hit — nameAr="${nameAr}" nameEn="${nameEn}"`,
