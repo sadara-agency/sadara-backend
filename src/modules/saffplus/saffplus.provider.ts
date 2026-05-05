@@ -2137,19 +2137,47 @@ const MOTTO_CDA_GET =
   "https://cda.mottostreaming.com/motto.cda.cms.entity.v1.EntityService/GetEntity";
 
 /**
- * Call Motto CDA GetEntity for a player by saffPlayerId.
- * Returns the raw entity object or null if not found / error.
+ * Fetch a single player entity from Motto CDA by saffPlayerId (slug).
+ * Tries multiple filter strategies in sequence — the Motto CDA GetEntity
+ * endpoint requires a numeric internal ID, whereas player page slugs like
+ * "NMD_mPMtk2HQTDmgvxD7x" are handled by ListEntities filters.
  */
 async function getMottoCdaEntity(
   id: string,
   locale: "ar" | "en",
 ): Promise<Record<string, unknown> | null> {
+  // Strategy 1: ListEntities with slug filter (works for alphanumeric slugs)
+  const filters = [
+    `type_id:player AND slug:${id}`,
+    `type_id:player AND fields.slug:${id}`,
+    `type_id:player AND id:${id}`,
+    `type_id:person AND slug:${id}`,
+    `type_id:person AND fields.slug:${id}`,
+  ];
+
+  for (const filter of filters) {
+    const entities = await listMottoCdaEntities(filter, {
+      locale,
+      pageSize: 1,
+    });
+    if (entities.length > 0) {
+      logger.info(
+        `[SAFF+ CDA] getMottoCdaEntity(${id}, ${locale}): hit via filter "${filter}"`,
+      );
+      // Unwrap fields if present
+      const e = entities[0];
+      const fields = e.fields as Record<string, unknown> | undefined;
+      return fields ? { ...fields, ...e } : e;
+    }
+  }
+
+  // Strategy 2: GetEntity with id (works if id is a numeric CDA internal ID)
   const message = JSON.stringify({ id, locale });
   const url = `${MOTTO_CDA_GET}?encoding=json&message=${encodeURIComponent(message)}`;
   try {
     const res = await fetch(url, {
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(8_000),
     });
     if (!res.ok) {
       logger.info(
@@ -2160,6 +2188,7 @@ async function getMottoCdaEntity(
     const data = (await res.json()) as Record<string, unknown>;
     const entity = data.entity ?? data.data ?? data;
     if (entity && typeof entity === "object" && !Array.isArray(entity)) {
+      logger.info(`[SAFF+ CDA] GetEntity(${id}, ${locale}): hit`);
       return entity as Record<string, unknown>;
     }
     return null;
@@ -2360,7 +2389,6 @@ export async function fetchPlayerProfile(
     `[SAFF+] fetchPlayerProfile(${saffPlayerId}): CDA miss — falling back to Puppeteer`,
   );
 
-  await saffPlusLimiter.acquire("saffplus.sa");
   const { html, jsonResponses } = await fetchPageWithJson(
     `/ar/entity/player/${saffPlayerId}`,
     "[data-testid='player-name'], h1, .player-name",
