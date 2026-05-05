@@ -311,9 +311,12 @@ describe('Player Service', () => {
   describe('getClubHistory', () => {
     it('should return club history', async () => {
       const { sequelize } = require('../../../src/config/database');
-      sequelize.query.mockResolvedValue([
+      // First call: current club query
+      sequelize.query.mockResolvedValueOnce([
         { clubId: 'club-001', name: 'Al-Hilal', joinDate: '2020-01-01' },
       ]);
+      // Second call: history query (empty since current club should be deduped)
+      sequelize.query.mockResolvedValueOnce([]);
 
       const result = await playerService.getClubHistory('player-001');
 

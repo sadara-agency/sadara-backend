@@ -207,6 +207,17 @@ export const applySessionSchema = z.object({
   confirmDigest: z.string().min(1, "Preview digest is required"),
 });
 
+// ── Reset SAFF/SAFF+ data ──
+
+export const resetSaffSchema = z.object({
+  scope: z.enum(["saff_only", "full"]).default("saff_only"),
+  confirm: z.literal(true, {
+    errorMap: () => ({
+      message: "Confirmation required: set confirm: true",
+    }),
+  }),
+});
+
 // ── Inferred Types ──
 
 export type TournamentQuery = z.infer<typeof tournamentQuerySchema>;
@@ -227,3 +238,4 @@ export type UpdateDecisionsInput = z.infer<typeof updateDecisionsSchema>;
 export type AdvanceStepInput = z.infer<typeof advanceStepSchema>;
 export type ApplySessionInput = z.infer<typeof applySessionSchema>;
 export type TeamResolutionInput = z.infer<typeof teamResolutionSchema>;
+export type ResetSaffInput = z.infer<typeof resetSaffSchema>;
