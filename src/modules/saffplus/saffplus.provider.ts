@@ -2401,109 +2401,226 @@ export async function fetchPlayerProfile(
     return null;
   }
 
-  // Walk captured JSON responses for a player-shaped object
-  let playerObj: Record<string, unknown> | null = null;
-  for (const r of jsonResponses) {
-    const data = r.data as Record<string, unknown>;
-    if (!data || typeof data !== "object") continue;
+  // Log what we got for diagnostics
+  logger.info(
+    `[SAFF+] fetchPlayerProfile(${saffPlayerId}): Puppeteer got ${jsonResponses.length} JSON responses, ` +
+      `URLs: ${jsonResponses.map((r) => r.url.slice(0, 80)).join(" | ")}`,
+  );
+  if (jsonResponses.length > 0) {
+    logger.info(
+      `[SAFF+] fetchPlayerProfile(${saffPlayerId}): first JSON response keys: ` +
+        `${Object.keys((jsonResponses[0].data as Record<string, unknown>) ?? {}).join(", ")} ` +
+        `— sample: ${JSON.stringify(jsonResponses[0].data).slice(0, 300)}`,
+    );
+  }
 
-    // Look for a top-level object that has player fields
-    function findPlayer(v: unknown): Record<string, unknown> | null {
-      if (v == null || typeof v !== "object" || Array.isArray(v)) return null;
-      const o = v as Record<string, unknown>;
-      // A player object has at least a name + (dateOfBirth or position or teams)
-      const hasName =
-        typeof o.name === "string" || typeof o.nameAr === "string";
-      const hasPlayerField =
-        o.dateOfBirth != null ||
-        o.dob != null ||
-        o.position != null ||
-        Array.isArray(o.teams) ||
-        Array.isArray(o.clubs);
-      if (hasName && hasPlayerField) return o;
-      for (const child of Object.values(o)) {
-        const found = findPlayer(child);
+  // Walk captured JSON responses for a player-shaped object.
+  // SAFF+ delivers data via Motto CDA — entities are shaped like:
+  //   { slug, type_id, fields: { name_ar, name_en, position, dob, ... } }
+  // OR the RSC stream embeds the page props with a nested entity object.
+  let playerObj: Record<string, unknown> | null = null;
+
+  function isPlayerShaped(o: Record<string, unknown>): boolean {
+    // Direct fields (CDA entity merged)
+    const hasName =
+      typeof o.name === "string" ||
+      typeof o.nameAr === "string" ||
+      typeof o.name_ar === "string" ||
+      typeof o.name_en === "string" ||
+      typeof o.fullName === "string";
+    const hasPlayerField =
+      o.dateOfBirth != null ||
+      o.date_of_birth != null ||
+      o.dob != null ||
+      o.position != null ||
+      o.nationality != null ||
+      o.age != null ||
+      Array.isArray(o.teams) ||
+      Array.isArray(o.clubs) ||
+      Array.isArray(o.clubHistory);
+    if (hasName && hasPlayerField) return true;
+    // Motto CDA entity shape: { type_id: "player", fields: {...} }
+    const typeId = pickStr(o, "type_id", "typeId");
+    if (typeId && /player|person/i.test(typeId)) {
+      const fields = o.fields as Record<string, unknown> | undefined;
+      if (fields && typeof fields === "object") return true;
+    }
+    // Slug matches the saffPlayerId
+    if (pickStr(o, "slug", "id") === saffPlayerId) return true;
+    return false;
+  }
+
+  function findPlayerObj(
+    v: unknown,
+    depth = 0,
+  ): Record<string, unknown> | null {
+    if (depth > 8 || v == null || typeof v !== "object") return null;
+    if (Array.isArray(v)) {
+      for (const item of v) {
+        const found = findPlayerObj(item, depth + 1);
         if (found) return found;
       }
       return null;
     }
+    const o = v as Record<string, unknown>;
+    if (isPlayerShaped(o)) return o;
+    for (const child of Object.values(o)) {
+      const found = findPlayerObj(child, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
 
-    const found = findPlayer(data);
+  for (const r of jsonResponses) {
+    if (!r.data || typeof r.data !== "object") continue;
+    const found = findPlayerObj(r.data);
     if (found) {
-      playerObj = found;
+      logger.info(
+        `[SAFF+] fetchPlayerProfile(${saffPlayerId}): player object found in JSON response from ${r.url.slice(0, 80)}`,
+      );
+      // If it's a Motto CDA entity, merge fields into the root
+      const fields = found.fields as Record<string, unknown> | undefined;
+      playerObj = fields ? { ...fields, ...found } : found;
       break;
     }
   }
 
-  // RSC fallback — try extracting from RSC chunks
+  // RSC fallback — walk Next.js RSC flight chunks embedded in the HTML
   if (!playerObj) {
     const rscChunks = extractRscData(html);
+    logger.info(
+      `[SAFF+] fetchPlayerProfile(${saffPlayerId}): RSC chunks: ${rscChunks.length}`,
+    );
     for (const chunk of rscChunks) {
+      // Try parsing the chunk as JSON
       try {
         const parsed = JSON.parse(chunk) as unknown;
-        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-          const o = parsed as Record<string, unknown>;
-          const hasName =
-            typeof o.name === "string" || typeof o.nameAr === "string";
-          if (
-            hasName &&
-            (o.position != null || o.dateOfBirth != null || o.teams != null)
-          ) {
-            playerObj = o;
+        const found = findPlayerObj(parsed);
+        if (found) {
+          const fields = found.fields as Record<string, unknown> | undefined;
+          playerObj = fields ? { ...fields, ...found } : found;
+          logger.info(
+            `[SAFF+] fetchPlayerProfile(${saffPlayerId}): player found in RSC JSON chunk`,
+          );
+          break;
+        }
+      } catch {
+        // not JSON — try regex extraction from raw chunk text
+      }
+
+      // Regex extraction: look for Motto CDA entity patterns in the raw RSC text
+      if (!playerObj) {
+        const slugMatch = new RegExp(
+          `"slug"\\s*:\\s*"${saffPlayerId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`,
+        ).test(chunk);
+        if (slugMatch) {
+          // Extract the enclosing JSON object containing this slug
+          const nameArMatch = /"name_ar"\s*:\s*"([^"]+)"/.exec(chunk);
+          const nameEnMatch = /"name(?:_en|En)?"\s*:\s*"([^"]+)"/.exec(chunk);
+          const posMatch = /"position"\s*:\s*"([^"]+)"/.exec(chunk);
+          const dobMatch =
+            /"(?:date_of_birth|dateOfBirth|dob)"\s*:\s*"([^"]+)"/.exec(chunk);
+          const natMatch = /"nationality"\s*:\s*"([^"]+)"/.exec(chunk);
+          const photoMatch =
+            /"(?:photo|image|avatar|thumbnail_url)"\s*:\s*"([^"]+)"/.exec(
+              chunk,
+            );
+          if (nameArMatch ?? nameEnMatch) {
+            playerObj = {
+              slug: saffPlayerId,
+              name_ar: nameArMatch?.[1] ?? null,
+              name: nameEnMatch?.[1] ?? null,
+              position: posMatch?.[1] ?? null,
+              date_of_birth: dobMatch?.[1] ?? null,
+              nationality: natMatch?.[1] ?? null,
+              photo: photoMatch?.[1] ?? null,
+            };
+            logger.info(
+              `[SAFF+] fetchPlayerProfile(${saffPlayerId}): player found via RSC regex extraction`,
+            );
             break;
           }
         }
-      } catch {
-        // skip malformed RSC chunk
       }
     }
   }
 
   if (!playerObj) {
-    // Last resort: scrape HTML
+    // Last resort: scrape HTML for name + basic fields
     const $ = cheerio.load(html);
     const nameText = $("h1").first().text().trim();
-    if (!nameText) {
+    // Also try to find the player name from any element containing the slug
+    const slugInPage = html.includes(saffPlayerId);
+    if (!nameText && !slugInPage) {
       logger.warn(
         `[SAFF+] fetchPlayerProfile(${saffPlayerId}): nothing found in Puppeteer output`,
       );
       return null;
     }
-    // Minimal profile from HTML only (no structured data)
-    playerObj = { name: nameText };
+    if (nameText) {
+      playerObj = { name: nameText };
+    } else {
+      // Page loaded and has the slug but no extractable name — return minimal
+      playerObj = { slug: saffPlayerId };
+    }
   }
 
+  // Support both camelCase (saffplus.sa frontend) and snake_case (Motto CDA)
   const nameAr =
-    pickStr(playerObj, "nameAr", "fullNameAr") ??
+    pickStr(playerObj, "nameAr", "fullNameAr", "name_ar", "full_name_ar") ??
     pickStr(playerObj, "name", "fullName") ??
     "";
   const nameEn =
-    pickStr(playerObj, "nameEn", "fullNameEn") ??
+    pickStr(playerObj, "nameEn", "fullNameEn", "name_en", "full_name_en") ??
     pickStr(playerObj, "name", "fullName") ??
     "";
 
   logger.info(
-    `[SAFF+] fetchPlayerProfile(${saffPlayerId}): Puppeteer hit — name="${nameEn || nameAr}"`,
+    `[SAFF+] fetchPlayerProfile(${saffPlayerId}): Puppeteer hit — nameAr="${nameAr}" nameEn="${nameEn}"`,
   );
 
   return {
     saffPlayerId,
     nameEn,
     nameAr,
-    position: pickStr(playerObj, "position") ?? null,
-    dateOfBirth: parseDob(playerObj.dateOfBirth ?? playerObj.dob),
+    position:
+      pickStr(playerObj, "position", "position_ar", "positionEn") ?? null,
+    dateOfBirth: parseDob(
+      playerObj.dateOfBirth ??
+        playerObj.date_of_birth ??
+        playerObj.dob ??
+        playerObj.birthDate,
+    ),
     nationality:
-      pickStr(playerObj, "nationality", "nationalityCode", "country") ?? null,
+      pickStr(
+        playerObj,
+        "nationality",
+        "nationalityCode",
+        "country",
+        "nationality_code",
+      ) ?? null,
     photoUrl:
-      pickStr(playerObj, "photo", "photoUrl", "avatar", "image") ?? null,
+      pickStr(
+        playerObj,
+        "photo",
+        "photoUrl",
+        "avatar",
+        "image",
+        "thumbnail_url",
+        "photo_url",
+      ) ?? null,
     teams: extractTeams(playerObj),
     recentMatches: extractMatchList(
       playerObj.recentMatches ??
         playerObj.lastMatches ??
-        playerObj.playedMatches,
+        playerObj.playedMatches ??
+        playerObj.recent_matches,
     ),
     upcomingMatches: extractMatchList(
-      playerObj.upcomingMatches ?? playerObj.nextMatches ?? playerObj.fixtures,
+      playerObj.upcomingMatches ??
+        playerObj.nextMatches ??
+        playerObj.fixtures ??
+        playerObj.upcoming_matches,
     ),
   };
 }
