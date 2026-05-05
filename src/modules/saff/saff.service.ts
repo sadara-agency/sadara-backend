@@ -1806,7 +1806,7 @@ export async function fetchTeamLogos(season: string, force = false) {
 
   const teamMaps = await SaffTeamMap.findAll({ where });
 
-  if (teamMaps.length === 0) return { fetched: 0 };
+  if (teamMaps.length === 0) return { fetched: 0, total: 0, season };
 
   const saffTeamIds = teamMaps.map((tm) => tm.saffTeamId);
   const logos = await scrapeTeamLogos(saffTeamIds);
