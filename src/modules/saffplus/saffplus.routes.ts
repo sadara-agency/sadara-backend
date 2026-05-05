@@ -9,6 +9,7 @@ import {
   matchIdParamSchema,
   syncPlayerSchema,
   saffPlayerIdParamSchema,
+  sadaraPlayerIdParamSchema,
 } from "./saffplus.validation";
 import {
   playerReviewQuerySchema,
@@ -144,6 +145,13 @@ router.post(
 );
 
 // ── Phase 4: Player profile enrichment ──
+
+router.get(
+  "/players/by-sadara/:sadaraPlayerId/live",
+  authorizeModule("saff-data", "read"),
+  validate(sadaraPlayerIdParamSchema, "params"),
+  asyncHandler(ctrl.getLiveProfileBySadaraIdCtrl),
+);
 
 router.get(
   "/players/:saffPlayerId/preview",

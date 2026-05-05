@@ -1174,6 +1174,28 @@ export interface SyncPlayerOptions {
 }
 
 /**
+ * Fetch the live SAFF+ profile for a Sadara player by their Sadara UUID.
+ * Resolves the SAFF+ slug from players.external_ids.saffplus, then reads
+ * through the Redis cache (or fetches fresh if fresh=true).
+ * Returns null when the player has no linked SAFF+ ID.
+ */
+export async function getLiveProfileBySadaraId(
+  sadaraPlayerId: string,
+  { fresh = false }: { fresh?: boolean } = {},
+) {
+  const player = await Player.findByPk(sadaraPlayerId, {
+    attributes: ["id", "externalIds"],
+  });
+  if (!player) throw new AppError("Player not found", 404);
+
+  const saffPlayerId = (player.externalIds as Record<string, string> | null)
+    ?.saffplus;
+  if (!saffPlayerId) return null;
+
+  return previewPlayerProfile(saffPlayerId, { fresh });
+}
+
+/**
  * Fetch the raw SAFF+ player profile without writing anything to the DB.
  * Used by the preview endpoint so operators can review data before syncing.
  */

@@ -66,4 +66,8 @@ export const saffPlayerIdParamSchema = z.object({
   saffPlayerId: z.string().min(1).max(200),
 });
 
+export const sadaraPlayerIdParamSchema = z.object({
+  sadaraPlayerId: z.string().uuid(),
+});
+
 export type SyncPlayerInput = z.infer<typeof syncPlayerSchema>;
