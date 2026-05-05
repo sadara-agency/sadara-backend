@@ -39,7 +39,6 @@ import {
 } from "@modules/saffplus/saffplus.service";
 import { upsertPendingReview } from "@modules/saffplus/playerReview.service";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
-import { logAudit } from "@shared/utils/audit";
 import type {
   TournamentQuery,
   FetchRequest,
@@ -3209,7 +3208,6 @@ interface ResetResult {
 
 export async function resetSaffData(
   scope: "saff_only" | "full",
-  executedBy: string,
 ): Promise<ResetResult> {
   const txn = await sequelize.transaction();
   const deleted: Record<string, number> = {};
@@ -3327,19 +3325,6 @@ export async function resetSaffData(
     await sequelize.query(
       `UPDATE clubs SET saff_team_id = NULL WHERE saff_team_id IS NOT NULL`,
       { transaction: txn },
-    );
-
-    // Write audit log
-    await logAudit(
-      "DELETE",
-      "saff_tournaments",
-      null,
-      {
-        userId: executedBy,
-        userName: "system",
-        userRole: "Admin" as const,
-      },
-      `SAFF reset (scope: ${scope}): ${JSON.stringify(deleted)}`,
     );
 
     await txn.commit();

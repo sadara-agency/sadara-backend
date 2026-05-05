@@ -456,7 +456,14 @@ export async function abortImportSession(req: AuthRequest, res: Response) {
 
 export async function resetData(req: AuthRequest, res: Response) {
   const { scope = "saff_only" } = req.body;
-  const result = await saffService.resetSaffData(scope, req.user!.id);
+  const result = await saffService.resetSaffData(scope);
+  await logAudit(
+    "DELETE",
+    "saff_tournaments",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF reset (scope: ${scope}): ${result.tablesCleared.join(", ")}`,
+  );
   sendSuccess(
     res,
     result,
