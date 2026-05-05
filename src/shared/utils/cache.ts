@@ -57,6 +57,7 @@ export const CachePrefix = {
   GOVERNANCE_GATES: "governance-gates",
   SESSION_COVERAGE: "session-coverage",
   CALENDAR_SCOPE: "calendar-scope",
+  SAFFPLUS_PLAYER: "saffplus:player",
 } as const;
 
 // ── Core Operations ──

@@ -239,6 +239,9 @@ export async function getPlayerProfilePreviewCtrl(
   res: Response,
 ) {
   const { saffPlayerId } = req.params;
-  const profile = await saffPlusService.previewPlayerProfile(saffPlayerId);
+  const fresh = req.query.fresh === "1" || req.query.fresh === "true";
+  const profile = await saffPlusService.previewPlayerProfile(saffPlayerId, {
+    fresh,
+  });
   sendSuccess(res, profile);
 }

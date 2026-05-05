@@ -1177,10 +1177,13 @@ export interface SyncPlayerOptions {
  * Fetch the raw SAFF+ player profile without writing anything to the DB.
  * Used by the preview endpoint so operators can review data before syncing.
  */
-export async function previewPlayerProfile(saffPlayerId: string) {
+export async function previewPlayerProfile(
+  saffPlayerId: string,
+  { fresh = false }: { fresh?: boolean } = {},
+) {
   let profile;
   try {
-    profile = await provider.fetchPlayerProfile(saffPlayerId);
+    profile = await provider.fetchPlayerProfile(saffPlayerId, { fresh });
   } catch (err) {
     throw new AppError(`SAFF+ provider error: ${(err as Error).message}`, 502);
   }
