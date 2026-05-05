@@ -490,6 +490,20 @@ export async function syncClubSquadsAndRosters(
               },
             });
             result.membershipsUpserted++;
+
+            // Auto-enrich the matched player with their full SAFF+ profile
+            // (DOB, nationality, photo, club history, match links). Fire-and-forget
+            // so a slow API response doesn't block the roster sync.
+            if (entry.externalId) {
+              autoEnrichPlayerFromSaffPlus(
+                match.playerId,
+                entry.externalId,
+              ).catch((err) =>
+                logger.warn(
+                  `[SAFF+] autoEnrich fire-and-forget failed (${match.playerId}): ${(err as Error).message}`,
+                ),
+              );
+            }
           } else {
             await upsertPendingReview({
               scrapedNameAr: entry.nameAr ?? null,
@@ -1212,6 +1226,165 @@ export async function previewPlayerProfile(
   if (!profile)
     throw new AppError(`SAFF+ profile not found for id "${saffPlayerId}"`, 404);
   return profile;
+}
+
+/**
+ * Silently enrich a player that was just auto-linked during a squad roster sync.
+ * No initiator required — fires and forgets; errors are only logged, never thrown.
+ * Called internally; not exported as an API endpoint handler.
+ */
+async function autoEnrichPlayerFromSaffPlus(
+  sadaraPlayerId: string,
+  saffPlayerId: string,
+): Promise<void> {
+  let profile: SaffPlusPlayerProfile | null;
+  try {
+    profile = await provider.fetchPlayerProfile(saffPlayerId);
+  } catch (err) {
+    logger.warn(
+      `[SAFF+] autoEnrich(${sadaraPlayerId}): provider error — ${(err as Error).message}`,
+    );
+    return;
+  }
+  if (!profile) {
+    logger.warn(
+      `[SAFF+] autoEnrich(${sadaraPlayerId}): no profile returned for saffPlus id "${saffPlayerId}"`,
+    );
+    return;
+  }
+
+  try {
+    const player = await Player.findByPk(sadaraPlayerId);
+    if (!player) return;
+
+    await sequelize.transaction(async (t) => {
+      await ExternalProviderMapping.upsert(
+        {
+          playerId: sadaraPlayerId,
+          providerName: "Other" as const,
+          externalPlayerId: saffPlayerId,
+          entityType: "player",
+          lastSyncedAt: new Date(),
+          notes: `saffplus:${saffPlayerId}`,
+          isActive: true,
+        },
+        { transaction: t },
+      );
+
+      const updates: Partial<{
+        firstName: string;
+        lastName: string;
+        firstNameAr: string;
+        lastNameAr: string;
+        dateOfBirth: string;
+        nationality: string;
+        position: string;
+        photoUrl: string;
+        externalIds: Record<string, string>;
+      }> = {};
+
+      function fill(currentVal: unknown): boolean {
+        return currentVal == null || currentVal === "";
+      }
+
+      if (profile!.nameEn) {
+        const parts = profile!.nameEn.trim().split(/\s+/);
+        const first = parts[0] ?? "";
+        const last = parts.slice(1).join(" ") || first;
+        if (first && fill(player.firstName)) updates.firstName = first;
+        if (last && fill(player.lastName)) updates.lastName = last;
+      }
+      if (profile!.nameAr) {
+        const partsAr = normalizeArabicName(profile!.nameAr)
+          .trim()
+          .split(/\s+/);
+        const firstAr = partsAr[0] ?? "";
+        const lastAr = partsAr.slice(1).join(" ") || firstAr;
+        if (firstAr && fill(player.firstNameAr)) updates.firstNameAr = firstAr;
+        if (lastAr && fill(player.lastNameAr)) updates.lastNameAr = lastAr;
+      }
+      if (profile!.dateOfBirth && fill(player.dateOfBirth))
+        updates.dateOfBirth = profile!.dateOfBirth;
+      if (profile!.nationality && fill(player.nationality))
+        updates.nationality = profile!.nationality;
+      if (profile!.position && fill(player.position))
+        updates.position = profile!.position;
+      if (profile!.photoUrl && fill(player.photoUrl))
+        updates.photoUrl = profile!.photoUrl;
+
+      const existingExtIds: Record<string, string> = player.externalIds ?? {};
+      updates.externalIds = { ...existingExtIds, saffplus: saffPlayerId };
+
+      if (Object.keys(updates).length > 0) {
+        await player.update(updates, { transaction: t });
+      }
+
+      for (const team of profile!.teams) {
+        const numericTeamId =
+          typeof team.saffTeamId === "number"
+            ? team.saffTeamId
+            : Number(team.saffTeamId);
+        if (!Number.isFinite(numericTeamId)) continue;
+        const club = await Club.findOne({
+          where: { saffTeamId: numericTeamId },
+          attributes: ["id"],
+          transaction: t,
+        });
+        if (!club) continue;
+        if (team.to == null) {
+          await player.update({ currentClubId: club.id }, { transaction: t });
+        }
+        const startDate = team.from ?? new Date().toISOString().slice(0, 10);
+        const existing = await PlayerClubHistory.findOne({
+          where: { playerId: sadaraPlayerId, clubId: club.id, startDate },
+          transaction: t,
+        });
+        if (!existing) {
+          await PlayerClubHistory.create(
+            {
+              playerId: sadaraPlayerId,
+              clubId: club.id,
+              startDate,
+              endDate: team.to ?? null,
+            },
+            { transaction: t },
+          );
+        }
+      }
+
+      const allMatches = [
+        ...profile!.recentMatches,
+        ...profile!.upcomingMatches,
+      ];
+      for (const m of allMatches) {
+        if (!m.lineupRole) continue;
+        const externalMatchId = `saffplus:${String(m.id)}`;
+        const match = await Match.findOne({
+          where: { providerSource: "saffplus", externalMatchId },
+          attributes: ["id"],
+          transaction: t,
+        });
+        if (!match) continue;
+        await MatchPlayer.upsert(
+          {
+            matchId: match.id,
+            playerId: sadaraPlayerId,
+            availability: m.lineupRole,
+            providerSource: "saffplus",
+          },
+          { transaction: t },
+        );
+      }
+    });
+
+    logger.info(
+      `[SAFF+] autoEnrich(${sadaraPlayerId}): enriched from saffplus id "${saffPlayerId}"`,
+    );
+  } catch (err) {
+    logger.warn(
+      `[SAFF+] autoEnrich(${sadaraPlayerId}): transaction failed — ${(err as Error).message}`,
+    );
+  }
 }
 
 /**
