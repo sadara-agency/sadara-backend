@@ -148,10 +148,10 @@ export async function getStandings(
   competitionId: number | string,
   season?: string,
 ) {
-  const competition = await Competition.findByPk(String(competitionId));
-  if (!competition)
-    throw new AppError(`Competition ${competitionId} not found`, 404);
-  const slug = competition.saffplusSlug ?? String(competitionId);
+  // competitionId comes from the SAFF+ competitions list — it is a slug or
+  // numeric SAFF+ ID, NOT a Sadara UUID. Look up by saffplusSlug first; if
+  // not found in our DB, use it directly as the provider slug.
+  const slug = await resolveCompetitionSlug(competitionId);
   const raw = await provider.fetchStandings(slug, season);
   return {
     total: raw.length,
@@ -167,16 +167,36 @@ export async function getMatches(
   competitionId: number | string,
   season?: string,
 ) {
-  const competition = await Competition.findByPk(String(competitionId));
-  if (!competition)
-    throw new AppError(`Competition ${competitionId} not found`, 404);
-  const slug = competition.saffplusSlug ?? String(competitionId);
+  const slug = await resolveCompetitionSlug(competitionId);
   const raw = await provider.fetchMatches(slug, season);
   return {
     total: raw.length,
     fixtures: raw.map(normalizeFixture),
     raw,
   };
+}
+
+async function resolveCompetitionSlug(
+  competitionId: number | string,
+): Promise<string> {
+  const raw = String(competitionId);
+  // Try lookup by saffplusSlug first
+  const bySlug = await Competition.findOne({
+    where: { saffplusSlug: raw },
+    attributes: ["saffplusSlug"],
+  });
+  if (bySlug?.saffplusSlug) return bySlug.saffplusSlug;
+  // Try lookup by saffId (numeric)
+  const numId = Number(raw);
+  if (!isNaN(numId)) {
+    const byId = await Competition.findOne({
+      where: { saffId: numId },
+      attributes: ["saffplusSlug"],
+    });
+    if (byId?.saffplusSlug) return byId.saffplusSlug;
+  }
+  // Not in our DB yet — use the raw value directly as the provider slug
+  return raw;
 }
 
 // ══════════════════════════════════════════
