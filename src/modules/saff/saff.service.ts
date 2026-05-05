@@ -38,6 +38,7 @@ import {
   type PlayerMatchResult,
 } from "@modules/saffplus/saffplus.service";
 import { upsertPendingReview } from "@modules/saffplus/playerReview.service";
+import { fetchTeams as fetchSaffPlusTeams } from "@modules/saffplus/saffplus.provider";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
 import type {
   TournamentQuery,
@@ -1830,7 +1831,47 @@ export async function fetchTeamLogos(season: string, force = false) {
     }
   }
 
-  return { fetched: updated, total: teamMaps.length };
+  const saffPlusFallback = await syncClubLogosFromSaffPlus();
+
+  return {
+    fetched: updated,
+    total: teamMaps.length,
+    season,
+    saffPlusFallback: saffPlusFallback.updated,
+  };
+}
+
+export async function syncClubLogosFromSaffPlus(): Promise<{
+  updated: number;
+  total: number;
+}> {
+  const raw = await fetchSaffPlusTeams();
+  let updated = 0;
+
+  for (const team of raw) {
+    if (!team.logo) continue;
+
+    const numericId = typeof team.id === "number" ? team.id : Number(team.id);
+    let club: Club | null = null;
+
+    if (Number.isFinite(numericId)) {
+      club = await Club.findOne({ where: { saffTeamId: numericId } });
+    }
+
+    if (!club && (team.nameAr || team.name)) {
+      club = await Club.findOne({
+        where: team.nameAr ? { nameAr: team.nameAr } : { name: team.name },
+      });
+    }
+
+    if (!club) continue;
+    if (club.logoUrl && !club.logoUrl.includes("/assets/images/logo")) continue;
+
+    await club.update({ logoUrl: team.logo });
+    updated++;
+  }
+
+  return { updated, total: raw.length };
 }
 
 // ══════════════════════════════════════════

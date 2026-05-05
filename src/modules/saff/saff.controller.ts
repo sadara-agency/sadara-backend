@@ -157,7 +157,7 @@ export async function fetchTeamLogos(req: AuthRequest, res: Response) {
     "saff_team_maps",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Fetched ${result.fetched} team logos out of ${result.total}`,
+    `Fetched ${result.fetched} team logos out of ${result.total}; ${result.saffPlusFallback ?? 0} filled from SAFF+`,
   );
   sendSuccess(
     res,
