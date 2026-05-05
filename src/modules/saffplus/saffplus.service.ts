@@ -60,7 +60,7 @@ import type { AuthUser } from "@shared/types";
 
 function normalizeTeam(team: SaffPlusTeam): NormalizedTeam {
   return {
-    saffTeamId: Number(team.id),
+    saffTeamId: String(team.id),
     teamNameEn: team.name || "",
     teamNameAr: team.nameAr || team.name || "",
     logoUrl: team.logo,
@@ -70,7 +70,7 @@ function normalizeTeam(team: SaffPlusTeam): NormalizedTeam {
 function normalizeStanding(row: SaffPlusStanding): NormalizedStanding {
   return {
     position: row.position,
-    saffTeamId: Number(row.teamId),
+    saffTeamId: String(row.teamId),
     teamNameEn: row.teamName || "",
     teamNameAr: row.teamNameAr || row.teamName || "",
     played: row.played || 0,
@@ -88,10 +88,10 @@ function normalizeFixture(match: SaffPlusMatch): NormalizedFixture {
   return {
     date: match.date?.split("T")[0] || "",
     time: match.time || "00:00",
-    saffHomeTeamId: Number(match.homeTeamId),
+    saffHomeTeamId: String(match.homeTeamId),
     homeTeamNameEn: match.homeTeamName || "",
     homeTeamNameAr: match.homeTeamNameAr || match.homeTeamName || "",
-    saffAwayTeamId: Number(match.awayTeamId),
+    saffAwayTeamId: String(match.awayTeamId),
     awayTeamNameEn: match.awayTeamName || "",
     awayTeamNameAr: match.awayTeamNameAr || match.awayTeamName || "",
     homeScore: match.homeScore ?? null,

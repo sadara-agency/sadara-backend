@@ -156,7 +156,7 @@ export interface SyncPlayerResult {
 
 export interface NormalizedStanding {
   position: number;
-  saffTeamId: number;
+  saffTeamId: string;
   teamNameEn: string;
   teamNameAr: string;
   played: number;
@@ -172,10 +172,10 @@ export interface NormalizedStanding {
 export interface NormalizedFixture {
   date: string;
   time: string;
-  saffHomeTeamId: number;
+  saffHomeTeamId: string;
   homeTeamNameEn: string;
   homeTeamNameAr: string;
-  saffAwayTeamId: number;
+  saffAwayTeamId: string;
   awayTeamNameEn: string;
   awayTeamNameAr: string;
   homeScore: number | null;
@@ -186,7 +186,7 @@ export interface NormalizedFixture {
 }
 
 export interface NormalizedTeam {
-  saffTeamId: number;
+  saffTeamId: string;
   teamNameEn: string;
   teamNameAr: string;
   logoUrl?: string;
