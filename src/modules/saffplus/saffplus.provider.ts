@@ -21,6 +21,10 @@ import type {
   SaffPlusTeam,
   SaffPlusStanding,
   SaffPlusMatch,
+  SaffPlusPlayerProfile,
+  SaffPlusPlayerTeam,
+  SaffPlusMatchWithLineup,
+  SaffPlusLineupRole,
 } from "./saffplus.types";
 import type { MatchEventType } from "@modules/matches/matchEvent.model";
 import { renderSaffPlusPage, type RenderResult } from "./saffplus.video";
@@ -2123,4 +2127,355 @@ export async function fetchMatches(
     `[SAFF+] fetchMatches(${slug}): ${allMatches.length} fixtures found`,
   );
   return allMatches;
+}
+
+// ══════════════════════════════════════════
+// PLAYER PROFILE (entity/player/:id)
+// ══════════════════════════════════════════
+
+const MOTTO_CDA_GET =
+  "https://cda.mottostreaming.com/motto.cda.cms.entity.v1.EntityService/GetEntity";
+
+/**
+ * Call Motto CDA GetEntity for a player by saffPlayerId.
+ * Returns the raw entity object or null if not found / error.
+ */
+async function getMottoCdaEntity(
+  id: string,
+  locale: "ar" | "en",
+): Promise<Record<string, unknown> | null> {
+  const message = JSON.stringify({ id, locale });
+  const url = `${MOTTO_CDA_GET}?encoding=json&message=${encodeURIComponent(message)}`;
+  try {
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) {
+      logger.info(
+        `[SAFF+ CDA] GetEntity(${id}, ${locale}) → HTTP ${res.status}`,
+      );
+      return null;
+    }
+    const data = (await res.json()) as Record<string, unknown>;
+    const entity = data.entity ?? data.data ?? data;
+    if (entity && typeof entity === "object" && !Array.isArray(entity)) {
+      return entity as Record<string, unknown>;
+    }
+    return null;
+  } catch (err) {
+    logger.info(
+      `[SAFF+ CDA] GetEntity(${id}, ${locale}) → error: ${(err as Error).message}`,
+    );
+    return null;
+  }
+}
+
+/** Parse a YYYY-MM-DD date from various field shapes CDA might return. */
+function parseDob(raw: unknown): string | null {
+  if (!raw) return null;
+  if (typeof raw === "string" && /^\d{4}-\d{2}-\d{2}/.test(raw))
+    return raw.slice(0, 10);
+  if (typeof raw === "object" && raw !== null) {
+    const o = raw as Record<string, unknown>;
+    const candidate = pickStr(o, "date", "value", "iso", "dateOfBirth", "dob");
+    if (candidate && /^\d{4}-\d{2}-\d{2}/.test(candidate))
+      return candidate.slice(0, 10);
+  }
+  return null;
+}
+
+/** Normalise a lineup role string from SAFF+ into our enum, or return undefined. */
+function parseLineupRole(raw: unknown): SaffPlusLineupRole | undefined {
+  if (!raw || typeof raw !== "string") return undefined;
+  const v = raw.toLowerCase().trim();
+  const map: Record<string, SaffPlusLineupRole> = {
+    starter: "starter",
+    starting: "starter",
+    bench: "bench",
+    substitute: "bench",
+    sub: "bench",
+    injured: "injured",
+    suspended: "suspended",
+    not_called: "not_called",
+    notcalled: "not_called",
+  };
+  return map[v];
+}
+
+/** Extract team entries from CDA entity payload. */
+function extractTeams(entity: Record<string, unknown>): SaffPlusPlayerTeam[] {
+  const teamsRaw =
+    entity.teams ??
+    entity.clubs ??
+    entity.clubHistory ??
+    entity.teamHistory ??
+    entity.playerTeams;
+  if (!Array.isArray(teamsRaw)) return [];
+
+  const teams: SaffPlusPlayerTeam[] = [];
+  for (const t of teamsRaw) {
+    if (t == null || typeof t !== "object") continue;
+    const o = t as Record<string, unknown>;
+    const rawId = o.teamId ?? o.clubId ?? o.id ?? o.saffTeamId;
+    const saffTeamId = rawId ? Number(rawId) : NaN;
+    if (isNaN(saffTeamId)) continue;
+    teams.push({
+      saffTeamId,
+      name: pickStr(o, "name", "teamName", "clubName") ?? "",
+      nameAr: pickStr(o, "nameAr", "teamNameAr", "clubNameAr") ?? "",
+      logoUrl: pickStr(o, "logo", "logoUrl", "teamLogo") ?? null,
+      from: parseDob(o.from ?? o.startDate ?? o.joinedAt) ?? null,
+      to: parseDob(o.to ?? o.endDate ?? o.leftAt) ?? null,
+    });
+  }
+  return teams;
+}
+
+/** Extract a match list from CDA entity payload, tagging with lineupRole if present. */
+function extractMatchList(raw: unknown): SaffPlusMatchWithLineup[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SaffPlusMatchWithLineup[] = [];
+  for (const m of raw) {
+    if (m == null || typeof m !== "object") continue;
+    const o = m as Record<string, unknown>;
+    const id = pickStr(o, "id", "matchId", "fixtureId");
+    if (!id) continue;
+    const match: SaffPlusMatchWithLineup = {
+      id,
+      competitionId: pickStr(o, "competitionId", "tournamentId") ?? 0,
+      date: pickStr(o, "date", "matchDate", "startDate") ?? "",
+      time: pickStr(o, "time", "kickoffTime") ?? undefined,
+      homeTeamId: (o.homeTeamId ?? o.homeClubId ?? 0) as string | number,
+      homeTeamName: pickStr(o, "homeTeamName", "homeClubName") ?? "",
+      homeTeamNameAr:
+        pickStr(o, "homeTeamNameAr", "homeClubNameAr") ?? undefined,
+      homeTeamLogo: pickStr(o, "homeTeamLogo", "homeClubLogo") ?? undefined,
+      awayTeamId: (o.awayTeamId ?? o.awayClubId ?? 0) as string | number,
+      awayTeamName: pickStr(o, "awayTeamName", "awayClubName") ?? "",
+      awayTeamNameAr:
+        pickStr(o, "awayTeamNameAr", "awayClubNameAr") ?? undefined,
+      awayTeamLogo: pickStr(o, "awayTeamLogo", "awayClubLogo") ?? undefined,
+      homeScore: typeof o.homeScore === "number" ? o.homeScore : null,
+      awayScore: typeof o.awayScore === "number" ? o.awayScore : null,
+      status: pickStr(o, "status", "matchStatus") ?? undefined,
+      stadium: pickStr(o, "stadium", "venue") ?? undefined,
+      city: pickStr(o, "city") ?? undefined,
+    };
+    const role = parseLineupRole(
+      o.lineupRole ?? o.playerRole ?? o.role ?? o.status,
+    );
+    if (role) match.lineupRole = role;
+    out.push(match);
+  }
+  return out;
+}
+
+/**
+ * Fetch a player profile from saffplus.sa for the given saffPlayerId.
+ *
+ * Strategy:
+ *   1. Call Motto CDA GetEntity in AR + EN and merge both locales.
+ *   2. Fall back to Puppeteer page render + RSC/XHR extraction when CDA
+ *      returns nothing (e.g. if the CDA shape changes).
+ *
+ * Returns null when the player cannot be found on SAFF+.
+ */
+export async function fetchPlayerProfile(
+  saffPlayerId: string,
+): Promise<SaffPlusPlayerProfile | null> {
+  // ── Tier A: CDA direct ──
+  const [arEntity, enEntity] = await Promise.all([
+    getMottoCdaEntity(saffPlayerId, "ar"),
+    getMottoCdaEntity(saffPlayerId, "en"),
+  ]);
+
+  if (arEntity ?? enEntity) {
+    const ar = arEntity ?? {};
+    const en = enEntity ?? {};
+
+    const nameAr =
+      pickStr(ar, "name", "nameAr", "fullName", "fullNameAr") ??
+      pickStr(en, "nameAr", "name") ??
+      "";
+    const nameEn =
+      pickStr(en, "name", "nameEn", "fullName") ??
+      pickStr(ar, "nameEn", "name") ??
+      "";
+    const position =
+      pickStr(ar, "position", "positionAr") ?? pickStr(en, "position") ?? null;
+    const dateOfBirth = parseDob(
+      ar.dateOfBirth ?? ar.dob ?? en.dateOfBirth ?? en.dob,
+    );
+    const nationality =
+      pickStr(ar, "nationality", "nationalityCode", "country") ??
+      pickStr(en, "nationality", "nationalityCode", "country") ??
+      null;
+    const photoUrl =
+      pickStr(ar, "photo", "photoUrl", "avatar", "image") ??
+      pickStr(en, "photo", "photoUrl", "avatar", "image") ??
+      null;
+
+    const teams =
+      extractTeams(ar).length > 0 ? extractTeams(ar) : extractTeams(en);
+
+    const recentMatches = extractMatchList(
+      ar.recentMatches ??
+        ar.lastMatches ??
+        ar.playedMatches ??
+        en.recentMatches ??
+        en.lastMatches ??
+        en.playedMatches,
+    );
+    const upcomingMatches = extractMatchList(
+      ar.upcomingMatches ??
+        ar.nextMatches ??
+        ar.fixtures ??
+        en.upcomingMatches ??
+        en.nextMatches ??
+        en.fixtures,
+    );
+
+    logger.info(
+      `[SAFF+] fetchPlayerProfile(${saffPlayerId}): CDA hit — ` +
+        `teams=${teams.length} recent=${recentMatches.length} upcoming=${upcomingMatches.length}`,
+    );
+
+    return {
+      saffPlayerId,
+      nameEn,
+      nameAr,
+      position,
+      dateOfBirth,
+      nationality,
+      photoUrl,
+      teams,
+      recentMatches,
+      upcomingMatches,
+    };
+  }
+
+  // ── Tier B: Puppeteer fallback ──
+  logger.info(
+    `[SAFF+] fetchPlayerProfile(${saffPlayerId}): CDA miss — falling back to Puppeteer`,
+  );
+
+  await saffPlusLimiter.acquire("saffplus.sa");
+  const { html, jsonResponses } = await fetchPageWithJson(
+    `/ar/entity/player/${saffPlayerId}`,
+    "[data-testid='player-name'], h1, .player-name",
+  );
+
+  if (!html && jsonResponses.length === 0) {
+    logger.warn(
+      `[SAFF+] fetchPlayerProfile(${saffPlayerId}): no content from Puppeteer`,
+    );
+    return null;
+  }
+
+  // Walk captured JSON responses for a player-shaped object
+  let playerObj: Record<string, unknown> | null = null;
+  for (const r of jsonResponses) {
+    const data = r.data as Record<string, unknown>;
+    if (!data || typeof data !== "object") continue;
+
+    // Look for a top-level object that has player fields
+    function findPlayer(v: unknown): Record<string, unknown> | null {
+      if (v == null || typeof v !== "object" || Array.isArray(v)) return null;
+      const o = v as Record<string, unknown>;
+      // A player object has at least a name + (dateOfBirth or position or teams)
+      const hasName =
+        typeof o.name === "string" || typeof o.nameAr === "string";
+      const hasPlayerField =
+        o.dateOfBirth != null ||
+        o.dob != null ||
+        o.position != null ||
+        Array.isArray(o.teams) ||
+        Array.isArray(o.clubs);
+      if (hasName && hasPlayerField) return o;
+      for (const child of Object.values(o)) {
+        const found = findPlayer(child);
+        if (found) return found;
+      }
+      return null;
+    }
+
+    const found = findPlayer(data);
+    if (found) {
+      playerObj = found;
+      break;
+    }
+  }
+
+  // RSC fallback — try extracting from RSC chunks
+  if (!playerObj) {
+    const rscChunks = extractRscData(html);
+    for (const chunk of rscChunks) {
+      try {
+        const parsed = JSON.parse(chunk) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+          const o = parsed as Record<string, unknown>;
+          const hasName =
+            typeof o.name === "string" || typeof o.nameAr === "string";
+          if (
+            hasName &&
+            (o.position != null || o.dateOfBirth != null || o.teams != null)
+          ) {
+            playerObj = o;
+            break;
+          }
+        }
+      } catch {
+        // skip malformed RSC chunk
+      }
+    }
+  }
+
+  if (!playerObj) {
+    // Last resort: scrape HTML
+    const $ = cheerio.load(html);
+    const nameText = $("h1").first().text().trim();
+    if (!nameText) {
+      logger.warn(
+        `[SAFF+] fetchPlayerProfile(${saffPlayerId}): nothing found in Puppeteer output`,
+      );
+      return null;
+    }
+    // Minimal profile from HTML only (no structured data)
+    playerObj = { name: nameText };
+  }
+
+  const nameAr =
+    pickStr(playerObj, "nameAr", "fullNameAr") ??
+    pickStr(playerObj, "name", "fullName") ??
+    "";
+  const nameEn =
+    pickStr(playerObj, "nameEn", "fullNameEn") ??
+    pickStr(playerObj, "name", "fullName") ??
+    "";
+
+  logger.info(
+    `[SAFF+] fetchPlayerProfile(${saffPlayerId}): Puppeteer hit — name="${nameEn || nameAr}"`,
+  );
+
+  return {
+    saffPlayerId,
+    nameEn,
+    nameAr,
+    position: pickStr(playerObj, "position") ?? null,
+    dateOfBirth: parseDob(playerObj.dateOfBirth ?? playerObj.dob),
+    nationality:
+      pickStr(playerObj, "nationality", "nationalityCode", "country") ?? null,
+    photoUrl:
+      pickStr(playerObj, "photo", "photoUrl", "avatar", "image") ?? null,
+    teams: extractTeams(playerObj),
+    recentMatches: extractMatchList(
+      playerObj.recentMatches ??
+        playerObj.lastMatches ??
+        playerObj.playedMatches,
+    ),
+    upcomingMatches: extractMatchList(
+      playerObj.upcomingMatches ?? playerObj.nextMatches ?? playerObj.fixtures,
+    ),
+  };
 }

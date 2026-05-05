@@ -43,3 +43,27 @@ export type SyncClubSquadsInput = z.infer<typeof syncClubSquadsBodySchema>;
 export const matchIdParamSchema = z.object({
   matchId: z.string().uuid(),
 });
+
+// ── Phase 4: Player profile enrichment ──
+
+// Accepts either a bare saffPlayerId or a full saffplus.sa URL.
+// Extracts the trailing path segment in both cases.
+const saffPlayerIdOrUrl = z
+  .string()
+  .min(1)
+  .transform((val) => {
+    const match = /\/entity\/player\/([^/?#]+)/.exec(val);
+    return match ? match[1] : val;
+  });
+
+export const syncPlayerSchema = z.object({
+  sadaraPlayerId: z.string().uuid(),
+  saffPlayerId: saffPlayerIdOrUrl,
+  overwrite: z.boolean().optional().default(false),
+});
+
+export const saffPlayerIdParamSchema = z.object({
+  saffPlayerId: z.string().min(1).max(200),
+});
+
+export type SyncPlayerInput = z.infer<typeof syncPlayerSchema>;

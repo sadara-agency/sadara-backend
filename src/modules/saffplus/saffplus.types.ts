@@ -105,6 +105,53 @@ export interface SaffPlusPlayer {
   photo?: string;
 }
 
+// ── Player Profile (entity/player page) ──
+
+export type SaffPlusLineupRole =
+  | "starter"
+  | "bench"
+  | "injured"
+  | "suspended"
+  | "not_called";
+
+export interface SaffPlusMatchWithLineup extends SaffPlusMatch {
+  lineupRole?: SaffPlusLineupRole;
+}
+
+export interface SaffPlusPlayerTeam {
+  saffTeamId: number;
+  name: string;
+  nameAr: string;
+  logoUrl: string | null;
+  from: string | null;
+  to: string | null;
+}
+
+export interface SaffPlusPlayerProfile {
+  saffPlayerId: string;
+  nameEn: string;
+  nameAr: string;
+  position: string | null;
+  dateOfBirth: string | null;
+  nationality: string | null;
+  photoUrl: string | null;
+  teams: SaffPlusPlayerTeam[];
+  recentMatches: SaffPlusMatchWithLineup[];
+  upcomingMatches: SaffPlusMatchWithLineup[];
+}
+
+// ── Sync result ──
+
+export interface SyncPlayerResult {
+  playerId: string;
+  enriched: string[];
+  matchesLinked: number;
+  matchesSkipped: number;
+  clubsLinked: number;
+  clubsSkipped: number;
+  notifiedUserIds: string[];
+}
+
 // ── Normalized types (mapped to existing SAFF scraper interfaces) ──
 
 export interface NormalizedStanding {
