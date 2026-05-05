@@ -7,6 +7,7 @@
 import {
   syncPlayerFromSaffPlus,
   previewPlayerProfile,
+  autoLinkPlayerToSaffPlus,
 } from "./saffplus.service";
 import type { SaffPlusPlayerProfile } from "./saffplus.types";
 import type { AuthUser } from "@shared/types";
@@ -15,6 +16,7 @@ import type { AuthUser } from "@shared/types";
 
 jest.mock("./saffplus.provider", () => ({
   fetchPlayerProfile: jest.fn(),
+  searchSaffPlusPlayersByName: jest.fn(),
   isWomensCompetition: jest.fn(),
   normalizeArabicName: jest.fn((s: string) => s),
 }));
@@ -22,6 +24,7 @@ jest.mock("./saffplus.provider", () => ({
 jest.mock("@modules/players/player.model", () => ({
   Player: {
     findByPk: jest.fn(),
+    findAll: jest.fn(),
     create: jest.fn(),
   },
 }));
@@ -42,6 +45,7 @@ jest.mock("@modules/players/playerClubHistory.model", () => ({
 jest.mock("@modules/clubs/club.model", () => ({
   Club: {
     findOne: jest.fn(),
+    findByPk: jest.fn(),
   },
 }));
 
@@ -174,6 +178,7 @@ import { Match } from "@modules/matches/match.model";
 import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerCoachAssignment } from "@modules/player-coach-assignments/playerCoachAssignment.model";
 import { notifyUser } from "@modules/notifications/notification.service";
+import { upsertPendingReview } from "./playerReview.service";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -544,5 +549,129 @@ describe("syncPlayerFromSaffPlus", () => {
         expect.any(Object),
       );
     });
+  });
+});
+
+// ── autoLinkPlayerToSaffPlus ────────────────────────────────────────────────
+
+const mockCandidate = (overrides: Record<string, unknown> = {}) => ({
+  saffPlayerId: "saff-abc",
+  nameAr: "فهد سالم",
+  nameEn: "Fahad Saleh",
+  dateOfBirth: "2000-05-10",
+  currentTeamSaffId: 10,
+  ...overrides,
+});
+
+describe("autoLinkPlayerToSaffPlus", () => {
+  it("skips when player not found", async () => {
+    (Player.findByPk as jest.Mock).mockResolvedValue(null);
+    const result = await autoLinkPlayerToSaffPlus("missing-uuid");
+    expect(result.outcome).toBe("skipped");
+    expect(result.reason).toMatch(/not found/);
+  });
+
+  it("skips when player already has external_ids.saffplus", async () => {
+    (Player.findByPk as jest.Mock).mockResolvedValue(
+      mockPlayer({ externalIds: { saffplus: "saff-existing" } }),
+    );
+    const result = await autoLinkPlayerToSaffPlus("player-uuid");
+    expect(result.outcome).toBe("skipped");
+    expect(result.reason).toMatch(/already linked/);
+    expect(provider.searchSaffPlusPlayersByName).not.toHaveBeenCalled();
+  });
+
+  it("skips when player has no name", async () => {
+    (Player.findByPk as jest.Mock).mockResolvedValue(
+      mockPlayer({
+        firstName: "",
+        lastName: "",
+        firstNameAr: null,
+        lastNameAr: null,
+      }),
+    );
+    const result = await autoLinkPlayerToSaffPlus("player-uuid");
+    expect(result.outcome).toBe("skipped");
+    expect(result.reason).toMatch(/no name/);
+  });
+
+  it("skips when SAFF+ returns no candidates", async () => {
+    (Player.findByPk as jest.Mock).mockResolvedValue(
+      mockPlayer({ firstNameAr: "فهد", lastNameAr: "سالم" }),
+    );
+    (Club.findByPk as jest.Mock).mockResolvedValue(null);
+    (provider.searchSaffPlusPlayersByName as jest.Mock).mockResolvedValue([]);
+    const result = await autoLinkPlayerToSaffPlus("player-uuid");
+    expect(result.outcome).toBe("skipped");
+    expect(result.reason).toMatch(/no SAFF\+ candidates/);
+  });
+
+  it("auto-links when name + club both match (threshold 0.70)", async () => {
+    const player = mockPlayer({
+      firstNameAr: "فهد",
+      lastNameAr: "سالم",
+      currentClubId: "club-uuid",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue(player);
+    (Club.findByPk as jest.Mock).mockResolvedValue({ saffTeamId: 10 });
+    // Same name → trigram similarity ≥ 0.90, club matches → auto-link
+    (provider.searchSaffPlusPlayersByName as jest.Mock).mockResolvedValue([
+      mockCandidate({ currentTeamSaffId: 10 }),
+    ]);
+    // fetchPlayerProfile is called fire-and-forget — mock it so it doesn't throw
+    (provider.fetchPlayerProfile as jest.Mock).mockResolvedValue({
+      ...baseProfile,
+      teams: [],
+      recentMatches: [],
+      upcomingMatches: [],
+    });
+
+    const result = await autoLinkPlayerToSaffPlus("player-uuid");
+
+    expect(result.outcome).toBe("linked");
+    expect(result.saffPlayerId).toBe("saff-abc");
+    expect(player.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        externalIds: expect.objectContaining({ saffplus: "saff-abc" }),
+      }),
+    );
+  });
+
+  it("queues for review when name is similar but club does not match", async () => {
+    const player = mockPlayer({
+      firstNameAr: "فهد",
+      lastNameAr: "سالم",
+      currentClubId: "club-uuid",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue(player);
+    (Club.findByPk as jest.Mock).mockResolvedValue({ saffTeamId: 99 }); // different club
+    (provider.searchSaffPlusPlayersByName as jest.Mock).mockResolvedValue([
+      mockCandidate({ currentTeamSaffId: 10 }), // club 10 ≠ 99 → no auto-link
+    ]);
+
+    const result = await autoLinkPlayerToSaffPlus("player-uuid");
+
+    expect(result.outcome).toBe("queued");
+    expect(upsertPendingReview).toHaveBeenCalled();
+    expect(player.update).not.toHaveBeenCalled();
+  });
+
+  it("skips when best candidate is below 0.50 similarity", async () => {
+    const player = mockPlayer({ firstNameAr: "خالد", lastNameAr: "المطيري" });
+    (Player.findByPk as jest.Mock).mockResolvedValue(player);
+    (Club.findByPk as jest.Mock).mockResolvedValue(null);
+    // Completely different name → very low similarity
+    (provider.searchSaffPlusPlayersByName as jest.Mock).mockResolvedValue([
+      mockCandidate({
+        nameAr: "زياد بوعزة",
+        nameEn: "Ziyad Bouazza",
+        currentTeamSaffId: null,
+      }),
+    ]);
+
+    const result = await autoLinkPlayerToSaffPlus("player-uuid");
+
+    expect(result.outcome).toBe("skipped");
+    expect(upsertPendingReview).not.toHaveBeenCalled();
   });
 });
