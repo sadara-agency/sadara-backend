@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorizeModule, authorize } from "@middleware/auth";
 import { validate } from "@middleware/validate";
 import {
   tournamentQuerySchema,
@@ -16,6 +16,7 @@ import {
   sessionIdParamSchema,
   updateDecisionsSchema,
   applySessionSchema,
+  resetSaffSchema,
 } from "@modules/saff/saff.validation";
 import * as saffController from "@modules/saff/saff.controller";
 import {
@@ -252,6 +253,42 @@ router.post(
     const result = await syncNationalTeams({ includeRosters });
     sendSuccess(res, result, `Synced ${result.teams} national teams`);
   }),
+);
+
+// ── Reset All SAFF/SAFFPLUS Data ──
+/**
+ * @swagger
+ * /saff/reset:
+ *   post:
+ *     summary: Reset all SAFF and SAFFPLUS data
+ *     tags: [SAFF]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               scope:
+ *                 type: string
+ *                 enum: [saff_only, full]
+ *                 default: saff_only
+ *               confirm:
+ *                 type: boolean
+ *                 example: true
+ *     responses:
+ *       200:
+ *         description: Data reset successfully
+ *       403:
+ *         description: Admin role required
+ */
+router.post(
+  "/reset",
+  authorize("Admin"),
+  validate(resetSaffSchema),
+  asyncHandler(saffController.resetData),
 );
 
 export default router;

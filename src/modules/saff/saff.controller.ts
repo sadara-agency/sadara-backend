@@ -451,3 +451,15 @@ export async function abortImportSession(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, session, "Session aborted");
 }
+
+// ── Reset All SAFF/SAFFPLUS Data ──
+
+export async function resetData(req: AuthRequest, res: Response) {
+  const { scope = "saff_only" } = req.body;
+  const result = await saffService.resetSaffData(scope, req.user!.id);
+  sendSuccess(
+    res,
+    result,
+    `SAFF data reset (${scope}): ${result.tablesCleared.length} tables cleared`,
+  );
+}

@@ -39,6 +39,7 @@ import {
 } from "@modules/saffplus/saffplus.service";
 import { upsertPendingReview } from "@modules/saffplus/playerReview.service";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
+import { logAudit } from "@shared/utils/audit";
 import type {
   TournamentQuery,
   FetchRequest,
@@ -3194,4 +3195,167 @@ export async function getScrapeRuns(opts: {
     order: [["startedAt", "DESC"]],
     limit: Math.min(limit, 200),
   });
+}
+
+// ══════════════════════════════════════════
+// RESET — PURGE ALL SAFF/SAFFPLUS DATA
+// ══════════════════════════════════════════
+
+interface ResetResult {
+  scope: "saff_only" | "full";
+  tablesCleared: string[];
+  rowsDeleted: Record<string, number>;
+}
+
+export async function resetSaffData(
+  scope: "saff_only" | "full",
+  executedBy: string,
+): Promise<ResetResult> {
+  const txn = await sequelize.transaction();
+  const deleted: Record<string, number> = {};
+
+  try {
+    if (scope === "full") {
+      // Step 1: Delete match_analyses for SAFF/SAFFPLUS matches (no ON DELETE cascade)
+      const ma = await sequelize.query(
+        `DELETE FROM match_analyses
+         WHERE match_id IN (SELECT id FROM matches WHERE provider_source IN ('saff', 'saffplus'))`,
+        { transaction: txn },
+      );
+      deleted.matchAnalyses = typeof ma === "number" ? ma : 0;
+
+      // Step 2: Delete player_match_review (or cascade from squads)
+      const pmr = await sequelize.query(
+        `DELETE FROM player_match_review WHERE provider_source = 'saffplus'`,
+        { transaction: txn },
+      );
+      deleted.playerMatchReview = typeof pmr === "number" ? pmr : 0;
+
+      // Step 3: Delete squad_memberships for SAFFPLUS squads
+      const sm = await sequelize.query(
+        `DELETE FROM squad_memberships WHERE provider_source = 'saffplus'`,
+        { transaction: txn },
+      );
+      deleted.squadMemberships = typeof sm === "number" ? sm : 0;
+
+      // Step 4-7: Delete matches (cascades to match_events, match_media, match_players, player_match_stats)
+      const m = await sequelize.query(
+        `DELETE FROM matches WHERE provider_source IN ('saff', 'saffplus')`,
+        { transaction: txn },
+      );
+      deleted.matches = typeof m === "number" ? m : 0;
+
+      // Step 6: Delete/null season_syncs
+      const ss = await sequelize.query(
+        `DELETE FROM season_syncs WHERE source IN ('saff', 'saffplus')`,
+        { transaction: txn },
+      );
+      deleted.seasonSyncs = typeof ss === "number" ? ss : 0;
+
+      // Step 7: Delete club_competitions for SAFF competitions
+      const cc = await sequelize.query(
+        `DELETE FROM club_competitions
+         WHERE competition_id IN (SELECT id FROM competitions WHERE source = 'saff' OR saffplus_slug IS NOT NULL)`,
+        { transaction: txn },
+      );
+      deleted.clubCompetitions = typeof cc === "number" ? cc : 0;
+
+      // Step 8: Delete SAFF/SAFFPLUS competitions
+      const c = await sequelize.query(
+        `DELETE FROM competitions WHERE source = 'saff' OR saffplus_slug IS NOT NULL`,
+        { transaction: txn },
+      );
+      deleted.competitions = typeof c === "number" ? c : 0;
+
+      // Step 15: Delete external_provider_mappings for SAFFPLUS
+      const epm = await sequelize.query(
+        `DELETE FROM external_provider_mappings WHERE notes LIKE 'saffplus:%' OR provider_name = 'Other'`,
+        { transaction: txn },
+      );
+      deleted.externalProviderMappings = typeof epm === "number" ? epm : 0;
+
+      // Step 16: Update players to remove saffplus from externalIds
+      await sequelize.query(
+        `UPDATE players SET external_ids = external_ids - 'saffplus' WHERE external_ids ? 'saffplus'`,
+        { transaction: txn },
+      );
+    }
+
+    // Steps 9-17: SAFF-only tables (always deleted regardless of scope)
+    deleted.saffScrapeRuns = await SaffScrapeRun.destroy({
+      where: {},
+      transaction: txn,
+    });
+
+    const SaffNationalTeam = sequelize.models.SaffNationalTeam as any;
+    if (SaffNationalTeam) {
+      deleted.saffNationalTeams = await SaffNationalTeam.destroy({
+        where: {},
+        transaction: txn,
+      });
+    }
+
+    const SaffImportSession = sequelize.models.SaffImportSession as any;
+    if (SaffImportSession) {
+      deleted.saffImportSessions = await SaffImportSession.destroy({
+        where: {},
+        transaction: txn,
+      });
+    }
+
+    deleted.saffFixtures = await SaffFixture.destroy({
+      where: {},
+      transaction: txn,
+    });
+
+    deleted.saffStandings = await SaffStanding.destroy({
+      where: {},
+      transaction: txn,
+    });
+
+    deleted.saffTeamMaps = await SaffTeamMap.destroy({
+      where: {},
+      transaction: txn,
+    });
+
+    deleted.saffTournaments = await SaffTournament.destroy({
+      where: {},
+      transaction: txn,
+    });
+
+    // Step 18: Null out clubs.saff_team_id (no FK cascade)
+    await sequelize.query(
+      `UPDATE clubs SET saff_team_id = NULL WHERE saff_team_id IS NOT NULL`,
+      { transaction: txn },
+    );
+
+    // Write audit log
+    await logAudit(
+      "DELETE",
+      "saff_tournaments",
+      null,
+      {
+        userId: executedBy,
+        userName: "system",
+        userRole: "Admin" as const,
+      },
+      `SAFF reset (scope: ${scope}): ${JSON.stringify(deleted)}`,
+    );
+
+    await txn.commit();
+
+    const tablesCleared = Object.keys(deleted).filter((k) => deleted[k] > 0);
+    logger.info(
+      `[SAFF Reset] scope=${scope}, deleted: ${JSON.stringify(deleted)}`,
+    );
+
+    return {
+      scope,
+      tablesCleared,
+      rowsDeleted: deleted,
+    };
+  } catch (error) {
+    await txn.rollback();
+    throw error;
+  }
 }
