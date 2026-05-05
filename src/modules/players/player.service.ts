@@ -651,7 +651,17 @@ export async function checkDuplicate(params: {
 
 // ── Player Club History ──
 export async function getClubHistory(playerId: string) {
-  const rows = await sequelize.query<any>(
+  // Get current club from players table
+  const currentClubRows = await sequelize.query<any>(
+    `SELECT p.id AS player_id, p.current_club_id AS club_id, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url AS club_logo
+     FROM players p
+     LEFT JOIN clubs c ON p.current_club_id = c.id
+     WHERE p.id = :playerId AND p.current_club_id IS NOT NULL`,
+    { replacements: { playerId }, type: QueryTypes.SELECT },
+  );
+
+  // Get historical records
+  const historyRows = await sequelize.query<any>(
     `SELECT h.*, c.name AS club_name, c.name_ar AS club_name_ar, c.logo_url AS club_logo
      FROM player_club_history h
      LEFT JOIN clubs c ON h.club_id = c.id
@@ -659,6 +669,17 @@ export async function getClubHistory(playerId: string) {
      ORDER BY h.start_date DESC`,
     { replacements: { playerId }, type: QueryTypes.SELECT },
   );
+
+  // Combine current + history, deduplicate by club_id
+  const all = [...currentClubRows, ...historyRows];
+  const seen = new Set<string>();
+  const rows = all.filter((r) => {
+    if (!r.club_id) return true; // Keep nulls (player with no club)
+    if (seen.has(r.club_id)) return false;
+    seen.add(r.club_id);
+    return true;
+  });
+
   return rows.map((r: any) => camelCaseKeys(r));
 }
 
