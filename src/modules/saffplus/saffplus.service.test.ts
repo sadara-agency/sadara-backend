@@ -413,6 +413,41 @@ describe("syncPlayerFromSaffPlus", () => {
       expect(result.clubsSkipped).toBe(1);
       expect(PlayerClubHistory.create).toHaveBeenCalledTimes(1);
     });
+
+    it("skips teams with alphanumeric Motto ids (no numeric DB equivalent)", async () => {
+      const profileWithMottoTeam: SaffPlusPlayerProfile = {
+        ...baseProfile,
+        teams: [
+          {
+            saffTeamId: "X1g7ZnvonEaF6_Z0C1FzC",
+            name: "Al Nassr U17",
+            nameAr: "النصر-تحت17",
+            logoUrl: null,
+            from: "2025-09-01",
+            to: null,
+          },
+        ],
+        recentMatches: [],
+        upcomingMatches: [],
+      };
+
+      (Player.findByPk as jest.Mock).mockResolvedValue(mockPlayer());
+      (provider.fetchPlayerProfile as jest.Mock).mockResolvedValue(
+        profileWithMottoTeam,
+      );
+      (Match.findOne as jest.Mock).mockResolvedValue(null);
+
+      const result = await syncPlayerFromSaffPlus(
+        "player-uuid",
+        "saff-123",
+        {},
+        mockInitiator,
+      );
+
+      expect(result.clubsSkipped).toBe(1);
+      expect(result.clubsLinked).toBe(0);
+      expect(Club.findOne).not.toHaveBeenCalled();
+    });
   });
 
   describe("match linking", () => {
