@@ -1231,9 +1231,8 @@ export async function previewPlayerProfile(
 /**
  * Silently enrich a player that was just auto-linked during a squad roster sync.
  * No initiator required — fires and forgets; errors are only logged, never thrown.
- * Called internally; not exported as an API endpoint handler.
  */
-async function autoEnrichPlayerFromSaffPlus(
+export async function autoEnrichPlayerFromSaffPlus(
   sadaraPlayerId: string,
   saffPlayerId: string,
 ): Promise<void> {
@@ -1638,5 +1637,237 @@ export async function syncPlayerFromSaffPlus(
       `notified=${result.notifiedUserIds.length}`,
   );
 
+  return result;
+}
+
+// ══════════════════════════════════════════
+// AUTO-LINK: match Sadara players to SAFF+ by name + club + DOB
+// ══════════════════════════════════════════
+
+/**
+ * JS-side trigram similarity — same algorithm as PostgreSQL pg_trgm.
+ * Used to score SAFF+ name candidates without extra DB round-trips.
+ */
+function trigramSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  const trigrams = (s: string): Set<string> => {
+    const padded = `  ${s}  `;
+    const set = new Set<string>();
+    for (let i = 0; i < padded.length - 2; i++) set.add(padded.slice(i, i + 3));
+    return set;
+  };
+  const ta = trigrams(a.toLowerCase());
+  const tb = trigrams(b.toLowerCase());
+  let intersection = 0;
+  for (const t of ta) if (tb.has(t)) intersection++;
+  return (2 * intersection) / (ta.size + tb.size);
+}
+
+export interface AutoLinkResult {
+  outcome: "linked" | "queued" | "skipped";
+  saffPlayerId?: string;
+  score?: number;
+  reason: string;
+}
+
+/**
+ * Attempt to auto-link a single Sadara player to their SAFF+ profile by
+ * searching the Motto CDA API by name and confirming via club + DOB signals.
+ *
+ * Thresholds:
+ *   name ≥ 0.70 AND club matches  → auto-link
+ *   name ≥ 0.85 AND DOB matches   → auto-link
+ *   name ≥ 0.92                   → auto-link (name alone, high confidence)
+ *   name ≥ 0.50                   → queue for review
+ *   name < 0.50                   → skip
+ */
+export async function autoLinkPlayerToSaffPlus(
+  sadaraPlayerId: string,
+): Promise<AutoLinkResult> {
+  const player = await Player.findByPk(sadaraPlayerId);
+  if (!player) return { outcome: "skipped", reason: "player not found" };
+
+  // Skip if already linked
+  const existing = (player.externalIds as Record<string, string> | null)
+    ?.saffplus;
+  if (existing) return { outcome: "skipped", reason: "already linked" };
+
+  // Build search name — prefer Arabic
+  const arName = [player.firstNameAr, player.lastNameAr]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const enName = [player.firstName, player.lastName]
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+  const searchName = arName || enName;
+  if (!searchName) return { outcome: "skipped", reason: "no name to search" };
+
+  // Fetch club's saffTeamId for club-signal matching
+  let clubSaffTeamId: number | null = null;
+  if (player.currentClubId) {
+    const club = await Club.findByPk(player.currentClubId, {
+      attributes: ["saffTeamId"],
+    });
+    clubSaffTeamId = club?.saffTeamId ?? null;
+  }
+
+  const candidates = await provider.searchSaffPlusPlayersByName(searchName, {
+    pageSize: 10,
+  });
+  if (candidates.length === 0)
+    return { outcome: "skipped", reason: "no SAFF+ candidates returned" };
+
+  // Score each candidate
+  const scored = candidates.map((c) => {
+    const nameScore = trigramSimilarity(
+      normalizeArabicName(arName || enName),
+      normalizeArabicName(c.nameAr || c.nameEn),
+    );
+
+    const clubMatch =
+      clubSaffTeamId != null &&
+      c.currentTeamSaffId != null &&
+      Number(c.currentTeamSaffId) === clubSaffTeamId;
+
+    const dobMatch =
+      player.dateOfBirth != null &&
+      c.dateOfBirth != null &&
+      c.dateOfBirth === player.dateOfBirth;
+
+    const autoLink =
+      (nameScore >= 0.7 && clubMatch) ||
+      (nameScore >= 0.85 && dobMatch) ||
+      nameScore >= 0.92;
+
+    return { candidate: c, nameScore, clubMatch, dobMatch, autoLink };
+  });
+
+  // Pick highest-scoring candidate that qualifies for auto-link
+  const autoLinkHit = scored
+    .filter((s) => s.autoLink)
+    .sort((a, b) => b.nameScore - a.nameScore)[0];
+
+  if (autoLinkHit) {
+    const { candidate, nameScore } = autoLinkHit;
+
+    // Stamp external id
+    const existingExtIds: Record<string, string> = player.externalIds ?? {};
+    await player.update({
+      externalIds: { ...existingExtIds, saffplus: candidate.saffPlayerId },
+    });
+
+    // Fire-and-forget full enrichment
+    autoEnrichPlayerFromSaffPlus(sadaraPlayerId, candidate.saffPlayerId).catch(
+      (err) =>
+        logger.warn(
+          `[SAFF+] autoLink enrichment failed (${sadaraPlayerId}): ${(err as Error).message}`,
+        ),
+    );
+
+    logger.info(
+      `[SAFF+] autoLink(${sadaraPlayerId}): linked → ${candidate.saffPlayerId} (score=${nameScore.toFixed(2)})`,
+    );
+    return {
+      outcome: "linked",
+      saffPlayerId: candidate.saffPlayerId,
+      score: nameScore,
+      reason: "auto-linked",
+    };
+  }
+
+  // Queue best candidate for review if name similarity is good enough
+  const reviewHit = scored
+    .filter((s) => s.nameScore >= 0.5)
+    .sort((a, b) => b.nameScore - a.nameScore)[0];
+
+  if (reviewHit) {
+    const { candidate, nameScore } = reviewHit;
+    await upsertPendingReview({
+      scrapedNameAr: candidate.nameAr || null,
+      scrapedNameEn: candidate.nameEn || null,
+      scrapedDob: candidate.dateOfBirth,
+      scrapedNationality: null,
+      scrapedJerseyNumber: null,
+      scrapedPosition: null,
+      squadId: null,
+      season: getCurrentSeason(),
+      suggestedPlayerIds: [
+        {
+          playerId: sadaraPlayerId,
+          score: nameScore,
+          reason: "auto-link-search",
+        },
+      ],
+      externalPlayerId: candidate.saffPlayerId,
+      providerSource: "saffplus",
+    });
+    logger.info(
+      `[SAFF+] autoLink(${sadaraPlayerId}): queued for review (score=${nameScore.toFixed(2)})`,
+    );
+    return {
+      outcome: "queued",
+      saffPlayerId: candidate.saffPlayerId,
+      score: nameScore,
+      reason: "below threshold — queued for review",
+    };
+  }
+
+  return { outcome: "skipped", reason: "no candidates above 0.50 similarity" };
+}
+
+/**
+ * Auto-link all Sadara players who have a currentClubId but no SAFF+ external id.
+ * Runs sequentially to respect Motto CDA API rate limits.
+ */
+export async function autoLinkAllUnlinkedPlayers(
+  opts: { limit?: number; dryRun?: boolean } = {},
+): Promise<{
+  linked: number;
+  queued: number;
+  skipped: number;
+  errors: number;
+}> {
+  const limit = opts.limit ?? 500;
+
+  const players = await Player.findAll({
+    where: {
+      currentClubId: { [Op.ne]: null },
+      [Op.and]: [sequelize.literal(`(external_ids->>'saffplus') IS NULL`)],
+    },
+    attributes: ["id"],
+    limit,
+  });
+
+  const result = { linked: 0, queued: 0, skipped: 0, errors: 0 };
+
+  if (opts.dryRun) {
+    logger.info(
+      `[SAFF+] autoLinkAll dryRun: ${players.length} eligible players`,
+    );
+    result.skipped = players.length;
+    return result;
+  }
+
+  logger.info(`[SAFF+] autoLinkAll: processing ${players.length} players`);
+
+  for (const p of players) {
+    try {
+      const outcome = await autoLinkPlayerToSaffPlus(p.id);
+      if (outcome.outcome === "linked") result.linked++;
+      else if (outcome.outcome === "queued") result.queued++;
+      else result.skipped++;
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] autoLinkAll error for player ${p.id}: ${(err as Error).message}`,
+      );
+      result.errors++;
+    }
+  }
+
+  logger.info(
+    `[SAFF+] autoLinkAll done: linked=${result.linked} queued=${result.queued} skipped=${result.skipped} errors=${result.errors}`,
+  );
   return result;
 }

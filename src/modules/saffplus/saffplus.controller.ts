@@ -258,3 +258,41 @@ export async function getPlayerProfilePreviewCtrl(
   });
   sendSuccess(res, profile);
 }
+
+// ── Auto-link: match Sadara players to SAFF+ by name + club + DOB ──
+
+export async function autoLinkPlayerCtrl(req: AuthRequest, res: Response) {
+  const { sadaraPlayerId } = req.params;
+  const result = await saffPlusService.autoLinkPlayerToSaffPlus(sadaraPlayerId);
+  await logAudit(
+    "UPDATE",
+    "players",
+    sadaraPlayerId,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ auto-link: outcome=${result.outcome} saffPlayerId=${result.saffPlayerId ?? "—"} score=${result.score?.toFixed(2) ?? "—"}`,
+  );
+  sendSuccess(res, result, `Auto-link: ${result.outcome}`);
+}
+
+export async function autoLinkAllPlayersCtrl(req: AuthRequest, res: Response) {
+  const { limit, dryRun } = req.body as {
+    limit?: number;
+    dryRun?: boolean;
+  };
+  const result = await saffPlusService.autoLinkAllUnlinkedPlayers({
+    limit,
+    dryRun: dryRun ?? false,
+  });
+  await logAudit(
+    "UPDATE",
+    "players",
+    null,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ auto-link-all: linked=${result.linked} queued=${result.queued} skipped=${result.skipped} errors=${result.errors}${dryRun ? " (dryRun)" : ""}`,
+  );
+  sendSuccess(
+    res,
+    result,
+    `linked=${result.linked} queued=${result.queued} skipped=${result.skipped} errors=${result.errors}`,
+  );
+}

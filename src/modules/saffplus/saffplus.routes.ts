@@ -10,6 +10,7 @@ import {
   syncPlayerSchema,
   saffPlayerIdParamSchema,
   sadaraPlayerIdParamSchema,
+  autoLinkAllBodySchema,
 } from "./saffplus.validation";
 import {
   playerReviewQuerySchema,
@@ -165,6 +166,24 @@ router.post(
   authorizeModule("saff-data", "create"),
   validate(syncPlayerSchema),
   asyncHandler(ctrl.syncPlayerCtrl),
+);
+
+// ── Auto-link: match Sadara players to SAFF+ by name + club + DOB ──
+
+// Fixed path must come before the param route to avoid Express treating
+// "auto-link-all" as a sadaraPlayerId UUID.
+router.post(
+  "/players/auto-link-all",
+  authorizeModule("saff-data", "update"),
+  validate(autoLinkAllBodySchema),
+  asyncHandler(ctrl.autoLinkAllPlayersCtrl),
+);
+
+router.post(
+  "/players/:sadaraPlayerId/auto-link",
+  authorizeModule("saff-data", "update"),
+  validate(sadaraPlayerIdParamSchema, "params"),
+  asyncHandler(ctrl.autoLinkPlayerCtrl),
 );
 
 export default router;
