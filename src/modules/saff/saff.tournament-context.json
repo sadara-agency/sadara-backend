@@ -7,7 +7,7 @@
   "334": { "ageCategory": "senior", "division": "1st-division",  "competitionType": "league",     "isSupported": true },
   "335": { "ageCategory": "senior", "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
   "336": { "ageCategory": "senior", "division": "3rd-division",  "competitionType": "league",     "isSupported": true },
-  "366": { "ageCategory": "senior", "division": "4th-division",  "competitionType": "league",     "isSupported": true },
+  "366": { "ageCategory": "senior", "division": "4th-division",  "competitionType": "tournament", "isSupported": true },
 
   "350": { "ageCategory": "u21",    "division": "premier",       "competitionType": "league",     "isSupported": true },
   "351": { "ageCategory": "u18",    "division": "premier",       "competitionType": "league",     "isSupported": true },
@@ -15,16 +15,16 @@
   "353": { "ageCategory": "u16",    "division": "premier",       "competitionType": "league",     "isSupported": true },
   "354": { "ageCategory": "u15",    "division": "premier",       "competitionType": "league",     "isSupported": true },
 
-  "371": { "ageCategory": "u21",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
+  "371": { "ageCategory": "u21",    "division": "1st-division",  "competitionType": "tournament", "isSupported": true },
   "355": { "ageCategory": "u18",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
   "356": { "ageCategory": "u17",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
   "357": { "ageCategory": "u16",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
   "358": { "ageCategory": "u15",    "division": "1st-division",  "competitionType": "league",     "isSupported": true },
 
-  "367": { "ageCategory": "u18",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
-  "368": { "ageCategory": "u17",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
-  "369": { "ageCategory": "u16",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
-  "370": { "ageCategory": "u15",    "division": "2nd-division",  "competitionType": "league",     "isSupported": true },
+  "367": { "ageCategory": "u18",    "division": "2nd-division",  "competitionType": "tournament", "isSupported": true },
+  "368": { "ageCategory": "u17",    "division": "2nd-division",  "competitionType": "tournament", "isSupported": true },
+  "369": { "ageCategory": "u16",    "division": "2nd-division",  "competitionType": "tournament", "isSupported": true },
+  "370": { "ageCategory": "u15",    "division": "2nd-division",  "competitionType": "tournament", "isSupported": true },
 
   "341": { "ageCategory": "u14",    "division": null,            "competitionType": "tournament", "isSupported": true },
   "331": { "ageCategory": "u13",    "division": null,            "competitionType": "tournament", "isSupported": true },
