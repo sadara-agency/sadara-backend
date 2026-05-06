@@ -186,4 +186,12 @@ router.post(
   asyncHandler(ctrl.autoLinkPlayerCtrl),
 );
 
+// Unlink — undo a SAFF+ player link (admin/manager via saff-data:update)
+router.delete(
+  "/players/:sadaraPlayerId/link",
+  authorizeModule("saff-data", "update"),
+  validate(sadaraPlayerIdParamSchema, "params"),
+  asyncHandler(ctrl.unlinkPlayerCtrl),
+);
+
 export default router;

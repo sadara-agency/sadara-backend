@@ -135,6 +135,18 @@ jest.mock('../../../src/modules/notifications/notification.service', () => ({
   notifyByRole: jest.fn().mockResolvedValue(0),
   createNotification: jest.fn().mockResolvedValue(null),
 }));
+jest.mock('../../../src/modules/saffplus/playerReview.model', () => ({
+  PlayerMatchReview: {
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    findAndCountAll: jest.fn(),
+    create: jest.fn(),
+    upsert: jest.fn(),
+    update: jest.fn(),
+    destroy: jest.fn(),
+    name: 'PlayerMatchReview',
+  },
+}));
 
 import * as saffService from '../../../src/modules/saff/saff.service';
 

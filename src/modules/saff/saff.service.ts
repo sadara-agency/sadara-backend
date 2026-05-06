@@ -38,6 +38,15 @@ import {
   type PlayerMatchResult,
 } from "@modules/saffplus/saffplus.service";
 import { upsertPendingReview } from "@modules/saffplus/playerReview.service";
+import {
+  fetchTeams as fetchSaffPlusTeams,
+  fetchPlayerProfile as fetchSaffPlusPlayerProfile,
+} from "@modules/saffplus/saffplus.provider";
+import type {
+  SaffPlusMatchWithLineup,
+  SaffPlusLineupRole,
+} from "@modules/saffplus/saffplus.types";
+import type { ImportSaffPlusMatchInput } from "@modules/saff/saff.validation";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
 import type {
   TournamentQuery,
@@ -1830,7 +1839,221 @@ export async function fetchTeamLogos(season: string, force = false) {
     }
   }
 
-  return { fetched: updated, total: teamMaps.length };
+  const saffPlusFallback = await syncClubLogosFromSaffPlus();
+
+  return {
+    fetched: updated,
+    total: teamMaps.length,
+    season,
+    saffPlusFallback: saffPlusFallback.updated,
+  };
+}
+
+export async function syncClubLogosFromSaffPlus(): Promise<{
+  updated: number;
+  total: number;
+}> {
+  const raw = await fetchSaffPlusTeams();
+  let updated = 0;
+
+  for (const team of raw) {
+    if (!team.logo) continue;
+
+    const numericId = typeof team.id === "number" ? team.id : Number(team.id);
+    let club: Club | null = null;
+
+    if (Number.isFinite(numericId)) {
+      club = await Club.findOne({ where: { saffTeamId: numericId } });
+    }
+
+    if (!club && (team.nameAr || team.name)) {
+      club = await Club.findOne({
+        where: team.nameAr ? { nameAr: team.nameAr } : { name: team.name },
+      });
+    }
+
+    if (!club) continue;
+    if (club.logoUrl && !club.logoUrl.includes("/assets/images/logo")) continue;
+
+    await club.update({ logoUrl: team.logo });
+    updated++;
+  }
+
+  return { updated, total: raw.length };
+}
+
+// ══════════════════════════════════════════
+// SINGLE-MATCH IMPORT FROM SAFF+
+// ══════════════════════════════════════════
+
+function mapLineupRole(
+  role: SaffPlusLineupRole | string | undefined | null,
+): "starter" | "bench" | "injured" | "suspended" | "not_called" {
+  switch (role) {
+    case "starter":
+      return "starter";
+    case "bench":
+    case "substitute":
+      return "bench";
+    case "injured":
+      return "injured";
+    case "suspended":
+      return "suspended";
+    default:
+      return "not_called";
+  }
+}
+
+async function resolveOrCreateClubFromSaffPlus(side: {
+  teamId: string | number;
+  name: string;
+  nameAr?: string;
+  logo?: string;
+}): Promise<Club> {
+  const numericId =
+    typeof side.teamId === "number" ? side.teamId : Number(side.teamId);
+
+  if (Number.isFinite(numericId)) {
+    const byId = await Club.findOne({ where: { saffTeamId: numericId } });
+    if (byId) return byId;
+  }
+
+  if (side.nameAr) {
+    const byAr = await Club.findOne({ where: { nameAr: side.nameAr } });
+    if (byAr) return byAr;
+  }
+  if (side.name) {
+    const byName = await Club.findOne({ where: { name: side.name } });
+    if (byName) return byName;
+  }
+
+  return Club.create({
+    name: side.name,
+    nameAr: side.nameAr ?? null,
+    logoUrl: side.logo ?? null,
+    saffTeamId: Number.isFinite(numericId) ? numericId : null,
+  } as never);
+}
+
+export async function importSaffPlusMatch(
+  input: ImportSaffPlusMatchInput,
+): Promise<{
+  matchId: string;
+  created: boolean;
+  status: "completed" | "upcoming";
+  homeScore: number | null;
+  awayScore: number | null;
+  playerLinked: boolean;
+}> {
+  const { saffPlayerId, playerId, saffMatchId } = input;
+  const saffMatchIdStr = String(saffMatchId);
+
+  // 1. Verify the Sadara player exists.
+  const player = await Player.findByPk(playerId);
+  if (!player) throw new AppError("Player not found", 404);
+
+  // 2. Pull the SAFF+ profile (cached) and locate the requested match.
+  const profile = await fetchSaffPlusPlayerProfile(saffPlayerId);
+  if (!profile) throw new AppError("SAFF+ player profile not found", 404);
+
+  const allMatches: SaffPlusMatchWithLineup[] = [
+    ...profile.recentMatches,
+    ...profile.upcomingMatches,
+  ];
+  const match = allMatches.find((m) => String(m.id) === saffMatchIdStr);
+  if (!match)
+    throw new AppError("SAFF+ match not found in player profile", 404);
+
+  const hasScores = match.homeScore != null && match.awayScore != null;
+  const status: "completed" | "upcoming" = hasScores ? "completed" : "upcoming";
+
+  // 3. Idempotency — if we've already imported this match, reuse it.
+  let dbMatch = await Match.findOne({
+    where: {
+      providerSource: "saffplus",
+      externalMatchId: saffMatchIdStr,
+    },
+  });
+  let created = false;
+
+  if (!dbMatch) {
+    // 4. Resolve clubs (create stubs if missing).
+    const homeClub = await resolveOrCreateClubFromSaffPlus({
+      teamId: match.homeTeamId,
+      name: match.homeTeamName,
+      nameAr: match.homeTeamNameAr,
+      logo: match.homeTeamLogo,
+    });
+    const awayClub = await resolveOrCreateClubFromSaffPlus({
+      teamId: match.awayTeamId,
+      name: match.awayTeamName,
+      nameAr: match.awayTeamNameAr,
+      logo: match.awayTeamLogo,
+    });
+
+    // 5. Build the matchDate. Bypass createMatch's 3-day-gap check by
+    //    writing directly through the model.
+    const dateStr = match.date;
+    const timeStr =
+      match.time && /^\d{2}:\d{2}/.test(match.time) ? match.time : "00:00";
+    const matchDate = new Date(`${dateStr}T${timeStr}`);
+    if (Number.isNaN(matchDate.getTime()))
+      throw new AppError("SAFF+ match has invalid date", 422);
+
+    dbMatch = await Match.create({
+      homeClubId: homeClub.id,
+      awayClubId: awayClub.id,
+      homeTeamName: match.homeTeamName,
+      awayTeamName: match.awayTeamName,
+      homeScore: hasScores ? (match.homeScore as number) : null,
+      awayScore: hasScores ? (match.awayScore as number) : null,
+      status,
+      matchDate,
+      venue: match.stadium ?? null,
+      externalMatchId: saffMatchIdStr,
+      providerSource: "saffplus",
+    } as never);
+    created = true;
+  } else if (
+    hasScores &&
+    (dbMatch.status !== "completed" ||
+      dbMatch.homeScore !== match.homeScore ||
+      dbMatch.awayScore !== match.awayScore)
+  ) {
+    // Re-import after a fixture finished — refresh status + score.
+    await dbMatch.update({
+      status: "completed",
+      homeScore: match.homeScore as number,
+      awayScore: match.awayScore as number,
+    });
+  }
+
+  // 6. Upsert the player's lineup row.
+  const availability = mapLineupRole(match.lineupRole);
+  const existingLink = await MatchPlayer.findOne({
+    where: { matchId: dbMatch.id, playerId },
+  });
+  if (existingLink) {
+    if (existingLink.availability !== availability) {
+      await existingLink.update({ availability });
+    }
+  } else {
+    await MatchPlayer.create({
+      matchId: dbMatch.id,
+      playerId,
+      availability,
+      providerSource: "saffplus",
+    } as never);
+  }
+
+  return {
+    matchId: dbMatch.id,
+    created,
+    status,
+    homeScore: dbMatch.homeScore,
+    awayScore: dbMatch.awayScore,
+    playerLinked: true,
+  };
 }
 
 // ══════════════════════════════════════════
