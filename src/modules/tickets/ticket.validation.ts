@@ -22,27 +22,43 @@ const TICKET_TYPES = [
   "SportsDecision",
 ] as const;
 
+export const RECEIVING_PARTIES = [
+  "AgencyManagement",
+  "MentalSpecialist",
+  "PhysicalSpecialist",
+  "ExternalCoach",
+  "Legal",
+  "Finance",
+  "PerformanceAnalyst",
+] as const;
+
 // ── Create Ticket ──
-export const createTicketSchema = z.object({
-  playerId: z.string().uuid("Invalid player ID").optional(),
-  journeyStageId: z.string().uuid("Invalid journey stage ID").optional(),
-  title: z.string().min(1, "Title is required"),
-  titleAr: z.string().optional(),
-  description: z.string().optional(),
-  descriptionAr: z.string().optional(),
-  ticketType: z.enum(TICKET_TYPES).default("General"),
-  priority: z.enum(TICKET_PRIORITIES).default("medium"),
-  assignedTo: z.string().uuid("Invalid user ID").optional(),
-  additionalAssignees: z.array(z.string().uuid("Invalid user ID")).optional(),
-  receivingParty: z.string().optional(),
-  receivingPartyAr: z.string().optional(),
-  dueDate: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
-    .optional(),
-  notes: z.string().optional(),
-  notesAr: z.string().optional(),
-});
+export const createTicketSchema = z
+  .object({
+    playerId: z.string().uuid("Invalid player ID").optional(),
+    journeyStageId: z.string().uuid("Invalid journey stage ID").optional(),
+    referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
+    title: z.string().min(1).optional(),
+    titleAr: z.string().min(1).optional(),
+    description: z.string().optional(),
+    descriptionAr: z.string().optional(),
+    ticketType: z.enum(TICKET_TYPES).default("General"),
+    priority: z.enum(TICKET_PRIORITIES).default("medium"),
+    assignedTo: z.string().uuid("Invalid user ID").optional(),
+    additionalAssignees: z.array(z.string().uuid("Invalid user ID")).optional(),
+    receivingParty: z.enum(RECEIVING_PARTIES).optional(),
+    receivingPartyAr: z.string().optional(),
+    dueDate: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
+      .optional(),
+    notes: z.string().optional(),
+    notesAr: z.string().optional(),
+  })
+  .refine((data) => !!data.title || !!data.titleAr, {
+    message: "Either title or titleAr is required",
+    path: ["title"],
+  });
 
 // ── Update Ticket ──
 export const updateTicketSchema = z.object({
@@ -51,6 +67,7 @@ export const updateTicketSchema = z.object({
     .uuid("Invalid journey stage ID")
     .nullable()
     .optional(),
+  referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
   title: z.string().min(1).optional(),
   titleAr: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
@@ -63,7 +80,7 @@ export const updateTicketSchema = z.object({
     .array(z.string().uuid("Invalid user ID"))
     .nullable()
     .optional(),
-  receivingParty: z.string().nullable().optional(),
+  receivingParty: z.enum(RECEIVING_PARTIES).nullable().optional(),
   receivingPartyAr: z.string().nullable().optional(),
   dueDate: z
     .string()
@@ -107,6 +124,7 @@ export const ticketQuerySchema = z.object({
   search: z.string().optional(),
   playerId: z.string().uuid().optional(),
   journeyStageId: z.string().uuid().optional(),
+  referralId: z.string().uuid().optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   ticketType: z.enum(TICKET_TYPES).optional(),
@@ -118,3 +136,4 @@ export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type UpdateTicketInput = z.infer<typeof updateTicketSchema>;
 export type UpdateTicketStatusInput = z.infer<typeof updateTicketStatusSchema>;
 export type TicketQuery = z.infer<typeof ticketQuerySchema>;
+export type TicketReceivingParty = (typeof RECEIVING_PARTIES)[number];

@@ -26,7 +26,8 @@ interface TicketAttributes {
   displayId: string | null;
   playerId: string | null;
   journeyStageId: string | null;
-  title: string;
+  referralId: string | null;
+  title: string | null;
   titleAr: string | null;
   description: string | null;
   descriptionAr: string | null;
@@ -53,6 +54,8 @@ interface TicketCreationAttributes extends Optional<
   | "displayId"
   | "playerId"
   | "journeyStageId"
+  | "referralId"
+  | "title"
   | "titleAr"
   | "description"
   | "descriptionAr"
@@ -81,7 +84,8 @@ export class Ticket
   declare displayId: string | null;
   declare playerId: string | null;
   declare journeyStageId: string | null;
-  declare title: string;
+  declare referralId: string | null;
+  declare title: string | null;
   declare titleAr: string | null;
   declare description: string | null;
   declare descriptionAr: string | null;
@@ -123,9 +127,14 @@ Ticket.init(
       type: DataTypes.UUID,
       field: "journey_stage_id",
     },
+    referralId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "referral_id",
+    },
     title: {
       type: DataTypes.STRING(500),
-      allowNull: false,
+      allowNull: true,
     },
     titleAr: {
       type: DataTypes.STRING(500),
@@ -192,6 +201,7 @@ Ticket.init(
       { fields: ["status"] },
       { fields: ["priority"] },
       { fields: ["player_id", "status"] },
+      { fields: ["referral_id"] },
     ],
   },
 );

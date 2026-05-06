@@ -4,8 +4,14 @@ import path from "path";
 import { z } from "zod";
 import { logger } from "@config/logger";
 
-// Load environment-specific .env file
+// Load environment-specific .env file.
+// ENV_FILE override lets ad-hoc tasks (e.g. running migrate:status against
+// prod via the Cloud SQL Auth Proxy) point at a non-standard env file
+// without renaming .env.production.local.
 const nodeEnv = process.env.NODE_ENV || "development";
+if (process.env.ENV_FILE) {
+  dotenv.config({ path: path.resolve(process.cwd(), process.env.ENV_FILE) });
+}
 dotenv.config({ path: path.resolve(process.cwd(), `.env.${nodeEnv}.local`) });
 dotenv.config({ path: path.resolve(process.cwd(), `.env.${nodeEnv}`) });
 dotenv.config({ path: path.resolve(process.cwd(), ".env") });
