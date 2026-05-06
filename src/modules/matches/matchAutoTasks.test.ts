@@ -1,3 +1,15 @@
+jest.mock("@modules/audit/AuditLog.model", () => ({
+  AuditLog: {
+    init: jest.fn(),
+    create: jest.fn(),
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    name: "AuditLog",
+  },
+}));
+jest.mock("@shared/utils/audit", () => ({
+  logAudit: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock("@modules/tasks/task.model");
 jest.mock("@modules/matches/matchPlayer.model");
 jest.mock("@modules/matches/playerMatchStats.model");

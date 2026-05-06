@@ -53,6 +53,17 @@ export async function listMatches(queryParams: any) {
     where.providerSource = queryParams.providerSource;
   }
 
+  // Return only completed matches with no match_analyses row (analyst widget)
+  if (queryParams.hasNoAnalysis) {
+    where.status = "completed";
+    where[Op.and] = [
+      ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+      Sequelize.literal(
+        `NOT EXISTS (SELECT 1 FROM match_analyses ma WHERE ma.match_id = "Match".id)`,
+      ),
+    ];
+  }
+
   if (queryParams.clubId) {
     where[Op.or] = [
       { homeClubId: queryParams.clubId },
@@ -900,4 +911,91 @@ export async function deleteMatchAnalysis(matchId: string, analysisId: string) {
   if (!analysis) throw new AppError("Analysis not found", 404);
   await analysis.destroy();
   return { id: analysisId, matchId };
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  CRON HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Returns IDs and club names for completed matches that have no
+ * match_analyses row. Used by the post-match analyst sweep cron job.
+ * Includes the assigned analyst per the pickMatchAnalyst logic (via
+ * player.analyst_id join) so the caller doesn't need a second query.
+ */
+export async function getCompletedMatchesWithoutAnalysis(
+  maxAgeDays = 14,
+): Promise<
+  { id: string; homeTeam: string; awayTeam: string; matchDate: Date }[]
+> {
+  const since = new Date();
+  since.setDate(since.getDate() - maxAgeDays);
+
+  const rows = await Match.findAll({
+    where: {
+      status: "completed",
+      matchDate: { [Op.gte]: since },
+      [Op.and]: [
+        Sequelize.literal(
+          `NOT EXISTS (SELECT 1 FROM match_analyses ma WHERE ma.match_id = "Match".id)`,
+        ),
+      ],
+    },
+    include: [
+      { model: Club, as: "homeClub", attributes: ["name"] },
+      { model: Club, as: "awayClub", attributes: ["name"] },
+    ],
+    order: [["matchDate", "DESC"]],
+    limit: 50,
+  });
+
+  return rows.map((m) => ({
+    id: m.id,
+    homeTeam: (m as any).homeClub?.name ?? "?",
+    awayTeam: (m as any).awayClub?.name ?? "?",
+    matchDate: m.matchDate as unknown as Date,
+  }));
+}
+
+/**
+ * Returns upcoming matches within the given hour windows (24h / 1h) so
+ * the kickoff-proximity alert cron can notify the responsible analysts.
+ */
+export async function getMatchesNearKickoff(
+  hoursAhead: 1 | 24,
+): Promise<
+  {
+    id: string;
+    homeTeam: string;
+    homeTeamAr: string;
+    awayTeam: string;
+    awayTeamAr: string;
+    matchDate: Date;
+  }[]
+> {
+  const now = new Date();
+  // Window: [now + hoursAhead - 15min, now + hoursAhead + 15min]
+  const windowStart = new Date(now.getTime() + (hoursAhead * 60 - 15) * 60_000);
+  const windowEnd = new Date(now.getTime() + (hoursAhead * 60 + 15) * 60_000);
+
+  const rows = await Match.findAll({
+    where: {
+      status: "upcoming",
+      matchDate: { [Op.between]: [windowStart, windowEnd] },
+    },
+    include: [
+      { model: Club, as: "homeClub", attributes: ["name", "nameAr"] },
+      { model: Club, as: "awayClub", attributes: ["name", "nameAr"] },
+    ],
+    limit: 50,
+  });
+
+  return rows.map((m) => ({
+    id: m.id,
+    homeTeam: (m as any).homeClub?.name ?? "?",
+    homeTeamAr: (m as any).homeClub?.nameAr ?? (m as any).homeClub?.name ?? "?",
+    awayTeam: (m as any).awayClub?.name ?? "?",
+    awayTeamAr: (m as any).awayClub?.nameAr ?? (m as any).awayClub?.name ?? "?",
+    matchDate: m.matchDate as unknown as Date,
+  }));
 }

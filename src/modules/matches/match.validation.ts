@@ -77,6 +77,8 @@ export const matchQuerySchema = z.object({
   providerSource: z
     .enum(["saff", "saffplus", "Sportmonks", "manual"])
     .optional(),
+  // When true, returns only completed matches that have no match_analyses row
+  hasNoAnalysis: z.coerce.boolean().optional(),
 });
 
 // ── Calendar Query ──

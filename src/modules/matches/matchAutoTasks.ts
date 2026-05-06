@@ -865,7 +865,9 @@ const MATCH_LEVEL_PRE_RULES: MatchLevelPreRule[] = [
  * Returns the analyst covering the most assigned players in the match,
  * or null if no assigned player has an analyst.
  */
-async function pickMatchAnalyst(matchId: string): Promise<string | null> {
+export async function pickMatchAnalyst(
+  matchId: string,
+): Promise<string | null> {
   const players = await MatchPlayer.findAll({
     where: { matchId },
     include: [
