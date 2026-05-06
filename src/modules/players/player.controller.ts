@@ -152,3 +152,8 @@ export async function getPlayerOverview(req: AuthRequest, res: Response) {
   const overview = await playerService.getPlayerOverview(req.params.id);
   sendSuccess(res, overview);
 }
+
+export async function getPerformanceSummary(req: AuthRequest, res: Response) {
+  const summary = await playerService.getPerformanceSummary(req.params.id);
+  sendSuccess(res, summary);
+}

@@ -845,3 +845,12 @@ export async function getPlayerOverview(id: string) {
     openCaseCount: openCases.length,
   };
 }
+
+export async function getPerformanceSummary(playerId: string) {
+  const rows = await sequelize.query(
+    `SELECT * FROM vw_player_performance_summary WHERE player_id = :playerId`,
+    { replacements: { playerId }, type: QueryTypes.SELECT },
+  );
+  if (!rows.length) return null;
+  return camelCaseKeys(rows[0] as Record<string, unknown>);
+}
