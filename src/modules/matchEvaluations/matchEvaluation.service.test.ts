@@ -86,7 +86,7 @@ describe("listEvaluations", () => {
       page: 1,
       limit: 20,
       sort: "createdAt",
-      order: "DESC",
+      order: "desc",
     });
     expect(result.data).toHaveLength(1);
     expect(result.meta.total).toBe(1);
@@ -97,7 +97,7 @@ describe("listEvaluations", () => {
       page: 1,
       limit: 20,
       sort: "createdAt",
-      order: "DESC",
+      order: "desc",
       playerId: "player-1",
     });
     const call = (MatchEvaluation.findAndCountAll as jest.Mock).mock

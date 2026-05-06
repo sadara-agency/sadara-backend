@@ -1862,7 +1862,10 @@ export async function unlinkPlayerFromSaffPlus(
     // 1. Strip the saffplus key but keep other provider ids intact.
     const next = { ...externalIds };
     delete next.saffplus;
-    await player.update({ externalIds: next }, { transaction: t });
+    await player.update(
+      { externalIds: next as Record<string, string> },
+      { transaction: t },
+    );
 
     // 2. Drop SAFF+-sourced match link rows for this player only.
     const matchPlayersDeleted = await MatchPlayer.destroy({
