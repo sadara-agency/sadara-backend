@@ -59,6 +59,7 @@ export const CachePrefix = {
   CALENDAR_SCOPE: "calendar-scope",
   SAFFPLUS_PLAYER: "saffplus:player",
   MATCH_EVALUATIONS: "match-evaluations",
+  HEATMAPS: "heatmaps",
 } as const;
 
 // ── Core Operations ──

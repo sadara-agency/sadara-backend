@@ -225,17 +225,23 @@ export async function up({
       FROM approved
       GROUP BY player_id
     ),
+    with_lag AS (
+      -- Pre-compute lag comparison so aggregates can use it safely
+      SELECT
+        player_id,
+        overall_rating,
+        rn,
+        overall_rating < LAG(overall_rating) OVER (PARTITION BY player_id ORDER BY rn ASC) AS declined_vs_prev
+      FROM approved
+    ),
     trend_calc AS (
-      -- Compare last 3 vs previous 3 to determine trend
       SELECT
         player_id,
         ROUND(AVG(overall_rating) FILTER (WHERE rn <= 3), 2) AS last3_avg,
         ROUND(AVG(overall_rating) FILTER (WHERE rn BETWEEN 4 AND 6), 2) AS prev3_avg,
-        -- Consecutive decline alert: last 3 all lower than their predecessor
-        bool_and(
-          overall_rating < LAG(overall_rating) OVER (PARTITION BY player_id ORDER BY created_at DESC)
-        ) FILTER (WHERE rn <= 3) AS has_consecutive_decline
-      FROM approved
+        -- All of the last 3 evals declined vs their predecessor
+        bool_and(declined_vs_prev) FILTER (WHERE rn <= 3) AS has_consecutive_decline
+      FROM with_lag
       GROUP BY player_id
     )
     SELECT

@@ -190,7 +190,7 @@ export const listMatchEvaluationsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   sort: z.string().optional().default("createdAt"),
-  order: z.enum(["ASC", "DESC"]).optional().default("DESC"),
+  order: z.enum(["asc", "desc"]).optional().default("desc"),
   playerId: z.string().uuid().optional(),
   matchId: z.string().uuid().optional(),
   analystId: z.string().uuid().optional(),

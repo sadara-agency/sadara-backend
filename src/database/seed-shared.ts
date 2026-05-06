@@ -367,6 +367,26 @@ const RAW_PERMISSIONS: Perm[] = [
   ...allRoles("sessions", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("sessions", ["Admin", "Manager"], { canDelete: true }),
 
+  // heatmaps — read for all roles, write for analyst/coaching/management,
+  // delete only for Admin/Manager.
+  ...allRoles("heatmaps", { canRead: true }),
+  ...forRoles(
+    "heatmaps",
+    [
+      "Admin",
+      "Manager",
+      "Analyst",
+      "Scout",
+      "Coach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GoalkeeperCoach",
+      "SkillCoach",
+    ],
+    { canCreate: true, canUpdate: true },
+  ),
+  ...forRoles("heatmaps", ["Admin", "Manager"], { canDelete: true }),
+
   ...forRoles(
     "session-feedback",
     [

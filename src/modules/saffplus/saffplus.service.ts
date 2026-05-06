@@ -20,7 +20,10 @@ import { Squad } from "@modules/squads/squad.model";
 import { SquadMembership } from "@modules/squads/squadMembership.model";
 import { findOrCreateSquad } from "@modules/squads/squad.service";
 import { upsertPendingReview } from "./playerReview.service";
-import type { PlayerReviewSuggestion } from "./playerReview.model";
+import {
+  PlayerMatchReview,
+  type PlayerReviewSuggestion,
+} from "./playerReview.model";
 import { MatchEvent } from "@modules/matches/matchEvent.model";
 import { MatchMedia } from "@modules/matches/matchMedia.model";
 import { extractMatchVideoUrl } from "./saffplus.video";
@@ -1815,6 +1818,100 @@ export async function autoLinkPlayerToSaffPlus(
   }
 
   return { outcome: "skipped", reason: "no candidates above 0.50 similarity" };
+}
+
+/**
+ * Undo a SAFF+ link: clears `external_ids.saffplus`, deletes match_players /
+ * match_events / external_provider_mappings rows that came from SAFF+, and
+ * resets any player_match_review row that pointed to this player back to
+ * pending. Does NOT touch the shared `matches` table (other players may be
+ * linked to it) or revert overwritten profile fields (originals weren't
+ * preserved at enrichment time).
+ */
+export async function unlinkPlayerFromSaffPlus(
+  sadaraPlayerId: string,
+): Promise<{
+  cleared: boolean;
+  previousSaffPlayerId: string | null;
+  matchPlayersDeleted: number;
+  matchEventsDeleted: number;
+  reviewsReset: number;
+  providerMappingDeleted: number;
+}> {
+  const player = await Player.findByPk(sadaraPlayerId);
+  if (!player) throw new AppError("Player not found", 404);
+
+  const externalIds = (player.externalIds as Record<string, unknown>) ?? {};
+  const previousSaffPlayerId =
+    typeof externalIds.saffplus === "string"
+      ? (externalIds.saffplus as string)
+      : null;
+
+  if (!previousSaffPlayerId) {
+    return {
+      cleared: false,
+      previousSaffPlayerId: null,
+      matchPlayersDeleted: 0,
+      matchEventsDeleted: 0,
+      reviewsReset: 0,
+      providerMappingDeleted: 0,
+    };
+  }
+
+  return await sequelize.transaction(async (t) => {
+    // 1. Strip the saffplus key but keep other provider ids intact.
+    const next = { ...externalIds };
+    delete next.saffplus;
+    await player.update({ externalIds: next }, { transaction: t });
+
+    // 2. Drop SAFF+-sourced match link rows for this player only.
+    const matchPlayersDeleted = await MatchPlayer.destroy({
+      where: { playerId: sadaraPlayerId, providerSource: "saffplus" },
+      transaction: t,
+    });
+    const matchEventsDeleted = await MatchEvent.destroy({
+      where: { playerId: sadaraPlayerId, providerSource: "saffplus" },
+      transaction: t,
+    });
+
+    // 3. Drop the audit/mapping row.
+    const providerMappingDeleted = await ExternalProviderMapping.destroy({
+      where: {
+        playerId: sadaraPlayerId,
+        externalPlayerId: previousSaffPlayerId,
+      },
+      transaction: t,
+    });
+
+    // 4. Re-open any review row that linked here, so the queue picks it up.
+    const [reviewsReset] = await PlayerMatchReview.update(
+      {
+        status: "pending",
+        linkedPlayerId: null,
+        reviewedBy: null,
+        reviewedAt: null,
+      },
+      {
+        where: { linkedPlayerId: sadaraPlayerId },
+        transaction: t,
+      },
+    );
+
+    logger.info(
+      `[SAFF+] unlink player=${sadaraPlayerId} saff=${previousSaffPlayerId} ` +
+        `matchPlayers=${matchPlayersDeleted} matchEvents=${matchEventsDeleted} ` +
+        `mappings=${providerMappingDeleted} reviewsReset=${reviewsReset}`,
+    );
+
+    return {
+      cleared: true,
+      previousSaffPlayerId,
+      matchPlayersDeleted,
+      matchEventsDeleted,
+      reviewsReset,
+      providerMappingDeleted,
+    };
+  });
 }
 
 /**
