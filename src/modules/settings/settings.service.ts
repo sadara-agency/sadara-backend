@@ -19,7 +19,10 @@ import {
 } from "../../database/csv-import/mappers/player.mapper";
 import { mapSessionRow } from "../../database/csv-import/mappers/session.mapper";
 import { mapTrainingSessionRow } from "../../database/csv-import/mappers/ticket.mapper";
-import { mapJourneyRow } from "../../database/csv-import/mappers/journey.mapper";
+import {
+  mapGateRow,
+  mapJourneyRow,
+} from "../../database/csv-import/mappers/journey.mapper";
 import type {
   UpdateProfileInput,
   ChangePasswordInput,
