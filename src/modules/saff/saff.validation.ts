@@ -207,6 +207,14 @@ export const applySessionSchema = z.object({
   confirmDigest: z.string().min(1, "Preview digest is required"),
 });
 
+// ── Import a single SAFF+ match into Sadara ──
+
+export const importSaffPlusMatchSchema = z.object({
+  saffPlayerId: z.string().min(1),
+  playerId: z.string().uuid(),
+  saffMatchId: z.union([z.string().min(1), z.number()]),
+});
+
 // ── Reset SAFF/SAFF+ data ──
 
 export const resetSaffSchema = z.object({
@@ -239,3 +247,6 @@ export type AdvanceStepInput = z.infer<typeof advanceStepSchema>;
 export type ApplySessionInput = z.infer<typeof applySessionSchema>;
 export type TeamResolutionInput = z.infer<typeof teamResolutionSchema>;
 export type ResetSaffInput = z.infer<typeof resetSaffSchema>;
+export type ImportSaffPlusMatchInput = z.infer<
+  typeof importSaffPlusMatchSchema
+>;

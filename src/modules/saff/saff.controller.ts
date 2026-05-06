@@ -166,6 +166,31 @@ export async function fetchTeamLogos(req: AuthRequest, res: Response) {
   );
 }
 
+// ── Import a single SAFF+ match into Sadara ──
+
+export async function importSaffPlusMatch(req: AuthRequest, res: Response) {
+  const { saffPlayerId, playerId, saffMatchId } = req.body;
+  const result = await saffService.importSaffPlusMatch({
+    saffPlayerId,
+    playerId,
+    saffMatchId,
+  });
+  await logAudit(
+    result.created ? "CREATE" : "UPDATE",
+    "matches",
+    result.matchId,
+    buildAuditContext(req.user!, req.ip),
+    result.created
+      ? `Imported SAFF+ match ${saffMatchId} (${result.status})`
+      : `Re-linked player to existing SAFF+ match ${saffMatchId}`,
+  );
+  sendSuccess(
+    res,
+    result,
+    result.created ? "Match imported from SAFF+" : "Match already linked",
+  );
+}
+
 // ── Bulk Fetch Men's Leagues (stage-only) ──
 
 export async function bulkFetchMenLeagues(req: AuthRequest, res: Response) {
