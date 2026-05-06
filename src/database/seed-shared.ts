@@ -970,6 +970,28 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
+
+  // ── ContentManager / Approver / Publisher baseline access ──
+  // Designs CRUD already granted above; this block adds the read-only
+  // operational modules so these roles have a usable workspace by default.
+  // Mirrors migration 210 so fresh-DB and existing DBs converge.
+  ...forRoles("dashboard", ["ContentManager", "Approver", "Publisher"], {
+    canRead: true,
+  }),
+  ...forRoles("notifications", ["ContentManager", "Approver", "Publisher"], {
+    canRead: true,
+  }),
+  ...forRoles("tasks", ["ContentManager", "Approver", "Publisher"], {
+    canRead: true,
+  }),
+  ...forRoles("players", ["ContentManager"], { canRead: true }),
+  ...forRoles("clubs", ["ContentManager"], { canRead: true }),
+  ...forRoles("matches", ["ContentManager"], { canRead: true }),
+  ...forRoles("documents", ["ContentManager", "Approver"], { canRead: true }),
+  // Approver: read deal artifacts + update approvals queue
+  ...forRoles("approvals", ["Approver"], { canRead: true, canUpdate: true }),
+  ...forRoles("contracts", ["Approver"], { canRead: true }),
+  ...forRoles("offers", ["Approver"], { canRead: true }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
