@@ -304,7 +304,41 @@ export async function createMatch(input: any) {
 
 export async function updateMatch(id: string, input: any) {
   const match = await findOrThrow(Match, id, "Match");
-  return match.update(input);
+
+  // Auto-resolve squad IDs to senior squad when club changes but squad not provided.
+  let { homeSquadId, awaySquadId, homeClubId, awayClubId } = input as any;
+
+  if (homeClubId !== undefined && !homeSquadId) {
+    if (homeClubId === null) {
+      homeSquadId = null;
+    } else {
+      const sq = await Squad.findOne({
+        where: { clubId: homeClubId, ageCategory: "senior" },
+        attributes: ["id"],
+        order: [["createdAt", "ASC"]],
+      });
+      homeSquadId = sq?.id ?? null;
+    }
+  }
+
+  if (awayClubId !== undefined && !awaySquadId) {
+    if (awayClubId === null) {
+      awaySquadId = null;
+    } else {
+      const sq = await Squad.findOne({
+        where: { clubId: awayClubId, ageCategory: "senior" },
+        attributes: ["id"],
+        order: [["createdAt", "ASC"]],
+      });
+      awaySquadId = sq?.id ?? null;
+    }
+  }
+
+  const payload: any = { ...input };
+  if (homeClubId !== undefined) payload.homeSquadId = homeSquadId;
+  if (awayClubId !== undefined) payload.awaySquadId = awaySquadId;
+
+  return match.update(payload);
 }
 
 export async function updateScore(
@@ -961,9 +995,7 @@ export async function getCompletedMatchesWithoutAnalysis(
  * Returns upcoming matches within the given hour windows (24h / 1h) so
  * the kickoff-proximity alert cron can notify the responsible analysts.
  */
-export async function getMatchesNearKickoff(
-  hoursAhead: 1 | 24,
-): Promise<
+export async function getMatchesNearKickoff(hoursAhead: 1 | 24): Promise<
   {
     id: string;
     homeTeam: string;

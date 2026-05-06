@@ -5,6 +5,8 @@ import { z } from "zod";
 const createMatchBaseSchema = z.object({
   homeClubId: z.string().uuid("Invalid club ID"),
   awayClubId: z.string().uuid("Invalid club ID"),
+  homeSquadId: z.string().uuid("Invalid squad ID").optional(),
+  awaySquadId: z.string().uuid("Invalid squad ID").optional(),
   competition: z.string().min(1, "Competition is required"),
   season: z.string().max(20).optional(),
   matchDate: z.string().min(1, "Match date is required"),
