@@ -274,6 +274,29 @@ export async function autoLinkPlayerCtrl(req: AuthRequest, res: Response) {
   sendSuccess(res, result, `Auto-link: ${result.outcome}`);
 }
 
+// ── Unlink: undo a SAFF+ link on a Sadara player ──
+
+export async function unlinkPlayerCtrl(req: AuthRequest, res: Response) {
+  const { sadaraPlayerId } = req.params;
+  const result = await saffPlusService.unlinkPlayerFromSaffPlus(sadaraPlayerId);
+  await logAudit(
+    "DELETE",
+    "players",
+    sadaraPlayerId,
+    buildAuditContext(req.user!, req.ip),
+    result.cleared
+      ? `SAFF+ unlink: removed saffPlayerId=${result.previousSaffPlayerId}, ` +
+          `matchPlayers=${result.matchPlayersDeleted} matchEvents=${result.matchEventsDeleted} ` +
+          `mappings=${result.providerMappingDeleted} reviewsReset=${result.reviewsReset}`
+      : "SAFF+ unlink no-op (player had no SAFF+ link)",
+  );
+  sendSuccess(
+    res,
+    result,
+    result.cleared ? "SAFF+ link removed" : "Player has no SAFF+ link",
+  );
+}
+
 export async function autoLinkAllPlayersCtrl(req: AuthRequest, res: Response) {
   const { limit, dryRun } = req.body as {
     limit?: number;

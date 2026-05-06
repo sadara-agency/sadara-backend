@@ -367,6 +367,26 @@ const RAW_PERMISSIONS: Perm[] = [
   ...allRoles("sessions", { canRead: true, canCreate: true, canUpdate: true }),
   ...forRoles("sessions", ["Admin", "Manager"], { canDelete: true }),
 
+  // heatmaps — read for all roles, write for analyst/coaching/management,
+  // delete only for Admin/Manager.
+  ...allRoles("heatmaps", { canRead: true }),
+  ...forRoles(
+    "heatmaps",
+    [
+      "Admin",
+      "Manager",
+      "Analyst",
+      "Scout",
+      "Coach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GoalkeeperCoach",
+      "SkillCoach",
+    ],
+    { canCreate: true, canUpdate: true },
+  ),
+  ...forRoles("heatmaps", ["Admin", "Manager"], { canDelete: true }),
+
   ...forRoles(
     "session-feedback",
     [
@@ -398,6 +418,38 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
+
+  // matchEvaluations — analyst creates/edits, manager approves, coaches read
+  ...forRoles("matchEvaluations", ["Admin"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles("matchEvaluations", ["Manager", "SportingDirector"], {
+    canRead: true,
+    canUpdate: true,
+  }),
+  ...forRoles("matchEvaluations", ["Analyst"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "matchEvaluations",
+    [
+      "Coach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+      "NutritionSpecialist",
+      "SkillCoach",
+      "Executive",
+    ],
+    { canRead: true },
+  ),
 
   ...forRoles("documents", ["Admin"], {
     canCreate: true,

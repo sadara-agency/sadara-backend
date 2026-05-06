@@ -157,12 +157,37 @@ export async function fetchTeamLogos(req: AuthRequest, res: Response) {
     "saff_team_maps",
     null,
     buildAuditContext(req.user!, req.ip),
-    `Fetched ${result.fetched} team logos out of ${result.total}`,
+    `Fetched ${result.fetched} team logos out of ${result.total}; ${result.saffPlusFallback ?? 0} filled from SAFF+`,
   );
   sendSuccess(
     res,
     result,
     `Fetched ${result.fetched} logos for season ${season}`,
+  );
+}
+
+// ── Import a single SAFF+ match into Sadara ──
+
+export async function importSaffPlusMatch(req: AuthRequest, res: Response) {
+  const { saffPlayerId, playerId, saffMatchId } = req.body;
+  const result = await saffService.importSaffPlusMatch({
+    saffPlayerId,
+    playerId,
+    saffMatchId,
+  });
+  await logAudit(
+    result.created ? "CREATE" : "UPDATE",
+    "matches",
+    result.matchId,
+    buildAuditContext(req.user!, req.ip),
+    result.created
+      ? `Imported SAFF+ match ${saffMatchId} (${result.status})`
+      : `Re-linked player to existing SAFF+ match ${saffMatchId}`,
+  );
+  sendSuccess(
+    res,
+    result,
+    result.created ? "Match imported from SAFF+" : "Match already linked",
   );
 }
 

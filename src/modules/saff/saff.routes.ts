@@ -17,6 +17,7 @@ import {
   updateDecisionsSchema,
   applySessionSchema,
   resetSaffSchema,
+  importSaffPlusMatchSchema,
 } from "@modules/saff/saff.validation";
 import * as saffController from "@modules/saff/saff.controller";
 import {
@@ -102,6 +103,14 @@ router.post(
   "/fetch-logos",
   authorizeModule("saff-data", "create"),
   asyncHandler(saffController.fetchTeamLogos),
+);
+
+// ── Import a single SAFF+ match into Sadara ──
+router.post(
+  "/matches/import",
+  authorizeModule("matches", "create"),
+  validate(importSaffPlusMatchSchema),
+  asyncHandler(saffController.importSaffPlusMatch),
 );
 
 // ── Bulk Fetch Men's Leagues (stage-only — no production writes after redesign) ──
