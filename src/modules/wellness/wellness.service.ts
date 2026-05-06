@@ -433,7 +433,7 @@ export async function getCoachOverview(
 
   // Get all active players visible to this user, LEFT JOIN profiles so players without profiles also appear
   const players: any[] = await sequelize.query(
-    `SELECT p.id AS player_id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar,
+    `SELECT p.id AS player_id, p.first_name, p.last_name, p.first_name_ar, p.last_name_ar, p.photo_url,
             CASE WHEN wp.id IS NOT NULL THEN true ELSE false END AS has_profile
      FROM players p
      LEFT JOIN wellness_profiles wp ON wp.player_id = p.id
@@ -469,6 +469,7 @@ export async function getCoachOverview(
         lastName: p.last_name,
         firstNameAr: p.first_name_ar,
         lastNameAr: p.last_name_ar,
+        photoUrl: p.photo_url ?? null,
         hasProfile: false,
         status: "none",
         avgRingScore: 0,
@@ -556,6 +557,7 @@ export async function getCoachOverview(
       lastName: p.last_name,
       firstNameAr: p.first_name_ar,
       lastNameAr: p.last_name_ar,
+      photoUrl: p.photo_url ?? null,
       hasProfile: true,
       status,
       avgRingScore,
