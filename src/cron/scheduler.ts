@@ -15,7 +15,14 @@ import {
   generateAutoTasks,
   generatePreMatchTasks,
   generateMatchLevelPreTasks,
+  pickMatchAnalyst,
 } from "@modules/matches/matchAutoTasks";
+import {
+  getCompletedMatchesWithoutAnalysis,
+  getMatchesNearKickoff,
+} from "@modules/matches/match.service";
+import { Task } from "@modules/tasks/task.model";
+import { User } from "@modules/users/user.model";
 import {
   checkPerformanceTrends,
   checkFatigueRisk,
@@ -943,11 +950,156 @@ async function checkMediaLatePublishing() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// JOB: Post-match analyst nudge
+// Runs daily. Finds completed matches (up to 14 days old) with no
+// match_analyses row and creates a "write your analysis" task + direct
+// notification for each match's responsible analyst.
+// ══════════════════════════════════════════════════════════════
+
+async function checkAwaitingMatchAnalysis() {
+  const matches = await getCompletedMatchesWithoutAnalysis(14);
+  if (matches.length === 0) return { nudged: 0 };
+
+  let nudged = 0;
+
+  for (const m of matches) {
+    const analystId = await pickMatchAnalyst(m.id);
+    if (!analystId) {
+      // No assigned analyst — fall back to role-wide nudge (won't duplicate:
+      // task creation below guards with triggerRuleId uniqueness)
+      const fallback = await User.findOne({
+        where: { role: "Analyst", isActive: true },
+        attributes: ["id"],
+        order: [["createdAt", "ASC"]],
+      });
+      if (!fallback) continue;
+    }
+
+    const targetId =
+      analystId ??
+      (
+        await User.findOne({
+          where: { role: "Analyst", isActive: true },
+          attributes: ["id"],
+          order: [["createdAt", "ASC"]],
+        })
+      )?.id;
+    if (!targetId) continue;
+
+    const existing = await Task.findOne({
+      where: {
+        matchId: m.id,
+        triggerRuleId: "post_analyst_write_analysis",
+        isAutoCreated: true,
+        playerId: null,
+      },
+    });
+    if (existing) continue;
+
+    const matchLabel = `${m.homeTeam} vs ${m.awayTeam}`;
+    const matchDateStr = new Date(m.matchDate).toISOString().split("T")[0];
+
+    await Task.create({
+      title: `Write post-match analysis — ${matchLabel}`,
+      titleAr: `كتابة تحليل ما بعد المباراة — ${matchLabel}`,
+      description: `The match ${matchLabel} on ${matchDateStr} has no analysis yet. Please submit your post-match report.`,
+      type: "Match",
+      priority: "high",
+      status: "Open",
+      playerId: null,
+      matchId: m.id,
+      assignedTo: targetId,
+      isAutoCreated: true,
+      triggerRuleId: "post_analyst_write_analysis",
+      dueDate: matchDateStr,
+    } as any);
+
+    notifyUser(targetId, {
+      type: "task",
+      title: `Analysis needed: ${matchLabel}`,
+      titleAr: `تحليل مطلوب: ${matchLabel}`,
+      body: `Match on ${matchDateStr} has no post-match analysis. Please write your report.`,
+      bodyAr: `مباراة ${matchDateStr} لا تزال بدون تحليل. يرجى كتابة تقريرك.`,
+      link: `/dashboard/matches/${m.id}`,
+      sourceType: "match",
+      sourceId: m.id,
+      priority: "high",
+    }).catch((err) =>
+      logger.warn("[Cron] Awaiting-analysis notification failed", {
+        matchId: m.id,
+        error: (err as Error).message,
+      }),
+    );
+
+    nudged++;
+  }
+
+  return { nudged };
+}
+
+// ══════════════════════════════════════════════════════════════
+// JOB: Kickoff-proximity alerts (24h and 1h before kickoff)
+// Runs every 30 minutes. Notifies the responsible analyst for
+// each match within a 30-minute window of the 24h / 1h mark.
+// ══════════════════════════════════════════════════════════════
+
+async function checkKickoffProximity() {
+  const [matches24h, matches1h] = await Promise.all([
+    getMatchesNearKickoff(24),
+    getMatchesNearKickoff(1),
+  ]);
+
+  let alerted = 0;
+
+  const notify = async (
+    matches: Awaited<ReturnType<typeof getMatchesNearKickoff>>,
+    window: "24h" | "1h",
+  ) => {
+    for (const m of matches) {
+      const analystId = await pickMatchAnalyst(m.id);
+      if (!analystId) continue;
+
+      const label = `${m.homeTeam} vs ${m.awayTeam}`;
+      const labelAr = `${m.homeTeamAr} ضد ${m.awayTeamAr}`;
+      const timeLabel = window === "24h" ? "24 hours" : "1 hour";
+      const timeLabelAr = window === "24h" ? "24 ساعة" : "ساعة واحدة";
+
+      notifyUser(analystId, {
+        type: "match",
+        title: `Kickoff in ${timeLabel}: ${label}`,
+        titleAr: `انطلاق المباراة خلال ${timeLabelAr}: ${labelAr}`,
+        body: `Prepare your analysis plan — ${label} kicks off in ${timeLabel}.`,
+        bodyAr: `استعد لخطة تحليلك — ${labelAr} تنطلق خلال ${timeLabelAr}.`,
+        link: `/dashboard/matches/${m.id}`,
+        sourceType: "match",
+        sourceId: m.id,
+        priority: window === "1h" ? "high" : "normal",
+      }).catch((err) =>
+        logger.warn(
+          `[Cron] Kickoff-proximity (${window}) notification failed`,
+          {
+            matchId: m.id,
+            error: (err as Error).message,
+          },
+        ),
+      );
+
+      alerted++;
+    }
+  };
+
+  await Promise.all([notify(matches24h, "24h"), notify(matches1h, "1h")]);
+  return { alerted };
+}
+
+// ══════════════════════════════════════════════════════════════
 // REGISTER ALL JOBS
 // ══════════════════════════════════════════════════════════════
 
 registerJob("match-status-auto-transition", autoTransitionMatchStatuses);
 registerJob("upcoming-matches", checkUpcomingMatches);
+registerJob("match-awaiting-analysis", checkAwaitingMatchAnalysis);
+registerJob("match-kickoff-proximity", checkKickoffProximity);
 registerJob("contract-status", updateContractStatuses);
 registerJob("contract-expiry", checkContractExpiry);
 registerJob("injury-followups", checkInjuryFollowups);
@@ -1150,6 +1302,8 @@ export async function startCronJobs() {
   schedule("40 5 * * *", "document-expiry"); // 5:40 AM  (was 9:30)
 
   schedule("50 5 * * *", "match-status-auto-transition"); // 5:50 AM — mark past "upcoming" matches as "completed"
+  schedule("55 5 * * *", "match-awaiting-analysis"); // 5:55 AM — nudge analysts for completed matches with no report
+  schedule("*/30 * * * *", "match-kickoff-proximity"); // every 30 min — 24h/1h before kickoff alerts
 
   // ── Morning batch 1: player & contract intelligence (6:00–6:50 AM) ──
   schedule("0 6 * * *", "upcoming-matches"); // 6:00 AM  (was 7:00)

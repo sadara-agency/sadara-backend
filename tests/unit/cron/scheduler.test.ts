@@ -167,6 +167,29 @@ jest.mock('../../../src/modules/saffplus/saffplus.service', () => ({
   // Empty mock - saffplus jobs aren't run in this test
 }));
 
+// Mock match.service and its model chain to prevent Match.init() at module load
+jest.mock('../../../src/modules/matches/match.service', () => ({
+  getCompletedMatchesWithoutAnalysis: jest.fn().mockResolvedValue([]),
+  getMatchesNearKickoff: jest.fn().mockResolvedValue([]),
+}));
+jest.mock('../../../src/modules/tasks/task.model', () => ({
+  Task: {
+    init: jest.fn(),
+    create: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: 'Task',
+  },
+}));
+jest.mock('../../../src/modules/users/user.model', () => ({
+  User: {
+    init: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: 'User',
+  },
+}));
+
 import { getJobNames, runJob, runAllJobs, startCronJobs } from '../../../src/cron/scheduler';
 import { isRedisConnected } from '../../../src/config/redis';
 import { logger } from '../../../src/config/logger';
@@ -272,7 +295,7 @@ describe('Cron Scheduler', () => {
     it('should schedule all 69 cron jobs', async () => {
       await startCronJobs();
       // node-cron.schedule should be called once per job
-      expect(cron.schedule).toHaveBeenCalledTimes(71);
+      expect(cron.schedule).toHaveBeenCalledTimes(73);
     });
 
     it('should log initialization', async () => {

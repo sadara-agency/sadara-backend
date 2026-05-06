@@ -45,6 +45,7 @@ export interface ReferralAttributes {
   referralType: ReferralType;
   playerId: string;
   injuryId?: string | null;
+  matchId?: string | null;
   referralTarget?: ReferralTarget | null;
   triggerDesc?: string | null;
   triggerRuleId?: string | null;
@@ -86,6 +87,7 @@ interface ReferralCreationAttributes extends Optional<
   | "sessionCount"
   | "resultingTicketId"
   | "isRestricted"
+  | "matchId"
   | "referralTarget"
   | "receivingParty"
   | "externalRef"
@@ -106,6 +108,7 @@ export class Referral
   declare referralType: ReferralType;
   declare playerId: string;
   declare injuryId: string | null;
+  declare matchId: string | null;
   declare referralTarget: ReferralTarget | null;
   declare triggerDesc: string | null;
   declare triggerRuleId: string | null;
@@ -158,6 +161,13 @@ Referral.init(
       allowNull: true,
       field: "injury_id",
       references: { model: "injuries", key: "id" },
+    },
+    matchId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "match_id",
+      references: { model: "matches", key: "id" },
+      onDelete: "SET NULL",
     },
     referralTarget: {
       type: DataTypes.STRING(50),

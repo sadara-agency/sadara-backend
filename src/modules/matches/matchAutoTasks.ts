@@ -855,6 +855,50 @@ const MATCH_LEVEL_PRE_RULES: MatchLevelPreRule[] = [
 ];
 
 /**
+ * Pick the analyst responsible for a given match.
+ *
+ * Why: the prior implementation grabbed `User.findOne({ role: 'Analyst' })`
+ * ordered by createdAt, which dumps every match-level analyst task on the
+ * org's oldest analyst account. Per-player rules already route via
+ * `player.analystId`; this aligns the match-level rules with that model.
+ *
+ * Returns the analyst covering the most assigned players in the match,
+ * or null if no assigned player has an analyst.
+ */
+export async function pickMatchAnalyst(
+  matchId: string,
+): Promise<string | null> {
+  const players = await MatchPlayer.findAll({
+    where: { matchId },
+    include: [
+      {
+        model: Player,
+        as: "player",
+        attributes: ["analystId"],
+      },
+    ],
+  });
+
+  const counts = new Map<string, number>();
+  for (const mp of players) {
+    const analystId = (mp as any).player?.analystId as string | null;
+    if (!analystId) continue;
+    counts.set(analystId, (counts.get(analystId) ?? 0) + 1);
+  }
+  if (counts.size === 0) return null;
+
+  let bestId: string | null = null;
+  let bestCount = -1;
+  for (const [id, count] of counts) {
+    if (count > bestCount) {
+      bestId = id;
+      bestCount = count;
+    }
+  }
+  return bestId;
+}
+
+/**
  * Generate match-level pre-match tasks for Scout and Analyst roles.
  * Called by the cron scheduler alongside generatePreMatchTasks().
  * Creates ONE task per rule per match (not per-player).
@@ -902,12 +946,21 @@ export async function generateMatchLevelPreTasks(
     });
     if (existing) continue;
 
-    // Find first active user with the target role
-    const assignee = await User.findOne({
-      where: { role: rule.targetRole, isActive: true },
-      attributes: ["id"],
-      order: [["createdAt", "ASC"]],
-    });
+    // Resolve assignee. For Analyst rules, prefer the analyst responsible
+    // for the players in this match (matches per-player rule behavior).
+    // Scout and any other role keep the legacy "first active user" path.
+    let assigneeId: string | null = null;
+    if (rule.targetRole === "Analyst") {
+      assigneeId = await pickMatchAnalyst(matchId);
+    }
+    if (!assigneeId) {
+      const fallback = await User.findOne({
+        where: { role: rule.targetRole, isActive: true },
+        attributes: ["id"],
+        order: [["createdAt", "ASC"]],
+      });
+      assigneeId = fallback?.id ?? null;
+    }
 
     await Task.create({
       title: rule.titleEn,
@@ -918,14 +971,33 @@ export async function generateMatchLevelPreTasks(
       status: "Open",
       playerId: null,
       matchId,
-      assignedTo: assignee?.id ?? null,
+      assignedTo: assigneeId,
       isAutoCreated: true,
       triggerRuleId: rule.id,
       dueDate: matchDate,
       notes: rule.descriptionAr(ctx),
     } as any);
 
-    // Notify all users with the target role
+    // Direct notification to the chosen assignee (higher signal).
+    if (assigneeId) {
+      notifyUser(assigneeId, {
+        type: "task",
+        title: rule.titleEn,
+        titleAr: rule.titleAr,
+        body: rule.descriptionEn(ctx),
+        bodyAr: rule.descriptionAr(ctx),
+        link: "/dashboard/tasks",
+        sourceType: "task",
+        priority: rule.priority === "critical" ? "critical" : "normal",
+      }).catch((err) =>
+        logger.warn("Match-level auto-task assignee notification failed", {
+          ruleId: rule.id,
+          error: (err as Error).message,
+        }),
+      );
+    }
+
+    // Role-wide safety net so coverage doesn't regress if assignee is stale.
     notifyByRole([rule.targetRole], {
       type: "task",
       title: rule.titleEn,
@@ -942,7 +1014,7 @@ export async function generateMatchLevelPreTasks(
       }),
     );
 
-    if (!assignee) {
+    if (!assigneeId) {
       logger.warn(
         `No active ${rule.targetRole} user found for match-level task`,
         {
