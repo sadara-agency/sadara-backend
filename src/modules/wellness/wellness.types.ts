@@ -212,6 +212,7 @@ export interface CoachOverviewPlayer {
   lastName: string;
   firstNameAr: string | null;
   lastNameAr: string | null;
+  photoUrl: string | null;
   hasProfile: boolean;
   status: TrafficLightStatus | "none";
   avgRingScore: number;

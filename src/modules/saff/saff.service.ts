@@ -1904,37 +1904,6 @@ function mapLineupRole(
   }
 }
 
-async function resolveOrCreateClubFromSaffPlus(side: {
-  teamId: string | number;
-  name: string;
-  nameAr?: string;
-  logo?: string;
-}): Promise<Club> {
-  const numericId =
-    typeof side.teamId === "number" ? side.teamId : Number(side.teamId);
-
-  if (Number.isFinite(numericId)) {
-    const byId = await Club.findOne({ where: { saffTeamId: numericId } });
-    if (byId) return byId;
-  }
-
-  if (side.nameAr) {
-    const byAr = await Club.findOne({ where: { nameAr: side.nameAr } });
-    if (byAr) return byAr;
-  }
-  if (side.name) {
-    const byName = await Club.findOne({ where: { name: side.name } });
-    if (byName) return byName;
-  }
-
-  return Club.create({
-    name: side.name,
-    nameAr: side.nameAr ?? null,
-    logoUrl: side.logo ?? null,
-    saffTeamId: Number.isFinite(numericId) ? numericId : null,
-  } as never);
-}
-
 export async function importSaffPlusMatch(
   input: ImportSaffPlusMatchInput,
 ): Promise<{
@@ -1977,22 +1946,11 @@ export async function importSaffPlusMatch(
   let created = false;
 
   if (!dbMatch) {
-    // 4. Resolve clubs (create stubs if missing).
-    const homeClub = await resolveOrCreateClubFromSaffPlus({
-      teamId: match.homeTeamId,
-      name: match.homeTeamName,
-      nameAr: match.homeTeamNameAr,
-      logo: match.homeTeamLogo,
-    });
-    const awayClub = await resolveOrCreateClubFromSaffPlus({
-      teamId: match.awayTeamId,
-      name: match.awayTeamName,
-      nameAr: match.awayTeamNameAr,
-      logo: match.awayTeamLogo,
-    });
-
-    // 5. Build the matchDate. Bypass createMatch's 3-day-gap check by
+    // 4. Build the matchDate. Bypass createMatch's 3-day-gap check by
     //    writing directly through the model.
+    // Note: clubIds are intentionally omitted — the check constraint from
+    // migration 152 requires squad_id whenever club_id is set, and SAFF+
+    // imported matches have no squad context. Team names carry full display info.
     const dateStr = match.date;
     const timeStr =
       match.time && /^\d{2}:\d{2}/.test(match.time) ? match.time : "00:00";
@@ -2001,8 +1959,6 @@ export async function importSaffPlusMatch(
       throw new AppError("SAFF+ match has invalid date", 422);
 
     dbMatch = await Match.create({
-      homeClubId: homeClub.id,
-      awayClubId: awayClub.id,
       homeTeamName: match.homeTeamName,
       awayTeamName: match.awayTeamName,
       homeScore: hasScores ? (match.homeScore as number) : null,
