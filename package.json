@@ -15,6 +15,8 @@
     "migrate": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts up",
     "migrate:down": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts down",
     "migrate:status": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts status",
+    "migrate:status:prod": "cross-env NODE_ENV=production ENV_FILE=.env.production.proxy.local ts-node -r tsconfig-paths/register src/database/migrate-cli.ts status",
+    "migrate:up:prod": "cross-env NODE_ENV=production ENV_FILE=.env.production.proxy.local ts-node -r tsconfig-paths/register src/database/migrate-cli.ts up",
     "migrate:fresh": "ts-node -r tsconfig-paths/register src/database/migrate-cli.ts fresh",
     "migrate:lint": "ts-node -r tsconfig-paths/register scripts/lint-migrations.ts",
     "lint": "eslint src && npm run migrate:lint",

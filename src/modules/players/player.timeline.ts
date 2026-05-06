@@ -107,7 +107,7 @@ export async function getPlayerTimeline(
           id: t.id,
           date: toIso(t.createdAt) ?? "",
           type: "ticket",
-          title: t.title,
+          title: t.title ?? t.titleAr ?? "",
           titleAr: t.titleAr,
           status: t.status,
           priority: t.priority,
