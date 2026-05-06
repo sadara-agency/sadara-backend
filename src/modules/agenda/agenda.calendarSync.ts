@@ -1,7 +1,8 @@
 import AgendaTask from "./agenda-task.model";
+import type { EventType } from "@modules/calendar/event.model";
 import { logger } from "@config/logger";
 
-const AGENDA_EVENT_TYPE = "AgendaTask";
+const AGENDA_EVENT_TYPE: EventType = "AgendaTask";
 
 /**
  * Creates or updates a CalendarEvent for a timed AgendaTask.
@@ -48,9 +49,7 @@ export async function createOrUpdateEventForTask(task: AgendaTask) {
   }
 
   // Create new event
-  const event = await CalendarEvent.create(
-    eventData as Parameters<typeof CalendarEvent.create>[0],
-  );
+  const event = await CalendarEvent.create(eventData);
 
   // Store the eventId back on the task without re-triggering calendar sync
   (task as unknown as Record<string, unknown>)._skipSync = true;

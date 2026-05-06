@@ -3,7 +3,7 @@ import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
 import { cacheRoute } from "@middleware/cache.middleware";
 import { CacheTTL } from "@shared/utils/cache";
-import asyncHandler from "express-async-handler";
+import { asyncHandler } from "@middleware/errorHandler";
 import * as agendaController from "./agenda.controller";
 import {
   createGoalSchema,

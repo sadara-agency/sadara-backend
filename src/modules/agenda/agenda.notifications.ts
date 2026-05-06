@@ -33,11 +33,10 @@ export async function dispatchAgendaNotification(
     const isQuiet = await redis.exists(quietKey);
     if (isQuiet) {
       // Defer to sorted set for later delivery
-      await redis.zadd(
-        "agenda:deferred",
-        Date.now(),
-        JSON.stringify({ userId, payload, channels }),
-      );
+      await redis.zAdd("agenda:deferred", {
+        score: Date.now(),
+        value: JSON.stringify({ userId, payload, channels }),
+      });
       logger.debug("[AGENDA] Notification deferred (quiet hours)", { userId });
       return;
     }
@@ -86,7 +85,7 @@ export async function flushDeferredNotifications() {
   if (!redis) return;
 
   const now = Date.now();
-  const items = await redis.zrangebyscore("agenda:deferred", 0, now);
+  const items = await redis.zRangeByScore("agenda:deferred", 0, now);
   if (!items.length) return;
 
   for (const item of items) {
@@ -104,7 +103,7 @@ export async function flushDeferredNotifications() {
     }
   }
 
-  await redis.zremrangebyscore("agenda:deferred", 0, now);
+  await redis.zRemRangeByScore("agenda:deferred", 0, now);
   logger.info("[AGENDA] Flushed deferred notifications", {
     count: items.length,
   });

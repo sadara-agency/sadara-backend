@@ -88,7 +88,7 @@ export async function getGoalProgress(
   }
 
   if (redis) {
-    await redis.set(cacheKey, String(progress), "EX", 60);
+    await redis.setEx(cacheKey, 60, String(progress));
   }
 
   return progress;
@@ -347,7 +347,7 @@ export async function markViewed(userId: string): Promise<void> {
   const redis = getRedisClient();
   if (!redis) return;
   // TTL 18 hours — covers a full working day
-  await redis.set(`agenda:lastView:${userId}`, "1", "EX", 18 * 3600);
+  await redis.setEx(`agenda:lastView:${userId}`, 18 * 3600, "1");
 }
 
 // ── Cron-called rollover ──
