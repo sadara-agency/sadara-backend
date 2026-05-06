@@ -1410,6 +1410,29 @@ export async function startCronJobs() {
   schedule("*/15 * * * *", "media-pre-publish-reminder"); // Every 15 min
   schedule("*/15 * * * *", "media-late-publishing"); // Every 15 min
 
+  // ── Agenda & Planning Engine ──
+  registerJob("agenda-rollover", async () => {
+    const { runAgendaRollover } = await import("@modules/agenda/agenda.cron");
+    return runAgendaRollover();
+  });
+  registerJob("agenda-morning-digest", async () => {
+    const { runMorningDigest } = await import("@modules/agenda/agenda.cron");
+    return runMorningDigest();
+  });
+  registerJob("agenda-month-rollover-prep", async () => {
+    const { runMonthRolloverPrep } =
+      await import("@modules/agenda/agenda.cron");
+    return runMonthRolloverPrep();
+  });
+  registerJob("agenda-deferred-flush", async () => {
+    const { runDeferredFlush } = await import("@modules/agenda/agenda.cron");
+    return runDeferredFlush();
+  });
+  schedule("0 4 * * *", "agenda-rollover"); // 04:00 daily
+  schedule("30 7 * * *", "agenda-morning-digest"); // 07:30 daily
+  schedule("0 9 1 * *", "agenda-month-rollover-prep"); // 09:00 on 1st of month
+  schedule("*/15 * * * *", "agenda-deferred-flush"); // every 15 min
+
   // ── Staff Monitoring — idle session closer ──
   registerJob("staff-monitoring-close-idle", runCloseIdleSessions);
   schedule("*/10 * * * *", "staff-monitoring-close-idle"); // Every 10 min
@@ -1418,5 +1441,5 @@ export async function startCronJobs() {
   registerJob("spl-live-match-poll", pollLiveMatches);
   // schedule("*/30 * * * * *", "spl-live-match-poll"); // Every 30 seconds — disabled
 
-  logger.info("[CRON] 71 jobs scheduled ✓");
+  logger.info("[CRON] 75 jobs scheduled ✓");
 }

@@ -74,6 +74,14 @@ export function forRoles(
 }
 
 const RAW_PERMISSIONS: Perm[] = [
+  // Every role can fully manage their own agenda (personal module)
+  ...allRoles("agenda", {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+
   ...allRoles("dashboard", { canRead: true }),
 
   ...allRoles("players", { canRead: true }),
