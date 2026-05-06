@@ -47,6 +47,12 @@ export async function listMatches(queryParams: any) {
     where.competition = { [Op.iLike]: `%${queryParams.competition}%` };
   if (queryParams.season) where.season = queryParams.season;
 
+  if (queryParams.providerSource === "manual") {
+    where.providerSource = { [Op.is]: null };
+  } else if (queryParams.providerSource) {
+    where.providerSource = queryParams.providerSource;
+  }
+
   if (queryParams.clubId) {
     where[Op.or] = [
       { homeClubId: queryParams.clubId },

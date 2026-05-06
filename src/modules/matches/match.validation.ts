@@ -73,6 +73,10 @@ export const matchQuerySchema = z.object({
   playerId: z.string().uuid().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
+  // "manual" is a UI-side sentinel meaning providerSource IS NULL
+  providerSource: z
+    .enum(["saff", "saffplus", "Sportmonks", "manual"])
+    .optional(),
 });
 
 // ── Calendar Query ──
