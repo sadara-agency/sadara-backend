@@ -92,7 +92,11 @@ jest.mock("@modules/notifications/notification.sse", () => ({
   sseClients: new Map(),
   sendSSE: jest.fn(),
 }));
-jest.mock("@modules/notifications/notification.service");
+jest.mock("@modules/notifications/notification.service", () => ({
+  notifyUser: jest.fn().mockResolvedValue(undefined),
+  notifyByRole: jest.fn().mockResolvedValue(undefined),
+  cleanupOldNotifications: jest.fn().mockResolvedValue(undefined),
+}));
 jest.mock("@shared/utils/autoTaskHelpers", () => ({
   createAutoTaskIfNotExists: jest.fn(),
   findUserByRole: jest.fn(),
