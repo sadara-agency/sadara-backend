@@ -6,7 +6,7 @@ import { Player } from "@modules/players/player.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { Gate } from "@modules/gates/gate.model";
-import Journey from "@modules/journey/journey.model";
+import { Journey } from "@modules/journey/journey.model";
 import { AppError } from "@middleware/errorHandler";
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
 import { resolveSmtpSecurity, resetTransporter } from "@shared/utils/mail";
@@ -19,7 +19,6 @@ import {
 } from "../../database/csv-import/mappers/player.mapper";
 import { mapSessionRow } from "../../database/csv-import/mappers/session.mapper";
 import { mapTrainingSessionRow } from "../../database/csv-import/mappers/ticket.mapper";
-import { mapGateRow } from "../../database/csv-import/mappers/journey.mapper";
 import { mapJourneyRow } from "../../database/csv-import/mappers/journey.mapper";
 import type {
   UpdateProfileInput,

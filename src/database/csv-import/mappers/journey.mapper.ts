@@ -61,6 +61,10 @@ function parseDate(value: string): string | null {
   return null;
 }
 
+/** @deprecated Use mapJourneyRow. Kept for CLI csv-import/index.ts compatibility. */
+export const mapGateRow = (row: Record<string, string>, rowIndex: number) =>
+  mapJourneyRow(row, rowIndex);
+
 export function mapJourneyRow(
   row: Record<string, string>,
   rowIndex: number,
