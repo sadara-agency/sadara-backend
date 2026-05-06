@@ -87,6 +87,7 @@ import salaryBenchmarkRoutes from "@modules/commercialAnalytics/salaryBenchmark.
 import governanceGateRoutes from "@modules/governanceGates/governanceGate.routes";
 import personalNoteRoutes from "@modules/personal-notes/personal-note.routes";
 import personalTodoRoutes from "@modules/personal-todos/personal-todo.routes";
+import matchEvaluationRoutes from "@modules/matchEvaluations/matchEvaluation.routes";
 import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
@@ -472,6 +473,7 @@ app.use("/api/v1/salary-benchmarks", salaryBenchmarkRoutes);
 app.use("/api/v1/governance-gates", governanceGateRoutes);
 app.use("/api/v1/personal-notes", personalNoteRoutes);
 app.use("/api/v1/personal-todos", personalTodoRoutes);
+app.use("/api/v1/match-evaluations", matchEvaluationRoutes);
 
 // ── Signed documents — authenticated serving ──
 const SIGNED_DOCUMENT_EXTS = [".pdf", ".png", ".jpg", ".jpeg"] as const;
