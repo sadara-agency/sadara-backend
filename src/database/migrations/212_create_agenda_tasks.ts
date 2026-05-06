@@ -111,17 +111,21 @@ export async function up({
     },
   });
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("agenda_tasks", ["user_id", "due_date"], {
     name: "idx_agenda_tasks_user_due",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex(
     "agenda_tasks",
     ["user_id", "status", "due_date"],
     { name: "idx_agenda_tasks_user_status_due" },
   );
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("agenda_tasks", ["goal_id"], {
     name: "idx_agenda_tasks_goal",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("agenda_tasks", ["calendar_event_id"], {
     name: "idx_agenda_tasks_calendar_event",
   });

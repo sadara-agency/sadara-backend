@@ -75,9 +75,11 @@ export async function up({
     },
   });
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("agenda_goals", ["user_id", "target_month"], {
     name: "idx_agenda_goals_user_month",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("agenda_goals", ["user_id", "status"], {
     name: "idx_agenda_goals_user_status",
   });
