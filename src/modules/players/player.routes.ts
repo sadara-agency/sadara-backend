@@ -94,6 +94,12 @@ router.get(
 );
 
 router.get(
+  "/:id/performance-summary",
+  authorizeModule("players", "read"),
+  asyncHandler(playerController.getPerformanceSummary),
+);
+
+router.get(
   "/:id/timeline",
   authorizeModule("players", "read"),
   asyncHandler(playerController.getTimeline),
