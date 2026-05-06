@@ -1,10 +1,28 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
+
+async function tableExists(
+  queryInterface: QueryInterface,
+  table: string,
+): Promise<boolean> {
+  const [row] = await queryInterface.sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = $1
+     ) AS exists`,
+    { type: QueryTypes.SELECT, bind: [table] },
+  );
+  return row?.exists === true;
+}
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  // Fresh-DB guard: users is created by sequelize.sync() (--sync-first), not a migration.
+  // On a bare CI DB this table won't exist yet — skip safely.
+  if (!(await tableExists(queryInterface, "users"))) return;
+
   await queryInterface.createTable("agenda_goals", {
     id: {
       type: DataTypes.UUID,
