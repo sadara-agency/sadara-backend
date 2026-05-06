@@ -75,6 +75,23 @@ jest.mock("@modules/notifications/notification.model", () => ({
     name: "Notification",
   },
 }));
+jest.mock("@modules/permissions/permission.model", () => ({
+  RolePermission: { init: jest.fn(), name: "RolePermission" },
+  RoleFieldPermission: { init: jest.fn(), name: "RoleFieldPermission" },
+}));
+jest.mock("@modules/permissions/permission.service", () => ({
+  hasPermission: jest.fn().mockResolvedValue(true),
+  getFieldPermissions: jest.fn().mockResolvedValue([]),
+}));
+jest.mock("@middleware/auth", () => ({
+  authenticate: jest.fn(),
+  authorizeModule: jest.fn(),
+  authorize: jest.fn(),
+}));
+jest.mock("@modules/notifications/notification.sse", () => ({
+  sseClients: new Map(),
+  sendSSE: jest.fn(),
+}));
 jest.mock("@modules/notifications/notification.service");
 jest.mock("@shared/utils/autoTaskHelpers", () => ({
   createAutoTaskIfNotExists: jest.fn(),
