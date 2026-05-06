@@ -10,13 +10,71 @@ jest.mock("@modules/audit/AuditLog.model", () => ({
 jest.mock("@shared/utils/audit", () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),
 }));
-jest.mock("@modules/tasks/task.model");
-jest.mock("@modules/matches/matchPlayer.model");
-jest.mock("@modules/matches/playerMatchStats.model");
-jest.mock("@modules/players/player.model");
-jest.mock("@modules/matches/match.model");
-jest.mock("@modules/clubs/club.model");
-jest.mock("@modules/users/user.model");
+jest.mock("@modules/tasks/task.model", () => ({
+  Task: {
+    init: jest.fn(),
+    create: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: "Task",
+  },
+}));
+jest.mock("@modules/matches/matchPlayer.model", () => ({
+  MatchPlayer: {
+    init: jest.fn(),
+    findAll: jest.fn(),
+    name: "MatchPlayer",
+  },
+}));
+jest.mock("@modules/matches/playerMatchStats.model", () => ({
+  PlayerMatchStats: {
+    init: jest.fn(),
+    findAll: jest.fn(),
+    name: "PlayerMatchStats",
+  },
+}));
+jest.mock("@modules/players/player.model", () => ({
+  Player: {
+    init: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: "Player",
+  },
+}));
+jest.mock("@modules/matches/match.model", () => ({
+  Match: {
+    init: jest.fn(),
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: "Match",
+  },
+}));
+jest.mock("@modules/clubs/club.model", () => ({
+  Club: {
+    init: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: "Club",
+  },
+}));
+jest.mock("@modules/users/user.model", () => ({
+  User: {
+    init: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    name: "User",
+  },
+}));
+jest.mock("@modules/notifications/notification.model", () => ({
+  Notification: {
+    init: jest.fn(),
+    create: jest.fn(),
+    findAll: jest.fn(),
+    findOne: jest.fn(),
+    name: "Notification",
+  },
+}));
 jest.mock("@modules/notifications/notification.service");
 jest.mock("@shared/utils/autoTaskHelpers", () => ({
   createAutoTaskIfNotExists: jest.fn(),
