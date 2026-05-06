@@ -273,6 +273,7 @@ function startServer(): Promise<void> {
     });
     server.timeout = 600000; // 10 min — SSE uses req.socket.setTimeout(0) to exempt itself
     server.keepAliveTimeout = 65000;
+    server.headersTimeout = 66000; // must exceed keepAliveTimeout to avoid Cloud Run malformed-response 503s
 
     server.on("error", (err: NodeJS.ErrnoException) => {
       reject(err);
@@ -446,7 +447,13 @@ process.on("unhandledRejection", (reason: unknown) => {
     error: reason instanceof Error ? reason.message : String(reason),
     stack: reason instanceof Error ? reason.stack : undefined,
   });
-  if (env.nodeEnv === "production") shutdown();
+  if (env.sentry?.dsn) {
+    Sentry.captureException(reason);
+  }
+  // Do NOT call shutdown() here — it closes the HTTP server and drops all
+  // in-flight requests, causing Cloud Run to return 503 "malformed response"
+  // for every concurrent request. Cloud Run sends SIGTERM when the instance
+  // is genuinely unhealthy; let that handle restarts instead.
 });
 
 process.on("uncaughtException", (err: Error) => {
