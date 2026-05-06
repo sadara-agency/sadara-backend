@@ -188,6 +188,20 @@ export async function updateEvent(id: string, input: UpdateEventInput) {
     }
 
     await transaction.commit();
+
+    // Reverse-sync: if this event was auto-created for an agenda task, propagate the new time back
+    if (
+      event.sourceType === "agenda_task" &&
+      event.sourceId &&
+      !(event as unknown as Record<string, unknown>)._skipSync
+    ) {
+      const { syncFromEvent } = await import("@modules/agenda/agenda.service");
+      syncFromEvent(event.sourceId, {
+        startDate: event.startDate,
+        endDate: event.endDate,
+      }).catch(() => null);
+    }
+
     return getEventById(id);
   } catch (err) {
     await transaction.rollback();

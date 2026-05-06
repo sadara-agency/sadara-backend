@@ -9,6 +9,7 @@ export const EVENT_TYPES = [
   "GateTimeline",
   "Meeting",
   "Custom",
+  "AgendaTask",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 

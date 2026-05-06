@@ -1,27 +1,47 @@
 // ─────────────────────────────────────────────────────────────
 // csv-import/mappers/journey.mapper.ts
-// Maps the Notion "Player Journey" CSV to Gate model records.
-// The client uses "Player Journey" in Notion to track player
-// development stages, which maps to the Gates pipeline (Gate 0-3).
+// Maps the Notion "Player Journey" CSV export to PlayerJourney
+// model records (player_journeys table).
 //
-// CSV columns:
-//   اسم المرحلة | Stage Name,
-//   تاريخ الانتهاء المتوقع | Expected End Date,
-//   تاريخ البدء | Start Date, الحالة | Status,
-//   اللاعب | Player, المرحلة | Stage,
-//   الجهة المسؤولة | Responsible
+// CSV columns (Notion bilingual underscore format):
+//   اسم_المرحلة_stage_name
+//   الجهة_المسؤولة_responsible
+//   الحالة_status
+//   المرحلة_stage  (stage type label in Arabic)
+//   تاريخ_البدء_start_date
+//   تاريخ_الانتهاء_المتوقع_expected_end_date
+//   اللاعب_player
 // ─────────────────────────────────────────────────────────────
 
-// Status mapping (Arabic → Gate enum)
 const STATUS_MAP: Record<string, string> = {
-  "لم تبدأ": "Pending",
+  "لم تبدأ": "NotStarted",
   "قيد التنفيذ": "InProgress",
+  منتهية: "Completed",
   مكتملة: "Completed",
   مكتمل: "Completed",
-  معلقة: "Pending",
+  معلقة: "OnHold",
 };
 
-export interface MappedGate {
+const STAGE_TYPE_MAP: Record<string, string> = {
+  "خطة تدريب بدني": "PhysicalTraining",
+  "خطة تدريب تقني": "TechnicalTraining",
+  "خطة تدريب تكتيكي": "TacticalTraining",
+  تقييم: "Assessment",
+  تعافي: "Recovery",
+  "تطوير ذهني": "MentalDevelopment",
+};
+
+const OWNER_BY_TYPE: Record<string, string> = {
+  PhysicalTraining: "FitnessCoach",
+  TechnicalTraining: "Coach",
+  TacticalTraining: "TacticalCoach",
+  Assessment: "Analyst",
+  Recovery: "FitnessCoach",
+  MentalDevelopment: "MentalCoach",
+  General: "Manager",
+};
+
+export interface MappedJourney {
   data: Record<string, unknown>;
   warnings: string[];
   errors: string[];
@@ -41,64 +61,82 @@ function parseDate(value: string): string | null {
   return null;
 }
 
-/**
- * Map a single Journey CSV row to Gate model attributes.
- * Gate number is assigned later by the orchestrator (sequential per player).
- */
-export function mapGateRow(
+/** @deprecated Use mapJourneyRow. Kept for CLI csv-import/index.ts compatibility. */
+export const mapGateRow = (row: Record<string, string>, rowIndex: number) =>
+  mapJourneyRow(row, rowIndex);
+
+export function mapJourneyRow(
   row: Record<string, string>,
   rowIndex: number,
-): MappedGate {
+): MappedJourney {
   const data: Record<string, unknown> = {};
   const warnings: string[] = [];
   const errors: string[] = [];
   const prefix = `Row ${rowIndex}`;
 
-  // ── Stage Name → notes ──
+  // ── Stage Name ──
   const stageName = (row["اسم_المرحلة_stage_name"] || "").trim();
   if (!stageName) {
     errors.push(`${prefix}: Missing stage name`);
     return { data, warnings, errors, playerName: "" };
   }
-  data.notes = stageName;
+  data.stageName = stageName;
+  data.stageNameAr = stageName;
+
+  // ── Stage Type ──
+  const stageTypeRaw = (row["المرحلة_stage"] || "").trim();
+  const stageType = STAGE_TYPE_MAP[stageTypeRaw] ?? "General";
+  if (stageTypeRaw && !STAGE_TYPE_MAP[stageTypeRaw]) {
+    warnings.push(
+      `${prefix}: Unknown stage type "${stageTypeRaw}", using "General"`,
+    );
+  }
+  data.stageType = stageType;
+
+  // ── Stage Owner (inferred from type) ──
+  data.stageOwner = OWNER_BY_TYPE[stageType] ?? "Manager";
 
   // ── Status ──
   const statusRaw = (row["الحالة_status"] || "").trim();
-  data.status = STATUS_MAP[statusRaw] || "Pending";
+  data.status = STATUS_MAP[statusRaw] ?? "NotStarted";
   if (statusRaw && !STATUS_MAP[statusRaw]) {
-    warnings.push(`${prefix}: Unknown status "${statusRaw}", using "Pending"`);
+    warnings.push(
+      `${prefix}: Unknown status "${statusRaw}", using "NotStarted"`,
+    );
   }
 
-  // ── Start Date → startedAt ──
-  const startDateRaw = (row["تاريخ_البدء_start_date"] || "").trim();
-  if (startDateRaw) {
-    const parsed = parseDate(startDateRaw);
+  // ── Responsible Party ──
+  const responsible = (row["الجهة_المسؤولة_responsible"] || "").trim();
+  if (responsible) {
+    data.responsibleParty = responsible;
+    data.responsiblePartyAr = responsible;
+  }
+
+  // ── Start Date ──
+  const startRaw = (row["تاريخ_البدء_start_date"] || "").trim();
+  if (startRaw) {
+    const parsed = parseDate(startRaw);
     if (parsed) {
-      // Set startedAt if gate is InProgress or Completed
-      if (data.status === "InProgress" || data.status === "Completed") {
-        data.startedAt = parsed;
-      }
+      data.startDate = parsed;
     } else {
-      warnings.push(`${prefix}: Could not parse start date "${startDateRaw}"`);
+      warnings.push(`${prefix}: Could not parse start date "${startRaw}"`);
     }
   }
 
-  // ── Expected End Date → completedAt (if Completed) ──
-  const endDateRaw = (
-    row["تاريخ_الانتهاء_المتوقع_expected_end_date"] || ""
-  ).trim();
-  if (endDateRaw && data.status === "Completed") {
-    const parsed = parseDate(endDateRaw);
+  // ── Expected End Date ──
+  const endRaw = (row["تاريخ_الانتهاء_المتوقع_expected_end_date"] || "").trim();
+  if (endRaw) {
+    const parsed = parseDate(endRaw);
     if (parsed) {
-      data.completedAt = parsed;
+      data.expectedEndDate = parsed;
+    } else {
+      warnings.push(`${prefix}: Could not parse end date "${endRaw}"`);
     }
   }
 
-  // ── Player ──
+  // ── Player (resolved by orchestrator) ──
   const playerRaw = row["اللاعب_player"] || "";
   const playerName = extractName(playerRaw);
-
-  // gateNumber will be assigned by the orchestrator (sequential per player)
 
   return { data, warnings, errors, playerName };
 }

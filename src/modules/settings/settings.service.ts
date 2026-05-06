@@ -6,6 +6,7 @@ import { Player } from "@modules/players/player.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { Gate } from "@modules/gates/gate.model";
+import { Journey } from "@modules/journey/journey.model";
 import { AppError } from "@middleware/errorHandler";
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
 import { resolveSmtpSecurity, resetTransporter } from "@shared/utils/mail";
@@ -18,7 +19,10 @@ import {
 } from "../../database/csv-import/mappers/player.mapper";
 import { mapSessionRow } from "../../database/csv-import/mappers/session.mapper";
 import { mapTrainingSessionRow } from "../../database/csv-import/mappers/ticket.mapper";
-import { mapGateRow } from "../../database/csv-import/mappers/journey.mapper";
+import {
+  mapGateRow,
+  mapJourneyRow,
+} from "../../database/csv-import/mappers/journey.mapper";
 import type {
   UpdateProfileInput,
   ChangePasswordInput,
@@ -538,7 +542,7 @@ export interface ImportResult {
 
 function detectCsvType(
   headers: string[],
-): "players" | "sessions" | "training" | "gates" | "unknown" {
+): "players" | "sessions" | "training" | "gates" | "journey" | "unknown" {
   const joined = headers.join(",").toLowerCase();
   if (joined.includes("أسم_الاعب") || joined.includes("أسم الاعب"))
     return "players";
@@ -546,6 +550,9 @@ function detectCsvType(
     return "sessions";
   if (joined.includes("ticket_title") || joined.includes("عنوان_التذكرة"))
     return "training";
+  // Journey check must come before gates — both have stage_name but only journey has الجهة_المسؤولة
+  if (joined.includes("الجهة_المسؤولة") || joined.includes("الجهة المسؤولة"))
+    return "journey";
   if (joined.includes("stage_name") || joined.includes("اسم_المرحلة"))
     return "gates";
   return "unknown";
@@ -595,9 +602,10 @@ export async function importCsv(
       sessions: 1,
       training: 2,
       gates: 3,
-      unknown: 4,
+      journey: 4,
+      unknown: 5,
     };
-    return (order[aType] ?? 4) - (order[bType] ?? 4);
+    return (order[aType] ?? 5) - (order[bType] ?? 5);
   });
 
   for (const file of sorted) {
@@ -645,6 +653,10 @@ export async function importCsv(
 
     if (type === "gates") {
       results.push(await importGates(rows, file.originalname));
+    }
+
+    if (type === "journey") {
+      results.push(await importJourneyStages(rows, file.originalname, adminId));
     }
   }
 
@@ -803,6 +815,53 @@ async function importGates(
   return {
     entity: "gates",
     type: "gates",
+    fileName,
+    total: filtered.length,
+    imported,
+    skipped: filtered.length - imported,
+    errors: mapped.flatMap((m) => m.errors).slice(0, 5),
+  };
+}
+
+async function importJourneyStages(
+  rows: any[],
+  fileName: string,
+  adminId: string,
+): Promise<ImportResult> {
+  const playerMap = await buildPlayerMap();
+  const filtered = rows.filter(
+    (r) => (r["اسم_المرحلة_stage_name"] || "").trim() !== "",
+  );
+  const mapped = filtered.map((row, i) => mapJourneyRow(row, i + 2));
+  for (const m of mapped) {
+    const pid = resolvePlayer(m.playerName, playerMap);
+    if (pid) {
+      m.data.playerId = pid;
+      m.data.createdBy = adminId;
+    }
+  }
+  const valid = mapped.filter((m) => m.errors.length === 0 && m.data.playerId);
+  let imported = 0;
+  const tx = await sequelize.transaction();
+  try {
+    for (const m of valid) {
+      const [, created] = await Journey.findOrCreate({
+        where: {
+          playerId: m.data.playerId as string,
+          stageName: m.data.stageName as string,
+        },
+        defaults: m.data as any,
+        transaction: tx,
+      });
+      if (created) imported++;
+    }
+    await tx.commit();
+  } catch {
+    await tx.rollback();
+  }
+  return {
+    entity: "journey_stages",
+    type: "journey",
     fileName,
     total: filtered.length,
     imported,
