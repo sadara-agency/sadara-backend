@@ -3,6 +3,8 @@ import { z } from "zod";
 const ROLES = [
   "Admin",
   "Manager",
+  "SportingDirector",
+  "Executive",
   "Analyst",
   "Scout",
   "Player",
@@ -15,9 +17,11 @@ const ROLES = [
   "NutritionSpecialist",
   "GymCoach",
   "GraphicDesigner",
-  "Executive",
   "GoalkeeperCoach",
   "MentalCoach",
+  "ContentManager",
+  "Approver",
+  "Publisher",
 ] as const;
 
 const MODULES = [
@@ -85,7 +89,7 @@ export const updatePermissionsSchema = z.object({
         }),
       )
       .min(1)
-      .max(1000), // 17 roles × 51 modules
+      .max(1500), // 21 roles × 51 modules
   }),
 });
 
