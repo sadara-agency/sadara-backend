@@ -38,6 +38,7 @@ export const createTicketSchema = z
     playerId: z.string().uuid("Invalid player ID").optional(),
     journeyStageId: z.string().uuid("Invalid journey stage ID").optional(),
     referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
+    matchId: z.string().uuid("Invalid match ID").nullable().optional(),
     title: z.string().min(1).optional(),
     titleAr: z.string().min(1).optional(),
     description: z.string().optional(),
@@ -68,6 +69,7 @@ export const updateTicketSchema = z.object({
     .nullable()
     .optional(),
   referralId: z.string().uuid("Invalid referral ID").nullable().optional(),
+  matchId: z.string().uuid("Invalid match ID").nullable().optional(),
   title: z.string().min(1).optional(),
   titleAr: z.string().nullable().optional(),
   description: z.string().nullable().optional(),
@@ -125,6 +127,7 @@ export const ticketQuerySchema = z.object({
   playerId: z.string().uuid().optional(),
   journeyStageId: z.string().uuid().optional(),
   referralId: z.string().uuid().optional(),
+  matchId: z.string().uuid().optional(),
   status: z.enum(TICKET_STATUSES).optional(),
   priority: z.enum(TICKET_PRIORITIES).optional(),
   ticketType: z.enum(TICKET_TYPES).optional(),

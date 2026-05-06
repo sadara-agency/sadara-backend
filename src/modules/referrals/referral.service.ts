@@ -87,6 +87,7 @@ export async function listReferrals(queryParams: any, user?: AuthUser) {
     where.referralTarget = queryParams.referralTarget;
   if (queryParams.priority) where.priority = queryParams.priority;
   if (queryParams.playerId) where.playerId = queryParams.playerId;
+  if (queryParams.matchId) where.matchId = queryParams.matchId;
   if (queryParams.assignedTo) where.assignedTo = queryParams.assignedTo;
 
   if (search) {

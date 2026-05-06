@@ -13,6 +13,7 @@ export async function listTickets(query: TicketQuery) {
   const where: WhereOptions = {};
 
   if (query.playerId) where.playerId = query.playerId;
+  if (query.matchId) where.matchId = query.matchId;
   if (query.journeyStageId) where.journeyStageId = query.journeyStageId;
   if (query.status) where.status = query.status;
   if (query.priority) where.priority = query.priority;
