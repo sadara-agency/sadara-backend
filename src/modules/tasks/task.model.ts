@@ -48,6 +48,7 @@ interface TaskAttributes {
   triggerRuleId: string | null;
   parentTaskId: string | null;
   assignmentId: string | null;
+  sourceDecisionId: string | null;
   sortOrder: number;
   notes: string | null;
   mediaTaskType: string | null;
@@ -56,6 +57,8 @@ interface TaskAttributes {
   reviewNote: string | null;
   reviewedBy: string | null;
   reviewedAt: Date | null;
+  requiresAttachment: boolean;
+  justificationText: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -82,6 +85,7 @@ interface TaskCreationAttributes extends Optional<
   | "triggerRuleId"
   | "parentTaskId"
   | "assignmentId"
+  | "sourceDecisionId"
   | "sortOrder"
   | "notes"
   | "mediaTaskType"
@@ -90,6 +94,8 @@ interface TaskCreationAttributes extends Optional<
   | "reviewNote"
   | "reviewedBy"
   | "reviewedAt"
+  | "requiresAttachment"
+  | "justificationText"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -132,6 +138,7 @@ export class Task
   declare triggerRuleId: string | null;
   declare parentTaskId: string | null;
   declare assignmentId: string | null;
+  declare sourceDecisionId: string | null;
   declare sortOrder: number;
   declare notes: string | null;
   declare mediaTaskType: string | null;
@@ -140,6 +147,8 @@ export class Task
   declare reviewNote: string | null;
   declare reviewedBy: string | null;
   declare reviewedAt: Date | null;
+  declare requiresAttachment: boolean;
+  declare justificationText: string | null;
 
   // Associations (populated by include)
   declare subTasks?: Task[];
@@ -253,6 +262,11 @@ Task.init(
       references: { model: "player_coach_assignments", key: "id" },
       onDelete: "SET NULL",
     },
+    sourceDecisionId: {
+      type: DataTypes.UUID,
+      field: "source_decision_id",
+      allowNull: true,
+    },
     sortOrder: {
       type: DataTypes.INTEGER,
       field: "sort_order",
@@ -271,6 +285,17 @@ Task.init(
     reviewNote: { type: DataTypes.TEXT, field: "review_note", allowNull: true },
     reviewedBy: { type: DataTypes.UUID, field: "reviewed_by", allowNull: true },
     reviewedAt: { type: DataTypes.DATE, field: "reviewed_at", allowNull: true },
+    requiresAttachment: {
+      type: DataTypes.BOOLEAN,
+      field: "requires_attachment",
+      allowNull: false,
+      defaultValue: false,
+    },
+    justificationText: {
+      type: DataTypes.TEXT,
+      field: "justification_text",
+      allowNull: true,
+    },
   },
   {
     sequelize,
@@ -284,6 +309,7 @@ Task.init(
       { fields: ["match_id"] },
       { fields: ["referral_id"] },
       { fields: ["parent_task_id"] },
+      { fields: ["source_decision_id"] },
       {
         name: "idx_tasks_cron_dedup",
         fields: [
