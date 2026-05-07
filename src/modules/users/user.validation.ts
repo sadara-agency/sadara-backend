@@ -27,6 +27,7 @@ const USER_ROLES = [
   "Executive",
   "GoalkeeperCoach",
   "MentalCoach",
+  "SportingDirector",
 ] as const;
 
 // ── Create User (Admin creates a new team member) ──
