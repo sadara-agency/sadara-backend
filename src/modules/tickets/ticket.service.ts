@@ -2,6 +2,12 @@ import { Op, WhereOptions } from "sequelize";
 import { Ticket } from "./ticket.model";
 import { AppError } from "@middleware/errorHandler";
 import { generateDisplayId } from "@shared/utils/displayId";
+import {
+  buildRowScope,
+  mergeScope,
+  checkRowAccess,
+} from "@shared/utils/rowScope";
+import type { AuthUser } from "@shared/types";
 import type {
   CreateTicketInput,
   UpdateTicketInput,
@@ -9,7 +15,7 @@ import type {
 } from "./ticket.validation";
 
 // ── List with filters + pagination ──
-export async function listTickets(query: TicketQuery) {
+export async function listTickets(query: TicketQuery, user?: AuthUser) {
   const where: WhereOptions = {};
 
   if (query.playerId) where.playerId = query.playerId;
@@ -34,6 +40,9 @@ export async function listTickets(query: TicketQuery) {
       { titleAr: { [Op.iLike]: `%${query.search}%` } },
     ];
   }
+
+  const scope = await buildRowScope("tickets", user);
+  if (scope) mergeScope(where as Record<string | symbol, unknown>, scope);
 
   // Map sort field from snake_case to camelCase for Sequelize
   const sortField = query.sort.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
@@ -68,9 +77,11 @@ export async function listTickets(query: TicketQuery) {
 }
 
 // ── Get by ID ──
-export async function getTicketById(id: string) {
+export async function getTicketById(id: string, user?: AuthUser) {
   const ticket = await Ticket.findByPk(id);
   if (!ticket) throw new AppError("Ticket not found", 404);
+  const allowed = await checkRowAccess("tickets", ticket, user);
+  if (!allowed) throw new AppError("Ticket not found", 404);
   return ticket;
 }
 
