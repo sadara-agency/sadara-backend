@@ -87,7 +87,6 @@ import salaryBenchmarkRoutes from "@modules/commercialAnalytics/salaryBenchmark.
 import governanceGateRoutes from "@modules/governanceGates/governanceGate.routes";
 import personalNoteRoutes from "@modules/personal-notes/personal-note.routes";
 import personalTodoRoutes from "@modules/personal-todos/personal-todo.routes";
-import matchEvaluationRoutes from "@modules/matchEvaluations/matchEvaluation.routes";
 import heatmapRoutes from "@modules/heatmaps/heatmap.routes";
 import "@modules/heatmaps/heatmap.swagger";
 import agendaRoutes from "@modules/agenda/agenda.routes";
@@ -476,7 +475,6 @@ app.use("/api/v1/salary-benchmarks", salaryBenchmarkRoutes);
 app.use("/api/v1/governance-gates", governanceGateRoutes);
 app.use("/api/v1/personal-notes", personalNoteRoutes);
 app.use("/api/v1/personal-todos", personalTodoRoutes);
-app.use("/api/v1/match-evaluations", matchEvaluationRoutes);
 app.use("/api/v1/heatmaps", heatmapRoutes);
 app.use("/api/v1/agenda", agendaRoutes);
 

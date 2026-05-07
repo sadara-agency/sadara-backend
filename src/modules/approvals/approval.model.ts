@@ -2,12 +2,7 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
 export type ApprovalStatus = "Pending" | "Approved" | "Rejected";
-export type ApprovalEntityType =
-  | "contract"
-  | "offer"
-  | "payment"
-  | "gate"
-  | "matchEvaluation";
+export type ApprovalEntityType = "contract" | "offer" | "payment" | "gate";
 
 interface ApprovalRequestAttributes {
   id: string;
