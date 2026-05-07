@@ -9,8 +9,8 @@ import * as taskService from "@modules/tasks/task.service";
 
 const crud = createCrudController({
   service: {
-    list: (query) => taskService.listTasks(query),
-    getById: (id) => taskService.getTaskById(id),
+    list: (query, user) => taskService.listTasks(query, user),
+    getById: (id, user) => taskService.getTaskById(id, user),
     create: (body, userId) => taskService.createTask(body, userId),
     update: (id, body) => taskService.updateTask(id, body),
     delete: (id) => taskService.deleteTask(id),
