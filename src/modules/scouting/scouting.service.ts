@@ -23,6 +23,7 @@ import {
   checkRowAccess,
 } from "@shared/utils/rowScope";
 import { freeformToTemplate } from "./positionTemplate";
+import { createManagerProfileTasks } from "./scoutingAutoTasks";
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
 
@@ -495,6 +496,22 @@ export async function createDecision(input: any, userId: string) {
       error: (err as Error).message,
     }),
   );
+
+  // On approval, fan out a "create player profile" task to every active Manager.
+  // Fire-and-forget — never block the decision response on auto-task creation.
+  if (input.decision === "Approved") {
+    void createManagerProfileTasks({
+      decisionId: decision.id,
+      recordedBy: userId,
+      prospectName,
+      prospectNameAr,
+    }).catch((err) =>
+      logger.warn("Manager profile auto-task fan-out failed", {
+        decisionId: decision.id,
+        error: (err as Error).message,
+      }),
+    );
+  }
 
   return decision;
 }
