@@ -344,7 +344,11 @@ export async function getTaskById(id: string, user?: AuthUser) {
 // Create Task
 // ────────────────────────────────────────────────────────────
 export async function createTask(
-  input: CreateTaskInput & { assignmentId?: string; isAutoCreated?: boolean },
+  input: CreateTaskInput & {
+    assignmentId?: string;
+    sourceDecisionId?: string | null;
+    isAutoCreated?: boolean;
+  },
   assignedBy: string,
 ) {
   // FK checks — catch invalid references before hitting the DB constraint
@@ -371,7 +375,9 @@ export async function createTask(
     notes: input.notes,
     displayId,
     assignmentId: input.assignmentId ?? null,
+    sourceDecisionId: input.sourceDecisionId ?? null,
     isAutoCreated: input.isAutoCreated ?? false,
+    requiresAttachment: input.requiresAttachment ?? false,
   });
 
   // Sync attendees for calendar visibility
@@ -465,7 +471,73 @@ export async function updateTaskStatus(id: string, status: TaskStatus) {
     await syncParentStatus(task.parentTaskId);
   }
 
+  // Fan-out auto-cancel: if this completion finishes a fan-out (e.g. one Manager
+  // picked up a prospect-acceptance task), cancel the sibling tasks so the work
+  // isn't done twice. Fire-and-forget — never block the response.
+  if (status === "Completed" && task.sourceDecisionId) {
+    void cancelSiblingTasks(task.id, task.sourceDecisionId);
+  }
+
   return getTaskById(id);
+}
+
+// ── Sibling auto-cancel for fan-out tasks ──
+async function cancelSiblingTasks(
+  completedTaskId: string,
+  sourceDecisionId: string,
+) {
+  try {
+    const siblings = await Task.findAll({
+      where: {
+        sourceDecisionId,
+        id: { [Op.ne]: completedTaskId },
+        status: { [Op.in]: ["Open", "InProgress"] },
+      },
+      attributes: ["id", "assignedTo", "title", "titleAr"],
+    });
+    if (siblings.length === 0) return;
+
+    const completer = await Task.findByPk(completedTaskId, {
+      include: [
+        { model: User, as: "assignee", attributes: ["fullName", "fullNameAr"] },
+      ],
+    });
+    const completerName =
+      (completer as any)?.assignee?.fullName ?? "another manager";
+    const completerNameAr =
+      (completer as any)?.assignee?.fullNameAr ?? "مدير آخر";
+
+    await Task.update(
+      { status: "Canceled", completedAt: new Date() },
+      {
+        where: {
+          id: { [Op.in]: siblings.map((s) => s.id) },
+        },
+      },
+    );
+
+    // Notify each affected manager — fire-and-forget
+    await Promise.all(
+      siblings
+        .filter((s) => s.assignedTo)
+        .map((s) =>
+          notifyUser(s.assignedTo as string, {
+            type: "task",
+            title: `Task completed by ${completerName}`,
+            titleAr: `أنجز ${completerNameAr} المهمة`,
+            body: s.title,
+            bodyAr: s.titleAr ?? s.title,
+            sourceType: "task",
+            sourceId: s.id,
+            priority: "low",
+          }),
+        ),
+    );
+  } catch (err) {
+    // Never let auto-cancel surface as an error to the user
+
+    console.warn("Sibling task auto-cancel failed", err);
+  }
 }
 
 // ────────────────────────────────────────────────────────────
@@ -493,7 +565,32 @@ export async function submitTaskForReview(id: string) {
     }
   }
 
+  // Proof-of-work guard: if admin required an attachment, enforce it before submission.
+  if (task.requiresAttachment) {
+    const deliverables = (task.deliverables as MediaTaskDeliverable[]) ?? [];
+    if (deliverables.length === 0) {
+      throw new AppError(
+        "Proof of work attachment is required before submitting this task for review",
+        422,
+      );
+    }
+  }
+
   await task.update({ status: "PendingReview", completedAt: null });
+  return getTaskById(id);
+}
+
+// ────────────────────────────────────────────────────────────
+// Submit Justification (staff saves their work description)
+// Separate from status change so staff can save a draft at any
+// point without being forced to also upload a file immediately.
+// ────────────────────────────────────────────────────────────
+export async function submitJustification(
+  id: string,
+  justificationText: string,
+): Promise<Task> {
+  const task = await findOrThrow(Task, id, "Task");
+  await task.update({ justificationText });
   return getTaskById(id);
 }
 
@@ -514,6 +611,10 @@ export async function approveTask(id: string, reviewer: AuthUser) {
 
   if (task.parentTaskId) {
     await syncParentStatus(task.parentTaskId);
+  }
+
+  if (task.sourceDecisionId) {
+    void cancelSiblingTasks(task.id, task.sourceDecisionId);
   }
 
   return getTaskById(id);

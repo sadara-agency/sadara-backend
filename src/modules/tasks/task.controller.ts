@@ -122,16 +122,19 @@ export async function suggestedAssignees(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
-// ── Add Deliverable (Media tasks) ──
+// ── Add Deliverable / Proof-of-work attachment ──
+// Routes image types to the "photos" folder (gets WebP + thumbnail).
+// All other types (PDF, Word, Excel, etc.) go to "documents" (private, signed URLs).
 export async function addDeliverable(req: AuthRequest, res: Response) {
   if (!req.file) throw new AppError("No file uploaded", 400);
 
+  const isImage = req.file.mimetype.startsWith("image/");
   const result = await uploadFile({
-    folder: "photos",
+    folder: isImage ? "photos" : "documents",
     originalName: req.file.originalname,
     mimeType: req.file.mimetype,
     buffer: req.file.buffer,
-    generateThumbnail: true,
+    generateThumbnail: isImage,
   });
 
   const { caption } = req.body;
@@ -142,6 +145,24 @@ export async function addDeliverable(req: AuthRequest, res: Response) {
     caption,
   );
   sendSuccess(res, task);
+}
+
+// ── Submit Justification (staff proof-of-work description) ──
+export async function submitJustification(req: AuthRequest, res: Response) {
+  const task = await taskService.submitJustification(
+    req.params.id,
+    req.body.justificationText as string,
+  );
+
+  await logAudit(
+    "UPDATE",
+    "tasks",
+    req.params.id,
+    buildAuditContext(req.user!, req.ip),
+    "Task justification submitted",
+  );
+
+  sendSuccess(res, task, "Justification saved");
 }
 
 // ── Remove Deliverable (Media tasks) ──

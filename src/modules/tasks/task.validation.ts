@@ -44,6 +44,13 @@ export const MEDIA_PLATFORMS = [
 export const addDeliverableSchema = z.object({
   caption: z.string().max(200).optional(),
 });
+
+export const submitJustificationSchema = z.object({
+  justificationText: z
+    .string()
+    .min(1, "Justification text is required")
+    .max(2000, "Justification text must be 2000 characters or fewer"),
+});
 const TASK_STATUSES = [
   "Open",
   "InProgress",
@@ -74,6 +81,7 @@ export const createTaskSchema = z.object({
   notes: z.string().optional(),
   mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
   mediaPlatforms: z.array(z.enum(MEDIA_PLATFORMS)).optional(),
+  requiresAttachment: z.boolean().optional(),
 });
 
 // ── Update Task (partial — any field except assignedBy) ──
@@ -97,6 +105,8 @@ export const updateTaskSchema = z.object({
   notes: z.string().nullable().optional(),
   mediaTaskType: z.enum(MEDIA_TASK_TYPES).optional(),
   mediaPlatforms: z.array(z.enum(MEDIA_PLATFORMS)).optional(),
+  requiresAttachment: z.boolean().optional(),
+  justificationText: z.string().max(2000).nullable().optional(),
 });
 
 // ── Update Status (dedicated endpoint for status transitions) ──
@@ -159,3 +169,6 @@ export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type UpdateStatusInput = z.infer<typeof updateStatusSchema>;
 export type TaskQuery = z.infer<typeof taskQuerySchema>;
 export type RejectTaskInput = z.infer<typeof rejectTaskSchema>;
+export type SubmitJustificationInput = z.infer<
+  typeof submitJustificationSchema
+>;

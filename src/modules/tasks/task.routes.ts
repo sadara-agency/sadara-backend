@@ -27,6 +27,7 @@ import {
   taskQuerySchema,
   approveTaskSchema,
   rejectTaskSchema,
+  submitJustificationSchema,
 } from "@modules/tasks/task.validation";
 import * as taskController from "@modules/tasks/task.controller";
 
@@ -161,7 +162,15 @@ router.delete(
   asyncHandler(taskController.remove),
 );
 
-// ── Deliverables (Media tasks only) ──
+// ── Justification (staff proof-of-work description) ──
+router.patch(
+  "/:id/justification",
+  authorizeModule("tasks", "update"),
+  validate(submitJustificationSchema),
+  asyncHandler(taskController.submitJustification),
+);
+
+// ── Deliverables / Proof-of-work attachments ──
 router.post(
   "/:id/deliverables",
   authorizeModule("tasks", "update"),
