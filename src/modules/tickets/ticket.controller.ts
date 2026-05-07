@@ -10,13 +10,13 @@ import * as ticketService from "./ticket.service";
 
 // ── List ──
 export async function list(req: AuthRequest, res: Response) {
-  const result = await ticketService.listTickets(req.query as any);
+  const result = await ticketService.listTickets(req.query as any, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 
 // ── Get by ID ──
 export async function getById(req: AuthRequest, res: Response) {
-  const ticket = await ticketService.getTicketById(req.params.id);
+  const ticket = await ticketService.getTicketById(req.params.id, req.user);
   sendSuccess(res, ticket);
 }
 

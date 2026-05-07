@@ -12,7 +12,7 @@ import { verifyUserRole } from "@shared/utils/verifyRole";
 
 // ── Helpers ──
 
-const BYPASS_ROLES = ["Admin", "Manager", "Executive"];
+const BYPASS_ROLES = ["Admin", "Manager", "Executive", "SportingDirector"];
 
 /** All roles that share coach-level row access (coach_id FK on players). */
 const COACH_ROLES = [
@@ -79,12 +79,17 @@ const analystPlayers: ScopeBuilder = async (u) => {
  *   - user is the creator
  * Expressed as a WHERE clause via the PG array-contains operator.
  */
-const restrictedReferral: ScopeBuilder = (u) => ({
+/** Own referral: creator or primary assignee only. */
+const ownReferral: ScopeBuilder = (u) => ({
+  [Op.or]: [{ createdBy: u.id }, { assignedTo: u.id }],
+});
+
+/** Own ticket: creator, primary assignee, or in additionalAssignees[]. */
+const ownTicket: ScopeBuilder = (u) => ({
   [Op.or]: [
-    { isRestricted: false },
-    { restrictedTo: { [Op.contains]: [u.id] } },
-    { assignedTo: u.id },
     { createdBy: u.id },
+    { assignedTo: u.id },
+    { additionalAssignees: { [Op.contains]: [u.id] } },
   ],
 });
 
@@ -140,7 +145,7 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Analyst: ownAssigned,
     Finance: ownAssigned,
     Legal: ownAssigned,
-    Media: ownAssigned,
+    GraphicDesigner: ownAssigned,
   },
 
   approvals: {
@@ -157,7 +162,7 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Analyst: (u) => ({
       [Op.or]: [{ requestedBy: u.id }, { assignedTo: u.id }],
     }),
-    Media: (u) => ({ requestedBy: u.id }),
+    GraphicDesigner: (u) => ({ requestedBy: u.id }),
   },
 
   documents: {
@@ -172,7 +177,7 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     GoalkeeperCoach: ownUploaded,
     MentalCoach: ownUploaded,
     Analyst: ownUploaded,
-    Media: ownUploaded,
+    GraphicDesigner: ownUploaded,
   },
 
   notes: {
@@ -187,7 +192,7 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     GoalkeeperCoach: ownCreated,
     MentalCoach: ownCreated,
     Analyst: ownCreated,
-    Media: ownCreated,
+    GraphicDesigner: ownCreated,
   },
 
   sessions: {
@@ -218,20 +223,37 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
   },
 
   referrals: {
-    Player: restrictedReferral,
-    Scout: restrictedReferral,
-    Coach: restrictedReferral,
-    SkillCoach: restrictedReferral,
-    TacticalCoach: restrictedReferral,
-    FitnessCoach: restrictedReferral,
-    NutritionSpecialist: restrictedReferral,
-    GymCoach: restrictedReferral,
-    GoalkeeperCoach: restrictedReferral,
-    MentalCoach: restrictedReferral,
-    Analyst: restrictedReferral,
-    Finance: restrictedReferral,
-    Legal: restrictedReferral,
-    Media: restrictedReferral,
+    Player: ownReferral,
+    Scout: ownReferral,
+    Coach: ownReferral,
+    SkillCoach: ownReferral,
+    TacticalCoach: ownReferral,
+    FitnessCoach: ownReferral,
+    NutritionSpecialist: ownReferral,
+    GymCoach: ownReferral,
+    GoalkeeperCoach: ownReferral,
+    MentalCoach: ownReferral,
+    Analyst: ownReferral,
+    Finance: ownReferral,
+    Legal: ownReferral,
+    GraphicDesigner: ownReferral,
+  },
+
+  tickets: {
+    Player: ownTicket,
+    Scout: ownTicket,
+    Coach: ownTicket,
+    SkillCoach: ownTicket,
+    TacticalCoach: ownTicket,
+    FitnessCoach: ownTicket,
+    NutritionSpecialist: ownTicket,
+    GymCoach: ownTicket,
+    GoalkeeperCoach: ownTicket,
+    MentalCoach: ownTicket,
+    Analyst: ownTicket,
+    Finance: ownTicket,
+    Legal: ownTicket,
+    GraphicDesigner: ownTicket,
   },
 };
 
@@ -379,10 +401,14 @@ export async function checkRowAccess(
       return true;
 
     case "referrals":
-      if (!record.isRestricted) return true;
-      if ((record.restrictedTo || []).includes(user.id)) return true;
-      if (record.assignedTo === user.id) return true;
       if (record.createdBy === user.id) return true;
+      if (record.assignedTo === user.id) return true;
+      return false;
+
+    case "tickets":
+      if (record.createdBy === user.id) return true;
+      if (record.assignedTo === user.id) return true;
+      if ((record.additionalAssignees || []).includes(user.id)) return true;
       return false;
   }
 

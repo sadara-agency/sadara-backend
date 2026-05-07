@@ -242,6 +242,22 @@ const RAW_PERMISSIONS: Perm[] = [
       canUpdate: true,
     },
   ),
+  ...forRoles(
+    "referrals",
+    [
+      "Legal",
+      "Finance",
+      "Player",
+      "GraphicDesigner",
+      "Executive",
+      "SportingDirector",
+    ],
+    {
+      canRead: true,
+      canCreate: true,
+      canUpdate: true,
+    },
+  ),
 
   ...forRoles("injuries", ["Admin"], {
     canRead: true,
