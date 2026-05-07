@@ -69,6 +69,24 @@ jest.mock('../../../src/modules/contracts/contract.service', () => ({
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
+jest.mock('../../../src/shared/utils/audit', () => ({
+  logAudit: jest.fn().mockResolvedValue(undefined),
+  buildAuditContext: jest.fn().mockReturnValue({}),
+}));
+jest.mock('../../../src/modules/tasks/task.model', () => ({
+  Task: {
+    create: jest.fn(),
+    findByPk: jest.fn(),
+    findOne: jest.fn(),
+    findAll: jest.fn(),
+    update: jest.fn(),
+    name: 'Task',
+  },
+  MediaTaskDeliverable: {},
+}));
+jest.mock('../../../src/modules/tasks/task.service', () => ({
+  createTask: jest.fn().mockResolvedValue({}),
+}));
 
 import * as scoutingService from '../../../src/modules/scouting/scouting.service';
 import { sequelize } from '../../../src/config/database';
