@@ -85,14 +85,14 @@ const RAW_PERMISSIONS: Perm[] = [
   ...allRoles("dashboard", { canRead: true }),
 
   ...allRoles("players", { canRead: true }),
-  ...forRoles("players", ["Admin"], {
+  ...forRoles("players", ["Admin", "SportingDirector"], {
     canCreate: true,
     canUpdate: true,
     canDelete: true,
   }),
   ...forRoles("players", ["Manager"], { canCreate: true, canUpdate: true }),
 
-  ...forRoles("clubs", ["Admin"], {
+  ...forRoles("clubs", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -124,7 +124,7 @@ const RAW_PERMISSIONS: Perm[] = [
     { canRead: true },
   ),
 
-  ...forRoles("matches", ["Admin"], {
+  ...forRoles("matches", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -146,7 +146,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
 
-  ...forRoles("contracts", ["Admin"], {
+  ...forRoles("contracts", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -161,7 +161,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
 
-  ...forRoles("offers", ["Admin"], {
+  ...forRoles("offers", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -176,7 +176,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
 
-  ...forRoles("gates", ["Admin"], {
+  ...forRoles("gates", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -190,7 +190,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("gates", ["Analyst"], { canRead: true, canUpdate: true }),
   ...forRoles("gates", ["Legal", "Executive"], { canRead: true }),
 
-  ...forRoles("approvals", ["Admin", "Manager"], {
+  ...forRoles("approvals", ["Admin", "Manager", "SportingDirector"], {
     canRead: true,
     canUpdate: true,
   }),
@@ -198,7 +198,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
 
-  ...forRoles("scouting", ["Admin"], {
+  ...forRoles("scouting", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -214,7 +214,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
   }),
 
-  ...forRoles("referrals", ["Admin"], {
+  ...forRoles("referrals", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -259,7 +259,7 @@ const RAW_PERMISSIONS: Perm[] = [
     },
   ),
 
-  ...forRoles("injuries", ["Admin"], {
+  ...forRoles("injuries", ["Admin", "SportingDirector"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
@@ -294,7 +294,7 @@ const RAW_PERMISSIONS: Perm[] = [
     { canRead: true },
   ),
 
-  ...forRoles("training", ["Admin"], {
+  ...forRoles("training", ["Admin", "SportingDirector"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
@@ -326,7 +326,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
 
-  ...forRoles("finance", ["Admin"], {
+  ...forRoles("finance", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -339,7 +339,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("finance", ["Executive"], { canRead: true }),
 
-  ...forRoles("reports", ["Admin"], {
+  ...forRoles("reports", ["Admin", "SportingDirector"], {
     canRead: true,
     canCreate: true,
     canDelete: true,
@@ -368,10 +368,12 @@ const RAW_PERMISSIONS: Perm[] = [
   ),
 
   ...allRoles("tasks", { canRead: true, canCreate: true, canUpdate: true }),
-  ...forRoles("tasks", ["Admin", "Manager"], { canDelete: true }),
+  ...forRoles("tasks", ["Admin", "Manager", "SportingDirector"], {
+    canDelete: true,
+  }),
 
   ...allRoles("journey", { canRead: true }),
-  ...forRoles("journey", ["Admin", "Manager"], {
+  ...forRoles("journey", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canUpdate: true,
     canDelete: true,
@@ -386,10 +388,14 @@ const RAW_PERMISSIONS: Perm[] = [
   ),
 
   ...allRoles("tickets", { canRead: true, canCreate: true, canUpdate: true }),
-  ...forRoles("tickets", ["Admin", "Manager"], { canDelete: true }),
+  ...forRoles("tickets", ["Admin", "Manager", "SportingDirector"], {
+    canDelete: true,
+  }),
 
   ...allRoles("sessions", { canRead: true, canCreate: true, canUpdate: true }),
-  ...forRoles("sessions", ["Admin", "Manager"], { canDelete: true }),
+  ...forRoles("sessions", ["Admin", "Manager", "SportingDirector"], {
+    canDelete: true,
+  }),
 
   // heatmaps — read for all roles, write for analyst/coaching/management,
   // delete only for Admin/Manager.
@@ -406,10 +412,13 @@ const RAW_PERMISSIONS: Perm[] = [
       "FitnessCoach",
       "GoalkeeperCoach",
       "SkillCoach",
+      "SportingDirector",
     ],
     { canCreate: true, canUpdate: true },
   ),
-  ...forRoles("heatmaps", ["Admin", "Manager"], { canDelete: true }),
+  ...forRoles("heatmaps", ["Admin", "Manager", "SportingDirector"], {
+    canDelete: true,
+  }),
 
   ...forRoles(
     "session-feedback",
@@ -424,7 +433,7 @@ const RAW_PERMISSIONS: Perm[] = [
     ],
     { canRead: true, canCreate: true, canUpdate: true },
   ),
-  ...forRoles("session-feedback", ["Admin", "Manager"], {
+  ...forRoles("session-feedback", ["Admin", "Manager", "SportingDirector"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
@@ -444,7 +453,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
 
   // matchEvaluations — analyst creates/edits, manager approves, coaches read
-  ...forRoles("matchEvaluations", ["Admin"], {
+  ...forRoles("matchEvaluations", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -475,7 +484,7 @@ const RAW_PERMISSIONS: Perm[] = [
     { canRead: true },
   ),
 
-  ...forRoles("documents", ["Admin"], {
+  ...forRoles("documents", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -503,25 +512,30 @@ const RAW_PERMISSIONS: Perm[] = [
   ),
 
   ...allRoles("notes", { canRead: true, canCreate: true }),
-  ...forRoles("notes", ["Admin", "Manager"], {
+  ...forRoles("notes", ["Admin", "Manager", "SportingDirector"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
     canDelete: true,
   }),
 
-  ...forRoles("audit", ["Admin", "Manager", "Executive"], { canRead: true }),
+  ...forRoles("audit", ["Admin", "Manager", "Executive", "SportingDirector"], {
+    canRead: true,
+  }),
 
   ...forRoles(
     "market-intel",
-    ["Admin", "Manager", "Analyst", "Scout", "Executive"],
+    ["Admin", "Manager", "Analyst", "Scout", "Executive", "SportingDirector"],
     { canRead: true },
   ),
 
   ...allRoles("settings", { canRead: true, canUpdate: true }),
-  ...forRoles("settings", ["Admin"], { canCreate: true, canDelete: true }),
+  ...forRoles("settings", ["Admin", "SportingDirector"], {
+    canCreate: true,
+    canDelete: true,
+  }),
 
-  ...forRoles("users", ["Admin"], {
+  ...forRoles("users", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -530,7 +544,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("users", ["Manager"], { canRead: true }),
 
   ...allRoles("competitions", { canRead: true }),
-  ...forRoles("competitions", ["Admin"], {
+  ...forRoles("competitions", ["Admin", "SportingDirector"], {
     canCreate: true,
     canUpdate: true,
     canDelete: true,
@@ -544,21 +558,21 @@ const RAW_PERMISSIONS: Perm[] = [
   // Mirrors the clubs read distribution since squads are a refinement of clubs.
   ...allRoles("squads", { canRead: true }),
 
-  ...forRoles("sportmonks", ["Admin"], {
+  ...forRoles("sportmonks", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
   }),
   ...forRoles("sportmonks", ["Manager"], { canRead: true }),
 
-  ...forRoles("saff-data", ["Admin"], {
+  ...forRoles("saff-data", ["Admin", "SportingDirector"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
   }),
   ...forRoles("saff-data", ["Manager"], { canRead: true, canCreate: true }),
 
-  ...forRoles("spl-sync", ["Admin"], {
+  ...forRoles("spl-sync", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -566,7 +580,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("spl-sync", ["Manager"], { canRead: true, canCreate: true }),
 
-  ...forRoles("wellness", ["Admin", "Manager"], {
+  ...forRoles("wellness", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -599,7 +613,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
 
-  ...forRoles("meal-plans", ["Admin", "Manager"], {
+  ...forRoles("meal-plans", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -618,7 +632,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("meal-plans", ["Executive"], { canRead: true }),
 
   // ── RTP Protocols ──
-  ...forRoles("rtp", ["Admin", "Manager"], {
+  ...forRoles("rtp", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -638,7 +652,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("rtp", ["Player"], { canRead: true }),
 
   // ── Tactical Intelligence ──
-  ...forRoles("tactical", ["Admin", "Manager"], {
+  ...forRoles("tactical", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -661,7 +675,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("tactical", ["Player"], { canRead: true }),
 
   // ── Match Analytics ──
-  ...forRoles("match-analytics", ["Admin", "Manager"], {
+  ...forRoles("match-analytics", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -682,24 +696,32 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
 
   // ── Injury Financials ──
-  ...forRoles("injury-financials", ["Admin", "Manager", "Finance"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
+  ...forRoles(
+    "injury-financials",
+    ["Admin", "Manager", "Finance", "SportingDirector"],
+    {
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+      canDelete: true,
+    },
+  ),
   ...forRoles("injury-financials", ["Coach", "FitnessCoach"], {
     canRead: true,
   }),
   ...forRoles("injury-financials", ["Executive"], { canRead: true }),
 
   // ── Designs / Media & Publishing ──
-  ...forRoles("designs", ["Admin", "GraphicDesigner", "ContentManager"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
+  ...forRoles(
+    "designs",
+    ["Admin", "GraphicDesigner", "ContentManager", "SportingDirector"],
+    {
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+      canDelete: true,
+    },
+  ),
   ...forRoles("designs", ["Manager", "Approver", "Publisher"], {
     canCreate: true,
     canRead: true,
@@ -710,7 +732,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
 
   // ── Training Plans ──
-  ...forRoles("training-plans", ["Admin", "Manager"], {
+  ...forRoles("training-plans", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -730,7 +752,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("training-plans", ["Player"], { canRead: true }),
 
   // ── Development Reviews ──
-  ...forRoles("dev-reviews", ["Admin", "Manager"], {
+  ...forRoles("dev-reviews", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -765,7 +787,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canDelete: true,
   }),
   // Admin can read everything (including confidential); full management
-  ...forRoles("mental", ["Admin"], {
+  ...forRoles("mental", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -777,7 +799,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("mental", ["Player"], { canRead: true }),
 
   // ── Video Library ──
-  ...forRoles("video", ["Admin", "Manager"], {
+  ...forRoles("video", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -803,7 +825,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("video", ["Player"], { canRead: true }),
 
-  ...forRoles("transfer-windows", ["Admin"], {
+  ...forRoles("transfer-windows", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -822,7 +844,7 @@ const RAW_PERMISSIONS: Perm[] = [
     },
   ),
 
-  ...forRoles("club-needs", ["Admin"], {
+  ...forRoles("club-needs", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -842,7 +864,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ),
 
   // Player-Coach Assignments (multi-specialty row-scope join table)
-  ...forRoles("player-coach-assignments", ["Admin"], {
+  ...forRoles("player-coach-assignments", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -906,7 +928,7 @@ const RAW_PERMISSIONS: Perm[] = [
   // permission gates who is allowed to use the feature at all. Analysts
   // get full CRUD on their own views. Admin/Manager/Executive can read
   // shared views.
-  ...forRoles("analyst_views", ["Analyst", "Admin"], {
+  ...forRoles("analyst_views", ["Analyst", "Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -920,7 +942,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
 
   // ── Salary Benchmarks (Commercial Analytics MVP-6) ──
-  ...forRoles("salary_benchmarks", ["Admin", "Manager"], {
+  ...forRoles("salary_benchmarks", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
@@ -933,7 +955,7 @@ const RAW_PERMISSIONS: Perm[] = [
   // ── Governance Gates (MVP-7) ──
   // Admin/Manager can trigger, resolve, and delete gates.
   // All analyst-tier roles can trigger gates and read the queue.
-  ...forRoles("governance_gates", ["Admin", "Manager"], {
+  ...forRoles("governance_gates", ["Admin", "Manager", "SportingDirector"], {
     canCreate: true,
     canRead: true,
     canUpdate: true,
