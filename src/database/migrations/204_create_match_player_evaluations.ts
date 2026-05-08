@@ -1,5 +1,5 @@
 import { QueryInterface, DataTypes } from "sequelize";
-import { tableExists } from "../migrationHelpers";
+import { tableExists, columnExists } from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
@@ -151,6 +151,14 @@ export async function up({
 
   // Performance summary view — recomputed live from approved evaluations
   // avg_item() macro: average of all 5 fitness ratings (rating field of each JSONB item)
+  // Guard: skip if the table was already created with the new flat-column schema (no JSONB fitness_scores column)
+  const hasJsonbColumns = await columnExists(
+    queryInterface,
+    "match_player_evaluations",
+    "fitness_scores",
+  );
+  if (!hasJsonbColumns) return;
+
   await queryInterface.sequelize.query(`
     CREATE OR REPLACE VIEW vw_player_performance_summary AS
     WITH approved AS (
