@@ -18,6 +18,14 @@ import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { SessionFeedback } from "@modules/sessions/feedback/sessionFeedback.model";
 import TrainingBlock from "@modules/wellness/trainingBlock.model";
+import {
+  WorkoutPlan,
+  WorkoutPlanDay,
+  WorkoutPlanExercise,
+  WorkoutSession,
+  WorkoutSetLog,
+} from "@modules/wellness/workoutPlan.model";
+import { WellnessExercise } from "@modules/wellness/fitness.model";
 import { BodyComposition } from "@modules/wellness/bodyComposition.model";
 import { Journey } from "@modules/journey/journey.model";
 import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
@@ -85,6 +93,10 @@ import { SquadMembership } from "@modules/squads/squadMembership.model";
 import { PlayerMatchReview } from "@modules/saffplus/playerReview.model";
 import { CaseAssignee } from "@modules/referrals/caseAssignee.model";
 import { Design } from "@modules/designs/design.model";
+import {
+  MatchEvaluation,
+  PlayerPerformanceSummary,
+} from "@modules/matchEvaluations/matchEvaluation.model";
 
 let associationsReady = false;
 
@@ -664,5 +676,45 @@ export function setupAssociations() {
   MedicalReport.belongsTo(Document, {
     foreignKey: "documentId",
     as: "document",
+  });
+
+  // ── Match Evaluations ──
+  MatchEvaluation.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  MatchEvaluation.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  MatchEvaluation.belongsTo(User, { foreignKey: "analystId", as: "analyst" });
+  MatchEvaluation.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  MatchEvaluation.belongsTo(Referral, {
+    foreignKey: "referralId",
+    as: "referral",
+  });
+  Player.hasMany(MatchEvaluation, {
+    foreignKey: "playerId",
+    as: "evaluations",
+  });
+  PlayerPerformanceSummary.belongsTo(Player, {
+    foreignKey: "playerId",
+    as: "player",
+  });
+  Player.hasOne(PlayerPerformanceSummary, {
+    foreignKey: "playerId",
+    as: "performanceSummary",
+  });
+
+  // ── Workout Plans ──
+  Player.hasMany(WorkoutPlan, { foreignKey: "playerId", as: "workoutPlans" });
+  WorkoutPlan.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  WorkoutPlan.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+
+  WorkoutSession.belongsTo(WorkoutPlanDay, {
+    foreignKey: "plan_day_id",
+    as: "planDay",
+  });
+  WorkoutPlanExercise.belongsTo(WellnessExercise, {
+    foreignKey: "exercise_id",
+    as: "exercise",
+  });
+  WorkoutSetLog.belongsTo(WellnessExercise, {
+    foreignKey: "exercise_id",
+    as: "exercise",
   });
 }

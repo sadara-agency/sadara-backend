@@ -73,6 +73,7 @@ const MODULES = [
   "staffMonitoring",
   "designs",
   "heatmaps",
+  "workout-plans",
 ] as const;
 
 export const updatePermissionsSchema = z.object({

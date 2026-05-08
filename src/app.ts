@@ -64,6 +64,7 @@ import bodyCompositionRoutes from "@modules/wellness/bodyComposition.routes";
 import trainingBlockRoutes from "@modules/wellness/trainingBlock.routes";
 import nutritionPrescriptionRoutes from "@modules/wellness/nutritionPrescription.routes";
 import developmentProgramRoutes from "@modules/wellness/developmentProgram.routes";
+import workoutPlanRoutes from "@modules/wellness/workoutPlan.routes";
 import designRoutes from "@modules/designs/design.routes";
 import journeyRoutes from "@modules/journey/journey.routes";
 import evolutionCycleRoutes from "@modules/evolution-cycles/evolution-cycle.routes";
@@ -90,6 +91,8 @@ import personalTodoRoutes from "@modules/personal-todos/personal-todo.routes";
 import heatmapRoutes from "@modules/heatmaps/heatmap.routes";
 import "@modules/heatmaps/heatmap.swagger";
 import agendaRoutes from "@modules/agenda/agenda.routes";
+import matchEvaluationRoutes from "@modules/matchEvaluations/matchEvaluation.routes";
+import "@modules/matchEvaluations/matchEvaluation.swagger";
 import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
@@ -454,6 +457,7 @@ app.use("/api/v1/body-compositions", bodyCompositionRoutes);
 app.use("/api/v1/training-blocks", trainingBlockRoutes);
 app.use("/api/v1/nutrition-prescriptions", nutritionPrescriptionRoutes);
 app.use("/api/v1/development-programs", developmentProgramRoutes);
+app.use("/api/v1/workout-plans", workoutPlanRoutes);
 app.use("/api/v1/designs", designRoutes);
 app.use("/api/v1/journey", journeyRoutes);
 app.use("/api/v1/evolution-cycles", evolutionCycleRoutes);
@@ -477,6 +481,7 @@ app.use("/api/v1/personal-notes", personalNoteRoutes);
 app.use("/api/v1/personal-todos", personalTodoRoutes);
 app.use("/api/v1/heatmaps", heatmapRoutes);
 app.use("/api/v1/agenda", agendaRoutes);
+app.use("/api/v1/match-evaluations", matchEvaluationRoutes);
 
 // ── Signed documents — authenticated serving ──
 const SIGNED_DOCUMENT_EXTS = [".pdf", ".png", ".jpg", ".jpeg"] as const;

@@ -29,6 +29,22 @@ export * from "./wellness.types";
 export * as wellnessService from "./wellness.service";
 export * as fitnessService from "./fitness.service";
 
+// Workout Plan models
+export {
+  WorkoutPlan,
+  WorkoutPlanDay,
+  WorkoutPlanExercise,
+  WorkoutSession,
+  WorkoutSetLog,
+} from "./workoutPlan.model";
+export type {
+  WorkoutGoal,
+  WorkoutPlanStatus,
+  WorkoutSessionStatus,
+  PhaseRule,
+} from "./workoutPlan.model";
+
 // Routes
 export { default as wellnessRoutes } from "./wellness.routes";
 export { default as fitnessRoutes } from "./fitness.routes";
+export { default as workoutPlanRoutes } from "./workoutPlan.routes";

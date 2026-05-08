@@ -60,6 +60,8 @@ export const CachePrefix = {
   SAFFPLUS_PLAYER: "saffplus:player",
   HEATMAPS: "heatmaps",
   AGENDA: "agenda",
+  MATCH_EVALUATIONS: "match-evaluations",
+  WORKOUT_PLANS: "workout-plans",
 } as const;
 
 // ── Core Operations ──
