@@ -328,19 +328,24 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
-  // Indexes for the most common query patterns
+  // Indexes for the most common query patterns — table was just created above
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("match_player_evaluations", ["player_id"], {
     name: "idx_mpe_player_id",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("match_player_evaluations", ["match_id"], {
     name: "idx_mpe_match_id",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("match_player_evaluations", ["analyst_id"], {
     name: "idx_mpe_analyst_id",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("match_player_evaluations", ["status"], {
     name: "idx_mpe_status",
   });
+  // migration-lint: disable-next-line
   await queryInterface.addIndex(
     "match_player_evaluations",
     ["player_id", "status"],

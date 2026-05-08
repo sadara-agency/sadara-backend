@@ -112,7 +112,6 @@ const RAW_PERMISSIONS: Perm[] = [
       "SkillCoach",
       "TacticalCoach",
       "FitnessCoach",
-      "NutritionSpecialist",
       "GymCoach",
       "GoalkeeperCoach",
       "MentalCoach",
@@ -231,7 +230,6 @@ const RAW_PERMISSIONS: Perm[] = [
       "SkillCoach",
       "TacticalCoach",
       "FitnessCoach",
-      "NutritionSpecialist",
       "GymCoach",
       "GoalkeeperCoach",
       "MentalCoach",
@@ -283,14 +281,7 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles(
     "injuries",
-    [
-      "SkillCoach",
-      "TacticalCoach",
-      "NutritionSpecialist",
-      "Analyst",
-      "Executive",
-      "GraphicDesigner",
-    ],
+    ["SkillCoach", "TacticalCoach", "Analyst", "Executive", "GraphicDesigner"],
     { canRead: true },
   ),
 
@@ -316,7 +307,7 @@ const RAW_PERMISSIONS: Perm[] = [
       canDelete: true,
     },
   ),
-  ...forRoles("training", ["NutritionSpecialist", "Analyst", "Scout"], {
+  ...forRoles("training", ["Analyst", "Scout"], {
     canRead: true,
   }),
   ...forRoles("training", ["Executive"], { canRead: true }),
@@ -360,7 +351,6 @@ const RAW_PERMISSIONS: Perm[] = [
       "SkillCoach",
       "TacticalCoach",
       "FitnessCoach",
-      "NutritionSpecialist",
       "GraphicDesigner",
       "Executive",
     ],
@@ -439,7 +429,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("session-feedback", ["NutritionSpecialist", "GymCoach"], {
+  ...forRoles("session-feedback", ["GymCoach"], {
     canRead: true,
     canCreate: true,
     canUpdate: true,
@@ -472,7 +462,6 @@ const RAW_PERMISSIONS: Perm[] = [
       "SkillCoach",
       "TacticalCoach",
       "FitnessCoach",
-      "NutritionSpecialist",
       "GraphicDesigner",
       "Executive",
     ],
@@ -614,7 +603,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("rtp", ["SkillCoach", "TacticalCoach", "MentalCoach"], {
     canRead: true,
   }),
-  ...forRoles("rtp", ["Analyst", "NutritionSpecialist", "Executive"], {
+  ...forRoles("rtp", ["Analyst", "Executive"], {
     canRead: true,
   }),
   ...forRoles("rtp", ["Player"], { canRead: true }),
@@ -850,7 +839,6 @@ const RAW_PERMISSIONS: Perm[] = [
       "SkillCoach",
       "TacticalCoach",
       "FitnessCoach",
-      "NutritionSpecialist",
       "GymCoach",
       "GoalkeeperCoach",
       "MentalCoach",
