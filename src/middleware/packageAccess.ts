@@ -12,6 +12,7 @@ import { AuthRequest } from "@shared/types";
 import { sendForbidden } from "@shared/utils/apiResponse";
 import {
   isModuleAllowed,
+  PLAYER_PACKAGES,
   type PlayerPackage,
   type CrudAction,
 } from "@shared/utils/packageAccess";
@@ -31,13 +32,13 @@ async function getPlayerPackage(
       const player = await Player.findByPk(playerId, {
         attributes: ["id", "playerPackage"],
       });
-      // Normalize plus-grade variants (A+→A, B+→B, C+→C) to canonical tier
       const raw = player?.playerPackage;
       if (!raw) return null;
-      const normalized = raw.replace("+", "") as PlayerPackage;
-      return (["A", "B", "C"] as PlayerPackage[]).includes(normalized)
-        ? normalized
-        : null;
+      if ((PLAYER_PACKAGES as readonly string[]).includes(raw)) {
+        return raw as PlayerPackage;
+      }
+      logger.warn("Unknown player_package value", { playerId, raw });
+      return null;
     },
     3600, // 1 hour TTL
   );

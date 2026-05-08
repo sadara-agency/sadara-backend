@@ -4,6 +4,7 @@ import { validate } from "@middleware/validate";
 import * as packageController from "./package.controller";
 import {
   updatePackageConfigSchema,
+  updatePackageTierSchema,
   updatePlayerPackageSchema,
 } from "./package.validation";
 
@@ -28,6 +29,11 @@ router.patch(
 router.get("/modules", authorize("Admin"), packageController.getModules);
 
 router.get("/tiers", authorize("Admin"), packageController.getTiers);
-router.patch("/tiers/:code", authorize("Admin"), packageController.updateTier);
+router.patch(
+  "/tiers/:code",
+  authorize("Admin"),
+  validate(updatePackageTierSchema),
+  packageController.updateTier,
+);
 
 export default router;
