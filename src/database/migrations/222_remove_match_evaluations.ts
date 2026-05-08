@@ -18,7 +18,7 @@ export async function up({
     `DELETE FROM role_field_permissions WHERE module = 'matchEvaluations';`,
   );
   await queryInterface.sequelize.query(
-    `DELETE FROM approvals WHERE entity_type = 'matchEvaluation';`,
+    `DELETE FROM approval_requests WHERE entity_type = 'matchEvaluation';`,
   );
 }
 
