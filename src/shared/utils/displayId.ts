@@ -13,6 +13,7 @@ const ENTITY_PREFIX: Record<string, string> = {
   tickets: "TCK",
   tasks: "TSK",
   injuries: "INJ",
+  matchEvaluations: "MEVAL",
 };
 
 /**
