@@ -175,6 +175,16 @@ export async function createContract(
       ? (input.baseSalary * input.commissionPct) / 100
       : 0;
 
+  // Agency contracts (Representation / CareerManagement) have no club counterparty —
+  // auto-fill clubId with the home-agency club record so the NOT NULL constraint is met.
+  if (
+    (input.contractType === "Representation" ||
+      input.contractType === "CareerManagement") &&
+    !input.clubId
+  ) {
+    input.clubId = await getHomeAgencyClubId();
+  }
+
   // Validate FKs early to return clean 404/422 instead of a DB constraint 500 (A-H8)
   const [playerRow] = await Promise.all([
     Player.findByPk(input.playerId, { attributes: ["id", "contractType"] }),
@@ -233,7 +243,7 @@ export async function createContract(
       {
         displayId,
         playerId: input.playerId,
-        clubId: input.clubId,
+        clubId: input.clubId as string, // always defined — agency contracts auto-resolved above; others validated by Zod
         category: input.category,
         contractType: (input as any).contractType,
         playerContractType,

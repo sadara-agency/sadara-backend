@@ -1,0 +1,36 @@
+import { QueryInterface } from "sequelize";
+
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}) {
+  await queryInterface.sequelize.query(
+    `DROP VIEW IF EXISTS vw_player_performance_summary;`,
+  );
+  await queryInterface.sequelize.query(
+    `DROP TABLE IF EXISTS match_player_evaluations CASCADE;`,
+  );
+  await queryInterface.sequelize.query(
+    `DELETE FROM role_permissions WHERE module = 'matchEvaluations';`,
+  );
+  await queryInterface.sequelize.query(
+    `DELETE FROM role_field_permissions WHERE module = 'matchEvaluations';`,
+  );
+  // Guard: approval_requests table may not exist on a fresh-DB run (created in a later migration)
+  await queryInterface.sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'approval_requests'
+      ) THEN
+        DELETE FROM approval_requests WHERE entity_type = 'matchEvaluation';
+      END IF;
+    END $$;
+  `);
+}
+
+export async function down(_: { context: QueryInterface }) {
+  // No-op — feature is intentionally removed. Migrations 204 and 205 remain
+  // in history as the historical source if anyone needs to revive it.
+}

@@ -32,7 +32,7 @@ const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 export const createContractSchema = z
   .object({
     playerId: z.string().uuid("Invalid player ID"),
-    clubId: z.string().uuid("Invalid club ID"),
+    clubId: z.string().uuid("Invalid club ID").optional(),
     category: z.enum(CONTRACT_CATEGORIES).default("Club"),
     contractType: z.enum(CONTRACT_TYPES).default("Representation"),
     title: z.string().optional(),

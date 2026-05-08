@@ -452,38 +452,6 @@ const RAW_PERMISSIONS: Perm[] = [
     canDelete: true,
   }),
 
-  // matchEvaluations — analyst creates/edits, manager approves, coaches read
-  ...forRoles("matchEvaluations", ["Admin", "SportingDirector"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles("matchEvaluations", ["Manager", "SportingDirector"], {
-    canRead: true,
-    canUpdate: true,
-  }),
-  ...forRoles("matchEvaluations", ["Analyst"], {
-    canCreate: true,
-    canRead: true,
-    canUpdate: true,
-    canDelete: true,
-  }),
-  ...forRoles(
-    "matchEvaluations",
-    [
-      "Coach",
-      "TacticalCoach",
-      "FitnessCoach",
-      "GoalkeeperCoach",
-      "MentalCoach",
-      "NutritionSpecialist",
-      "SkillCoach",
-      "Executive",
-    ],
-    { canRead: true },
-  ),
-
   ...forRoles("documents", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
