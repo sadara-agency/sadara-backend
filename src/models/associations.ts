@@ -18,6 +18,14 @@ import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { SessionFeedback } from "@modules/sessions/feedback/sessionFeedback.model";
 import TrainingBlock from "@modules/wellness/trainingBlock.model";
+import {
+  WorkoutPlan,
+  WorkoutPlanDay,
+  WorkoutPlanExercise,
+  WorkoutSession,
+  WorkoutSetLog,
+} from "@modules/wellness/workoutPlan.model";
+import { WellnessExercise } from "@modules/wellness/fitness.model";
 import { BodyComposition } from "@modules/wellness/bodyComposition.model";
 import { Journey } from "@modules/journey/journey.model";
 import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
@@ -690,5 +698,23 @@ export function setupAssociations() {
   Player.hasOne(PlayerPerformanceSummary, {
     foreignKey: "playerId",
     as: "performanceSummary",
+  });
+
+  // ── Workout Plans ──
+  Player.hasMany(WorkoutPlan, { foreignKey: "playerId", as: "workoutPlans" });
+  WorkoutPlan.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  WorkoutPlan.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+
+  WorkoutSession.belongsTo(WorkoutPlanDay, {
+    foreignKey: "plan_day_id",
+    as: "planDay",
+  });
+  WorkoutPlanExercise.belongsTo(WellnessExercise, {
+    foreignKey: "exercise_id",
+    as: "exercise",
+  });
+  WorkoutSetLog.belongsTo(WellnessExercise, {
+    foreignKey: "exercise_id",
+    as: "exercise",
   });
 }

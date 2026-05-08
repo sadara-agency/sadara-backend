@@ -61,6 +61,7 @@ export const CachePrefix = {
   HEATMAPS: "heatmaps",
   AGENDA: "agenda",
   MATCH_EVALUATIONS: "match-evaluations",
+  WORKOUT_PLANS: "workout-plans",
 } as const;
 
 // ── Core Operations ──

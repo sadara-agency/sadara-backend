@@ -1,5 +1,4 @@
 import { Op } from "sequelize";
-import { addDays, format, parseISO, getDay } from "date-fns";
 import {
   WorkoutPlan,
   WorkoutPlanDay,
@@ -17,7 +16,19 @@ import type {
   LogSetDTO,
 } from "./workoutPlan.validation";
 
-// ── helpers ──
+// ── date helpers (no external dep) ──
+
+function toDateString(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+function addDays(d: Date, n: number): Date {
+  const r = new Date(d);
+  r.setUTCDate(r.getUTCDate() + n);
+  return r;
+}
+
+// ── phase helpers ──
 
 function applyPhaseToWeight(
   baseKg: number | null | undefined,
@@ -189,12 +200,12 @@ async function generateSessions(plan: WorkoutPlan) {
   });
   const dayMap = new Map(days.map((d) => [d.dayOfWeek, d]));
 
-  const start = parseISO(plan.startDate);
+  const start = new Date(plan.startDate + "T00:00:00Z");
   const totalDays = plan.durationWeeks * 7;
 
   for (let i = 0; i < totalDays; i++) {
     const date = addDays(start, i);
-    const dow = getDay(date); // 0=Sun…6=Sat
+    const dow = date.getUTCDay(); // 0=Sun…6=Sat
     const planDay = dayMap.get(dow);
     if (!planDay) continue;
 
@@ -202,7 +213,7 @@ async function generateSessions(plan: WorkoutPlan) {
       planId: plan.id,
       planDayId: planDay.id,
       playerId: plan.playerId!,
-      scheduledDate: format(date, "yyyy-MM-dd"),
+      scheduledDate: toDateString(date),
       status: "pending",
     });
   }
@@ -211,7 +222,7 @@ async function generateSessions(plan: WorkoutPlan) {
 // ── Session actions ──
 
 export async function getTodaysWorkout(playerId: string) {
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = toDateString(new Date());
   const session = await WorkoutSession.findOne({
     where: {
       playerId,
@@ -241,8 +252,9 @@ export async function getTodaysWorkout(playerId: string) {
 
 export async function getWeeklyWorkouts(playerId: string) {
   const today = new Date();
-  const weekStart = format(addDays(today, -getDay(today)), "yyyy-MM-dd");
-  const weekEnd = format(addDays(today, 6 - getDay(today)), "yyyy-MM-dd");
+  const dow = today.getUTCDay();
+  const weekStart = toDateString(addDays(today, -dow));
+  const weekEnd = toDateString(addDays(today, 6 - dow));
 
   return WorkoutSession.findAll({
     where: {
@@ -342,7 +354,7 @@ export async function getPlanAdherence(planId: string) {
   const plan = await WorkoutPlan.findByPk(planId);
   if (!plan) throw new AppError("Workout plan not found", 404);
 
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = toDateString(new Date());
   const allSessions = await WorkoutSession.findAll({ where: { planId } });
   const scheduledToDate = allSessions.filter((s) => s.scheduledDate <= today);
   const completed = scheduledToDate.filter((s) => s.status === "completed");
