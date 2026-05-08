@@ -3,14 +3,12 @@ import { PackageConfig } from "./packageConfig.model";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
 import { sequelize } from "@config/database";
-import {
-  cacheOrFetch,
-  invalidateByPrefix,
-  CachePrefix,
-} from "@shared/utils/cache";
+import { cacheOrFetch, invalidateByPrefix } from "@shared/utils/cache";
 import { logger } from "@config/logger";
+import { PLAYER_PACKAGES } from "@shared/utils/packageAccess";
 import type {
   UpdatePackageConfigDTO,
+  UpdatePackageTierDTO,
   UpdatePlayerPackageDTO,
 } from "./package.validation";
 
@@ -56,20 +54,25 @@ const ALL_MODULES = [
   "market-intel",
 ];
 
+type PackageCode = (typeof PLAYER_PACKAGES)[number];
+
+function emptyGrouped<T>(): Record<PackageCode, T[]> {
+  return { "A+": [], A: [], "B+": [], B: [] };
+}
+
+interface ModuleAccessRow {
+  module: string;
+  canCreate: boolean;
+  canRead: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+}
+
 /**
  * Get all package configs grouped by package tier.
  */
 export async function getPackageConfigs(): Promise<
-  Record<
-    string,
-    Array<{
-      module: string;
-      canCreate: boolean;
-      canRead: boolean;
-      canUpdate: boolean;
-      canDelete: boolean;
-    }>
-  >
+  Record<string, ModuleAccessRow[]>
 > {
   const configs = await cacheOrFetch(
     "package-configs:all",
@@ -85,30 +88,17 @@ export async function getPackageConfigs(): Promise<
     3600,
   );
 
-  const grouped: Record<
-    string,
-    Array<{
-      module: string;
-      canCreate: boolean;
-      canRead: boolean;
-      canUpdate: boolean;
-      canDelete: boolean;
-    }>
-  > = {
-    A: [],
-    B: [],
-    C: [],
-  };
+  const grouped = emptyGrouped<ModuleAccessRow>();
 
   for (const c of configs) {
-    const pkg = (c as any).package;
+    const pkg = (c as { package: string }).package as PackageCode;
     if (grouped[pkg]) {
       grouped[pkg].push({
-        module: (c as any).module,
-        canCreate: (c as any).canCreate,
-        canRead: (c as any).canRead,
-        canUpdate: (c as any).canUpdate,
-        canDelete: (c as any).canDelete,
+        module: (c as ModuleAccessRow).module,
+        canCreate: (c as ModuleAccessRow).canCreate,
+        canRead: (c as ModuleAccessRow).canRead,
+        canUpdate: (c as ModuleAccessRow).canUpdate,
+        canDelete: (c as ModuleAccessRow).canDelete,
       });
     }
   }
@@ -139,9 +129,7 @@ export async function updatePackageConfig(
     }
     await tx.commit();
 
-    // Invalidate caches
     await invalidateByPrefix("package-configs");
-    // Also invalidate per-player package caches
     await invalidateByPrefix("pkg:");
 
     logger.info(`Package config updated for tier ${data.package}`);
@@ -151,22 +139,21 @@ export async function updatePackageConfig(
   }
 }
 
+interface PackagePlayerRow {
+  id: string;
+  firstName: string;
+  lastName: string;
+  firstNameAr: string | null;
+  lastNameAr: string | null;
+  playerPackage: string;
+  photoUrl: string | null;
+}
+
 /**
  * Get players grouped by package tier.
  */
 export async function getPlayersByPackage(): Promise<
-  Record<
-    string,
-    Array<{
-      id: string;
-      firstName: string;
-      lastName: string;
-      firstNameAr: string | null;
-      lastNameAr: string | null;
-      playerPackage: string;
-      photoUrl: string | null;
-    }>
-  >
+  Record<string, PackagePlayerRow[]>
 > {
   const players = await Player.findAll({
     attributes: [
@@ -181,18 +168,19 @@ export async function getPlayersByPackage(): Promise<
     order: [["firstName", "ASC"]],
   });
 
-  const grouped: Record<string, typeof players> = { A: [], B: [], C: [] };
+  const grouped = emptyGrouped<PackagePlayerRow>();
   for (const p of players) {
-    const pkg = p.playerPackage || "C";
-    if (!grouped[pkg]) grouped[pkg] = [];
-    grouped[pkg].push(p);
+    const pkg = (p.playerPackage || "B") as PackageCode;
+    if (grouped[pkg]) {
+      grouped[pkg].push(p as unknown as PackagePlayerRow);
+    }
   }
 
-  return grouped as any;
+  return grouped;
 }
 
 /**
- * Update a player's package tier.
+ * Update a player's package tier. Enforces per-tier max_players caps when set.
  */
 export async function updatePlayerPackage(
   playerId: string,
@@ -201,9 +189,26 @@ export async function updatePlayerPackage(
   const player = await Player.findByPk(playerId);
   if (!player) throw new AppError("Player not found", 404);
 
-  await player.update({ playerPackage: data.playerPackage });
+  // No change → skip cap check
+  if (player.playerPackage !== data.playerPackage) {
+    const tier = await Package.findOne({
+      where: { code: data.playerPackage },
+    });
 
-  // Invalidate the player's cached package
+    if (tier?.maxPlayers != null) {
+      const currentCount = await Player.count({
+        where: { playerPackage: data.playerPackage },
+      });
+      if (currentCount >= tier.maxPlayers) {
+        throw new AppError(
+          `Tier "${data.playerPackage}" cap of ${tier.maxPlayers} player(s) has been reached`,
+          422,
+        );
+      }
+    }
+  }
+
+  await player.update({ playerPackage: data.playerPackage });
   await invalidateByPrefix(`pkg:${playerId}`);
 
   logger.info(`Player ${playerId} package updated to ${data.playerPackage}`);
@@ -217,8 +222,8 @@ export function getAvailableModules(): string[] {
 }
 
 /**
- * Get all package tier definitions (A, B, C) with names and descriptions.
- * Results are cached for 1 hour.
+ * Get all active package tier definitions ordered by display_order.
+ * Cached for 1 hour.
  */
 export async function getPackageTiers() {
   return cacheOrFetch(
@@ -226,7 +231,10 @@ export async function getPackageTiers() {
     async () => {
       const tiers = await Package.findAll({
         where: { isActive: true },
-        order: [["code", "ASC"]],
+        order: [
+          ["displayOrder", "ASC"],
+          ["code", "ASC"],
+        ],
       });
       return tiers.map((t) => t.toJSON());
     },
@@ -239,10 +247,10 @@ export async function getPackageTiers() {
  */
 export async function updatePackageTier(
   code: string,
-  data: { name?: string; nameAr?: string; description?: string },
+  data: UpdatePackageTierDTO,
 ) {
   const tier = await Package.findOne({ where: { code } });
-  if (!tier) throw new Error(`Package tier "${code}" not found`);
+  if (!tier) throw new AppError(`Package tier "${code}" not found`, 404);
   await tier.update(data);
   await invalidateByPrefix("package-tiers");
   return tier;

@@ -1215,9 +1215,9 @@ const _ = false;
 
 // Default package access matrix (mirrors the hardcoded config)
 const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
-  // ── Package C (Basic) ──
+  // ── Package B (Foundational) ──
   {
-    package: "C",
+    package: "B",
     module: "players",
     canCreate: F,
     canRead: F,
@@ -1225,7 +1225,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "C",
+    package: "B",
     module: "contracts",
     canCreate: _,
     canRead: F,
@@ -1233,7 +1233,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "C",
+    package: "B",
     module: "matches",
     canCreate: _,
     canRead: F,
@@ -1241,7 +1241,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "C",
+    package: "B",
     module: "calendar",
     canCreate: _,
     canRead: F,
@@ -1249,7 +1249,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "C",
+    package: "B",
     module: "notifications",
     canCreate: F,
     canRead: F,
@@ -1257,7 +1257,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "C",
+    package: "B",
     module: "messaging",
     canCreate: F,
     canRead: F,
@@ -1265,7 +1265,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "C",
+    package: "B",
     module: "documents",
     canCreate: _,
     canRead: F,
@@ -1273,7 +1273,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "C",
+    package: "B",
     module: "tickets",
     canCreate: F,
     canRead: F,
@@ -1281,7 +1281,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "C",
+    package: "B",
     module: "tasks",
     canCreate: _,
     canRead: F,
@@ -1289,9 +1289,9 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
 
-  // ── Package B (Standard) ──
+  // ── Package B+ (Ascent — Emerging Pro) ──
   {
-    package: "B",
+    package: "B+",
     module: "players",
     canCreate: F,
     canRead: F,
@@ -1299,7 +1299,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "contracts",
     canCreate: _,
     canRead: F,
@@ -1307,7 +1307,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "matches",
     canCreate: F,
     canRead: F,
@@ -1315,7 +1315,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "calendar",
     canCreate: F,
     canRead: F,
@@ -1323,7 +1323,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "notifications",
     canCreate: F,
     canRead: F,
@@ -1331,7 +1331,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "messaging",
     canCreate: F,
     canRead: F,
@@ -1339,7 +1339,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "documents",
     canCreate: F,
     canRead: F,
@@ -1347,7 +1347,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "tickets",
     canCreate: F,
     canRead: F,
@@ -1355,7 +1355,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "tasks",
     canCreate: F,
     canRead: F,
@@ -1363,7 +1363,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "sessions",
     canCreate: F,
     canRead: F,
@@ -1371,7 +1371,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "referrals",
     canCreate: F,
     canRead: F,
@@ -1379,7 +1379,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "wellness",
     canCreate: F,
     canRead: F,
@@ -1387,7 +1387,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "injuries",
     canCreate: F,
     canRead: F,
@@ -1395,7 +1395,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: F,
   },
   {
-    package: "B",
+    package: "B+",
     module: "training",
     canCreate: _,
     canRead: F,
@@ -1403,7 +1403,7 @@ const DEFAULT_PACKAGE_CONFIGS: PkgEntry[] = [
     canDelete: _,
   },
   {
-    package: "B",
+    package: "B+",
     module: "notes",
     canCreate: F,
     canRead: F,

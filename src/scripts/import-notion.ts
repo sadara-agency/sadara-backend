@@ -340,7 +340,7 @@ async function importPlayers(
     const firstName = pick(row, "First Name", "الاسم الإنجليزي") || firstAr;
     const lastName = pick(row, "Last Name", "اسم العائلة الإنجليزي") || lastAr;
 
-    const grade = pick(row, "الدرجة", "Grade", "Package") || "C";
+    const grade = pick(row, "الدرجة", "Grade", "Package") || "B";
     const position =
       pick(row, "المركز", "Position", "المركز الرئيسي") || "Midfielder";
     const nationality = pick(row, "الجنسية", "Nationality") || "Saudi";

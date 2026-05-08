@@ -59,8 +59,8 @@ describe('authorizePlayerPackage middleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('should deny Package C from sessions', async () => {
-    (Player.findByPk as jest.Mock).mockResolvedValue({ playerPackage: 'C' });
+  it('should deny Package B from sessions', async () => {
+    (Player.findByPk as jest.Mock).mockResolvedValue({ playerPackage: 'B' });
     const req = { params: { playerId: 'abc' }, body: {}, user: {} } as any;
     const res = mockRes();
     const mw = authorizePlayerPackage('sessions', 'create');
@@ -79,8 +79,8 @@ describe('authorizePlayerPackage middleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('should allow Package B to read wellness', async () => {
-    (Player.findByPk as jest.Mock).mockResolvedValue({ playerPackage: 'B' });
+  it('should allow Package B+ to read wellness', async () => {
+    (Player.findByPk as jest.Mock).mockResolvedValue({ playerPackage: 'B+' });
     const req = { params: { playerId: 'abc' }, body: {}, user: {} } as any;
     const res = mockRes();
     const mw = authorizePlayerPackage('wellness', 'read');

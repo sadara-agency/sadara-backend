@@ -2,17 +2,27 @@
  * Player Package Access Configuration
  *
  * Defines which modules/features each player package tier can access.
- * Package A = Premium (full), B = Standard (core+), C = Basic (essential).
+ * Tiers (per v2.0 framework):
+ *   - B  (Foundational)            — entry-level
+ *   - B+ (Ascent / Emerging Pro)
+ *   - A  (Elite)                    — full module access
+ *   - A+ (World-Class Elite)        — full module access, capped slots
  *
- * Config is loaded from DB (package_configs table) with Redis caching.
+ * Config is loaded from DB (`package_configs` table) with Redis caching.
  * Hardcoded defaults serve as fallback when DB is empty.
  */
 
-import { cacheOrFetch } from "@shared/utils/cache";
 import { logger } from "@config/logger";
 
-export type PlayerPackage = "A" | "B" | "C";
+export type PlayerPackage = "A+" | "A" | "B+" | "B";
 export type CrudAction = "create" | "read" | "update" | "delete";
+
+export const PLAYER_PACKAGES: readonly PlayerPackage[] = [
+  "A+",
+  "A",
+  "B+",
+  "B",
+] as const;
 
 export interface PackageModuleAccess {
   canCreate: boolean;
@@ -46,22 +56,22 @@ const NONE: PackageModuleAccess = {
   canDelete: false,
 };
 
-// ── Hardcoded Defaults (fallback when DB is empty) ──
+// ── Hardcoded Defaults (fallback when DB cache misses) ──
 
-const PACKAGE_C: Record<string, PackageModuleAccess> = {
+const PACKAGE_B: Record<string, PackageModuleAccess> = {
   players: FULL,
   contracts: READ_ONLY,
   matches: READ_ONLY,
   calendar: READ_ONLY,
-  notifications: FULL,
-  messaging: FULL,
   documents: READ_ONLY,
-  tickets: CREATE_READ,
   tasks: READ_ONLY,
+  tickets: CREATE_READ,
+  messaging: FULL,
+  notifications: FULL,
 };
 
-const PACKAGE_B: Record<string, PackageModuleAccess> = {
-  ...PACKAGE_C,
+const PACKAGE_BPLUS: Record<string, PackageModuleAccess> = {
+  ...PACKAGE_B,
   sessions: CREATE_READ,
   referrals: CREATE_READ,
   wellness: CREATE_READ,
@@ -79,41 +89,38 @@ const HARDCODED_MAP: Record<
   PlayerPackage,
   Record<string, PackageModuleAccess>
 > = {
-  C: PACKAGE_C,
   B: PACKAGE_B,
-  A: {},
+  "B+": PACKAGE_BPLUS,
+  A: {}, // sentinel — A returns FULL for any module
+  "A+": {}, // sentinel — A+ returns FULL for any module
 };
 
-// ── DB-Driven Config (loaded lazily, cached 1hr) ──
+// ── DB-Driven Config (loaded lazily) ──
 
 let dbConfigLoaded = false;
 let dbConfigMap: Record<PlayerPackage, Record<string, PackageModuleAccess>> = {
+  "A+": {},
   A: {},
+  "B+": {},
   B: {},
-  C: {},
 };
 
-/**
- * Load package configs from DB into memory. Redis cached for 1hr.
- * Called lazily on first access check, or can be called at startup.
- */
 export async function loadPackageConfigsFromDB(): Promise<void> {
   try {
-    // Dynamic import to avoid circular dependency at module load time
     const { PackageConfig } =
       await import("@modules/packages/packageConfig.model");
 
     const rows = await PackageConfig.findAll();
     if (rows.length === 0) {
-      // No DB config — use hardcoded defaults
       dbConfigLoaded = false;
       return;
     }
 
     const map: Record<PlayerPackage, Record<string, PackageModuleAccess>> = {
+      "A+": {},
       A: {},
+      "B+": {},
       B: {},
-      C: {},
     };
 
     for (const row of rows) {
@@ -141,22 +148,18 @@ export async function loadPackageConfigsFromDB(): Promise<void> {
 
 /**
  * Get the access level for a module given a player package.
- * Package A always returns FULL. B and C return their configured access or NONE.
+ * A and A+ tiers always return FULL (apex tiers, full platform access).
  */
 export function getPackageAccess(
   pkg: PlayerPackage,
   module: string,
 ): PackageModuleAccess {
-  if (pkg === "A") return FULL;
+  if (pkg === "A" || pkg === "A+") return FULL;
 
-  // Use DB config if loaded, otherwise hardcoded defaults
   const configMap = dbConfigLoaded ? dbConfigMap : HARDCODED_MAP;
   return configMap[pkg]?.[module] ?? NONE;
 }
 
-/**
- * Check if a specific action is allowed for a module under a player package.
- */
 export function isModuleAllowed(
   pkg: PlayerPackage,
   module: string,
@@ -177,21 +180,16 @@ export function isModuleAllowed(
   }
 }
 
-/**
- * Get the full access map for a package (used by the API endpoint).
- */
 export function getFullAccessMap(
   pkg: PlayerPackage,
 ): Record<string, PackageModuleAccess> {
-  if (pkg === "A") {
-    // Return explicit FULL for all known modules
+  if (pkg === "A" || pkg === "A+") {
     const allModules = new Set([
-      ...Object.keys(PACKAGE_C),
       ...Object.keys(PACKAGE_B),
+      ...Object.keys(PACKAGE_BPLUS),
       "scouting",
       "finance",
       "esignatures",
-      "media",
       "reports",
       "journey",
       "gates",
@@ -202,10 +200,9 @@ export function getFullAccessMap(
       "fitness",
     ]);
 
-    // Also include any DB-configured modules
     if (dbConfigLoaded) {
-      for (const pkg of Object.values(dbConfigMap)) {
-        for (const mod of Object.keys(pkg)) {
+      for (const tierMap of Object.values(dbConfigMap)) {
+        for (const mod of Object.keys(tierMap)) {
           allModules.add(mod);
         }
       }

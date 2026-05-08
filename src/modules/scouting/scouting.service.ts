@@ -1040,7 +1040,7 @@ export async function signProspect(
     firstNameAr?: string;
     lastNameAr?: string;
     playerType: "Pro" | "Youth" | "Amateur";
-    playerPackage: "A" | "B" | "C";
+    playerPackage: "A+" | "A" | "B+" | "B";
     nationalId?: string;
     email?: string;
     phone?: string;

@@ -53,9 +53,11 @@ router.get(
       attributes: ["id", "playerPackage"],
     });
     if (!player) {
-      return sendSuccess(res, { package: "C", access: getFullAccessMap("C") });
+      return sendSuccess(res, { package: "B", access: getFullAccessMap("B") });
     }
-    const pkg = (player.playerPackage.replace("+", "") as PlayerPackage) || "C";
+    const raw = player.playerPackage as PlayerPackage;
+    const valid: PlayerPackage[] = ["A+", "A", "B+", "B"];
+    const pkg = valid.includes(raw) ? raw : "B";
     sendSuccess(res, { package: pkg, access: getFullAccessMap(pkg) });
   }),
 );
