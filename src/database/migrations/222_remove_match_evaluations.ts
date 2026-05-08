@@ -17,9 +17,17 @@ export async function up({
   await queryInterface.sequelize.query(
     `DELETE FROM role_field_permissions WHERE module = 'matchEvaluations';`,
   );
-  await queryInterface.sequelize.query(
-    `DELETE FROM approval_requests WHERE entity_type = 'matchEvaluation';`,
-  );
+  // Guard: approval_requests table may not exist on a fresh-DB run (created in a later migration)
+  await queryInterface.sequelize.query(`
+    DO $$ BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'approval_requests'
+      ) THEN
+        DELETE FROM approval_requests WHERE entity_type = 'matchEvaluation';
+      END IF;
+    END $$;
+  `);
 }
 
 export async function down(_: { context: QueryInterface }) {

@@ -243,7 +243,7 @@ export async function createContract(
       {
         displayId,
         playerId: input.playerId,
-        clubId: input.clubId,
+        clubId: input.clubId as string, // always defined — agency contracts auto-resolved above; others validated by Zod
         category: input.category,
         contractType: (input as any).contractType,
         playerContractType,
