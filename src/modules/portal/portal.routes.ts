@@ -66,6 +66,23 @@ router.post(
   authorize("Player"),
   asyncHandler(portalController.requestProfileLink),
 );
+/**
+ * @swagger
+ * /portal/me/agent:
+ *   get:
+ *     summary: Get the agent assigned to the unlinked player's matching profile
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Agent info or null if none found
+ */
+router.get(
+  "/me/agent",
+  authorize("Player"),
+  asyncHandler(portalController.getMyAgent),
+);
 router.post(
   "/me/avatar",
   authorize("Player"),

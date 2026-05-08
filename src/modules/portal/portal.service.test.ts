@@ -84,7 +84,11 @@ jest.mock("@modules/wellness/trainingBlock.model", () => ({
   TrainingBlockExercise: { name: "TrainingBlockExercise" },
 }));
 
-import { requestProfileLink, getMySessions } from "./portal.service";
+import {
+  requestProfileLink,
+  getMySessions,
+  getMyAgent,
+} from "./portal.service";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
 import { Session } from "@modules/sessions/session.model";
@@ -225,6 +229,96 @@ describe("requestProfileLink", () => {
     });
     expect(notifyUser).not.toHaveBeenCalled();
     expect(notifyByRole).not.toHaveBeenCalled();
+  });
+});
+
+describe("getMyAgent", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("returns agent fields when player row has an agentId", async () => {
+    (User.findByPk as jest.Mock)
+      .mockResolvedValueOnce({
+        id: "user-1",
+        email: "p@example.com",
+        role: "Player",
+        playerId: null,
+      })
+      .mockResolvedValueOnce({
+        id: "agent-1",
+        fullName: "Ahmad Al-Mansouri",
+        fullNameAr: "أحمد المنصور",
+        avatarUrl: "https://cdn.example.com/avatars/agent1.jpg",
+        lastActivity: new Date("2026-05-08T10:00:00Z"),
+      });
+    (Player.findOne as jest.Mock).mockResolvedValue({
+      id: "p-1",
+      agentId: "agent-1",
+    });
+
+    const result = await getMyAgent("user-1");
+
+    expect(result).toEqual({
+      fullName: "Ahmad Al-Mansouri",
+      fullNameAr: "أحمد المنصور",
+      avatarUrl: "https://cdn.example.com/avatars/agent1.jpg",
+      lastActiveAt: "2026-05-08T10:00:00.000Z",
+    });
+  });
+
+  it("returns null when no matching player row exists", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-2",
+      email: "noplayer@example.com",
+      role: "Player",
+      playerId: null,
+    });
+    (Player.findOne as jest.Mock).mockResolvedValue(null);
+
+    const result = await getMyAgent("user-2");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when matching player has no agentId", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-3",
+      email: "p3@example.com",
+      role: "Player",
+      playerId: null,
+    });
+    (Player.findOne as jest.Mock).mockResolvedValue({
+      id: "p-3",
+      agentId: null,
+    });
+
+    const result = await getMyAgent("user-3");
+    expect(result).toBeNull();
+  });
+
+  it("returns null when already linked (playerId is set)", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-4",
+      email: "linked@example.com",
+      role: "Player",
+      playerId: "p-99",
+    });
+
+    const result = await getMyAgent("user-4");
+    expect(result).toBeNull();
+  });
+
+  it("throws 403 for non-Player roles", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-5",
+      email: "admin@example.com",
+      role: "Admin",
+      playerId: null,
+    });
+
+    await expect(getMyAgent("user-5")).rejects.toMatchObject({
+      statusCode: 403,
+    });
   });
 });
 

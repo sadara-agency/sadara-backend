@@ -229,6 +229,13 @@ export async function requestProfileLink(req: AuthRequest, res: Response) {
   sendSuccess(res, data, "Request sent");
 }
 
+// ── Get My Agent (unlinked player pre-link state) ──
+
+export async function getMyAgent(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyAgent(req.user!.id);
+  sendSuccess(res, data);
+}
+
 // ── Upload Signed Contract document (Player only, step before sign/upload) ──
 
 export async function uploadSignedContractFile(

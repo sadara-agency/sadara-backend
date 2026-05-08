@@ -1309,6 +1309,41 @@ export async function requestProfileLink(userId: string) {
 }
 
 // ══════════════════════════════════════════
+// GET MY AGENT (unlinked player — pre-link state)
+// ══════════════════════════════════════════
+
+export async function getMyAgent(userId: string) {
+  const user = await User.findByPk(userId, {
+    attributes: ["id", "role", "playerId", "email"],
+  });
+  if (!user) throw new AppError("User not found", 404);
+  if (user.role !== "Player")
+    throw new AppError("Only players can access this endpoint", 403);
+  if (user.playerId) return null; // already linked — caller can ignore or treat as no-op
+
+  const playerByEmail = user.email
+    ? await Player.findOne({
+        where: { email: user.email },
+        attributes: ["id", "agentId"],
+      })
+    : null;
+
+  if (!playerByEmail?.agentId) return null;
+
+  const agent = await User.findByPk(playerByEmail.agentId, {
+    attributes: ["id", "fullName", "fullNameAr", "avatarUrl", "lastActivity"],
+  });
+  if (!agent) return null;
+
+  return {
+    fullName: agent.fullName,
+    fullNameAr: agent.fullNameAr,
+    avatarUrl: agent.avatarUrl,
+    lastActiveAt: agent.lastActivity ? agent.lastActivity.toISOString() : null,
+  };
+}
+
+// ══════════════════════════════════════════
 // MY PROGRAMS (development programs)
 // ══════════════════════════════════════════
 
