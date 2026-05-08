@@ -85,6 +85,10 @@ import { SquadMembership } from "@modules/squads/squadMembership.model";
 import { PlayerMatchReview } from "@modules/saffplus/playerReview.model";
 import { CaseAssignee } from "@modules/referrals/caseAssignee.model";
 import { Design } from "@modules/designs/design.model";
+import {
+  MatchEvaluation,
+  PlayerPerformanceSummary,
+} from "@modules/matchEvaluations/matchEvaluation.model";
 
 let associationsReady = false;
 
@@ -664,5 +668,27 @@ export function setupAssociations() {
   MedicalReport.belongsTo(Document, {
     foreignKey: "documentId",
     as: "document",
+  });
+
+  // ── Match Evaluations ──
+  MatchEvaluation.belongsTo(Player, { foreignKey: "playerId", as: "player" });
+  MatchEvaluation.belongsTo(Match, { foreignKey: "matchId", as: "match" });
+  MatchEvaluation.belongsTo(User, { foreignKey: "analystId", as: "analyst" });
+  MatchEvaluation.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
+  MatchEvaluation.belongsTo(Referral, {
+    foreignKey: "referralId",
+    as: "referral",
+  });
+  Player.hasMany(MatchEvaluation, {
+    foreignKey: "playerId",
+    as: "evaluations",
+  });
+  PlayerPerformanceSummary.belongsTo(Player, {
+    foreignKey: "playerId",
+    as: "player",
+  });
+  Player.hasOne(PlayerPerformanceSummary, {
+    foreignKey: "playerId",
+    as: "performanceSummary",
   });
 }

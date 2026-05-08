@@ -1,10 +1,16 @@
 import { QueryInterface, DataTypes } from "sequelize";
+import { tableExists } from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
 }: {
   context: QueryInterface;
 }) {
+  // Fresh-DB guard: parent tables (players/matches/users/referrals) are created
+  // by Sequelize sync, not migrations. If they don't exist yet, skip — the
+  // migration runner will retry on the next boot once sync has populated them.
+  if (!(await tableExists(queryInterface, "players"))) return;
+
   await queryInterface.createTable("match_player_evaluations", {
     id: {
       type: DataTypes.UUID,
