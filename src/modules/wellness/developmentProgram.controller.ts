@@ -74,3 +74,32 @@ export async function reorderExercises(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, program, "Exercises reordered");
 }
+
+// ── DaySession handlers ──
+
+export async function listDaySessions(req: AuthRequest, res: Response) {
+  const sessions = await svc.listDaySessions(req.params.id);
+  sendSuccess(res, sessions);
+}
+
+export async function createDaySession(req: AuthRequest, res: Response) {
+  const session = await svc.createDaySession(req.params.id, req.body);
+  sendCreated(res, session);
+}
+
+export async function updateDaySession(req: AuthRequest, res: Response) {
+  const session = await svc.updateDaySession(
+    req.params.id,
+    req.params.sessionId,
+    req.body,
+  );
+  sendSuccess(res, session, "Day session updated");
+}
+
+export async function deleteDaySession(req: AuthRequest, res: Response) {
+  const result = await svc.deleteDaySession(
+    req.params.id,
+    req.params.sessionId,
+  );
+  sendSuccess(res, result, "Day session deleted");
+}

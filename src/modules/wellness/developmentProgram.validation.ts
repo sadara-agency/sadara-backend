@@ -67,3 +67,24 @@ export type AddExerciseToProgramDTO = z.infer<
 >;
 export type ReorderExercisesDTO = z.infer<typeof reorderExercisesSchema>;
 export type ListProgramsQueryDTO = z.infer<typeof listProgramsQuerySchema>;
+
+// ── DaySession schemas ──
+
+export const createDaySessionSchema = z.object({
+  label: z.string().min(1).max(100),
+  labelAr: z.string().max(100).optional(),
+  dayOfWeek: z.number().int().min(0).max(6).optional(),
+  orderIndex: z.number().int().min(0).optional(),
+  estimatedMinutes: z.number().int().positive().optional(),
+  notes: z.string().max(1000).optional(),
+});
+
+export const updateDaySessionSchema = createDaySessionSchema.partial();
+
+export const daySessionParamsSchema = z.object({
+  id: z.string().uuid(),
+  sessionId: z.string().uuid(),
+});
+
+export type CreateDaySessionDTO = z.infer<typeof createDaySessionSchema>;
+export type UpdateDaySessionDTO = z.infer<typeof updateDaySessionSchema>;

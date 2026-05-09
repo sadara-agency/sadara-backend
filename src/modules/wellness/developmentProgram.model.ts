@@ -71,6 +71,7 @@ export class DevelopmentProgram
 
   // associations
   declare exercises?: ProgramExercise[];
+  declare daySessions?: import("./programDaySession.model").ProgramDaySession[];
 }
 
 DevelopmentProgram.init(
@@ -144,6 +145,7 @@ interface ProgramExerciseAttributes {
   id: string;
   programId: string;
   exerciseId: string;
+  daySessionId?: string | null;
   orderIndex: number;
   targetSets: number;
   targetReps: string;
@@ -155,7 +157,12 @@ interface ProgramExerciseAttributes {
 
 interface ProgramExerciseCreation extends Optional<
   ProgramExerciseAttributes,
-  "id" | "orderIndex" | "targetSets" | "targetReps" | "createdAt"
+  | "id"
+  | "daySessionId"
+  | "orderIndex"
+  | "targetSets"
+  | "targetReps"
+  | "createdAt"
 > {}
 
 export class ProgramExercise
@@ -165,6 +172,7 @@ export class ProgramExercise
   declare id: string;
   declare programId: string;
   declare exerciseId: string;
+  declare daySessionId: string | null;
   declare orderIndex: number;
   declare targetSets: number;
   declare targetReps: string;
@@ -184,6 +192,11 @@ ProgramExercise.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "program_id",
+    },
+    daySessionId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      field: "day_session_id",
     },
     exerciseId: {
       type: DataTypes.UUID,
@@ -243,3 +256,18 @@ ProgramExercise.belongsTo(WellnessExercise, {
   foreignKey: "exerciseId",
   as: "exercise",
 });
+
+// ProgramDaySession association — registered after import to avoid circular ref
+import("./programDaySession.model")
+  .then(({ ProgramDaySession }) => {
+    DevelopmentProgram.hasMany(ProgramDaySession, {
+      foreignKey: "programId",
+      as: "daySessions",
+      onDelete: "CASCADE",
+    });
+    ProgramDaySession.belongsTo(DevelopmentProgram, {
+      foreignKey: "programId",
+      as: "program",
+    });
+  })
+  .catch(() => {});
