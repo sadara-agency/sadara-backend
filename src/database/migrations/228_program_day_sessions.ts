@@ -10,6 +10,11 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  // Skip entirely on fresh-DB runs where the parent table hasn't been created yet.
+  // The sessions table will be created by this migration whenever it runs on an
+  // established DB; on a fresh DB the FK is enforced at the model level instead.
+  if (!(await tableExists(queryInterface, "development_programs"))) return;
+
   await queryInterface.createTable("program_day_sessions", {
     id: {
       type: DataTypes.UUID,
@@ -25,7 +30,6 @@ export async function up({
     day_of_week: {
       type: DataTypes.INTEGER,
       allowNull: true,
-      comment: "0=Sunday … 6=Saturday; null when using freeform label only",
     },
     label: {
       type: DataTypes.STRING(100),
