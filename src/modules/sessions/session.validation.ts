@@ -36,6 +36,8 @@ const PROGRAM_OWNERS = [
   "MentalCoach",
 ] as const;
 
+const LOCATION_TYPES = ["InPerson", "Online", "PhoneCall"] as const;
+
 const COMPLETION_STATUSES = [
   "Scheduled",
   "Completed",
@@ -74,6 +76,8 @@ export const createSessionSchema = z.object({
   videoTimestamps: z.array(videoTimestampSchema).nullable().optional(),
   resultingTicketId: z.string().uuid("Invalid ticket ID").nullable().optional(),
   outcomeTags: z.array(z.enum(SESSION_OUTCOME_TAGS)).nullable().optional(),
+  locationType: z.enum(LOCATION_TYPES).nullable().optional(),
+  locationUrl: z.string().url("Invalid URL").nullable().optional(),
 });
 
 // ── Update Session ──
@@ -99,6 +103,8 @@ export const updateSessionSchema = z.object({
   videoTimestamps: z.array(videoTimestampSchema).nullable().optional(),
   resultingTicketId: z.string().uuid().nullable().optional(),
   outcomeTags: z.array(z.enum(SESSION_OUTCOME_TAGS)).nullable().optional(),
+  locationType: z.enum(LOCATION_TYPES).nullable().optional(),
+  locationUrl: z.string().url("Invalid URL").nullable().optional(),
 });
 
 // ── Coverage Radar ──
