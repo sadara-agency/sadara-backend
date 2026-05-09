@@ -122,10 +122,21 @@ export async function addExerciseToProgram(
   // Ensure program exists
   await getProgramById(programId);
 
-  // Default orderIndex to current max + 1
+  // Validate daySessionId belongs to this program
+  if (data.daySessionId) {
+    const session = await ProgramDaySession.findOne({
+      where: { id: data.daySessionId, programId },
+    });
+    if (!session)
+      throw new AppError("Day session not found in this program", 404);
+  }
+
+  // Default orderIndex to current max + 1 (scoped to session when provided)
   if (data.orderIndex === undefined) {
+    const where: Record<string, unknown> = { programId };
+    if (data.daySessionId) where.daySessionId = data.daySessionId;
     const maxRow = await ProgramExercise.findOne({
-      where: { programId },
+      where,
       order: [["orderIndex", "DESC"]],
     });
     data.orderIndex = maxRow ? maxRow.orderIndex + 1 : 0;
@@ -134,6 +145,7 @@ export async function addExerciseToProgram(
   const exercise = await ProgramExercise.create({
     programId,
     exerciseId: data.exerciseId,
+    daySessionId: data.daySessionId ?? null,
     orderIndex: data.orderIndex,
     targetSets: data.targetSets ?? 3,
     targetReps: data.targetReps ?? "8-12",

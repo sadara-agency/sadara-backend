@@ -40,6 +40,7 @@ export const updateProgramSchema = createProgramSchema.partial();
 
 export const addExerciseToProgramSchema = z.object({
   exerciseId: z.string().uuid(),
+  daySessionId: z.string().uuid().optional(),
   orderIndex: z.number().int().min(0).optional(),
   targetSets: z.number().int().positive().optional(),
   targetReps: z.string().max(20).optional(),
