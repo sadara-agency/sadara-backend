@@ -275,6 +275,12 @@ export async function getMyPrograms(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+export async function getMyProgramById(req: AuthRequest, res: Response) {
+  const { id } = req.params;
+  const data = await portalService.getMyProgramById(req.user!.id, id);
+  sendSuccess(res, data);
+}
+
 // ── Admin: Resend Invite ──
 
 export async function resendInvite(req: AuthRequest, res: Response) {

@@ -15,7 +15,11 @@ import { Document } from "@modules/documents/document.model";
 import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Task } from "@modules/tasks/task.model";
 import { Injury, InjuryUpdate } from "@modules/injuries/injury.model";
-import { DevelopmentProgram } from "@modules/wellness/developmentProgram.model";
+import {
+  DevelopmentProgram,
+  ProgramExercise,
+} from "@modules/wellness/developmentProgram.model";
+import { WellnessExercise } from "@modules/wellness/fitness.model";
 import { TrainingBlock } from "@modules/wellness/trainingBlock.model";
 import { AppError } from "@middleware/errorHandler";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
@@ -1380,4 +1384,43 @@ export async function getMyPrograms(userId: string) {
   const active = programs.filter((p) => p.isActive).length;
 
   return { programs: programsWithBlock, total: programs.length, active };
+}
+
+export async function getMyProgramById(userId: string, programId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  const blocks = await TrainingBlock.findAll({
+    where: { playerId },
+    attributes: ["id", "goal", "status", "startedAt", "plannedEndAt"],
+  });
+  const blockIds = blocks.map((b) => b.id);
+
+  const program = await DevelopmentProgram.findByPk(programId, {
+    include: [
+      {
+        model: ProgramExercise,
+        as: "exercises",
+        include: [{ model: WellnessExercise, as: "exercise" }],
+      },
+    ],
+    order: [[{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"]],
+  });
+
+  if (!program) throw new AppError("Program not found", 404);
+
+  const isOwn = program.playerId === playerId;
+  const isViaBlock =
+    program.trainingBlockId !== null &&
+    program.trainingBlockId !== undefined &&
+    blockIds.includes(program.trainingBlockId);
+  if (!isOwn && !isViaBlock) {
+    throw new AppError("Program not found", 404);
+  }
+
+  const block = program.trainingBlockId
+    ? blocks.find((b) => b.id === program.trainingBlockId)
+    : null;
+
+  return { ...program.toJSON(), trainingBlock: block ? block.toJSON() : null };
 }
