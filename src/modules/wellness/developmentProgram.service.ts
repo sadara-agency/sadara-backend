@@ -2,12 +2,15 @@ import {
   DevelopmentProgram,
   ProgramExercise,
 } from "./developmentProgram.model";
+import { ProgramDaySession } from "./programDaySession.model";
 import { WellnessExercise } from "./fitness.model";
 import type {
   CreateProgramDTO,
   UpdateProgramDTO,
   AddExerciseToProgramDTO,
   ListProgramsQueryDTO,
+  CreateDaySessionDTO,
+  UpdateDaySessionDTO,
 } from "./developmentProgram.validation";
 import { AppError } from "@middleware/errorHandler";
 import { buildMeta } from "@shared/utils/pagination";
@@ -39,8 +42,22 @@ export async function getProgramById(id: string): Promise<DevelopmentProgram> {
         as: "exercises",
         include: [{ model: WellnessExercise, as: "exercise" }],
       },
+      {
+        model: ProgramDaySession,
+        as: "daySessions",
+        include: [
+          {
+            model: ProgramExercise,
+            as: "exercises",
+            include: [{ model: WellnessExercise, as: "exercise" }],
+          },
+        ],
+      },
     ],
-    order: [[{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"]],
+    order: [
+      [{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"],
+      [{ model: ProgramDaySession, as: "daySessions" }, "orderIndex", "ASC"],
+    ],
   });
   if (!program) throw new AppError("Program not found", 404);
   return program;
@@ -159,4 +176,72 @@ export async function reorderExercises(
 
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
   return getProgramById(programId);
+}
+
+// ── DaySession service functions ──
+
+export async function listDaySessions(
+  programId: string,
+): Promise<ProgramDaySession[]> {
+  await getProgramById(programId);
+  return ProgramDaySession.findAll({
+    where: { programId },
+    include: [
+      {
+        model: ProgramExercise,
+        as: "exercises",
+        include: [{ model: WellnessExercise, as: "exercise" }],
+      },
+    ],
+    order: [
+      ["orderIndex", "ASC"],
+      [{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"],
+    ],
+  });
+}
+
+export async function createDaySession(
+  programId: string,
+  data: CreateDaySessionDTO,
+): Promise<ProgramDaySession> {
+  await getProgramById(programId);
+
+  if (data.orderIndex === undefined) {
+    const maxRow = await ProgramDaySession.findOne({
+      where: { programId },
+      order: [["orderIndex", "DESC"]],
+    });
+    data.orderIndex = maxRow ? maxRow.orderIndex + 1 : 0;
+  }
+
+  const session = await ProgramDaySession.create({ ...data, programId });
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return session;
+}
+
+export async function updateDaySession(
+  programId: string,
+  sessionId: string,
+  data: UpdateDaySessionDTO,
+): Promise<ProgramDaySession> {
+  const session = await ProgramDaySession.findOne({
+    where: { id: sessionId, programId },
+  });
+  if (!session) throw new AppError("Day session not found", 404);
+  await session.update(data);
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return session;
+}
+
+export async function deleteDaySession(
+  programId: string,
+  sessionId: string,
+): Promise<{ id: string }> {
+  const session = await ProgramDaySession.findOne({
+    where: { id: sessionId, programId },
+  });
+  if (!session) throw new AppError("Day session not found", 404);
+  await session.destroy();
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return { id: sessionId };
 }

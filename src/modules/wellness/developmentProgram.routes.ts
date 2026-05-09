@@ -12,6 +12,8 @@ import {
   addExerciseToProgramSchema,
   reorderExercisesSchema,
   listProgramsQuerySchema,
+  createDaySessionSchema,
+  updateDaySessionSchema,
 } from "./developmentProgram.validation";
 
 const router = Router();
@@ -245,6 +247,111 @@ router.put(
   authorizeModule("wellness", "update"),
   validate(reorderExercisesSchema),
   asyncHandler(ctrl.reorderExercises),
+);
+
+// ── Day Session routes ──
+
+/**
+ * @swagger
+ * /development-programs/{id}/day-sessions:
+ *   get:
+ *     summary: List day sessions for a program (includes exercises per session)
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Array of day sessions with exercises
+ */
+router.get(
+  "/:id/day-sessions",
+  authorizeModule("wellness", "read"),
+  dynamicFieldAccess("wellness"),
+  asyncHandler(ctrl.listDaySessions),
+);
+
+/**
+ * @swagger
+ * /development-programs/{id}/day-sessions:
+ *   post:
+ *     summary: Add a day session to a program
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       201:
+ *         description: Day session created
+ */
+router.post(
+  "/:id/day-sessions",
+  authorizeModule("wellness", "update"),
+  validate(createDaySessionSchema),
+  asyncHandler(ctrl.createDaySession),
+);
+
+/**
+ * @swagger
+ * /development-programs/{id}/day-sessions/{sessionId}:
+ *   patch:
+ *     summary: Update a day session
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Day session updated
+ */
+router.patch(
+  "/:id/day-sessions/:sessionId",
+  authorizeModule("wellness", "update"),
+  validate(updateDaySessionSchema),
+  asyncHandler(ctrl.updateDaySession),
+);
+
+/**
+ * @swagger
+ * /development-programs/{id}/day-sessions/{sessionId}:
+ *   delete:
+ *     summary: Delete a day session (exercises are unlinked, not deleted)
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Day session deleted
+ */
+router.delete(
+  "/:id/day-sessions/:sessionId",
+  authorizeModule("wellness", "update"),
+  asyncHandler(ctrl.deleteDaySession),
 );
 
 export default router;
