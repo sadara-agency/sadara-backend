@@ -28,6 +28,8 @@ export type SessionCompletionStatus =
   | "Cancelled"
   | "NoShow";
 
+export type SessionLocationType = "InPerson" | "Online" | "PhoneCall";
+
 // ── Attribute Interfaces ──
 
 export interface VideoTimestamp {
@@ -60,6 +62,8 @@ export interface SessionAttributes {
   displayId?: string | null;
   externalRef?: string | null;
   outcomeTags: string[] | null;
+  locationType: SessionLocationType | null;
+  locationUrl: string | null;
   createdBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -85,6 +89,8 @@ interface SessionCreationAttributes extends Optional<
   | "displayId"
   | "externalRef"
   | "outcomeTags"
+  | "locationType"
+  | "locationUrl"
   | "createdBy"
   | "createdAt"
   | "updatedAt"
@@ -118,6 +124,8 @@ export class Session
   declare displayId: string | null;
   declare externalRef: string | null;
   declare outcomeTags: string[] | null;
+  declare locationType: SessionLocationType | null;
+  declare locationUrl: string | null;
   declare createdBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -220,6 +228,16 @@ Session.init(
       type: DataTypes.JSONB,
       allowNull: true,
       field: "outcome_tags",
+    },
+    locationType: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: "location_type",
+    },
+    locationUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "location_url",
     },
     createdBy: {
       type: DataTypes.UUID,
