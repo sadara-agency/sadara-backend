@@ -208,6 +208,13 @@ router.get(
   cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMyPrograms),
 );
+router.get(
+  "/programs/:id",
+  authorize("Player"),
+  validate(z.object({ id: z.string().uuid() }), "params"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
+  asyncHandler(portalController.getMyProgramById),
+);
 
 // ── Admin/Manager routes: generate invite links ──
 router.post(
