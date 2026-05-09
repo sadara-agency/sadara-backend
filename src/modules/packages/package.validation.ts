@@ -77,9 +77,9 @@ export const updatePackageTierSchema = z
     description: z.string().nullable().optional(),
     taglineEn: z.string().nullable().optional(),
     taglineAr: z.string().nullable().optional(),
-    feeMin: z.number().int().nonnegative().nullable().optional(),
-    feeMax: z.number().int().nonnegative().nullable().optional(),
-    commissionPct: z.number().min(0).max(100).nullable().optional(),
+    feeMin: z.coerce.number().int().nonnegative().nullable().optional(),
+    feeMax: z.coerce.number().int().nonnegative().nullable().optional(),
+    commissionPct: z.coerce.number().min(0).max(100).nullable().optional(),
     tracks: z
       .object({
         career: trackBulletsSchema,
@@ -89,7 +89,7 @@ export const updatePackageTierSchema = z
       })
       .nullable()
       .optional(),
-    maxPlayers: z.number().int().positive().nullable().optional(),
+    maxPlayers: z.coerce.number().int().positive().nullable().optional(),
     displayOrder: z.number().int().nonnegative().optional(),
   })
   .strict();
