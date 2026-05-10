@@ -16,6 +16,7 @@ import {
   buildRowScope,
   mergeScope,
   checkRowAccess,
+  getAssignedPlayerIds,
 } from "@shared/utils/rowScope";
 import { AuthUser } from "@shared/types";
 import type {
@@ -179,29 +180,6 @@ export async function getSessionById(id: string, user?: AuthUser) {
   const ok = await checkRowAccess("sessions", session, user);
   if (!ok) throw new AppError("Session not found", 404);
   return session;
-}
-
-// ── Assigned players (working-group assignments) ──
-// Mirrors rowScope.ts `coachPlayers` / `analystPlayers` builders. Returns the
-// distinct player IDs the given staff user is responsible for.
-async function getAssignedPlayerIds(user: AuthUser): Promise<string[]> {
-  const ids = new Set<string>();
-
-  const assignmentRows = await sequelize.query<{ player_id: string }>(
-    `SELECT DISTINCT player_id FROM player_coach_assignments WHERE coach_user_id = :userId`,
-    { replacements: { userId: user.id }, type: QueryTypes.SELECT },
-  );
-  for (const r of assignmentRows) ids.add(r.player_id);
-
-  if (user.role === "Analyst") {
-    const analystRows = await sequelize.query<{ id: string }>(
-      `SELECT id FROM players WHERE analyst_id = :userId`,
-      { replacements: { userId: user.id }, type: QueryTypes.SELECT },
-    );
-    for (const r of analystRows) ids.add(r.id);
-  }
-
-  return [...ids];
 }
 
 // ── Create-session context (drives the create modal's defaults & locks) ──

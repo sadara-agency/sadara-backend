@@ -28,6 +28,8 @@ import {
   buildRowScope,
   mergeScope,
   checkRowAccess,
+  getAssignedPlayerIds,
+  isBypassRole,
 } from "@shared/utils/rowScope";
 import { PlayerQuery } from "@modules/players/utils/player.validation";
 
@@ -185,6 +187,10 @@ export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
     "createdAt",
   );
 
+  // "Assigned to me" applies only to non-bypass staff; admins see the full roster.
+  const scopeToAssigned =
+    !!queryParams.assignedToMe && !isBypassRole(user?.role ?? "");
+
   const cacheKey = buildCacheKey(CachePrefix.PLAYERS, {
     limit,
     page,
@@ -198,6 +204,7 @@ export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
     nationality: queryParams.nationality,
     contractType: queryParams.contractType,
     userId: user?.id,
+    assignedToMe: scopeToAssigned ? 1 : undefined,
   });
 
   return cacheOrFetch(
@@ -236,6 +243,13 @@ export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
       // Row-level scoping
       const scope = await buildRowScope("players", user);
       if (scope) mergeScope(where, scope);
+
+      // Opt-in "assigned to me" filter (used by the referral-creation wizard).
+      // An empty assignment set yields `id IN ()` → no rows, which is correct.
+      if (scopeToAssigned && user) {
+        const assignedIds = await getAssignedPlayerIds(user);
+        mergeScope(where, { id: { [Op.in]: assignedIds } });
+      }
 
       // Step 1: Base query with only lightweight computed attributes (name, age)
       const { count, rows } = await Player.findAndCountAll({

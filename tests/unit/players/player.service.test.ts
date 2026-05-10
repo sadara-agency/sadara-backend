@@ -74,6 +74,10 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('../../../src/shared/utils/verifyRole', () => ({
+  verifyUserRole: jest.fn().mockResolvedValue(undefined),
+}));
+
 import * as playerService from '../../../src/modules/players/player.service';
 
 describe('Player Service', () => {
@@ -129,6 +133,59 @@ describe('Player Service', () => {
 
       const call = mockFindAndCountAll.mock.calls[0][0];
       expect(call.where).toBeDefined();
+    });
+
+    it('scopes to assigned players when assignedToMe is set for a non-bypass role', async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      const { sequelize } = require('../../../src/config/database');
+      // getAssignedPlayerIds → player_coach_assignments rows
+      sequelize.query.mockResolvedValue([{ player_id: 'p-1' }, { player_id: 'p-2' }]);
+
+      await playerService.listPlayers(
+        { assignedToMe: true, page: 1, limit: 10 } as unknown as PlayerQuery,
+        { id: 'coach-1', role: 'Coach' } as any,
+      );
+
+      const call = mockFindAndCountAll.mock.calls[0][0];
+      // where should constrain id to the assigned set (directly or via Op.and)
+      const whereStr = JSON.stringify(call.where, (_k, v) =>
+        typeof v === 'symbol' ? v.toString() : v,
+      );
+      expect(whereStr).toContain('p-1');
+      expect(whereStr).toContain('p-2');
+    });
+
+    it('ignores assignedToMe for bypass roles (Admin sees full roster)', async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      const { sequelize } = require('../../../src/config/database');
+      sequelize.query.mockResolvedValue([{ player_id: 'p-1' }]);
+
+      await playerService.listPlayers(
+        { assignedToMe: true, page: 1, limit: 10 } as unknown as PlayerQuery,
+        { id: 'admin-1', role: 'Admin' } as any,
+      );
+
+      const call = mockFindAndCountAll.mock.calls[0][0];
+      const whereStr = JSON.stringify(call.where, (_k, v) =>
+        typeof v === 'symbol' ? v.toString() : v,
+      );
+      expect(whereStr).not.toContain('p-1');
+    });
+
+    it('returns no rows when a staff member has no assignments', async () => {
+      mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      const { Op } = require('sequelize');
+      const { sequelize } = require('../../../src/config/database');
+      sequelize.query.mockResolvedValue([]);
+
+      await playerService.listPlayers(
+        { assignedToMe: true, page: 1, limit: 10 } as unknown as PlayerQuery,
+        { id: 'coach-2', role: 'NutritionSpecialist' } as any,
+      );
+
+      const call = mockFindAndCountAll.mock.calls[0][0];
+      // id constrained to an empty array → Op.in [] → matches nothing
+      expect(call.where.id?.[Op.in]).toEqual([]);
     });
   });
 
