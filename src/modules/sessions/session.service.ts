@@ -295,7 +295,20 @@ export async function createSession(
 
 // ── Update ──
 
-export async function updateSession(id: string, body: UpdateSessionInput) {
+export async function updateSession(
+  id: string,
+  body: UpdateSessionInput,
+  user?: AuthUser,
+) {
+  if (user && !isAdminLevelRole(user.role)) {
+    body.responsibleId = user.id;
+    const roleCfg = SESSION_ROLE_CONFIG[user.role];
+    if (roleCfg) {
+      body.sessionType = roleCfg.sessionType;
+      body.programOwner = roleCfg.programOwner;
+    }
+  }
+
   const session = await Session.findByPk(id);
   if (!session) throw new AppError("Session not found", 404);
 

@@ -56,7 +56,11 @@ export async function create(req: AuthRequest, res: Response) {
 
 // ── Update ──
 export async function update(req: AuthRequest, res: Response) {
-  const session = await sessionService.updateSession(req.params.id, req.body);
+  const session = await sessionService.updateSession(
+    req.params.id,
+    req.body,
+    req.user!,
+  );
 
   Promise.all([
     invalidateMultiple([
