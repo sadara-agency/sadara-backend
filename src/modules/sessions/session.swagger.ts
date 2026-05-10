@@ -88,6 +88,43 @@
  *     responses:
  *       201: { description: Session created }
  *
+ * /sessions/create-context:
+ *   get:
+ *     tags: [Sessions]
+ *     summary: Defaults & locks for the create-session form, scoped to the current user
+ *     description: >
+ *       Returns the responsible-person default, role-based session type / program owner
+ *       defaults, which of those fields are locked for the current user (Admin/Manager are
+ *       never locked), and the list of player IDs the user is allowed to create sessions for
+ *       (null for Admin/Manager = full roster).
+ *     security: [{ bearerAuth: [] }]
+ *     responses:
+ *       200:
+ *         description: Create-session context
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 currentUserId: { type: string, format: uuid }
+ *                 isAdminLevel: { type: boolean }
+ *                 defaults:
+ *                   type: object
+ *                   properties:
+ *                     responsibleId: { type: string, format: uuid }
+ *                     sessionType: { type: string, nullable: true }
+ *                     programOwner: { type: string, nullable: true }
+ *                 locks:
+ *                   type: object
+ *                   properties:
+ *                     responsibleId: { type: boolean }
+ *                     sessionType: { type: boolean }
+ *                     programOwner: { type: boolean }
+ *                 assignedPlayerIds:
+ *                   type: array
+ *                   nullable: true
+ *                   items: { type: string, format: uuid }
+ *
  * /sessions/stats:
  *   get:
  *     tags: [Sessions]

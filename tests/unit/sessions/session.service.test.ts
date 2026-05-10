@@ -146,6 +146,92 @@ describe('Session Service', () => {
         } as any, 'user-001'),
       ).rejects.toThrow();
     });
+
+    it('forces responsibleId and role-based type/owner for non-admin staff', async () => {
+      const player = mockModelInstance(mockPlayer());
+      mockPlayerFindByPk.mockResolvedValue(player);
+      const created = mockSession();
+      mockSessionCreate.mockResolvedValue(created);
+      mockSessionFindByPk.mockResolvedValue(created);
+
+      await sessionService.createSession(
+        {
+          playerId: 'player-001',
+          sessionType: 'Tactical',
+          programOwner: 'TacticalCoach',
+          responsibleId: 'someone-else',
+          sessionDate: '2026-04-10',
+        } as any,
+        'nutri-user',
+        { id: 'nutri-user', email: 'n@x.com', fullName: 'N', role: 'NutritionSpecialist' } as any,
+      );
+
+      const arg = mockSessionCreate.mock.calls[0][0];
+      expect(arg.responsibleId).toBe('nutri-user');
+      expect(arg.sessionType).toBe('Nutrition');
+      expect(arg.programOwner).toBe('NutritionSpecialist');
+    });
+
+    it('leaves body untouched for Admin', async () => {
+      const player = mockModelInstance(mockPlayer());
+      mockPlayerFindByPk.mockResolvedValue(player);
+      const created = mockSession();
+      mockSessionCreate.mockResolvedValue(created);
+      mockSessionFindByPk.mockResolvedValue(created);
+
+      await sessionService.createSession(
+        {
+          playerId: 'player-001',
+          sessionType: 'Tactical',
+          programOwner: 'TacticalCoach',
+          responsibleId: 'someone-else',
+          sessionDate: '2026-04-10',
+        } as any,
+        'admin-user',
+        { id: 'admin-user', email: 'a@x.com', fullName: 'A', role: 'Admin' } as any,
+      );
+
+      const arg = mockSessionCreate.mock.calls[0][0];
+      expect(arg.responsibleId).toBe('someone-else');
+      expect(arg.sessionType).toBe('Tactical');
+      expect(arg.programOwner).toBe('TacticalCoach');
+    });
+  });
+
+  describe('getSessionCreateContext', () => {
+    it('returns role defaults and locks for non-admin staff', async () => {
+      const ctx = await sessionService.getSessionCreateContext({
+        id: 'nutri-user', email: 'n@x.com', fullName: 'N', role: 'NutritionSpecialist',
+      } as any);
+      expect(ctx.isAdminLevel).toBe(false);
+      expect(ctx.defaults.responsibleId).toBe('nutri-user');
+      expect(ctx.defaults.sessionType).toBe('Nutrition');
+      expect(ctx.defaults.programOwner).toBe('NutritionSpecialist');
+      expect(ctx.locks).toEqual({ responsibleId: true, sessionType: true, programOwner: true });
+      expect(Array.isArray(ctx.assignedPlayerIds)).toBe(true);
+    });
+
+    it('returns no locks and full roster for Admin', async () => {
+      const ctx = await sessionService.getSessionCreateContext({
+        id: 'admin-user', email: 'a@x.com', fullName: 'A', role: 'Admin',
+      } as any);
+      expect(ctx.isAdminLevel).toBe(true);
+      expect(ctx.defaults.sessionType).toBeNull();
+      expect(ctx.defaults.programOwner).toBeNull();
+      expect(ctx.locks).toEqual({ responsibleId: false, sessionType: false, programOwner: false });
+      expect(ctx.assignedPlayerIds).toBeNull();
+    });
+
+    it('does not lock type/owner for a staff role without a discipline mapping (Legal)', async () => {
+      const ctx = await sessionService.getSessionCreateContext({
+        id: 'legal-user', email: 'l@x.com', fullName: 'L', role: 'Legal',
+      } as any);
+      expect(ctx.isAdminLevel).toBe(false);
+      expect(ctx.locks.responsibleId).toBe(true);
+      expect(ctx.locks.sessionType).toBe(false);
+      expect(ctx.locks.programOwner).toBe(false);
+      expect(ctx.defaults.sessionType).toBeNull();
+    });
   });
 
   describe('deleteSession', () => {

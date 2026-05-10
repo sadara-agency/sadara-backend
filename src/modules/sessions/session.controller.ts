@@ -22,9 +22,19 @@ export async function getById(req: AuthRequest, res: Response) {
   sendSuccess(res, session);
 }
 
+// ── Create-session context (defaults + locks for the create modal) ──
+export async function createContext(req: AuthRequest, res: Response) {
+  const data = await sessionService.getSessionCreateContext(req.user!);
+  sendSuccess(res, data);
+}
+
 // ── Create ──
 export async function create(req: AuthRequest, res: Response) {
-  const session = await sessionService.createSession(req.body, req.user!.id);
+  const session = await sessionService.createSession(
+    req.body,
+    req.user!.id,
+    req.user!,
+  );
 
   Promise.all([
     invalidateMultiple([
