@@ -41,6 +41,10 @@
  *       - in: query
  *         name: order
  *         schema: { type: string, enum: [asc, desc], default: asc }
+ *       - in: query
+ *         name: assignedToMe
+ *         schema: { type: boolean }
+ *         description: If true, restricts results to players the caller is assigned to (working-group assignments + analyst_id). Ignored for Admin/Manager/Executive/SportingDirector.
  *     responses:
  *       200:
  *         description: Paginated player list

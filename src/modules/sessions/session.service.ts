@@ -16,6 +16,7 @@ import {
   buildRowScope,
   mergeScope,
   checkRowAccess,
+  getAssignedPlayerIds,
 } from "@shared/utils/rowScope";
 import { AuthUser } from "@shared/types";
 import type {
@@ -181,29 +182,6 @@ export async function getSessionById(id: string, user?: AuthUser) {
   return session;
 }
 
-// ── Assigned players (working-group assignments) ──
-// Mirrors rowScope.ts `coachPlayers` / `analystPlayers` builders. Returns the
-// distinct player IDs the given staff user is responsible for.
-async function getAssignedPlayerIds(user: AuthUser): Promise<string[]> {
-  const ids = new Set<string>();
-
-  const assignmentRows = await sequelize.query<{ player_id: string }>(
-    `SELECT DISTINCT player_id FROM player_coach_assignments WHERE coach_user_id = :userId`,
-    { replacements: { userId: user.id }, type: QueryTypes.SELECT },
-  );
-  for (const r of assignmentRows) ids.add(r.player_id);
-
-  if (user.role === "Analyst") {
-    const analystRows = await sequelize.query<{ id: string }>(
-      `SELECT id FROM players WHERE analyst_id = :userId`,
-      { replacements: { userId: user.id }, type: QueryTypes.SELECT },
-    );
-    for (const r of analystRows) ids.add(r.id);
-  }
-
-  return [...ids];
-}
-
 // ── Create-session context (drives the create modal's defaults & locks) ──
 export async function getSessionCreateContext(user: AuthUser) {
   const adminLevel = isAdminLevelRole(user.role);
@@ -357,22 +335,55 @@ export async function listByPlayer(playerId: string, query: SessionQuery) {
 
 // ── Stats ──
 
-export async function getSessionStats() {
+export async function getSessionStats(user?: AuthUser) {
+  const scope = await buildRowScope("sessions", user);
+
+  // Translate the Sequelize scope fragment into a SQL WHERE snippet.
+  // Sessions scope resolves to one of three shapes:
+  //   { playerId: { [Op.in]: string[] } }  → coach / analyst roles
+  //   { playerId: string }                 → Player role (own player)
+  //   { createdBy: string }                → Scout / Finance / Legal / etc.
+  //   null                                 → bypass roles (no filtering)
+  let whereClause = "";
+  const replacements: Record<string, unknown> = {};
+
+  if (scope) {
+    if ("createdBy" in scope) {
+      whereClause = "WHERE created_by = :scopeUserId";
+      replacements.scopeUserId = (scope as any).createdBy;
+    } else if ("playerId" in scope) {
+      const playerIdVal = (scope as any).playerId;
+      if (typeof playerIdVal === "string") {
+        whereClause = "WHERE player_id = :scopePlayerId";
+        replacements.scopePlayerId = playerIdVal;
+      } else if (playerIdVal?.[Op.in]) {
+        const ids: string[] = playerIdVal[Op.in];
+        if (ids.length === 0) {
+          // Staff with no assignments → zero sessions visible
+          whereClause = "WHERE FALSE";
+        } else {
+          whereClause = "WHERE player_id IN (:scopePlayerIds)";
+          replacements.scopePlayerIds = ids;
+        }
+      }
+    }
+  }
+
   const [byType, byStatus, byOwner] = await Promise.all([
     sequelize.query<{ session_type: string; count: string }>(
       `SELECT session_type, COUNT(*)::int AS count
-       FROM sessions GROUP BY session_type ORDER BY count DESC`,
-      { type: QueryTypes.SELECT },
+       FROM sessions ${whereClause} GROUP BY session_type ORDER BY count DESC`,
+      { replacements, type: QueryTypes.SELECT },
     ),
     sequelize.query<{ completion_status: string; count: string }>(
       `SELECT completion_status, COUNT(*)::int AS count
-       FROM sessions GROUP BY completion_status ORDER BY count DESC`,
-      { type: QueryTypes.SELECT },
+       FROM sessions ${whereClause} GROUP BY completion_status ORDER BY count DESC`,
+      { replacements, type: QueryTypes.SELECT },
     ),
     sequelize.query<{ program_owner: string; count: string }>(
       `SELECT program_owner, COUNT(*)::int AS count
-       FROM sessions GROUP BY program_owner ORDER BY count DESC`,
-      { type: QueryTypes.SELECT },
+       FROM sessions ${whereClause} GROUP BY program_owner ORDER BY count DESC`,
+      { replacements, type: QueryTypes.SELECT },
     ),
   ]);
 

@@ -14,6 +14,11 @@ import { verifyUserRole } from "@shared/utils/verifyRole";
 
 const BYPASS_ROLES = ["Admin", "Manager", "Executive", "SportingDirector"];
 
+/** True for roles that see all rows in every module (no row-scoping). */
+export function isBypassRole(role: string): boolean {
+  return BYPASS_ROLES.includes(role);
+}
+
 /** All roles that share coach-level row access (coach_id FK on players). */
 const COACH_ROLES = [
   "Coach",
@@ -70,6 +75,32 @@ const analystPlayers: ScopeBuilder = async (u) => {
   );
   return { playerId: { [Op.in]: rows.map((r) => r.id) } };
 };
+
+/**
+ * Player IDs a staff member is responsible for: their working-group
+ * assignments (`player_coach_assignments`), plus — for Analysts — players
+ * whose `analyst_id` points at them. Shared by pickers and create-context
+ * endpoints that need to constrain a player list to "my players".
+ */
+export async function getAssignedPlayerIds(user: AuthUser): Promise<string[]> {
+  const ids = new Set<string>();
+
+  const assignmentRows = await sequelize.query<{ player_id: string }>(
+    `SELECT DISTINCT player_id FROM player_coach_assignments WHERE coach_user_id = :userId`,
+    { replacements: { userId: user.id }, type: QueryTypes.SELECT },
+  );
+  for (const r of assignmentRows) ids.add(r.player_id);
+
+  if (user.role === "Analyst") {
+    const analystRows = await sequelize.query<{ id: string }>(
+      `SELECT id FROM players WHERE analyst_id = :userId`,
+      { replacements: { userId: user.id }, type: QueryTypes.SELECT },
+    );
+    for (const r of analystRows) ids.add(r.id);
+  }
+
+  return [...ids];
+}
 
 /**
  * Restricted-referral scope: a referral is visible if any of

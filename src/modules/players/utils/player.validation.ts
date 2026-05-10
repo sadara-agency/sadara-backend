@@ -144,6 +144,9 @@ export const playerQuerySchema = z.object({
   clubId: z.string().uuid().optional(),
   position: z.string().optional(),
   nationality: z.string().optional(),
+  // When true, restricts the result to players the caller is assigned to
+  // (working-group assignments + analyst_id). Ignored for bypass roles.
+  assignedToMe: z.coerce.boolean().optional(),
 });
 
 export type CreatePlayerInput = z.infer<typeof createPlayerSchema>;
