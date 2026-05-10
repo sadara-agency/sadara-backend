@@ -48,6 +48,28 @@ describe('Session Controller', () => {
       await controller.create(mockReq({ body: { sessionType: 'Physical' } }), res);
       expect(res.status).toHaveBeenCalledWith(201);
     });
+
+    it('passes the authenticated user to the service', async () => {
+      (svc.createSession as jest.Mock).mockResolvedValue({ id: 's1', sessionType: 'Physical', playerId: 'p1' });
+      const res = mockRes();
+      const req = mockReq({ body: { sessionType: 'Physical' } });
+      await controller.create(req, res);
+      expect(svc.createSession).toHaveBeenCalledWith(req.body, req.user.id, req.user);
+    });
+  });
+
+  describe('createContext', () => {
+    it('returns the create-session context', async () => {
+      (svc.getSessionCreateContext as jest.Mock).mockResolvedValue({
+        currentUserId: 'user-001', isAdminLevel: true,
+        defaults: { responsibleId: 'user-001', sessionType: null, programOwner: null },
+        locks: { responsibleId: false, sessionType: false, programOwner: false },
+        assignedPlayerIds: null,
+      });
+      const res = mockRes();
+      await controller.createContext(mockReq(), res);
+      expect(res.status).toHaveBeenCalledWith(200);
+    });
   });
 
   describe('update', () => {

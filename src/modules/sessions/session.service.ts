@@ -25,6 +25,7 @@ import type {
   CoverageRadarQuery,
 } from "./session.validation";
 import { SESSION_OUTCOME_TAGS } from "./session.validation";
+import { SESSION_ROLE_CONFIG, isAdminLevelRole } from "./sessionRoleConfig";
 
 const PLAYER_ATTRS = [
   "id",
@@ -180,9 +181,69 @@ export async function getSessionById(id: string, user?: AuthUser) {
   return session;
 }
 
+// ── Assigned players (working-group assignments) ──
+// Mirrors rowScope.ts `coachPlayers` / `analystPlayers` builders. Returns the
+// distinct player IDs the given staff user is responsible for.
+async function getAssignedPlayerIds(user: AuthUser): Promise<string[]> {
+  const ids = new Set<string>();
+
+  const assignmentRows = await sequelize.query<{ player_id: string }>(
+    `SELECT DISTINCT player_id FROM player_coach_assignments WHERE coach_user_id = :userId`,
+    { replacements: { userId: user.id }, type: QueryTypes.SELECT },
+  );
+  for (const r of assignmentRows) ids.add(r.player_id);
+
+  if (user.role === "Analyst") {
+    const analystRows = await sequelize.query<{ id: string }>(
+      `SELECT id FROM players WHERE analyst_id = :userId`,
+      { replacements: { userId: user.id }, type: QueryTypes.SELECT },
+    );
+    for (const r of analystRows) ids.add(r.id);
+  }
+
+  return [...ids];
+}
+
+// ── Create-session context (drives the create modal's defaults & locks) ──
+export async function getSessionCreateContext(user: AuthUser) {
+  const adminLevel = isAdminLevelRole(user.role);
+  const roleCfg = SESSION_ROLE_CONFIG[user.role] ?? null;
+
+  return {
+    currentUserId: user.id,
+    isAdminLevel: adminLevel,
+    defaults: {
+      responsibleId: user.id,
+      sessionType: roleCfg?.sessionType ?? null,
+      programOwner: roleCfg?.programOwner ?? null,
+    },
+    locks: {
+      responsibleId: !adminLevel,
+      sessionType: !adminLevel && !!roleCfg,
+      programOwner: !adminLevel && !!roleCfg,
+    },
+    assignedPlayerIds: adminLevel ? null : await getAssignedPlayerIds(user),
+  };
+}
+
 // ── Create ──
 
-export async function createSession(body: CreateSessionInput, userId: string) {
+export async function createSession(
+  body: CreateSessionInput,
+  userId: string,
+  user?: AuthUser,
+) {
+  // Server-side enforcement: non-Admin/Manager staff cannot assign work to a
+  // colleague, and their session type / program owner is fixed by their role.
+  if (user && !isAdminLevelRole(user.role)) {
+    body.responsibleId = user.id;
+    const roleCfg = SESSION_ROLE_CONFIG[user.role];
+    if (roleCfg) {
+      body.sessionType = roleCfg.sessionType;
+      body.programOwner = roleCfg.programOwner;
+    }
+  }
+
   await findOrThrow(Player, body.playerId, "Player");
 
   let referral: Referral | null = null;

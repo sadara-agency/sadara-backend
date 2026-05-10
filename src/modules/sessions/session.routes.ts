@@ -27,6 +27,13 @@ router.get(
   asyncHandler(sessionController.getManagerDashboard),
 );
 
+// ── Create-session context (before /:id routes) ──
+router.get(
+  "/create-context",
+  authorizeModule("sessions", "create"),
+  asyncHandler(sessionController.createContext),
+);
+
 // ── Read ──
 router.get(
   "/",
