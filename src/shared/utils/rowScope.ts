@@ -349,7 +349,8 @@ export async function checkRowAccess(
   switch (module) {
     case "players":
       if (role === "Player") return record.id === user.playerId;
-      return true;
+      // All non-bypass staff can only view players they are assigned to
+      return isPlayerAssignedToUser(record.id, user.id);
 
     case "contracts":
     case "offers":
@@ -441,6 +442,25 @@ async function isPlayerOwnedBy(
   const [result] = await sequelize.query<{ exists: boolean }>(
     `SELECT EXISTS(SELECT 1 FROM players WHERE id = :playerId AND analyst_id = :userId) AS "exists"`,
     { replacements: { playerId, userId: user.id }, type: QueryTypes.SELECT },
+  );
+  return result?.exists ?? false;
+}
+
+/**
+ * Check if a player is assigned to any staff user via player_coach_assignments.
+ * Used for roles not covered by isPlayerOwnedBy (Scout, Legal, Finance, etc.).
+ */
+async function isPlayerAssignedToUser(
+  playerId: string | undefined | null,
+  userId: string,
+): Promise<boolean> {
+  if (!playerId) return false;
+  const [result] = await sequelize.query<{ exists: boolean }>(
+    `SELECT EXISTS(
+      SELECT 1 FROM player_coach_assignments
+      WHERE player_id = :playerId AND coach_user_id = :userId
+    ) AS "exists"`,
+    { replacements: { playerId, userId }, type: QueryTypes.SELECT },
   );
   return result?.exists ?? false;
 }
