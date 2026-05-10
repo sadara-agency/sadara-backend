@@ -137,6 +137,7 @@ describe('Player Service', () => {
 
     it('scopes to assigned players when assignedToMe is set for a non-bypass role', async () => {
       mockFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+      const { Op } = require('sequelize');
       const { sequelize } = require('../../../src/config/database');
       // getAssignedPlayerIds → player_coach_assignments rows
       sequelize.query.mockResolvedValue([{ player_id: 'p-1' }, { player_id: 'p-2' }]);
@@ -147,12 +148,11 @@ describe('Player Service', () => {
       );
 
       const call = mockFindAndCountAll.mock.calls[0][0];
-      // where should constrain id to the assigned set (directly or via Op.and)
-      const whereStr = JSON.stringify(call.where, (_k, v) =>
-        typeof v === 'symbol' ? v.toString() : v,
-      );
-      expect(whereStr).toContain('p-1');
-      expect(whereStr).toContain('p-2');
+      // Op.in is a symbol — JSON.stringify ignores symbol-keyed properties,
+      // so assert on the actual where object instead.
+      const inList: string[] = call.where.id?.[Op.in];
+      expect(inList).toContain('p-1');
+      expect(inList).toContain('p-2');
     });
 
     it('ignores assignedToMe for bypass roles (Admin sees full roster)', async () => {

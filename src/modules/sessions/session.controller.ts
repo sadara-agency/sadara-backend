@@ -122,7 +122,7 @@ export async function listByPlayer(req: AuthRequest, res: Response) {
 
 // ── Stats ──
 export async function stats(req: AuthRequest, res: Response) {
-  const data = await sessionService.getSessionStats();
+  const data = await sessionService.getSessionStats(req.user);
   sendSuccess(res, data);
 }
 
