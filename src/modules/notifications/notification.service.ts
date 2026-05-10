@@ -101,6 +101,8 @@ const TYPE_TO_PREF: Record<string, string> = {
   calendar: "calendar",
   system: "system",
   mental_alert: "mental",
+  management_order: "system",
+  mental_task: "mental",
 };
 
 // ── Notify all users with specific roles ──
@@ -221,8 +223,8 @@ export async function getUnreadCount(userId: string) {
 
 export async function markAsRead(userId: string, notificationId: string) {
   const [updated] = await Notification.update(
-    { isRead: true },
-    { where: { id: notificationId, userId } },
+    { isRead: true, readAt: new Date() },
+    { where: { id: notificationId, userId, isRead: false } },
   );
   return updated > 0;
 }
@@ -231,7 +233,7 @@ export async function markAsRead(userId: string, notificationId: string) {
 
 export async function markAllAsRead(userId: string) {
   const [updated] = await Notification.update(
-    { isRead: true },
+    { isRead: true, readAt: new Date() },
     { where: { userId, isRead: false } },
   );
   return updated;

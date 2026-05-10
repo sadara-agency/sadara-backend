@@ -279,6 +279,19 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     Publisher: ownReferral,
   },
 
+  "player-inbox": {
+    Player: ownPlayer,
+    Coach: coachPlayers,
+    SkillCoach: coachPlayers,
+    TacticalCoach: coachPlayers,
+    FitnessCoach: coachPlayers,
+    NutritionSpecialist: coachPlayers,
+    GymCoach: coachPlayers,
+    GoalkeeperCoach: coachPlayers,
+    MentalCoach: coachPlayers,
+    Analyst: analystPlayers,
+  },
+
   tickets: {
     Player: ownTicket,
     Scout: ownTicket,
@@ -454,6 +467,12 @@ export async function checkRowAccess(
       if (record.assignedTo === user.id) return true;
       if ((record.additionalAssignees || []).includes(user.id)) return true;
       return false;
+
+    case "player-inbox":
+      if (role === "Player") return record.playerId === user.playerId;
+      if (COACH_ROLES.includes(role) || role === "Analyst")
+        return isPlayerOwnedBy(record.playerId, user);
+      return true;
   }
 
   return true;

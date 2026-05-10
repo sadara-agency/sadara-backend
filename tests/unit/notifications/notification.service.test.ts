@@ -114,10 +114,13 @@ describe('Notification Service', () => {
   });
 
   describe('markAsRead', () => {
-    it('should mark notification as read', async () => {
+    it('should mark notification as read and stamp readAt', async () => {
       mockNotifUpdate.mockResolvedValue([1]);
       const result = await notifService.markAsRead('user-001', 'notif-001');
       expect(result).toBe(true);
+      const [values] = mockNotifUpdate.mock.calls[0] as [Record<string, unknown>, unknown];
+      expect(values.isRead).toBe(true);
+      expect(values.readAt).toBeInstanceOf(Date);
     });
 
     it('should return false if not found', async () => {
@@ -128,10 +131,16 @@ describe('Notification Service', () => {
   });
 
   describe('markAllAsRead', () => {
-    it('should mark all as read', async () => {
+    it('should mark all as read and stamp readAt on previously-unread rows only', async () => {
       mockNotifUpdate.mockResolvedValue([10]);
       const result = await notifService.markAllAsRead('user-001');
       expect(result).toBe(10);
+      const [values, options] = mockNotifUpdate.mock.calls[0] as [
+        Record<string, unknown>,
+        { where: Record<string, unknown> },
+      ];
+      expect(values.readAt).toBeInstanceOf(Date);
+      expect(options.where).toMatchObject({ userId: 'user-001', isRead: false });
     });
   });
 

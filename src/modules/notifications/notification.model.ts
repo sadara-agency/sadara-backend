@@ -11,7 +11,9 @@ export type NotificationType =
   | "task"
   | "calendar"
   | "system"
-  | "mental_alert";
+  | "mental_alert"
+  | "management_order"
+  | "mental_task";
 export type NotificationPriority = "low" | "normal" | "high" | "critical";
 
 interface NotificationAttributes {
@@ -28,12 +30,20 @@ interface NotificationAttributes {
   isRead: boolean;
   isDismissed: boolean;
   priority: NotificationPriority;
+  readAt?: Date | null;
   createdAt?: Date;
+  updatedAt?: Date;
 }
 
 interface NotificationCreation extends Optional<
   NotificationAttributes,
-  "id" | "isRead" | "isDismissed" | "priority" | "createdAt"
+  | "id"
+  | "isRead"
+  | "isDismissed"
+  | "priority"
+  | "readAt"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 export class Notification
@@ -53,7 +63,9 @@ export class Notification
   declare isRead: boolean;
   declare isDismissed: boolean;
   declare priority: NotificationPriority;
+  declare readAt: Date | null;
   declare createdAt: Date;
+  declare updatedAt: Date;
 }
 
 Notification.init(
@@ -83,12 +95,12 @@ Notification.init(
       field: "is_dismissed",
     },
     priority: { type: DataTypes.STRING(20), defaultValue: "normal" },
+    readAt: { type: DataTypes.DATE, allowNull: true, field: "read_at" },
   },
   {
     sequelize,
     tableName: "notifications",
     underscored: true,
     timestamps: true,
-    updatedAt: false, // no updated_at column
   },
 );
