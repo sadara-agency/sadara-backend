@@ -16,7 +16,7 @@ const PLAYER_CACHE = [
 
 const crud = createCrudController({
   service: {
-    list: (query) => playerService.listPlayers(query),
+    list: (query, user) => playerService.listPlayers(query, user),
     getById: (id) => playerService.getPlayerById(id),
     create: (body, userId) => playerService.createPlayer(body, userId),
     update: (id, body) => playerService.updatePlayer(id, body),
