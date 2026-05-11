@@ -16,6 +16,9 @@ import {
   createCheckinSchema,
   createMyCheckinSchema,
   checkinQuerySchema,
+  createMyMealLogSchema,
+  mealLogDateSchema,
+  complianceRangeSchema,
 } from "./wellness.validation";
 import * as ctrl from "./wellness.controller";
 
@@ -86,6 +89,32 @@ router.get(
   "/my/dashboard",
   authorizeModule("wellness", "read"),
   asyncHandler(ctrl.myDashboard),
+);
+
+// ── Meal Logs (Loop 2) ──
+// /my/meals/compliance must precede /my/meals/:id
+router.get(
+  "/my/meals/compliance",
+  authorizeModule("wellness", "read"),
+  validate(mealLogDateSchema, "query"),
+  asyncHandler(ctrl.getMyCompliance),
+);
+router.post(
+  "/my/meals",
+  authorizeModule("wellness", "create"),
+  validate(createMyMealLogSchema),
+  asyncHandler(ctrl.logMeal),
+);
+router.get(
+  "/my/meals",
+  authorizeModule("wellness", "read"),
+  validate(mealLogDateSchema, "query"),
+  asyncHandler(ctrl.getMyLogs),
+);
+router.delete(
+  "/my/meals/:id",
+  authorizeModule("wellness", "delete"),
+  asyncHandler(ctrl.deleteMealLog),
 );
 
 // ══════════════════════════════════════════
@@ -198,6 +227,15 @@ router.get(
   authorizeModule("wellness", "read"),
   authorizePlayerPackage("wellness", "read"),
   asyncHandler(ctrl.checkinTrend),
+);
+
+// ── Staff meal compliance per player ──
+router.get(
+  "/compliance/:playerId",
+  authorizeModule("wellness", "read"),
+  authorizePlayerPackage("wellness", "read"),
+  validate(complianceRangeSchema, "query"),
+  asyncHandler(ctrl.getPlayerCompliance),
 );
 
 export default router;

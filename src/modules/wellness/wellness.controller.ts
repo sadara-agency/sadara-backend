@@ -270,3 +270,46 @@ export async function myCheckinTrend(req: AuthRequest, res: Response) {
   const data = await svc.getCheckinTrend(playerId, days);
   sendSuccess(res, data);
 }
+
+// ══════════════════════════════════════════
+// MEAL LOGS (Loop 2 — Nutrition Compliance)
+// ══════════════════════════════════════════
+
+export async function logMeal(req: AuthRequest, res: Response) {
+  const log = await svc.logMyMeal(req.user!.id, req.body);
+  sendCreated(res, log);
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+}
+
+export async function getMyLogs(req: AuthRequest, res: Response) {
+  const date = req.query.date as string | undefined;
+  const result = await svc.getMyMealLogs(req.user!.id, date);
+  sendSuccess(res, result);
+}
+
+export async function deleteMealLog(req: AuthRequest, res: Response) {
+  const result = await svc.deleteMyMealLog(req.user!.id, req.params.id);
+  sendSuccess(res, result);
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+}
+
+export async function getMyCompliance(req: AuthRequest, res: Response) {
+  const date = req.query.date as string | undefined;
+  const result = await svc.getMyDailyCompliance(req.user!.id, date);
+  sendSuccess(res, result);
+}
+
+export async function getPlayerCompliance(req: AuthRequest, res: Response) {
+  const { playerId } = req.params;
+  const from =
+    (req.query.from as string) ??
+    new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0];
+  const to = (req.query.to as string) ?? new Date().toISOString().split("T")[0];
+  const result = await svc.getPlayerMealCompliance(
+    playerId,
+    from,
+    to,
+    req.user,
+  );
+  sendSuccess(res, result);
+}
