@@ -1,4 +1,5 @@
 import { QueryInterface, DataTypes } from "sequelize";
+import { tableExists } from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
@@ -50,9 +51,11 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
-  await queryInterface.addIndex("session_logs", ["player_id"], {
-    name: "session_logs_player_id_idx",
-  });
+  if (await tableExists(queryInterface, "session_logs")) {
+    await queryInterface.addIndex("session_logs", ["player_id"], {
+      name: "session_logs_player_id_idx",
+    });
+  }
 }
 
 export async function down({
