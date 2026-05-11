@@ -275,7 +275,8 @@ describe("invalidatePermissionCache", () => {
 
     expect(mockCacheDel).toHaveBeenCalledWith("rbac:permissions");
     expect(mockCacheDel).toHaveBeenCalledWith("rbac:field-permissions");
-    expect(mockCacheDel).toHaveBeenCalledTimes(2);
+    expect(mockCacheDel).toHaveBeenCalledWith("rbac:configurable-fields");
+    expect(mockCacheDel).toHaveBeenCalledTimes(3);
   });
 
   it("should force next getPermissions call to reload from DB", async () => {
