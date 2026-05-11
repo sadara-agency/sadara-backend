@@ -103,6 +103,25 @@ router.get(
 
 /**
  * @swagger
+ * /player-coach-assignments/staff-counts:
+ *   get:
+ *     summary: Get player counts per staff member
+ *     description: Returns a map of coachUserId → number of players assigned. Staff with zero assignments are omitted.
+ *     tags: [Player Coach Assignments]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Map of staff ID to player count
+ */
+router.get(
+  "/staff-counts",
+  authorizeModule("player-coach-assignments", "read"),
+  asyncHandler(assignmentController.staffCounts),
+);
+
+/**
+ * @swagger
  * /player-coach-assignments/{id}:
  *   get:
  *     summary: Get an assignment by ID

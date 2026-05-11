@@ -1,4 +1,4 @@
-import { Op, UniqueConstraintError } from "sequelize";
+import { Op, QueryTypes, UniqueConstraintError } from "sequelize";
 import PlayerCoachAssignment, {
   type AssignmentStatus,
   type StaffRole,
@@ -390,4 +390,20 @@ export async function deleteAssignment(id: string) {
   // Evict calendar scope so removed player no longer appears
   evictCalendarScope(coachUserId).catch(() => void 0);
   return { id };
+}
+
+export async function getStaffPlayerCounts(): Promise<Record<string, number>> {
+  const rows = await PlayerCoachAssignment.sequelize!.query<{
+    coach_user_id: string;
+    player_count: number;
+  }>(
+    `SELECT coach_user_id, COUNT(player_id)::int AS player_count
+     FROM player_coach_assignments
+     GROUP BY coach_user_id`,
+    { type: QueryTypes.SELECT },
+  );
+  return rows.reduce<Record<string, number>>((acc, r) => {
+    acc[r.coach_user_id] = r.player_count;
+    return acc;
+  }, {});
 }

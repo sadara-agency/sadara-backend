@@ -27,6 +27,10 @@ import type {
 } from "./session.validation";
 import { SESSION_OUTCOME_TAGS } from "./session.validation";
 import { SESSION_ROLE_CONFIG, isAdminLevelRole } from "./sessionRoleConfig";
+import { SessionLog } from "./sessionLog.model";
+import type { CreateSessionLogInput } from "./session.validation";
+import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { notifyUser } from "@modules/notifications/notification.service";
 
 const PLAYER_ATTRS = [
   "id",
@@ -642,5 +646,177 @@ export async function getCoverageRadar(params: CoverageRadarQuery) {
     uncoveredCount: uncovered.length,
     coverageRate:
       rows.length > 0 ? Math.round((covered.length / rows.length) * 100) : 0,
+  };
+}
+
+// ══════════════════════════════════════════
+// SESSION LOG (Loop 1 — Player Feedback)
+// ══════════════════════════════════════════
+
+export async function logSession(
+  sessionId: string,
+  userId: string,
+  data: CreateSessionLogInput,
+  ctx: ReturnType<typeof buildAuditContext>,
+) {
+  const user = await User.findByPk(userId, { attributes: ["id", "playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId) throw new AppError("Player account not linked", 403);
+
+  const session = await Session.findByPk(sessionId, {
+    attributes: [
+      "id",
+      "playerId",
+      "completionStatus",
+      "responsibleId",
+      "title",
+    ],
+  });
+  if (!session) throw new AppError("Session not found", 404);
+  if (session.playerId !== playerId)
+    throw new AppError("Session not found", 404);
+  if (session.completionStatus !== "Completed")
+    throw new AppError("Session is not yet completed", 422);
+
+  const existing = await SessionLog.findOne({ where: { sessionId } });
+  const isFirst = !existing;
+
+  let log: SessionLog;
+  if (existing) {
+    await existing.update({
+      rpe: data.rpe ?? null,
+      durationMin: data.durationMin ?? null,
+      completed: data.completed,
+      playerNotes: data.playerNotes ?? null,
+    });
+    log = existing;
+  } else {
+    log = await SessionLog.create({
+      sessionId,
+      playerId,
+      rpe: data.rpe ?? null,
+      durationMin: data.durationMin ?? null,
+      completed: data.completed,
+      playerNotes: data.playerNotes ?? null,
+    });
+  }
+
+  logAudit(
+    "LOG",
+    "sessions",
+    sessionId,
+    ctx,
+    `Player logged session feedback`,
+  ).catch(() => {});
+
+  if (isFirst && session.responsibleId) {
+    const coach = await User.findByPk(session.responsibleId, {
+      attributes: ["id"],
+    });
+    if (coach) {
+      notifyUser(coach.id, {
+        type: "system",
+        title: "Session feedback received",
+        titleAr: "تم استلام تقييم الجلسة",
+        body: `A player logged feedback for session: ${session.title ?? sessionId}`,
+        bodyAr: `سجّل اللاعب تقييماً للجلسة: ${session.title ?? sessionId}`,
+        sourceType: "sessions",
+        sourceId: sessionId,
+      }).catch(() => {});
+    }
+  }
+
+  return log;
+}
+
+export async function getMySessionLog(sessionId: string, userId: string) {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId) throw new AppError("Player account not linked", 403);
+
+  const session = await Session.findByPk(sessionId, {
+    attributes: ["id", "playerId"],
+  });
+  if (!session || session.playerId !== playerId)
+    throw new AppError("Session not found", 404);
+
+  const log = await SessionLog.findOne({ where: { sessionId, playerId } });
+  return log ?? null;
+}
+
+export async function getSessionLogAggregate(
+  user: AuthUser,
+  from?: string,
+  to?: string,
+) {
+  const dateClause =
+    from && to
+      ? `AND s.session_date BETWEEN :from AND :to`
+      : from
+        ? `AND s.session_date >= :from`
+        : to
+          ? `AND s.session_date <= :to`
+          : "";
+
+  const rows = await sequelize.query<{
+    session_id: string;
+    session_date: string;
+    title: string | null;
+    rpe: string | null;
+    duration_min: string | null;
+    completed: boolean | null;
+  }>(
+    `SELECT
+       s.id        AS session_id,
+       s.session_date,
+       s.title,
+       sl.rpe,
+       sl.duration_min,
+       sl.completed
+     FROM sessions s
+     LEFT JOIN session_logs sl ON sl.session_id = s.id
+     WHERE s.completion_status = 'Completed'
+       AND s.responsible_id = :responsibleId
+       ${dateClause}
+     ORDER BY s.session_date DESC`,
+    {
+      replacements: { responsibleId: user.id, from, to },
+      type: QueryTypes.SELECT,
+    },
+  );
+
+  const logged = rows.filter((r) => r.rpe !== null || r.duration_min !== null);
+  const avgRpe =
+    logged.length > 0
+      ? Math.round(
+          (logged.reduce((s, r) => s + (Number(r.rpe) || 0), 0) /
+            logged.length) *
+            10,
+        ) / 10
+      : null;
+  const totalDurationMin = logged.reduce(
+    (s, r) => s + (Number(r.duration_min) || 0),
+    0,
+  );
+  const completionRate =
+    rows.length > 0 ? Math.round((logged.length / rows.length) * 100) : null;
+
+  return {
+    bySession: rows.map((r) => ({
+      sessionId: r.session_id,
+      sessionDate: r.session_date,
+      title: r.title,
+      rpe: r.rpe !== null ? Number(r.rpe) : null,
+      durationMin: r.duration_min !== null ? Number(r.duration_min) : null,
+      completed: r.completed,
+      logged: r.rpe !== null || r.duration_min !== null,
+    })),
+    summary: {
+      total: rows.length,
+      loggedCount: logged.length,
+      avgRpe,
+      totalDurationMin,
+      completionRate,
+    },
   };
 }

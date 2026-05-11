@@ -48,6 +48,23 @@ jest.mock('../../../src/modules/calendar/calendarScope', () => ({
   evictCalendarScope: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/shared/utils/audit', () => ({
+  logAudit: jest.fn().mockResolvedValue(undefined),
+  buildAuditContext: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('../../../src/modules/notifications/notification.service', () => ({
+  notifyUser: jest.fn().mockResolvedValue(null),
+  notifyByRole: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('../../../src/modules/sessions/sessionLog.model', () => ({
+  SessionLog: {
+    findOne: jest.fn(),
+    create: jest.fn(),
+  },
+}));
+
 import * as sessionService from '../../../src/modules/sessions/session.service';
 
 const mockSession = (overrides: Record<string, any> = {}) => ({
@@ -260,6 +277,93 @@ describe('Session Service', () => {
       expect(result).toHaveProperty('byType');
       expect(result).toHaveProperty('byStatus');
       expect(result).toHaveProperty('byOwner');
+    });
+  });
+
+  describe('logSession', () => {
+    const ctx = { userId: 'u1', userName: 'Player', userRole: 'Player', ip: '127.0.0.1', userAgent: '' };
+
+    it('creates a new log for a completed session', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      const { SessionLog } = require('../../../src/modules/sessions/sessionLog.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: 'player-001' });
+      const session = mockModelInstance({ id: 'session-001', playerId: 'player-001', completionStatus: 'Completed', responsibleId: null, title: 'Test' });
+      mockSessionFindByPk.mockResolvedValue(session);
+      SessionLog.findOne.mockResolvedValue(null);
+      const created = { id: 'log-001', sessionId: 'session-001', playerId: 'player-001', rpe: 7, durationMin: 60, completed: true, playerNotes: null };
+      SessionLog.create.mockResolvedValue(created);
+
+      const result = await sessionService.logSession('session-001', 'user-001', { rpe: 7, durationMin: 60, completed: true }, ctx as any);
+      expect(SessionLog.create).toHaveBeenCalled();
+      expect(result).toEqual(created);
+    });
+
+    it('updates an existing log (upsert)', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      const { SessionLog } = require('../../../src/modules/sessions/sessionLog.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: 'player-001' });
+      const session = mockModelInstance({ id: 'session-001', playerId: 'player-001', completionStatus: 'Completed', responsibleId: null, title: 'Test' });
+      mockSessionFindByPk.mockResolvedValue(session);
+      const existing = mockModelInstance({ id: 'log-001', sessionId: 'session-001' });
+      SessionLog.findOne.mockResolvedValue(existing);
+
+      await sessionService.logSession('session-001', 'user-001', { rpe: 8, completed: true }, ctx as any);
+      expect(existing.update).toHaveBeenCalledWith(expect.objectContaining({ rpe: 8 }));
+      expect(SessionLog.create).not.toHaveBeenCalled();
+    });
+
+    it('throws 403 if user has no linked player', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: null });
+      await expect(sessionService.logSession('s1', 'u1', { completed: true }, ctx as any)).rejects.toThrow('Player account not linked');
+    });
+
+    it('throws 404 if session not found', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: 'player-001' });
+      mockSessionFindByPk.mockResolvedValue(null);
+      await expect(sessionService.logSession('bad', 'u1', { completed: true }, ctx as any)).rejects.toThrow('Session not found');
+    });
+
+    it('throws 422 if session not completed', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: 'player-001' });
+      const session = mockModelInstance({ id: 's1', playerId: 'player-001', completionStatus: 'Scheduled', responsibleId: null, title: 'T' });
+      mockSessionFindByPk.mockResolvedValue(session);
+      await expect(sessionService.logSession('s1', 'u1', { completed: true }, ctx as any)).rejects.toThrow('Session is not yet completed');
+    });
+  });
+
+  describe('getMySessionLog', () => {
+    it('returns the log if found', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      const { SessionLog } = require('../../../src/modules/sessions/sessionLog.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: 'player-001' });
+      const session = mockModelInstance({ id: 's1', playerId: 'player-001' });
+      mockSessionFindByPk.mockResolvedValue(session);
+      const log = { id: 'log-001', rpe: 6 };
+      SessionLog.findOne.mockResolvedValue(log);
+
+      const result = await sessionService.getMySessionLog('s1', 'u1');
+      expect(result).toEqual(log);
+    });
+
+    it('returns null if no log exists', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      const { SessionLog } = require('../../../src/modules/sessions/sessionLog.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: 'player-001' });
+      const session = mockModelInstance({ id: 's1', playerId: 'player-001' });
+      mockSessionFindByPk.mockResolvedValue(session);
+      SessionLog.findOne.mockResolvedValue(null);
+
+      const result = await sessionService.getMySessionLog('s1', 'u1');
+      expect(result).toBeNull();
+    });
+
+    it('throws 403 if user has no linked player', async () => {
+      const { User } = require('../../../src/modules/users/user.model');
+      User.findByPk.mockResolvedValueOnce({ playerId: null });
+      await expect(sessionService.getMySessionLog('s1', 'u1')).rejects.toThrow('Player account not linked');
     });
   });
 });

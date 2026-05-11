@@ -143,3 +143,31 @@ export async function coverageRadar(req: AuthRequest, res: Response) {
   const data = await sessionService.getCoverageRadar(req.query as any);
   sendSuccess(res, data);
 }
+
+// ══════════════════════════════════════════
+// SESSION LOG (Loop 1 — Player Feedback)
+// ══════════════════════════════════════════
+
+export async function logMySession(req: AuthRequest, res: Response) {
+  const log = await sessionService.logSession(
+    req.params.sessionId,
+    req.user!.id,
+    req.body,
+    buildAuditContext(req.user!, req.ip),
+  );
+  sendCreated(res, log);
+}
+
+export async function getMySessionLog(req: AuthRequest, res: Response) {
+  const log = await sessionService.getMySessionLog(
+    req.params.sessionId,
+    req.user!.id,
+  );
+  sendSuccess(res, log);
+}
+
+export async function sessionLogAggregate(req: AuthRequest, res: Response) {
+  const { from, to } = req.query as { from?: string; to?: string };
+  const data = await sessionService.getSessionLogAggregate(req.user!, from, to);
+  sendSuccess(res, data);
+}
