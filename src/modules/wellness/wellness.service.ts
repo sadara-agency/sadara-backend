@@ -8,7 +8,11 @@ import {
   WellnessProfile,
   WellnessWeightLog,
   WellnessCheckin,
+  WellnessMealLog,
+  type MealType,
 } from "./wellness.model";
+import { NutritionPrescription } from "./nutritionPrescription.model";
+import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
@@ -308,7 +312,268 @@ export async function getWeightTrend(
   };
 }
 
-// meal log and food item functions removed in Phase 3 — data in _archive_meal_logs_20260422
+// ══════════════════════════════════════════
+// MEAL LOGS (Loop 2 — Nutrition Compliance)
+// ══════════════════════════════════════════
+
+export async function logMyMeal(
+  userId: string,
+  data: {
+    mealType: MealType;
+    foodItemId?: string;
+    customName?: string;
+    servings?: number;
+    calories: number;
+    proteinG: number;
+    carbsG: number;
+    fatG: number;
+    loggedDate?: string;
+    notes?: string;
+  },
+) {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId) throw new AppError("Player account not linked", 403);
+
+  const loggedDate = data.loggedDate ?? todayLocal();
+  return WellnessMealLog.create({
+    playerId,
+    mealType: data.mealType,
+    foodItemId: data.foodItemId ?? null,
+    customName: data.customName ?? null,
+    servings: data.servings ?? 1,
+    calories: data.calories,
+    proteinG: data.proteinG,
+    carbsG: data.carbsG,
+    fatG: data.fatG,
+    loggedDate,
+    notes: data.notes ?? null,
+  });
+}
+
+export async function getMyMealLogs(userId: string, date?: string) {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId) return { date: date ?? todayLocal(), meals: {} };
+
+  const targetDate = date ?? todayLocal();
+  const logs = await WellnessMealLog.findAll({
+    where: { playerId, loggedDate: targetDate },
+    order: [["createdAt", "ASC"]],
+  });
+
+  const grouped: Record<MealType, typeof logs> = {
+    breakfast: [],
+    lunch: [],
+    dinner: [],
+    snack: [],
+  };
+  for (const log of logs) {
+    grouped[log.mealType].push(log);
+  }
+
+  const totals = logs.reduce(
+    (acc, l) => ({
+      calories: acc.calories + Number(l.calories),
+      proteinG: acc.proteinG + Number(l.proteinG),
+      carbsG: acc.carbsG + Number(l.carbsG),
+      fatG: acc.fatG + Number(l.fatG),
+    }),
+    { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+  );
+
+  return { date: targetDate, meals: grouped, totals };
+}
+
+export async function deleteMyMealLog(userId: string, logId: string) {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId) throw new AppError("Player account not linked", 403);
+
+  const log = await WellnessMealLog.findByPk(logId);
+  if (!log) throw new AppError("Meal log not found", 404);
+  if (log.playerId !== playerId) throw new AppError("Not found", 404);
+
+  await log.destroy();
+  return { id: logId };
+}
+
+export async function getMyDailyCompliance(userId: string, date?: string) {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId)
+    return {
+      date: date ?? todayLocal(),
+      targets: null,
+      actuals: { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
+      pct: null,
+    };
+
+  const targetDate = date ?? todayLocal();
+
+  const [rows, prescription] = await Promise.all([
+    sequelize.query<{
+      total_calories: string;
+      total_protein_g: string;
+      total_carbs_g: string;
+      total_fat_g: string;
+    }>(
+      `SELECT
+         COALESCE(SUM(calories), 0)   AS total_calories,
+         COALESCE(SUM(protein_g), 0)  AS total_protein_g,
+         COALESCE(SUM(carbs_g), 0)    AS total_carbs_g,
+         COALESCE(SUM(fat_g), 0)      AS total_fat_g
+       FROM wellness_meal_logs
+       WHERE player_id = :playerId AND logged_date = :date`,
+      { replacements: { playerId, date: targetDate }, type: QueryTypes.SELECT },
+    ),
+    NutritionPrescription.findOne({
+      where: { playerId, supersededAt: null },
+      attributes: [
+        "targetCalories",
+        "targetProteinG",
+        "targetCarbsG",
+        "targetFatG",
+      ],
+    }),
+  ]);
+
+  const row = rows[0];
+  const actuals = {
+    calories: Math.round(Number(row.total_calories)),
+    proteinG: Math.round(Number(row.total_protein_g) * 10) / 10,
+    carbsG: Math.round(Number(row.total_carbs_g) * 10) / 10,
+    fatG: Math.round(Number(row.total_fat_g) * 10) / 10,
+  };
+
+  if (!prescription) {
+    return { date: targetDate, targets: null, actuals, pct: null };
+  }
+
+  const targets = {
+    calories: prescription.targetCalories
+      ? Number(prescription.targetCalories)
+      : null,
+    proteinG: prescription.targetProteinG
+      ? Number(prescription.targetProteinG)
+      : null,
+    carbsG: prescription.targetCarbsG
+      ? Number(prescription.targetCarbsG)
+      : null,
+    fatG: prescription.targetFatG ? Number(prescription.targetFatG) : null,
+  };
+
+  const pct = {
+    calories: targets.calories
+      ? Math.min(100, Math.round((actuals.calories / targets.calories) * 100))
+      : null,
+    proteinG: targets.proteinG
+      ? Math.min(100, Math.round((actuals.proteinG / targets.proteinG) * 100))
+      : null,
+    carbsG: targets.carbsG
+      ? Math.min(100, Math.round((actuals.carbsG / targets.carbsG) * 100))
+      : null,
+    fatG: targets.fatG
+      ? Math.min(100, Math.round((actuals.fatG / targets.fatG) * 100))
+      : null,
+  };
+
+  return { date: targetDate, targets, actuals, pct };
+}
+
+export async function getPlayerMealCompliance(
+  playerId: string,
+  from: string,
+  to: string,
+  user?: AuthUser,
+) {
+  const ok = await checkRowAccess("wellness", { playerId }, user);
+  if (!ok) throw new AppError("Not found", 404);
+
+  const [rows, prescription] = await Promise.all([
+    sequelize.query<{
+      logged_date: string;
+      total_calories: string;
+      total_protein_g: string;
+      total_carbs_g: string;
+      total_fat_g: string;
+    }>(
+      `SELECT
+         logged_date,
+         COALESCE(SUM(calories), 0)   AS total_calories,
+         COALESCE(SUM(protein_g), 0)  AS total_protein_g,
+         COALESCE(SUM(carbs_g), 0)    AS total_carbs_g,
+         COALESCE(SUM(fat_g), 0)      AS total_fat_g
+       FROM wellness_meal_logs
+       WHERE player_id = :playerId
+         AND logged_date BETWEEN :from AND :to
+       GROUP BY logged_date
+       ORDER BY logged_date ASC`,
+      {
+        replacements: { playerId, from, to },
+        type: QueryTypes.SELECT,
+      },
+    ),
+    NutritionPrescription.findOne({
+      where: { playerId, supersededAt: null },
+      attributes: [
+        "targetCalories",
+        "targetProteinG",
+        "targetCarbsG",
+        "targetFatG",
+      ],
+    }),
+  ]);
+
+  const targets = prescription
+    ? {
+        calories: prescription.targetCalories
+          ? Number(prescription.targetCalories)
+          : null,
+        proteinG: prescription.targetProteinG
+          ? Number(prescription.targetProteinG)
+          : null,
+        carbsG: prescription.targetCarbsG
+          ? Number(prescription.targetCarbsG)
+          : null,
+        fatG: prescription.targetFatG ? Number(prescription.targetFatG) : null,
+      }
+    : null;
+
+  const dailyRows = rows.map((r) => {
+    const actuals = {
+      calories: Math.round(Number(r.total_calories)),
+      proteinG: Math.round(Number(r.total_protein_g) * 10) / 10,
+      carbsG: Math.round(Number(r.total_carbs_g) * 10) / 10,
+      fatG: Math.round(Number(r.total_fat_g) * 10) / 10,
+    };
+    const pct = targets
+      ? {
+          calories: targets.calories
+            ? Math.min(
+                100,
+                Math.round((actuals.calories / targets.calories) * 100),
+              )
+            : null,
+          proteinG: targets.proteinG
+            ? Math.min(
+                100,
+                Math.round((actuals.proteinG / targets.proteinG) * 100),
+              )
+            : null,
+          carbsG: targets.carbsG
+            ? Math.min(100, Math.round((actuals.carbsG / targets.carbsG) * 100))
+            : null,
+          fatG: targets.fatG
+            ? Math.min(100, Math.round((actuals.fatG / targets.fatG) * 100))
+            : null,
+        }
+      : null;
+    return { date: r.logged_date, actuals, pct };
+  });
+
+  return { playerId, from, to, targets, days: dailyRows };
+}
 
 // ══════════════════════════════════════════
 // DASHBOARD (Phase 4)

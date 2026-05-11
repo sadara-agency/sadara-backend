@@ -63,6 +63,13 @@ jest.mock('../../src/shared/utils/audit', () => ({
 jest.mock('../../src/modules/wellness/wellness.service');
 jest.mock('../../src/modules/wellness/wellness.model', () => ({
   WellnessProfile: { findByPk: jest.fn(), findOne: jest.fn(), create: jest.fn() },
+  WellnessMealLog: { findAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() },
+}));
+jest.mock('../../src/modules/wellness/nutritionPrescription.model', () => ({
+  NutritionPrescription: { findOne: jest.fn(), findAndCountAll: jest.fn() },
+}));
+jest.mock('../../src/modules/users/user.model', () => ({
+  User: { findByPk: jest.fn() },
 }));
 jest.mock('../../src/modules/players/player.model', () => ({
   Player: { findByPk: jest.fn(), findAndCountAll: jest.fn() },
