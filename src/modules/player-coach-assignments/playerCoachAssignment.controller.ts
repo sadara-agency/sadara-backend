@@ -50,3 +50,8 @@ export async function updateStatus(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, updated, "Assignment status updated");
 }
+
+export async function staffCounts(_req: AuthRequest, res: Response) {
+  const counts = await assignmentService.getStaffPlayerCounts();
+  sendSuccess(res, counts);
+}
