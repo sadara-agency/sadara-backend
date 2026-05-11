@@ -1416,12 +1416,6 @@ export async function getMyProgramById(userId: string, programId: string) {
     order: [
       [{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"],
       [{ model: ProgramDaySession, as: "daySessions" }, "orderIndex", "ASC"],
-      [
-        { model: ProgramDaySession, as: "daySessions" },
-        { model: ProgramExercise, as: "exercises" },
-        "orderIndex",
-        "ASC",
-      ],
     ],
   });
 
@@ -1460,15 +1454,18 @@ export async function getMyProgramById(userId: string, programId: string) {
       logCount: logCountMap[pe.id] ?? 0,
     }));
   }
-  // Annotate day-session exercises with logCount
+  // Annotate day-session exercises with logCount (sort by orderIndex in JS
+  // since Sequelize can't ORDER BY a doubly-nested include reliably here)
   if (Array.isArray(programJson.daySessions)) {
     programJson.daySessions = programJson.daySessions.map((ds: any) => ({
       ...ds,
       exercises: Array.isArray(ds.exercises)
-        ? ds.exercises.map((pe: any) => ({
-            ...pe,
-            logCount: logCountMap[pe.id] ?? 0,
-          }))
+        ? [...ds.exercises]
+            .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
+            .map((pe: any) => ({
+              ...pe,
+              logCount: logCountMap[pe.id] ?? 0,
+            }))
         : [],
     }));
   }
