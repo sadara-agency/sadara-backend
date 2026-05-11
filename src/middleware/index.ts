@@ -5,7 +5,7 @@ export { authenticate, authorize, authorizeModule, optionalAuth } from "./auth";
 export { AppError, errorHandler, asyncHandler } from "./errorHandler";
 
 // Field access
-export { fieldAccess, dynamicFieldAccess } from "./fieldAccess";
+export { dynamicFieldAccess } from "./fieldAccess";
 
 // Rate limiting
 export {

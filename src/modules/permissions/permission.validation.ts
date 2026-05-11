@@ -111,4 +111,17 @@ export const updateFieldPermissionsSchema = z.object({
   }),
 });
 
+export const upsertConfigurableFieldSchema = z.object({
+  body: z.object({
+    module: z.enum(MODULES),
+    field: z.string().min(1).max(100),
+    label: z.string().min(1).max(150),
+    sortOrder: z.number().int().min(0).max(1000).optional(),
+  }),
+});
+
+export const deleteConfigurableFieldSchema = z.object({
+  params: z.object({ id: z.string().uuid() }),
+});
+
 export { ROLES, MODULES };

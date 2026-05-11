@@ -1,4 +1,4 @@
-export interface ConfigurableField {
+export interface ConfigurableFieldDef {
   field: string;
   label: string;
 }
@@ -6,8 +6,13 @@ export interface ConfigurableField {
 /**
  * Fields that can be configured for field-level visibility per role.
  * Keyed by module name matching the permission system's module identifiers.
+ *
+ * NOTE: this is now the seed source for the `configurable_fields` DB table
+ * (migration 234) and the runtime fallback when that table is empty. Day-to-day
+ * changes go through the admin API (POST/DELETE /permissions/fields/config),
+ * not by editing this file.
  */
-export const CONFIGURABLE_FIELDS: Record<string, ConfigurableField[]> = {
+export const CONFIGURABLE_FIELDS: Record<string, ConfigurableFieldDef[]> = {
   players: [
     { field: "phone", label: "Phone" },
     { field: "email", label: "Email" },

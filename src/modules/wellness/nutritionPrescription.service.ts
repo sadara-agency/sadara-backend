@@ -1,8 +1,10 @@
+import { Op } from "sequelize";
 import {
   NutritionPrescription,
   PrescriptionMeal,
   type TriggeringReason,
 } from "./nutritionPrescription.model";
+import { FoodItem } from "./foodItem.model";
 import type {
   IssuePrescriptionDTO,
   UpdatePrescriptionDTO,
@@ -17,6 +19,7 @@ import {
 } from "@shared/utils/rowScope";
 import { buildMeta } from "@shared/utils/pagination";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { sequelize as db } from "@config/database";
 
 export async function listPrescriptions(
   query: ListPrescriptionsQueryDTO,
@@ -191,4 +194,24 @@ export async function deletePrescription(id: string): Promise<{ id: string }> {
   await prescription.destroy();
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
   return { id };
+}
+
+export async function searchFoods(q: string, limit = 20): Promise<FoodItem[]> {
+  const safeLimit = Math.min(limit, 50);
+
+  if (q.trim().length < 3) {
+    return FoodItem.findAll({
+      where: { name: { [Op.iLike]: `%${q.trim()}%` } },
+      limit: safeLimit,
+      order: [["name", "ASC"]],
+    });
+  }
+
+  return FoodItem.findAll({
+    where: db.where(db.fn("to_tsvector", "english", db.col("name")), {
+      [Op.match]: db.fn("plainto_tsquery", "english", q.trim()),
+    }),
+    limit: safeLimit,
+    order: [["name", "ASC"]],
+  });
 }

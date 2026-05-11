@@ -11,6 +11,7 @@ import {
   updatePrescriptionSchema,
   reissuePrescriptionSchema,
   listPrescriptionsQuerySchema,
+  foodSearchSchema,
 } from "./nutritionPrescription.validation";
 
 const router = Router();
@@ -96,6 +97,35 @@ router.get(
   authorizeModule("wellness", "read"),
   dynamicFieldAccess("wellness"),
   asyncHandler(ctrl.getHistory),
+);
+
+/**
+ * @swagger
+ * /nutrition-prescriptions/foods/search:
+ *   get:
+ *     summary: Search food items by name (full-text)
+ *     tags: [NutritionPrescriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema: { type: string }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *     responses:
+ *       200:
+ *         description: List of matching food items with macro data
+ */
+router.get(
+  "/foods/search",
+  authorizeModule("wellness", "read"),
+  dynamicFieldAccess("wellness"),
+  cacheRoute("food-search", CacheTTL.LONG),
+  validate(foodSearchSchema, "query"),
+  asyncHandler(ctrl.searchFoods),
 );
 
 /**
