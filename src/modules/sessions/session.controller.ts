@@ -148,8 +148,6 @@ export async function coverageRadar(req: AuthRequest, res: Response) {
 // SESSION LOG (Loop 1 — Player Feedback)
 // ══════════════════════════════════════════
 
-import { buildAuditContext } from "@shared/utils/audit";
-
 export async function logMySession(req: AuthRequest, res: Response) {
   const log = await sessionService.logSession(
     req.params.sessionId,

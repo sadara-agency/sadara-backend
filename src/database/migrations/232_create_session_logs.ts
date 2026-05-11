@@ -16,14 +16,10 @@ export async function up({
       type: DataTypes.UUID,
       allowNull: false,
       unique: true,
-      references: { model: "sessions", key: "id" },
-      onDelete: "CASCADE",
     },
     player_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "players", key: "id" },
-      onDelete: "CASCADE",
     },
     rpe: {
       type: DataTypes.SMALLINT,

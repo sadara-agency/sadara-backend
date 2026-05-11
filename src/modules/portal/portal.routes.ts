@@ -9,6 +9,7 @@ import { cacheRoute } from "@middleware/cache.middleware";
 import { CachePrefix, CacheTTL } from "@shared/utils/cache";
 import * as portalController from "@modules/portal/portal.controller";
 import * as authController from "@modules/auth/auth.controller";
+import { logSetSchema } from "@modules/wellness/programExerciseLog.validation";
 
 const router = Router();
 
@@ -214,6 +215,25 @@ router.get(
   validate(z.object({ id: z.string().uuid() }), "params"),
   cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMyProgramById),
+);
+router.post(
+  "/programs/:programId/exercises/:exerciseId/logs",
+  authorize("Player"),
+  validate(
+    z.object({ programId: z.string().uuid(), exerciseId: z.string().uuid() }),
+    "params",
+  ),
+  validate(logSetSchema),
+  asyncHandler(portalController.logProgramExerciseSet),
+);
+router.get(
+  "/programs/:programId/exercises/:exerciseId/logs",
+  authorize("Player"),
+  validate(
+    z.object({ programId: z.string().uuid(), exerciseId: z.string().uuid() }),
+    "params",
+  ),
+  asyncHandler(portalController.getProgramExerciseLogs),
 );
 
 // ── Admin/Manager routes: generate invite links ──

@@ -7,6 +7,7 @@ import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { uploadFile } from "@shared/utils/storage";
 import * as portalService from "@modules/portal/portal.service";
 import * as documentService from "@modules/documents/document.service";
+import * as programExerciseLogService from "@modules/wellness/programExerciseLog.service";
 
 // ── My Profile ──
 
@@ -278,6 +279,29 @@ export async function getMyPrograms(req: AuthRequest, res: Response) {
 export async function getMyProgramById(req: AuthRequest, res: Response) {
   const { id } = req.params;
   const data = await portalService.getMyProgramById(req.user!.id, id);
+  sendSuccess(res, data);
+}
+
+// ── Program Exercise Logs ──
+
+export async function logProgramExerciseSet(req: AuthRequest, res: Response) {
+  const { programId, exerciseId } = req.params;
+  const data = await programExerciseLogService.logSet(
+    req.user!.id,
+    programId,
+    exerciseId,
+    req.body,
+  );
+  sendCreated(res, data);
+}
+
+export async function getProgramExerciseLogs(req: AuthRequest, res: Response) {
+  const { programId, exerciseId } = req.params;
+  const data = await programExerciseLogService.getLogsForExercise(
+    req.user!.id,
+    programId,
+    exerciseId,
+  );
   sendSuccess(res, data);
 }
 

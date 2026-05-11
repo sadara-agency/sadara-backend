@@ -21,6 +21,8 @@ import {
 } from "@modules/wellness/developmentProgram.model";
 import { WellnessExercise } from "@modules/wellness/fitness.model";
 import { TrainingBlock } from "@modules/wellness/trainingBlock.model";
+import { ProgramDaySession } from "@modules/wellness/programDaySession.model";
+import { ProgramExerciseLog } from "@modules/wellness/programExerciseLog.model";
 import { AppError } from "@middleware/errorHandler";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { PlayerAccount } from "@modules/portal/playerAccount.model";
@@ -1396,15 +1398,31 @@ export async function getMyProgramById(userId: string, programId: string) {
   });
   const blockIds = blocks.map((b) => b.id);
 
+  const exerciseInclude = {
+    model: ProgramExercise,
+    as: "exercises",
+    include: [{ model: WellnessExercise, as: "exercise" }],
+  };
+
   const program = await DevelopmentProgram.findByPk(programId, {
     include: [
+      exerciseInclude,
       {
-        model: ProgramExercise,
-        as: "exercises",
-        include: [{ model: WellnessExercise, as: "exercise" }],
+        model: ProgramDaySession,
+        as: "daySessions",
+        include: [exerciseInclude],
       },
     ],
-    order: [[{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"]],
+    order: [
+      [{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"],
+      [{ model: ProgramDaySession, as: "daySessions" }, "orderIndex", "ASC"],
+      [
+        { model: ProgramDaySession, as: "daySessions" },
+        { model: ProgramExercise, as: "exercises" },
+        "orderIndex",
+        "ASC",
+      ],
+    ],
   });
 
   if (!program) throw new AppError("Program not found", 404);
@@ -1422,5 +1440,38 @@ export async function getMyProgramById(userId: string, programId: string) {
     ? blocks.find((b) => b.id === program.trainingBlockId)
     : null;
 
-  return { ...program.toJSON(), trainingBlock: block ? block.toJSON() : null };
+  // Attach per-exercise log counts so the player UI can show "X sets logged"
+  const logCounts = await ProgramExerciseLog.findAll({
+    where: { programId, playerId },
+    attributes: ["programExerciseId"],
+  });
+  const logCountMap: Record<string, number> = {};
+  for (const l of logCounts) {
+    const key = l.programExerciseId;
+    logCountMap[key] = (logCountMap[key] ?? 0) + 1;
+  }
+
+  const programJson = program.toJSON() as any;
+
+  // Annotate top-level exercises with logCount
+  if (Array.isArray(programJson.exercises)) {
+    programJson.exercises = programJson.exercises.map((pe: any) => ({
+      ...pe,
+      logCount: logCountMap[pe.id] ?? 0,
+    }));
+  }
+  // Annotate day-session exercises with logCount
+  if (Array.isArray(programJson.daySessions)) {
+    programJson.daySessions = programJson.daySessions.map((ds: any) => ({
+      ...ds,
+      exercises: Array.isArray(ds.exercises)
+        ? ds.exercises.map((pe: any) => ({
+            ...pe,
+            logCount: logCountMap[pe.id] ?? 0,
+          }))
+        : [],
+    }));
+  }
+
+  return { ...programJson, trainingBlock: block ? block.toJSON() : null };
 }
