@@ -12,10 +12,10 @@ export async function up({
       primaryKey: true,
     },
     program_exercise_id: {
+      // No FK constraint — program_exercises table may not exist on a fresh DB run
+      // (it is created by a later migration). Integrity enforced at app layer.
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "program_exercises", key: "id" },
-      onDelete: "CASCADE",
     },
     program_id: {
       type: DataTypes.UUID,
