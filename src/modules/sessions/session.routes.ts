@@ -11,6 +11,8 @@ import {
   updateSessionSchema,
   sessionQuerySchema,
   coverageRadarQuerySchema,
+  createSessionLogSchema,
+  logAggregateQuerySchema,
 } from "./session.validation";
 import * as sessionController from "./session.controller";
 import feedbackRoutes from "./feedback/sessionFeedback.routes";
@@ -79,6 +81,25 @@ router.get(
   cacheRoute(CachePrefix.SESSION_COVERAGE, CacheTTL.SHORT),
   asyncHandler(sessionController.suggestions),
 );
+// ── Player self-service log (before /:id catch-all) ──
+router.post(
+  "/me/:sessionId/log",
+  validate(createSessionLogSchema),
+  asyncHandler(sessionController.logMySession),
+);
+router.get(
+  "/me/:sessionId/log",
+  asyncHandler(sessionController.getMySessionLog),
+);
+
+// ── Coach log aggregate ──
+router.get(
+  "/coach/log-aggregate",
+  authorizeModule("sessions", "read"),
+  validate(logAggregateQuerySchema, "query"),
+  asyncHandler(sessionController.sessionLogAggregate),
+);
+
 router.get(
   "/:id",
   authorizeModule("sessions", "read"),

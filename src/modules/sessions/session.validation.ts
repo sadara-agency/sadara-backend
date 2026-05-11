@@ -155,8 +155,30 @@ export const sessionQuerySchema = z.object({
   outcomeTags: z.string().optional(),
 });
 
+// ── Session Log (player feedback) ──
+
+export const createSessionLogSchema = z.object({
+  rpe: z.number().int().min(0).max(10).optional(),
+  durationMin: z.number().int().min(1).max(600).optional(),
+  completed: z.boolean().default(true),
+  playerNotes: z.string().max(1000).optional(),
+});
+
+export const logAggregateQuerySchema = z.object({
+  from: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  to: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
 // ── Inferred Types ──
 
 export type CreateSessionInput = z.infer<typeof createSessionSchema>;
 export type UpdateSessionInput = z.infer<typeof updateSessionSchema>;
 export type SessionQuery = z.infer<typeof sessionQuerySchema>;
+export type CreateSessionLogInput = z.infer<typeof createSessionLogSchema>;
+export type LogAggregateQuery = z.infer<typeof logAggregateQuerySchema>;
