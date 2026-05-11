@@ -1404,6 +1404,11 @@ export async function getMyProgramById(userId: string, programId: string) {
     include: [{ model: WellnessExercise, as: "exercise" }],
   };
 
+  // NOTE: no Sequelize `order` clause here — ordering a query that mixes a
+  // top-level hasMany include (`exercises`) with a nested hasMany include
+  // (`daySessions.exercises`) makes Sequelize emit a bad ORDER BY referencing
+  // an un-aliased "daySessions" table → `missing FROM-clause entry`. We sort
+  // everything in JS below instead.
   const program = await DevelopmentProgram.findByPk(programId, {
     include: [
       exerciseInclude,
@@ -1412,10 +1417,6 @@ export async function getMyProgramById(userId: string, programId: string) {
         as: "daySessions",
         include: [exerciseInclude],
       },
-    ],
-    order: [
-      [{ model: ProgramExercise, as: "exercises" }, "orderIndex", "ASC"],
-      [{ model: ProgramDaySession, as: "daySessions" }, "orderIndex", "ASC"],
     ],
   });
 
@@ -1447,27 +1448,27 @@ export async function getMyProgramById(userId: string, programId: string) {
 
   const programJson = program.toJSON() as any;
 
-  // Annotate top-level exercises with logCount
+  const byOrderIndex = (a: any, b: any) =>
+    (a.orderIndex ?? 0) - (b.orderIndex ?? 0);
+
+  // Annotate top-level exercises with logCount (sorted by orderIndex in JS)
   if (Array.isArray(programJson.exercises)) {
-    programJson.exercises = programJson.exercises.map((pe: any) => ({
-      ...pe,
-      logCount: logCountMap[pe.id] ?? 0,
-    }));
+    programJson.exercises = [...programJson.exercises]
+      .sort(byOrderIndex)
+      .map((pe: any) => ({ ...pe, logCount: logCountMap[pe.id] ?? 0 }));
   }
-  // Annotate day-session exercises with logCount (sort by orderIndex in JS
-  // since Sequelize can't ORDER BY a doubly-nested include reliably here)
+  // Annotate day-session exercises with logCount (sorted by orderIndex in JS)
   if (Array.isArray(programJson.daySessions)) {
-    programJson.daySessions = programJson.daySessions.map((ds: any) => ({
-      ...ds,
-      exercises: Array.isArray(ds.exercises)
-        ? [...ds.exercises]
-            .sort((a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0))
-            .map((pe: any) => ({
-              ...pe,
-              logCount: logCountMap[pe.id] ?? 0,
-            }))
-        : [],
-    }));
+    programJson.daySessions = [...programJson.daySessions]
+      .sort(byOrderIndex)
+      .map((ds: any) => ({
+        ...ds,
+        exercises: Array.isArray(ds.exercises)
+          ? [...ds.exercises]
+              .sort(byOrderIndex)
+              .map((pe: any) => ({ ...pe, logCount: logCountMap[pe.id] ?? 0 }))
+          : [],
+      }));
   }
 
   return { ...programJson, trainingBlock: block ? block.toJSON() : null };
