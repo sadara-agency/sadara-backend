@@ -39,10 +39,6 @@ export const createContractSchema = z
     startDate: z
       .string()
       .regex(DATE_REGEX, "Date must be YYYY-MM-DD")
-      .refine(
-        (d) => new Date(d) >= new Date(new Date().toISOString().split("T")[0]),
-        { message: "Start date cannot be in the past" },
-      )
       .optional(),
     endDate: z.string().regex(DATE_REGEX, "Date must be YYYY-MM-DD").optional(),
     baseSalary: z.number().positive("Salary must be positive").optional(),
