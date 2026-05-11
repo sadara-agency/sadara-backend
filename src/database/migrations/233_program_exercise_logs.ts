@@ -20,14 +20,10 @@ export async function up({
     program_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "development_programs", key: "id" },
-      onDelete: "CASCADE",
     },
     player_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "players", key: "id" },
-      onDelete: "CASCADE",
     },
     set_number: {
       type: DataTypes.INTEGER,

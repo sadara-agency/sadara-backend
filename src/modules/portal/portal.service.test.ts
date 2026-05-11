@@ -83,6 +83,9 @@ jest.mock("@modules/wellness/trainingBlock.model", () => ({
   TrainingBlock: { findAll: jest.fn(), name: "TrainingBlock" },
   TrainingBlockExercise: { name: "TrainingBlockExercise" },
 }));
+jest.mock("@modules/wellness/programDaySession.model", () => ({
+  ProgramDaySession: { findAll: jest.fn(), name: "ProgramDaySession" },
+}));
 
 import {
   requestProfileLink,

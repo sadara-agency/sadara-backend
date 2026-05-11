@@ -81,6 +81,9 @@ jest.mock('../../../src/modules/wellness/trainingBlock.model', () => ({
   TrainingBlock: { findAll: jest.fn(), name: 'TrainingBlock' },
   TrainingBlockExercise: { name: 'TrainingBlockExercise' },
 }));
+jest.mock('../../../src/modules/wellness/programDaySession.model', () => ({
+  ProgramDaySession: { findAll: jest.fn(), name: 'ProgramDaySession' },
+}));
 jest.mock('../../../src/modules/portal/playerAccount.model', () => ({
   PlayerAccount: {
     findOne: jest.fn(),

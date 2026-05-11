@@ -48,6 +48,16 @@ jest.mock('../../../src/modules/calendar/calendarScope', () => ({
   evictCalendarScope: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../../../src/shared/utils/audit', () => ({
+  logAudit: jest.fn().mockResolvedValue(undefined),
+  buildAuditContext: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('../../../src/modules/notifications/notification.service', () => ({
+  notifyUser: jest.fn().mockResolvedValue(null),
+  notifyByRole: jest.fn().mockResolvedValue(null),
+}));
+
 jest.mock('../../../src/modules/sessions/sessionLog.model', () => ({
   SessionLog: {
     findOne: jest.fn(),
