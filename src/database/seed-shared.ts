@@ -853,6 +853,28 @@ const RAW_PERMISSIONS: Perm[] = [
     { canRead: true },
   ),
 
+  // ── Player Inbox (management orders / disciplinary / fines / directives) ──
+  // Issuers: leadership. Player access is via the /me ownership routes, not RBAC.
+  ...forRoles(
+    "player-inbox",
+    ["Admin", "SportingDirector", "Manager", "Executive"],
+    { canCreate: true, canRead: true, canUpdate: true, canDelete: true },
+  ),
+  ...forRoles(
+    "player-inbox",
+    [
+      "Coach",
+      "SkillCoach",
+      "TacticalCoach",
+      "FitnessCoach",
+      "GymCoach",
+      "GoalkeeperCoach",
+      "MentalCoach",
+      "Analyst",
+    ],
+    { canRead: true },
+  ),
+
   // ── Staff Monitoring ──
   // Admin bypasses all permission checks — no explicit row needed.
   // SportingDirector: full monitoring read + task CRU

@@ -74,6 +74,7 @@ const MODULES = [
   "designs",
   "heatmaps",
   "workout-plans",
+  "player-inbox",
 ] as const;
 
 export const updatePermissionsSchema = z.object({
