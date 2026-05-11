@@ -1398,24 +1398,27 @@ export async function getMyProgramById(userId: string, programId: string) {
   });
   const blockIds = blocks.map((b) => b.id);
 
-  const exerciseInclude = {
+  // Build a fresh include object each time — Sequelize mutates include option
+  // objects in place during query normalization, so reusing one object for both
+  // the top-level `exercises` include and the nested `daySessions.exercises`
+  // include corrupts the second join's parent/association pointers and produces
+  // `missing FROM-clause entry for table "daySessions"`.
+  const exerciseInclude = () => ({
     model: ProgramExercise,
     as: "exercises",
     include: [{ model: WellnessExercise, as: "exercise" }],
-  };
+  });
 
-  // NOTE: no Sequelize `order` clause here — ordering a query that mixes a
-  // top-level hasMany include (`exercises`) with a nested hasMany include
-  // (`daySessions.exercises`) makes Sequelize emit a bad ORDER BY referencing
-  // an un-aliased "daySessions" table → `missing FROM-clause entry`. We sort
-  // everything in JS below instead.
+  // NOTE: no Sequelize `order` clause — ordering a query that mixes a top-level
+  // hasMany include with a nested hasMany include makes Sequelize emit a bad
+  // ORDER BY. We sort everything in JS below instead.
   const program = await DevelopmentProgram.findByPk(programId, {
     include: [
-      exerciseInclude,
+      exerciseInclude(),
       {
         model: ProgramDaySession,
         as: "daySessions",
-        include: [exerciseInclude],
+        include: [exerciseInclude()],
       },
     ],
   });
