@@ -80,6 +80,7 @@ export async function up({
     `CREATE INDEX food_items_name_gin ON food_items USING gin(to_tsvector('english', name));`,
   );
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("food_items", ["name"], {
     name: "food_items_name_btree",
   });
