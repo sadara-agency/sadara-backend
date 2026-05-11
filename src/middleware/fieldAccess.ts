@@ -1,54 +1,8 @@
 import { Response, NextFunction } from "express";
-import { AuthRequest, UserRole } from "@shared/types";
+import { AuthRequest } from "@shared/types";
 import { getHiddenFields } from "@modules/permissions/permission.service";
 import { verifyUserRole } from "@shared/utils/verifyRole";
 import { logger } from "@config/logger";
-
-/**
- * Field-level access control middleware.
- *
- * Strips specified fields from the response JSON based on the
- * authenticated user's role. Applies to `res.json()` calls only.
- *
- * Usage:
- *   router.get('/players', fieldAccess(PLAYER_HIDDEN_FIELDS), asyncHandler(ctrl.list));
- *
- * Config format:
- *   { fieldName: [roles that CANNOT see it] }
- */
-
-type HiddenFieldsConfig = Record<string, UserRole[]>;
-
-export function fieldAccess(config: HiddenFieldsConfig) {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    const role = req.user?.role;
-    if (!role) {
-      next();
-      return;
-    }
-
-    // Collect fields to strip for this role
-    const fieldsToStrip = Object.entries(config)
-      .filter(([, deniedRoles]) => deniedRoles.includes(role))
-      .map(([field]) => field);
-
-    if (fieldsToStrip.length === 0) {
-      next();
-      return;
-    }
-
-    // Intercept res.json to strip fields before sending
-    const originalJson = res.json.bind(res);
-    res.json = function (body: any) {
-      if (body && typeof body === "object") {
-        stripFields(body, fieldsToStrip);
-      }
-      return originalJson(body);
-    };
-
-    next();
-  };
-}
 
 /**
  * Recursively strip fields from the response payload.
@@ -85,8 +39,8 @@ function removeKeys(obj: any, fields: string[]): void {
 }
 
 /**
- * Dynamic field access middleware — reads hidden fields from DB/cache.
- * Replaces the static fieldAccess() for DB-driven field-level permissions.
+ * Dynamic field access middleware — reads hidden fields from DB/cache
+ * (`role_field_permissions` table) and strips them from `res.json()` per role.
  */
 export function dynamicFieldAccess(module: string) {
   return async (

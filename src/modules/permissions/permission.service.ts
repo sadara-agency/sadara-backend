@@ -1,5 +1,7 @@
 import { RolePermission } from "@modules/permissions/permission.model";
 import { RoleFieldPermission } from "@modules/permissions/fieldPermission.model";
+import { ConfigurableField } from "@modules/permissions/configurableField.model";
+import { CONFIGURABLE_FIELDS } from "@modules/permissions/fieldPermission.config";
 import { cacheGet, cacheSet, cacheDel, CacheTTL } from "@shared/utils/cache";
 import { verifyUserRole } from "@shared/utils/verifyRole";
 
@@ -93,14 +95,17 @@ export async function hasPermission(
   }
 }
 
-/** Clear both in-memory and Redis caches (module + field permissions). */
+/** Clear all in-memory and Redis caches (module + field perms + configurable fields). */
 export async function invalidatePermissionCache(): Promise<void> {
   memoryCache = null;
   memoryCacheTimestamp = 0;
   fieldMemoryCache = null;
   fieldMemoryCacheTimestamp = 0;
+  configFieldsMemoryCache = null;
+  configFieldsMemoryCacheTimestamp = 0;
   await cacheDel(CACHE_KEY);
   await cacheDel(FIELD_CACHE_KEY);
+  await cacheDel(CONFIG_FIELDS_CACHE_KEY);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -164,4 +169,68 @@ export async function getHiddenFields(
   }
   const perms = await getFieldPermissions();
   return perms[role]?.[module] ?? [];
+}
+
+// ══════════════════════════════════════════════════════════
+// Configurable Fields (which fields per module may be hidden)
+// ══════════════════════════════════════════════════════════
+
+/** module → array of { field, label } that can be toggled per role */
+export type ConfigurableFieldsMap = Record<
+  string,
+  Array<{ field: string; label: string }>
+>;
+
+const CONFIG_FIELDS_CACHE_KEY = "rbac:configurable-fields";
+let configFieldsMemoryCache: ConfigurableFieldsMap | null = null;
+let configFieldsMemoryCacheTimestamp = 0;
+
+/** Load configurable fields from DB → memory + Redis cache. Empty DB → in-code fallback. */
+export async function loadConfigurableFields(): Promise<ConfigurableFieldsMap> {
+  const rows = await ConfigurableField.findAll({
+    order: [
+      ["module", "ASC"],
+      ["sortOrder", "ASC"],
+    ],
+    raw: true,
+  });
+
+  let map: ConfigurableFieldsMap;
+  if (rows.length === 0) {
+    // Table not yet seeded (e.g. deploy landed before migration) — fall back
+    // to the in-code constant so the endpoint never regresses.
+    map = {};
+    for (const [module, fields] of Object.entries(CONFIGURABLE_FIELDS)) {
+      map[module] = fields.map((f) => ({ field: f.field, label: f.label }));
+    }
+  } else {
+    map = {};
+    for (const row of rows) {
+      if (!map[row.module]) map[row.module] = [];
+      map[row.module].push({ field: row.field, label: row.label });
+    }
+  }
+
+  configFieldsMemoryCache = map;
+  configFieldsMemoryCacheTimestamp = Date.now();
+  await cacheSet(CONFIG_FIELDS_CACHE_KEY, map, CacheTTL.HOUR);
+  return map;
+}
+
+/** Get the configurable-fields map (memory → Redis → DB → in-code fallback). */
+export async function getConfigurableFields(): Promise<ConfigurableFieldsMap> {
+  if (
+    configFieldsMemoryCache &&
+    Date.now() - configFieldsMemoryCacheTimestamp < MEMORY_TTL_MS
+  ) {
+    return configFieldsMemoryCache;
+  }
+
+  const cached = await cacheGet<ConfigurableFieldsMap>(CONFIG_FIELDS_CACHE_KEY);
+  if (cached) {
+    configFieldsMemoryCache = cached;
+    return cached;
+  }
+
+  return loadConfigurableFields();
 }

@@ -36,9 +36,15 @@ export const listPrescriptionsQuerySchema = z.object({
   currentOnly: z.coerce.boolean().default(false),
 });
 
+export const foodSearchSchema = z.object({
+  q: z.string().min(1).max(100),
+  limit: z.coerce.number().int().min(1).max(50).default(20),
+});
+
 export type IssuePrescriptionDTO = z.infer<typeof issuePrescriptionSchema>;
 export type UpdatePrescriptionDTO = z.infer<typeof updatePrescriptionSchema>;
 export type ReissuePrescriptionDTO = z.infer<typeof reissuePrescriptionSchema>;
 export type ListPrescriptionsQueryDTO = z.infer<
   typeof listPrescriptionsQuerySchema
 >;
+export type FoodSearchDTO = z.infer<typeof foodSearchSchema>;

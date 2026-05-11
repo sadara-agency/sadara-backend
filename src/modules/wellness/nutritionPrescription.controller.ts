@@ -67,6 +67,12 @@ export async function getHistory(req: AuthRequest, res: Response) {
   sendSuccess(res, history);
 }
 
+export async function searchFoods(req: AuthRequest, res: Response) {
+  const { q, limit } = req.query as { q: string; limit?: string };
+  const results = await svc.searchFoods(q, limit ? Number(limit) : 20);
+  sendSuccess(res, results);
+}
+
 export async function reissue(req: AuthRequest, res: Response) {
   const prescription = await svc.issueNewVersion(
     req.params.playerId,

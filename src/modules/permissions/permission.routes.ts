@@ -1,5 +1,5 @@
 import { Router, Response } from "express";
-import { asyncHandler } from "@middleware/errorHandler";
+import { asyncHandler, AppError } from "@middleware/errorHandler";
 import { authenticate, authorize } from "@middleware/auth";
 import { validate } from "@middleware/validate";
 import { AuthRequest } from "@shared/types";
@@ -12,13 +12,17 @@ import {
   loadPermissions,
   getFieldPermissions,
   loadFieldPermissions,
+  getConfigurableFields,
+  loadConfigurableFields,
 } from "@modules/permissions/permission.service";
 import { verifyUserRole } from "@shared/utils/verifyRole";
 import { RoleFieldPermission } from "@modules/permissions/fieldPermission.model";
-import { CONFIGURABLE_FIELDS } from "@modules/permissions/fieldPermission.config";
+import { ConfigurableField } from "@modules/permissions/configurableField.model";
 import {
   updatePermissionsSchema,
   updateFieldPermissionsSchema,
+  upsertConfigurableFieldSchema,
+  deleteConfigurableFieldSchema,
 } from "@modules/permissions/permission.validation";
 import { permissionMutationLimiter } from "@middleware/rateLimiter";
 
@@ -87,11 +91,127 @@ router.put(
 
 // ── GET /permissions/fields/config — configurable fields definition (Admin only) ──
 
+/**
+ * @swagger
+ * /permissions/fields/config:
+ *   get:
+ *     summary: Get the map of fields that can be hidden per role, keyed by module
+ *     tags: [Permissions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: module → array of { field, label }
+ */
 router.get(
   "/fields/config",
   authorize("Admin"),
   asyncHandler(async (_req: AuthRequest, res: Response) => {
-    sendSuccess(res, CONFIGURABLE_FIELDS);
+    sendSuccess(res, await getConfigurableFields());
+  }),
+);
+
+// ── POST /permissions/fields/config — add/update a configurable field (Admin only) ──
+
+/**
+ * @swagger
+ * /permissions/fields/config:
+ *   post:
+ *     summary: Add or update a configurable field (which fields a module exposes for per-role hiding)
+ *     tags: [Permissions]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Updated configurable-fields map
+ */
+router.post(
+  "/fields/config",
+  authorize("Admin"),
+  permissionMutationLimiter,
+  validate(upsertConfigurableFieldSchema.shape.body),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { module, field, label, sortOrder } = req.body;
+
+    const existing = await ConfigurableField.findOne({
+      where: { module, field },
+    });
+    if (existing) {
+      await existing.update({
+        label,
+        sortOrder: sortOrder ?? existing.sortOrder,
+      });
+    } else {
+      await ConfigurableField.create({
+        module,
+        field,
+        label,
+        sortOrder: sortOrder ?? 0,
+      });
+    }
+
+    await invalidatePermissionCache();
+    const updated = await loadConfigurableFields();
+
+    await logAudit(
+      "UPDATE",
+      "configurable_fields",
+      `${module}.${field}`,
+      buildAuditContext(req.user!, req.ip),
+      `Configurable field ${module}.${field} ${existing ? "updated" : "added"}`,
+    );
+
+    sendSuccess(res, updated, "Configurable field saved");
+  }),
+);
+
+// ── DELETE /permissions/fields/config/:id — remove a configurable field (Admin only) ──
+
+/**
+ * @swagger
+ * /permissions/fields/config/{id}:
+ *   delete:
+ *     summary: Remove a configurable field
+ *     tags: [Permissions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Updated configurable-fields map
+ */
+router.delete(
+  "/fields/config/:id",
+  authorize("Admin"),
+  permissionMutationLimiter,
+  validate(deleteConfigurableFieldSchema.shape.params, "params"),
+  asyncHandler(async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+
+    const row = await ConfigurableField.findByPk(id);
+    if (!row) throw new AppError("Configurable field not found", 404);
+
+    const { module, field } = row;
+    await row.destroy();
+
+    await invalidatePermissionCache();
+    const updated = await loadConfigurableFields();
+
+    await logAudit(
+      "DELETE",
+      "configurable_fields",
+      `${module}.${field}`,
+      buildAuditContext(req.user!, req.ip),
+      `Configurable field ${module}.${field} removed`,
+    );
+
+    sendSuccess(res, updated, "Configurable field removed");
   }),
 );
 
