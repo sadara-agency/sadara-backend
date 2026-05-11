@@ -60,6 +60,7 @@ export async function up({
     },
   });
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex(
     "program_exercise_logs",
     ["program_exercise_id", "player_id"],
@@ -68,6 +69,7 @@ export async function up({
     },
   );
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex(
     "program_exercise_logs",
     ["program_id", "player_id"],
