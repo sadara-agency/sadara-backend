@@ -22,6 +22,7 @@
     "lint": "eslint src && npm run migrate:lint",
     "seed:exercises": "ts-node -r tsconfig-paths/register src/database/seed-exercises.ts",
     "seed:foods": "ts-node -r tsconfig-paths/register src/scripts/seed-foods.ts",
+    "seed:foods:prod": "cross-env NODE_ENV=production ENV_FILE=.env.production.proxy.local ts-node -r tsconfig-paths/register src/scripts/seed-foods.ts",
     "migrate:prod": "node dist/database/migrate-cli.js up",
     "seed:exercises:prod": "node dist/database/seed-exercises.js",
     "prepare": "husky || true"

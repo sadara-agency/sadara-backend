@@ -3,7 +3,9 @@ import { env } from "@config/env";
 import { logger } from "@config/logger";
 
 // Cloud SQL via Unix socket: DB_HOST starts with /cloudsql/
-const isCloudSQL = env.db.host.startsWith("/cloudsql/");
+// Also skip SSL when connecting via Cloud SQL Auth Proxy (127.0.0.1)
+const isCloudSQL =
+  env.db.host.startsWith("/cloudsql/") || env.db.host === "127.0.0.1";
 
 const sequelizeOptions: Options = {
   database: env.db.name,
