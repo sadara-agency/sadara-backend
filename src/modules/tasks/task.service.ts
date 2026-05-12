@@ -149,7 +149,7 @@ function buildTaskWhere(queryParams: any, search?: string): any {
       [Op.ne]: null as any,
     };
     where.status = {
-      [Op.notIn]: ["Completed", "Canceled", "PendingReview"],
+      [Op.notIn]: ["Completed", "Canceled"],
     };
   }
   if (queryParams.dueAfter) {
@@ -259,7 +259,7 @@ export async function getTaskStats(queryParams: any, user?: AuthUser) {
       ],
       [
         literal(
-          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" NOT IN ('Completed','Canceled','PendingReview') AND "Task"."due_date" IS NOT NULL AND "Task"."due_date" < CURRENT_DATE)`,
+          `COUNT(DISTINCT "Task"."id") FILTER (WHERE "Task"."status" NOT IN ('Completed','Canceled') AND "Task"."due_date" IS NOT NULL AND "Task"."due_date" < CURRENT_DATE)`,
         ),
         "overdue",
       ],
@@ -445,19 +445,33 @@ type TaskStatus =
 export async function updateTaskStatus(id: string, status: TaskStatus) {
   const task = await findOrThrow(Task, id, "Task");
 
-  // Prevent completing a parent task that has open/in-progress sub-tasks
-  if (status === "Completed" && !task.parentTaskId) {
-    const openSubTasks = await Task.count({
-      where: {
-        parentTaskId: id,
-        status: { [Op.in]: ["Open", "InProgress", "PendingReview"] },
-      },
-    });
-    if (openSubTasks > 0) {
-      throw new AppError(
-        "Cannot complete a task with open or in-progress sub-tasks",
-        400,
-      );
+  if (status === "Completed") {
+    // Prevent completing a parent task that has open/in-progress sub-tasks
+    if (!task.parentTaskId) {
+      const openSubTasks = await Task.count({
+        where: {
+          parentTaskId: id,
+          status: { [Op.in]: ["Open", "InProgress", "PendingReview"] },
+        },
+      });
+      if (openSubTasks > 0) {
+        throw new AppError(
+          "Cannot complete a task with open or in-progress sub-tasks",
+          400,
+        );
+      }
+    }
+
+    // Proof-of-work guard: if an admin required an attachment, enforce it
+    // before the task can be marked complete.
+    if (task.requiresAttachment) {
+      const deliverables = (task.deliverables as MediaTaskDeliverable[]) ?? [];
+      if (deliverables.length === 0) {
+        throw new AppError(
+          "Proof of work attachment is required before completing this task",
+          422,
+        );
+      }
     }
   }
 

@@ -23,9 +23,19 @@ export async function up({
         ALTER COLUMN status TYPE VARCHAR(30)
         USING status::TEXT::VARCHAR(30)
     `);
+    // Drop the column default before dropping the type — the default
+    // retains a cast to the enum even after the column type changes,
+    // causing "cannot drop type … because other objects depend on it".
+    await queryInterface.sequelize.query(`
+      ALTER TABLE technical_reports ALTER COLUMN status DROP DEFAULT
+    `);
     await queryInterface.sequelize.query(
       `DROP TYPE IF EXISTS "enum_technical_reports_status"`,
     );
+    // Restore a plain-text default (no enum cast needed now).
+    await queryInterface.sequelize.query(`
+      ALTER TABLE technical_reports ALTER COLUMN status SET DEFAULT 'draft'
+    `);
   }
 
   // Add AI / publish columns (idempotent)

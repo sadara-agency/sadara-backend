@@ -29,38 +29,28 @@ export async function getStats(req: AuthRequest, res: Response) {
 }
 
 // ── Update Status (custom) ──
-// Non-admin/manager users that mark a task "Completed" actually submit it
-// for review — Admin or Manager must then approve or reject.
+// Status changes are applied directly. When a task with a proof-of-work
+// requirement is marked Completed, updateTaskStatus enforces the attachment.
 export async function updateStatus(req: AuthRequest, res: Response) {
   const requestedStatus = req.body.status as string;
-  const reviewerRoles = ["Admin", "Manager"];
-  const isReviewer = reviewerRoles.includes(req.user!.role);
 
-  let task;
-  let effectiveStatus = requestedStatus;
-
-  if (requestedStatus === "Completed" && !isReviewer) {
-    task = await taskService.submitTaskForReview(req.params.id);
-    effectiveStatus = "PendingReview";
-  } else {
-    task = await taskService.updateTaskStatus(
-      req.params.id,
-      requestedStatus as any,
-    );
-  }
+  const task = await taskService.updateTaskStatus(
+    req.params.id,
+    requestedStatus as any,
+  );
 
   await logAudit(
     "UPDATE",
     "tasks",
     req.params.id,
     buildAuditContext(req.user!, req.ip),
-    `Task status changed to: ${effectiveStatus}`,
+    `Task status changed to: ${requestedStatus}`,
   );
 
   sendSuccess(res, task, "Task status updated");
 }
 
-// ── Approve a task pending review (Admin/Manager only) ──
+// ── Approve a task pending review (Admin/Manager only) — retained, unused by UI ──
 export async function approve(req: AuthRequest, res: Response) {
   const task = await taskService.approveTask(req.params.id, req.user!);
 
