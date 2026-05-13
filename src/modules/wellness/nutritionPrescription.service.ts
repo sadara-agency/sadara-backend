@@ -323,11 +323,12 @@ export async function getFoodItemById(id: string) {
 
 export async function createFoodItem(data: CreateFoodItemDTO) {
   const fdcId = Date.now();
+  const { defaultServingG, ...rest } = data;
   const item = await FoodItem.create({
     fdcId,
     source: "manual",
-    defaultServingG: data.defaultServingG ?? 100,
-    ...data,
+    ...rest,
+    defaultServingG: defaultServingG ?? 100,
   });
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
   return { ...item.toJSON(), macroType: deriveMacroType(item) };
