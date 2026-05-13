@@ -1,9 +1,11 @@
 import { Response } from "express";
 import fs from "fs";
+import path from "path";
 import { AuthRequest } from "@shared/types";
 import { AppError } from "@middleware/errorHandler";
 import { logger } from "@config/logger";
 import * as contractService from "@modules/contracts/contract.service";
+import { streamFileBuffer } from "@shared/utils/storage";
 import {
   fmtDate as sharedFmtDate,
   wrapHtml,
@@ -12,6 +14,18 @@ import {
   COVER_PDF_PATH,
   BACK_PDF_PATH,
 } from "@shared/utils/pdf";
+
+// Map file extensions to MIME types for uploaded signed-contract downloads
+const UPLOAD_MIME_BY_EXT: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx":
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+};
 
 // ─── Helpers ────────────────────────────────────────────────
 
@@ -300,8 +314,54 @@ export async function generateContractPdfBuffer(
 // ─── Main Endpoint ──────────────────────────────────────────
 
 export async function generatePdf(req: AuthRequest, res: Response) {
-  const { buffer, playerName } = await generateContractPdfBuffer(req.params.id);
-  const name = `عقد_تمثيل_${playerName}.pdf`;
+  const contract = await contractService.getContractById(req.params.id);
+  const playerName = (contract as any).playerName ?? "contract";
+
+  // Path 1: user uploaded an already-signed contract — serve the original file.
+  const signedRef = (contract as any).signedDocumentUrl as string | null;
+  let servedUploaded = false;
+
+  if (signedRef && (contract as any).signingMethod === "uploaded") {
+    // Legacy rows may have stored a full URL instead of a private GCS key.
+    if (/^https?:\/\//i.test(signedRef)) {
+      res.redirect(302, signedRef);
+      servedUploaded = true;
+    } else {
+      try {
+        const fileBuffer = await streamFileBuffer(signedRef);
+        const ext = path.extname(signedRef).toLowerCase();
+        const mime = UPLOAD_MIME_BY_EXT[ext] ?? "application/octet-stream";
+        const downloadName = `عقد_تمثيل_${playerName}${ext || ""}`;
+
+        res.setHeader("Content-Type", mime);
+        res.setHeader("Content-Length", fileBuffer.length);
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename*=UTF-8''${encodeURIComponent(downloadName)}`,
+        );
+        res.end(fileBuffer);
+        servedUploaded = true;
+      } catch (err) {
+        // If the stored file is missing/unreadable, fall through to template
+        // generation rather than 500-ing — preserves at least *some* download.
+        logger.warn(
+          "Signed contract file unreadable; falling back to template",
+          {
+            contractId: req.params.id,
+            signedRef,
+            error: (err as Error).message,
+          },
+        );
+      }
+    }
+  }
+
+  if (servedUploaded) return;
+
+  // Path 2 (default): generate the PDF from the template.
+  const { buffer, playerName: generatedPlayerName } =
+    await generateContractPdfBuffer(req.params.id);
+  const name = `عقد_تمثيل_${generatedPlayerName}.pdf`;
 
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Length", buffer.length);
