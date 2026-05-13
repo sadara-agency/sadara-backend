@@ -94,15 +94,31 @@ export async function linkReviewToPlayer(
 
       // Auto-enrich with full SAFF+ profile now that we have the external id.
       // Lazy require breaks the circular dependency (playerReview ↔ saffplus.service).
-      if (row.providerSource === "saffplus") {
-        const { autoEnrichPlayerFromSaffPlus } =
-          require("./saffplus.service") as typeof import("./saffplus.service");
-        autoEnrichPlayerFromSaffPlus(player.id, row.externalPlayerId).catch(
-          (err) =>
+      // Wrapped so a synchronous failure (undefined export under partial circular
+      // load, etc.) cannot bubble up and 500 the link request.
+      if (row.providerSource === "saffplus" && row.externalPlayerId) {
+        try {
+          const mod = require("./saffplus.service") as Partial<
+            typeof import("./saffplus.service")
+          >;
+          if (typeof mod.autoEnrichPlayerFromSaffPlus === "function") {
+            void mod
+              .autoEnrichPlayerFromSaffPlus(player.id, row.externalPlayerId)
+              .catch((err) =>
+                logger.warn(
+                  `[SAFF+ review] autoEnrich failed (${player.id}): ${(err as Error).message}`,
+                ),
+              );
+          } else {
             logger.warn(
-              `[SAFF+ review] autoEnrich failed (${player.id}): ${(err as Error).message}`,
-            ),
-        );
+              `[SAFF+ review] autoEnrich skipped — function not loaded (circular import?)`,
+            );
+          }
+        } catch (err) {
+          logger.warn(
+            `[SAFF+ review] autoEnrich threw synchronously: ${(err as Error).message}`,
+          );
+        }
       }
     }
   }
