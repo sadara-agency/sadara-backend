@@ -53,6 +53,7 @@ export const createReferralSchema = z.object({
   notes: z.string().optional(),
   isRestricted: z.boolean().default(false),
   restrictedTo: z.array(z.string().uuid()).optional(),
+  source: z.enum(["playercare"]).optional(),
 });
 
 // ── Update Referral ──
