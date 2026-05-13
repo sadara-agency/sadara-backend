@@ -100,6 +100,9 @@ export const updateContractSchema = z.object({
   playerContractType: z.enum(PLAYER_CONTRACT_TYPES).nullable().optional(),
   documentUrl: z.string().url().nullable().optional(),
   notes: z.string().nullable().optional(),
+  signedDocumentUrl: z.string().nullable().optional(),
+  signingMethod: z.string().nullable().optional(),
+  signedAt: z.string().nullable().optional(),
 });
 
 // ── Transition Status ──
