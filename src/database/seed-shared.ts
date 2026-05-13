@@ -993,6 +993,12 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
+  ...allRoles("playercare", {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...allRoles("personal-todos", {
     canCreate: true,
     canRead: true,

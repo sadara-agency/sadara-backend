@@ -68,6 +68,22 @@ export function authorizePlayerPackage(module: string, action: CrudAction) {
     res: Response,
     next: NextFunction,
   ): Promise<void> => {
+    // Scoped bypass: the Player-Care wizard creates tickets/referrals for
+    // players regardless of package tier. Only honored for referrals:create
+    // to keep the surface minimal.
+    if (
+      module === "referrals" &&
+      action === "create" &&
+      req.body?.source === "playercare"
+    ) {
+      logger.info("Package access bypassed via playercare source", {
+        playerId: req.body?.playerId,
+        userId: (req as any).user?.id,
+      });
+      next();
+      return;
+    }
+
     const playerId = extractPlayerId(req);
 
     // No playerId in request — skip check (not player-specific)
