@@ -12,6 +12,9 @@ import {
   reissuePrescriptionSchema,
   listPrescriptionsQuerySchema,
   foodSearchSchema,
+  createFoodItemSchema,
+  updateFoodItemSchema,
+  listFoodItemsSchema,
 } from "./nutritionPrescription.validation";
 
 const router = Router();
@@ -101,6 +104,43 @@ router.get(
 
 /**
  * @swagger
+ * /nutrition-prescriptions/foods:
+ *   get:
+ *     summary: List food items with optional search and filters
+ *     tags: [NutritionPrescriptions]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         schema: { type: string }
+ *       - in: query
+ *         name: category
+ *         schema: { type: string }
+ *       - in: query
+ *         name: macroType
+ *         schema: { type: string, enum: [protein, carb, fat] }
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 40 }
+ *     responses:
+ *       200:
+ *         description: Paginated food items
+ */
+router.get(
+  "/foods",
+  authorizeModule("wellness", "read"),
+  dynamicFieldAccess("wellness"),
+  cacheRoute("food-items", CacheTTL.MEDIUM),
+  validate(listFoodItemsSchema, "query"),
+  asyncHandler(ctrl.listFoodItems),
+);
+
+/**
+ * @swagger
  * /nutrition-prescriptions/foods/search:
  *   get:
  *     summary: Search food items by name (full-text)
@@ -126,6 +166,33 @@ router.get(
   cacheRoute("food-search", CacheTTL.LONG),
   validate(foodSearchSchema, "query"),
   asyncHandler(ctrl.searchFoods),
+);
+
+router.get(
+  "/foods/:id",
+  authorizeModule("wellness", "read"),
+  dynamicFieldAccess("wellness"),
+  asyncHandler(ctrl.getFoodItemById),
+);
+
+router.post(
+  "/foods",
+  authorizeModule("wellness", "create"),
+  validate(createFoodItemSchema),
+  asyncHandler(ctrl.createFoodItem),
+);
+
+router.patch(
+  "/foods/:id",
+  authorizeModule("wellness", "update"),
+  validate(updateFoodItemSchema),
+  asyncHandler(ctrl.updateFoodItem),
+);
+
+router.delete(
+  "/foods/:id",
+  authorizeModule("wellness", "delete"),
+  asyncHandler(ctrl.deleteFoodItem),
 );
 
 /**
