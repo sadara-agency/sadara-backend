@@ -41,6 +41,33 @@ export const foodSearchSchema = z.object({
   limit: z.coerce.number().int().min(1).max(50).default(20),
 });
 
+export const macroTypeEnum = z.enum(["protein", "carb", "fat"]);
+
+export const createFoodItemSchema = z.object({
+  name: z.string().min(1).max(255),
+  nameAr: z.string().max(255).optional().nullable(),
+  category: z.string().max(100).optional().nullable(),
+  macroType: z.array(macroTypeEnum).optional().nullable(),
+  calories: z.coerce.number().positive().optional().nullable(),
+  proteinG: z.coerce.number().min(0).optional().nullable(),
+  carbsG: z.coerce.number().min(0).optional().nullable(),
+  fatG: z.coerce.number().min(0).optional().nullable(),
+  fiberG: z.coerce.number().min(0).optional().nullable(),
+  sodiumMg: z.coerce.number().min(0).optional().nullable(),
+  defaultServingG: z.coerce.number().positive().default(100),
+  servingLabel: z.string().max(50).optional().nullable(),
+});
+
+export const updateFoodItemSchema = createFoodItemSchema.partial();
+
+export const listFoodItemsSchema = z.object({
+  q: z.string().max(100).optional(),
+  category: z.string().max(100).optional(),
+  macroType: macroTypeEnum.optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(40),
+});
+
 export type IssuePrescriptionDTO = z.infer<typeof issuePrescriptionSchema>;
 export type UpdatePrescriptionDTO = z.infer<typeof updatePrescriptionSchema>;
 export type ReissuePrescriptionDTO = z.infer<typeof reissuePrescriptionSchema>;
@@ -48,3 +75,6 @@ export type ListPrescriptionsQueryDTO = z.infer<
   typeof listPrescriptionsQuerySchema
 >;
 export type FoodSearchDTO = z.infer<typeof foodSearchSchema>;
+export type CreateFoodItemDTO = z.infer<typeof createFoodItemSchema>;
+export type UpdateFoodItemDTO = z.infer<typeof updateFoodItemSchema>;
+export type ListFoodItemsDTO = z.infer<typeof listFoodItemsSchema>;

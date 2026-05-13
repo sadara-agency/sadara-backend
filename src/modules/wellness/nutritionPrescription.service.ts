@@ -9,6 +9,9 @@ import type {
   IssuePrescriptionDTO,
   UpdatePrescriptionDTO,
   ListPrescriptionsQueryDTO,
+  CreateFoodItemDTO,
+  UpdateFoodItemDTO,
+  ListFoodItemsDTO,
 } from "./nutritionPrescription.validation";
 import { AppError } from "@middleware/errorHandler";
 import type { AuthUser } from "@shared/types";
@@ -238,4 +241,110 @@ export async function searchFoods(q: string, limit = 20): Promise<FoodItem[]> {
     limit: safeLimit,
     order: [["name", "ASC"]],
   });
+}
+
+// ── Food Library CRUD ─────────────────────────────────────────────────────────
+
+function deriveMacroType(item: FoodItem): string[] {
+  if (item.macroType && item.macroType.length > 0) return item.macroType;
+  const derived: string[] = [];
+  if ((item.proteinG ?? 0) >= 10) derived.push("protein");
+  if ((item.carbsG ?? 0) >= 20) derived.push("carb");
+  if ((item.fatG ?? 0) >= 10) derived.push("fat");
+  return derived;
+}
+
+export async function listFoodItems(query: ListFoodItemsDTO) {
+  const { q, category, macroType, page, limit } = query;
+
+  const where: any = {};
+
+  if (q?.trim()) {
+    const term = q.trim();
+    const pattern = `%${term}%`;
+    const isArabic = /[؀-ۿ]/.test(term);
+    if (isArabic || term.length < 3) {
+      where[Op.or] = [
+        { name: { [Op.iLike]: pattern } },
+        { nameAr: { [Op.iLike]: pattern } },
+      ];
+    } else {
+      where[Op.or] = [
+        db.where(db.fn("to_tsvector", "english", db.col("name")), {
+          [Op.match]: db.fn("plainto_tsquery", "english", term),
+        }),
+        { name: { [Op.iLike]: pattern } },
+        { nameAr: { [Op.iLike]: pattern } },
+      ];
+    }
+  }
+
+  if (category) {
+    where.category = { [Op.iLike]: `%${category}%` };
+  }
+
+  // macroType filter: use stored tag or derive from thresholds
+  if (macroType) {
+    const thresholds: Record<string, object> = {
+      protein: { proteinG: { [Op.gte]: 10 } },
+      carb: { carbsG: { [Op.gte]: 20 } },
+      fat: { fatG: { [Op.gte]: 10 } },
+    };
+    where[Op.and] = [
+      {
+        [Op.or]: [
+          { macroType: { [Op.contains]: [macroType] } },
+          thresholds[macroType],
+        ],
+      },
+    ];
+  }
+
+  const { rows, count } = await FoodItem.findAndCountAll({
+    where,
+    limit,
+    offset: (page - 1) * limit,
+    order: [["name", "ASC"]],
+  });
+
+  const data = rows.map((item) => ({
+    ...item.toJSON(),
+    macroType: deriveMacroType(item),
+  }));
+
+  return { data, meta: buildMeta(count, page, limit) };
+}
+
+export async function getFoodItemById(id: string) {
+  const item = await FoodItem.findByPk(id);
+  if (!item) throw new AppError("Food item not found", 404);
+  return { ...item.toJSON(), macroType: deriveMacroType(item) };
+}
+
+export async function createFoodItem(data: CreateFoodItemDTO) {
+  const fdcId = Date.now();
+  const item = await FoodItem.create({
+    fdcId,
+    source: "manual",
+    defaultServingG: data.defaultServingG ?? 100,
+    ...data,
+  });
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return { ...item.toJSON(), macroType: deriveMacroType(item) };
+}
+
+export async function updateFoodItem(id: string, data: UpdateFoodItemDTO) {
+  const item = await FoodItem.findByPk(id);
+  if (!item) throw new AppError("Food item not found", 404);
+  await item.update(data);
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return { ...item.toJSON(), macroType: deriveMacroType(item) };
+}
+
+export async function deleteFoodItem(id: string) {
+  const item = await FoodItem.findByPk(id);
+  if (!item) throw new AppError("Food item not found", 404);
+  await item.destroy();
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return { id };
 }

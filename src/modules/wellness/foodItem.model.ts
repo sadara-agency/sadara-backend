@@ -15,6 +15,7 @@ export interface FoodItemAttributes {
   sodiumMg: number | null;
   defaultServingG: number;
   servingLabel: string | null;
+  macroType: string[] | null;
   source: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -32,6 +33,7 @@ interface FoodItemCreationAttributes extends Optional<
   | "fiberG"
   | "sodiumMg"
   | "servingLabel"
+  | "macroType"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -53,6 +55,7 @@ export class FoodItem
   declare sodiumMg: number | null;
   declare defaultServingG: number;
   declare servingLabel: string | null;
+  declare macroType: string[] | null;
   declare source: string;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -114,6 +117,10 @@ FoodItem.init(
     servingLabel: {
       type: DataTypes.STRING(50),
       field: "serving_label",
+    },
+    macroType: {
+      type: DataTypes.JSONB,
+      field: "macro_type",
     },
     source: {
       type: DataTypes.STRING(20),
