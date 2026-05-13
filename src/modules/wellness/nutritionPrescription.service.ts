@@ -198,19 +198,43 @@ export async function deletePrescription(id: string): Promise<{ id: string }> {
 
 export async function searchFoods(q: string, limit = 20): Promise<FoodItem[]> {
   const safeLimit = Math.min(limit, 50);
+  const term = q.trim();
+  const pattern = `%${term}%`;
 
-  if (q.trim().length < 3) {
+  // Arabic text: always use iLike on name_ar (GIN index is English-only)
+  const isArabic = /[؀-ۿ]/.test(term);
+
+  if (isArabic || term.length < 3) {
     return FoodItem.findAll({
-      where: { name: { [Op.iLike]: `%${q.trim()}%` } },
+      where: {
+        [Op.or]: [
+          { name: { [Op.iLike]: pattern } },
+          { nameAr: { [Op.iLike]: pattern } },
+        ],
+      },
       limit: safeLimit,
       order: [["name", "ASC"]],
     });
   }
 
-  return FoodItem.findAll({
+  // English full-text via GIN index, fall back to iLike on both columns
+  const ftResults = await FoodItem.findAll({
     where: db.where(db.fn("to_tsvector", "english", db.col("name")), {
-      [Op.match]: db.fn("plainto_tsquery", "english", q.trim()),
+      [Op.match]: db.fn("plainto_tsquery", "english", term),
     }),
+    limit: safeLimit,
+    order: [["name", "ASC"]],
+  });
+
+  if (ftResults.length > 0) return ftResults;
+
+  return FoodItem.findAll({
+    where: {
+      [Op.or]: [
+        { name: { [Op.iLike]: pattern } },
+        { nameAr: { [Op.iLike]: pattern } },
+      ],
+    },
     limit: safeLimit,
     order: [["name", "ASC"]],
   });
