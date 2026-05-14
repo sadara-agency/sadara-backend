@@ -35,6 +35,11 @@ router.post(
   asyncHandler(clubController.bulkRemove),
 );
 router.get(
+  "/analytics",
+  authorizeModule("clubs", "read"),
+  asyncHandler(clubController.analytics),
+);
+router.get(
   "/logo-audit",
   authorizeModule("clubs", "read"),
   asyncHandler(clubController.logoAudit),

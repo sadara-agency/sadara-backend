@@ -477,6 +477,78 @@ export async function deleteContact(contactId: string, clubId: string) {
 }
 
 // ────────────────────────────────────────────────────────────
+// Club Analytics — aggregated across ALL clubs (no pagination)
+// ────────────────────────────────────────────────────────────
+export async function getClubAnalytics(user?: AuthUser) {
+  const scope = user ? await buildRowScope("clubs", user) : null;
+  const where: Record<string, unknown> = { isActive: true };
+  if (scope) mergeScope(where, scope);
+
+  const [topByPlayers, topByValue, typeCounts] = await Promise.all([
+    sequelize.query<{
+      id: string;
+      name: string;
+      name_ar: string | null;
+      player_count: string;
+    }>(
+      `SELECT c.id, c.name, c.name_ar,
+              COUNT(p.id) AS player_count
+       FROM clubs c
+       LEFT JOIN players p ON p.current_club_id = c.id
+       WHERE c.is_active = true
+       GROUP BY c.id, c.name, c.name_ar
+       ORDER BY player_count DESC
+       LIMIT 10`,
+      { type: QueryTypes.SELECT },
+    ),
+
+    sequelize.query<{
+      id: string;
+      name: string;
+      name_ar: string | null;
+      total_value: string;
+      total_commission: string;
+    }>(
+      `SELECT c.id, c.name, c.name_ar,
+              COALESCE(SUM(CASE WHEN ct.base_salary ~ '^[0-9.]+$' THEN ct.base_salary::NUMERIC ELSE 0 END), 0) AS total_value,
+              COALESCE(SUM(CASE WHEN ct.total_commission ~ '^[0-9.]+$' THEN ct.total_commission::NUMERIC ELSE 0 END), 0) AS total_commission
+       FROM clubs c
+       LEFT JOIN contracts ct ON ct.club_id = c.id
+       WHERE c.is_active = true
+       GROUP BY c.id, c.name, c.name_ar
+       ORDER BY total_value DESC
+       LIMIT 6`,
+      { type: QueryTypes.SELECT },
+    ),
+
+    sequelize.query<{ type: string; count: string }>(
+      `SELECT type, COUNT(*) AS count FROM clubs WHERE is_active = true GROUP BY type`,
+      { type: QueryTypes.SELECT },
+    ),
+  ]);
+
+  return {
+    topByPlayers: topByPlayers.map((r) => ({
+      id: r.id,
+      name: r.name,
+      nameAr: r.name_ar,
+      playerCount: Number(r.player_count),
+    })),
+    topByValue: topByValue.map((r) => ({
+      id: r.id,
+      name: r.name,
+      nameAr: r.name_ar,
+      totalContractValue: Number(r.total_value),
+      totalCommission: Number(r.total_commission),
+    })),
+    typeDistribution: typeCounts.map((r) => ({
+      type: r.type,
+      count: Number(r.count),
+    })),
+  };
+}
+
+// ────────────────────────────────────────────────────────────
 // Logo Audit — check all clubs for missing or broken logos
 // ────────────────────────────────────────────────────────────
 

@@ -528,6 +528,11 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
   ...forRoles("saff-data", ["Manager"], { canRead: true, canCreate: true }),
+  ...forRoles("saff-data", ["Analyst"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
 
   ...forRoles("spl-sync", ["Admin", "SportingDirector"], {
     canCreate: true,

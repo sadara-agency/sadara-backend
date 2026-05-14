@@ -106,6 +106,13 @@ export async function deleteContact(req: AuthRequest, res: Response) {
   sendSuccess(res, result, "Contact deleted");
 }
 
+// ── Club Analytics ──
+
+export async function analytics(req: AuthRequest, res: Response) {
+  const result = await clubService.getClubAnalytics(req.user);
+  sendSuccess(res, result);
+}
+
 // ── Logo Audit ──
 
 export async function logoAudit(req: AuthRequest, res: Response) {
