@@ -68,6 +68,8 @@ const PACKAGE_B: Record<string, PackageModuleAccess> = {
   tickets: CREATE_READ,
   messaging: FULL,
   notifications: FULL,
+  sessions: FULL,
+  referrals: FULL,
 };
 
 const PACKAGE_BPLUS: Record<string, PackageModuleAccess> = {

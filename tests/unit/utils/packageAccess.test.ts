@@ -37,10 +37,12 @@ describe('Package Access', () => {
       expect(contracts.canRead).toBe(true);
     });
 
-    it('should return NONE for Package B on sessions (foundational floor)', () => {
+    it('should return FULL for Package B on sessions', () => {
       const sessions = getPackageAccess('B', 'sessions');
-      expect(sessions.canCreate).toBe(false);
-      expect(sessions.canRead).toBe(false);
+      expect(sessions.canCreate).toBe(true);
+      expect(sessions.canRead).toBe(true);
+      expect(sessions.canUpdate).toBe(true);
+      expect(sessions.canDelete).toBe(true);
     });
 
     it('should return configured access for Package B', () => {
@@ -72,9 +74,11 @@ describe('Package Access', () => {
       expect(isModuleAllowed('B', 'contracts', 'update')).toBe(false);
     });
 
-    it('should deny Package B from sessions', () => {
-      expect(isModuleAllowed('B', 'sessions', 'read')).toBe(false);
-      expect(isModuleAllowed('B', 'sessions', 'create')).toBe(false);
+    it('should allow Package B full access to sessions', () => {
+      expect(isModuleAllowed('B', 'sessions', 'read')).toBe(true);
+      expect(isModuleAllowed('B', 'sessions', 'create')).toBe(true);
+      expect(isModuleAllowed('B', 'sessions', 'update')).toBe(true);
+      expect(isModuleAllowed('B', 'sessions', 'delete')).toBe(true);
     });
 
     it('should allow Package B+ to create sessions', () => {
@@ -99,10 +103,13 @@ describe('Package Access', () => {
       }
     });
 
-    it('should return limited modules for Package B (foundational floor)', () => {
+    it('should return sessions and referrals for Package B', () => {
       const map = getFullAccessMap('B');
       expect(map.players?.canRead).toBe(true);
-      expect(map.sessions).toBeUndefined();
+      expect(map.sessions?.canCreate).toBe(true);
+      expect(map.sessions?.canRead).toBe(true);
+      expect(map.referrals?.canCreate).toBe(true);
+      expect(map.referrals?.canRead).toBe(true);
     });
 
     it('should return more modules for Package B+ than B', () => {
