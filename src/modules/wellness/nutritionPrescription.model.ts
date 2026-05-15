@@ -1,5 +1,6 @@
 import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
+import { FoodItem } from "./foodItem.model";
 
 export type TriggeringReason = "manual" | "scan" | "injury" | "block_change";
 
@@ -168,7 +169,8 @@ export interface PrescriptionMealAttributes {
   id: string;
   prescriptionId: string;
   dayOfWeek: number | null;
-  mealType: "breakfast" | "lunch" | "dinner" | "snacks";
+  mealType: "breakfast" | "lunch" | "dinner" | "snacks" | null;
+  customName: string | null;
   description: string | null;
   sortOrder: number;
   notes: string | null;
@@ -177,7 +179,14 @@ export interface PrescriptionMealAttributes {
 
 interface PrescriptionMealCreationAttributes extends Optional<
   PrescriptionMealAttributes,
-  "id" | "dayOfWeek" | "description" | "sortOrder" | "notes" | "createdAt"
+  | "id"
+  | "dayOfWeek"
+  | "mealType"
+  | "customName"
+  | "description"
+  | "sortOrder"
+  | "notes"
+  | "createdAt"
 > {}
 
 export class PrescriptionMeal
@@ -187,11 +196,14 @@ export class PrescriptionMeal
   declare id: string;
   declare prescriptionId: string;
   declare dayOfWeek: number | null;
-  declare mealType: "breakfast" | "lunch" | "dinner" | "snacks";
+  declare mealType: "breakfast" | "lunch" | "dinner" | "snacks" | null;
+  declare customName: string | null;
   declare description: string | null;
   declare sortOrder: number;
   declare notes: string | null;
   declare readonly createdAt: Date;
+
+  declare items?: PrescriptionMealItem[];
 }
 
 PrescriptionMeal.init(
@@ -212,8 +224,13 @@ PrescriptionMeal.init(
     },
     mealType: {
       type: DataTypes.STRING(20),
-      allowNull: false,
+      allowNull: true,
       field: "meal_type",
+    },
+    customName: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "custom_name",
     },
     description: {
       type: DataTypes.TEXT,
@@ -237,6 +254,96 @@ PrescriptionMeal.init(
   },
 );
 
+// ─── PrescriptionMealItem ─────────────────────────────────────────────────────
+
+export interface PrescriptionMealItemAttributes {
+  id: string;
+  mealId: string;
+  foodItemId: string;
+  servings: number;
+  calories: number | null;
+  proteinG: number | null;
+  carbsG: number | null;
+  fatG: number | null;
+  createdAt?: Date;
+}
+
+interface PrescriptionMealItemCreationAttributes extends Optional<
+  PrescriptionMealItemAttributes,
+  "id" | "calories" | "proteinG" | "carbsG" | "fatG" | "createdAt"
+> {}
+
+export class PrescriptionMealItem
+  extends Model<
+    PrescriptionMealItemAttributes,
+    PrescriptionMealItemCreationAttributes
+  >
+  implements PrescriptionMealItemAttributes
+{
+  declare id: string;
+  declare mealId: string;
+  declare foodItemId: string;
+  declare servings: number;
+  declare calories: number | null;
+  declare proteinG: number | null;
+  declare carbsG: number | null;
+  declare fatG: number | null;
+  declare readonly createdAt: Date;
+
+  declare food?: FoodItem;
+}
+
+PrescriptionMealItem.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    mealId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "meal_id",
+    },
+    foodItemId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "food_item_id",
+    },
+    servings: {
+      type: DataTypes.DECIMAL(5, 2),
+      allowNull: false,
+      defaultValue: 1.0,
+    },
+    calories: {
+      type: DataTypes.DECIMAL(7, 2),
+      allowNull: true,
+    },
+    proteinG: {
+      type: DataTypes.DECIMAL(6, 2),
+      allowNull: true,
+      field: "protein_g",
+    },
+    carbsG: {
+      type: DataTypes.DECIMAL(6, 2),
+      allowNull: true,
+      field: "carbs_g",
+    },
+    fatG: {
+      type: DataTypes.DECIMAL(6, 2),
+      allowNull: true,
+      field: "fat_g",
+    },
+  },
+  {
+    sequelize,
+    tableName: "prescription_meal_items",
+    underscored: true,
+    timestamps: true,
+    updatedAt: false,
+  },
+);
+
 // ─── Associations ─────────────────────────────────────────────────────────────
 
 NutritionPrescription.hasMany(PrescriptionMeal, {
@@ -247,6 +354,20 @@ NutritionPrescription.hasMany(PrescriptionMeal, {
 PrescriptionMeal.belongsTo(NutritionPrescription, {
   foreignKey: "prescriptionId",
   as: "prescription",
+});
+
+PrescriptionMeal.hasMany(PrescriptionMealItem, {
+  foreignKey: "mealId",
+  as: "items",
+  onDelete: "CASCADE",
+});
+PrescriptionMealItem.belongsTo(PrescriptionMeal, {
+  foreignKey: "mealId",
+  as: "meal",
+});
+PrescriptionMealItem.belongsTo(FoodItem, {
+  foreignKey: "foodItemId",
+  as: "food",
 });
 
 export default NutritionPrescription;
