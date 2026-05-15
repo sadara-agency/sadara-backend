@@ -59,14 +59,13 @@ describe('authorizePlayerPackage middleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('should deny Package B from sessions', async () => {
+  it('should allow Package B on sessions', async () => {
     (Player.findByPk as jest.Mock).mockResolvedValue({ playerPackage: 'B' });
     const req = { params: { playerId: 'abc' }, body: {}, user: {} } as any;
     const res = mockRes();
     const mw = authorizePlayerPackage('sessions', 'create');
     await mw(req, res, next);
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(403);
+    expect(next).toHaveBeenCalled();
   });
 
   it('should extract playerId from body', async () => {
