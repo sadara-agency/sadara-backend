@@ -89,7 +89,8 @@ export async function up() {
       id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
       prescription_id UUID NOT NULL,
       day_of_week     INTEGER,
-      meal_type       VARCHAR(20) NOT NULL,
+      meal_type       VARCHAR(20),
+      custom_name     VARCHAR(255),
       description     TEXT,
       sort_order      INTEGER NOT NULL DEFAULT 0,
       notes           TEXT,
@@ -113,12 +114,37 @@ export async function up() {
     ON prescription_meals (prescription_id);
   `);
 
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS prescription_meal_items (
+      id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      meal_id      UUID NOT NULL,
+      food_item_id UUID NOT NULL,
+      servings     DECIMAL(5,2) NOT NULL DEFAULT 1.0,
+      calories     DECIMAL(7,2),
+      protein_g    DECIMAL(6,2),
+      carbs_g      DECIMAL(6,2),
+      fat_g        DECIMAL(6,2),
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  try {
+    await sequelize.query(`
+      ALTER TABLE prescription_meal_items
+        ADD CONSTRAINT fk_prescription_meal_items_meal
+        FOREIGN KEY (meal_id) REFERENCES prescription_meals(id) ON DELETE CASCADE;
+    `);
+  } catch {
+    // Constraint already exists
+  }
+
   console.log(
-    "Migration 136: nutrition_prescriptions + prescription_meals tables created",
+    "Migration 136: nutrition_prescriptions + prescription_meals + prescription_meal_items tables created",
   );
 }
 
 export async function down() {
+  await sequelize.query(`DROP TABLE IF EXISTS prescription_meal_items`);
   await sequelize.query(`DROP TABLE IF EXISTS prescription_meals`);
   await sequelize.query(
     `ALTER TABLE nutrition_prescriptions DROP CONSTRAINT IF EXISTS fk_nutrition_prescriptions_superseded_by`,

@@ -1,0 +1,113 @@
+import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
+import {
+  addColumnIfMissing,
+  removeColumnIfPresent,
+  tableExists,
+} from "../migrationHelpers";
+
+export async function up({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
+  // On a fresh DB, prescription_meals is created by an earlier migration.
+  // Skip entirely if it doesn't exist yet — the earlier migration's createTable
+  // already defines the correct schema including custom_name and nullable meal_type.
+  if (!(await tableExists(queryInterface, "prescription_meals"))) {
+    return;
+  }
+
+  // 1. Add custom_name to prescription_meals
+  await addColumnIfMissing(
+    queryInterface,
+    "prescription_meals",
+    "custom_name",
+    {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+    },
+  );
+
+  // 2. Make meal_type nullable (was NOT NULL)
+  await queryInterface.sequelize.query(
+    `ALTER TABLE prescription_meals ALTER COLUMN meal_type DROP NOT NULL`,
+  );
+
+  // 3. Create prescription_meal_items (if not already created by migration 136)
+  if (!(await tableExists(queryInterface, "prescription_meal_items"))) {
+    await queryInterface.createTable("prescription_meal_items", {
+      id: {
+        type: DataTypes.UUID,
+        defaultValue: DataTypes.UUIDV4,
+        primaryKey: true,
+      },
+      meal_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      food_item_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+      },
+      servings: {
+        type: DataTypes.DECIMAL(5, 2),
+        allowNull: false,
+        defaultValue: 1.0,
+      },
+      calories: { type: DataTypes.DECIMAL(7, 2), allowNull: true },
+      protein_g: { type: DataTypes.DECIMAL(6, 2), allowNull: true },
+      carbs_g: { type: DataTypes.DECIMAL(6, 2), allowNull: true },
+      fat_g: { type: DataTypes.DECIMAL(6, 2), allowNull: true },
+      created_at: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: DataTypes.NOW,
+      },
+    });
+    // FK to prescription_meals (always exists at this point)
+    await queryInterface.sequelize.query(`
+      ALTER TABLE prescription_meal_items
+        ADD CONSTRAINT fk_prescription_meal_items_meal
+        FOREIGN KEY (meal_id) REFERENCES prescription_meals(id) ON DELETE CASCADE
+    `);
+  }
+
+  // Add food_items FK (food_items table exists by migration 235, before 238)
+  try {
+    await queryInterface.sequelize.query(`
+      ALTER TABLE prescription_meal_items
+        ADD CONSTRAINT fk_prescription_meal_items_food
+        FOREIGN KEY (food_item_id) REFERENCES food_items(id) ON DELETE RESTRICT
+    `);
+  } catch {
+    // Constraint already exists
+  }
+}
+
+export async function down({
+  context: queryInterface,
+}: {
+  context: QueryInterface;
+}): Promise<void> {
+  // Drop prescription_meal_items first (FK dependency)
+  if (await tableExists(queryInterface, "prescription_meal_items")) {
+    await queryInterface.dropTable("prescription_meal_items");
+  }
+
+  // Restore NOT NULL on meal_type
+  if (await tableExists(queryInterface, "prescription_meals")) {
+    // Set a default for any rows that might have null meal_type before restoring constraint
+    await queryInterface.sequelize.query(
+      `UPDATE prescription_meals SET meal_type = 'breakfast' WHERE meal_type IS NULL`,
+    );
+    await queryInterface.sequelize.query(
+      `ALTER TABLE prescription_meals ALTER COLUMN meal_type SET NOT NULL`,
+    );
+  }
+
+  await removeColumnIfPresent(
+    queryInterface,
+    "prescription_meals",
+    "custom_name",
+  );
+}

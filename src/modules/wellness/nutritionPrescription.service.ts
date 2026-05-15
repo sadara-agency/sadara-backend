@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import {
   NutritionPrescription,
   PrescriptionMeal,
+  PrescriptionMealItem,
   type TriggeringReason,
 } from "./nutritionPrescription.model";
 import { FoodItem } from "./foodItem.model";
@@ -38,7 +39,19 @@ export async function listPrescriptions(
 
   const { rows, count } = await NutritionPrescription.findAndCountAll({
     where,
-    include: [{ model: PrescriptionMeal, as: "meals" }],
+    include: [
+      {
+        model: PrescriptionMeal,
+        as: "meals",
+        include: [
+          {
+            model: PrescriptionMealItem,
+            as: "items",
+            include: [{ model: FoodItem, as: "food" }],
+          },
+        ],
+      },
+    ],
     limit,
     offset: (page - 1) * limit,
     order: [["createdAt", "DESC"]],
@@ -56,7 +69,19 @@ export async function getCurrentPrescription(
 
   return NutritionPrescription.findOne({
     where: { playerId, supersededAt: null },
-    include: [{ model: PrescriptionMeal, as: "meals" }],
+    include: [
+      {
+        model: PrescriptionMeal,
+        as: "meals",
+        include: [
+          {
+            model: PrescriptionMealItem,
+            as: "items",
+            include: [{ model: FoodItem, as: "food" }],
+          },
+        ],
+      },
+    ],
     order: [["versionNumber", "DESC"]],
   });
 }
@@ -70,7 +95,19 @@ export async function getVersionHistory(
 
   return NutritionPrescription.findAll({
     where: { playerId },
-    include: [{ model: PrescriptionMeal, as: "meals" }],
+    include: [
+      {
+        model: PrescriptionMeal,
+        as: "meals",
+        include: [
+          {
+            model: PrescriptionMealItem,
+            as: "items",
+            include: [{ model: FoodItem, as: "food" }],
+          },
+        ],
+      },
+    ],
     order: [["versionNumber", "DESC"]],
   });
 }
@@ -80,7 +117,19 @@ export async function getPrescriptionById(
   user?: AuthUser,
 ): Promise<NutritionPrescription> {
   const prescription = await NutritionPrescription.findByPk(id, {
-    include: [{ model: PrescriptionMeal, as: "meals" }],
+    include: [
+      {
+        model: PrescriptionMeal,
+        as: "meals",
+        include: [
+          {
+            model: PrescriptionMealItem,
+            as: "items",
+            include: [{ model: FoodItem, as: "food" }],
+          },
+        ],
+      },
+    ],
   });
   if (!prescription) throw new AppError("Prescription not found", 404);
 
@@ -108,15 +157,75 @@ export async function issuePrescription(
     );
   }
 
-  const prescription = await NutritionPrescription.create({
-    ...data,
-    versionNumber: 1,
-    issuedBy: userId,
-    triggeringReason: "manual",
+  const { meals, ...prescriptionData } = data;
+
+  const prescription = await db.transaction(async (t) => {
+    const rx = await NutritionPrescription.create(
+      {
+        ...prescriptionData,
+        versionNumber: 1,
+        issuedBy: userId,
+        triggeringReason: "manual",
+      },
+      { transaction: t },
+    );
+
+    if (meals && meals.length > 0) {
+      for (const [idx, meal] of meals.entries()) {
+        const mealRow = await PrescriptionMeal.create(
+          {
+            prescriptionId: rx.id,
+            customName: meal.customName,
+            sortOrder: meal.sortOrder ?? idx,
+          },
+          { transaction: t },
+        );
+
+        if (meal.items.length > 0) {
+          const foodIds = meal.items.map((i) => i.foodItemId);
+          const foods = await FoodItem.findAll({
+            where: { id: foodIds },
+            transaction: t,
+          });
+          const foodMap = new Map(foods.map((f) => [f.id, f]));
+
+          await PrescriptionMealItem.bulkCreate(
+            meal.items.map((item) => {
+              const food = foodMap.get(item.foodItemId);
+              const scale = food
+                ? item.servings * (food.defaultServingG / 100)
+                : item.servings;
+              return {
+                mealId: mealRow.id,
+                foodItemId: item.foodItemId,
+                servings: item.servings,
+                calories:
+                  food?.calories != null
+                    ? +(food.calories * scale).toFixed(1)
+                    : null,
+                proteinG:
+                  food?.proteinG != null
+                    ? +(food.proteinG * scale).toFixed(2)
+                    : null,
+                carbsG:
+                  food?.carbsG != null
+                    ? +(food.carbsG * scale).toFixed(2)
+                    : null,
+                fatG:
+                  food?.fatG != null ? +(food.fatG * scale).toFixed(2) : null,
+              };
+            }),
+            { transaction: t },
+          );
+        }
+      }
+    }
+
+    return rx;
   });
 
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
-  return prescription;
+  return getPrescriptionById(prescription.id);
 }
 
 /**
@@ -132,7 +241,19 @@ export async function issueNewVersion(
 ): Promise<NutritionPrescription | null> {
   const current = await NutritionPrescription.findOne({
     where: { playerId, supersededAt: null },
-    include: [{ model: PrescriptionMeal, as: "meals" }],
+    include: [
+      {
+        model: PrescriptionMeal,
+        as: "meals",
+        include: [
+          {
+            model: PrescriptionMealItem,
+            as: "items",
+            include: [{ model: FoodItem, as: "food" }],
+          },
+        ],
+      },
+    ],
   });
 
   if (!current) return null;
@@ -155,16 +276,31 @@ export async function issueNewVersion(
   });
 
   if (current.meals && current.meals.length > 0) {
-    await PrescriptionMeal.bulkCreate(
-      current.meals.map((m) => ({
+    for (const m of current.meals) {
+      const newMeal = await PrescriptionMeal.create({
         prescriptionId: newVersion.id,
         dayOfWeek: m.dayOfWeek,
         mealType: m.mealType,
+        customName: m.customName,
         description: m.description,
         sortOrder: m.sortOrder,
         notes: m.notes,
-      })),
-    );
+      });
+
+      if (m.items && m.items.length > 0) {
+        await PrescriptionMealItem.bulkCreate(
+          m.items.map((item) => ({
+            mealId: newMeal.id,
+            foodItemId: item.foodItemId,
+            servings: item.servings,
+            calories: item.calories,
+            proteinG: item.proteinG,
+            carbsG: item.carbsG,
+            fatG: item.fatG,
+          })),
+        );
+      }
+    }
   }
 
   await current.update({

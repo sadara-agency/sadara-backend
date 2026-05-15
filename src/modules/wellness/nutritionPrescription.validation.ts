@@ -7,6 +7,17 @@ export const triggeringReasonEnum = z.enum([
   "block_change",
 ]);
 
+const prescriptionMealItemSchema = z.object({
+  foodItemId: z.string().uuid(),
+  servings: z.number().positive(),
+});
+
+const prescriptionMealSchema = z.object({
+  customName: z.string().min(1).max(100),
+  sortOrder: z.number().int().min(0).optional(),
+  items: z.array(prescriptionMealItemSchema).min(1),
+});
+
 export const issuePrescriptionSchema = z.object({
   playerId: z.string().uuid(),
   trainingBlockId: z.string().uuid().optional(),
@@ -18,6 +29,7 @@ export const issuePrescriptionSchema = z.object({
   preTrainingGuidance: z.string().max(2000).optional(),
   postTrainingGuidance: z.string().max(2000).optional(),
   notes: z.string().max(1000).optional(),
+  meals: z.array(prescriptionMealSchema).optional(),
 });
 
 export const updatePrescriptionSchema = issuePrescriptionSchema
