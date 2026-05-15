@@ -90,7 +90,7 @@ export async function linkReviewToPlayer(
         ...existing,
         [row.providerSource]: row.externalPlayerId,
       };
-      await player.save();
+      await player.save({ fields: ["externalIds"] });
 
       // Auto-enrich with full SAFF+ profile now that we have the external id.
       // Lazy require breaks the circular dependency (playerReview ↔ saffplus.service).
