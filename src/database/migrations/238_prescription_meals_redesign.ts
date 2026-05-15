@@ -10,6 +10,13 @@ export async function up({
 }: {
   context: QueryInterface;
 }): Promise<void> {
+  // On a fresh DB, prescription_meals is created by an earlier migration.
+  // Skip entirely if it doesn't exist yet — the earlier migration's createTable
+  // already defines the correct schema including custom_name and nullable meal_type.
+  if (!(await tableExists(queryInterface, "prescription_meals"))) {
+    return;
+  }
+
   // 1. Add custom_name to prescription_meals
   await addColumnIfMissing(
     queryInterface,
@@ -22,11 +29,9 @@ export async function up({
   );
 
   // 2. Make meal_type nullable (was NOT NULL)
-  if (await tableExists(queryInterface, "prescription_meals")) {
-    await queryInterface.sequelize.query(
-      `ALTER TABLE prescription_meals ALTER COLUMN meal_type DROP NOT NULL`,
-    );
-  }
+  await queryInterface.sequelize.query(
+    `ALTER TABLE prescription_meals ALTER COLUMN meal_type DROP NOT NULL`,
+  );
 
   // 3. Create prescription_meal_items
   if (!(await tableExists(queryInterface, "prescription_meal_items"))) {
