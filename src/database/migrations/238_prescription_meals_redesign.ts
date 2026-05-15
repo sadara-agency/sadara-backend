@@ -33,7 +33,7 @@ export async function up({
     `ALTER TABLE prescription_meals ALTER COLUMN meal_type DROP NOT NULL`,
   );
 
-  // 3. Create prescription_meal_items
+  // 3. Create prescription_meal_items (if not already created by migration 136)
   if (!(await tableExists(queryInterface, "prescription_meal_items"))) {
     await queryInterface.createTable("prescription_meal_items", {
       id: {
@@ -44,42 +44,43 @@ export async function up({
       meal_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: { model: "prescription_meals", key: "id" },
-        onDelete: "CASCADE",
       },
       food_item_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: { model: "food_items", key: "id" },
-        onDelete: "RESTRICT",
       },
       servings: {
         type: DataTypes.DECIMAL(5, 2),
         allowNull: false,
         defaultValue: 1.0,
       },
-      calories: {
-        type: DataTypes.DECIMAL(7, 2),
-        allowNull: true,
-      },
-      protein_g: {
-        type: DataTypes.DECIMAL(6, 2),
-        allowNull: true,
-      },
-      carbs_g: {
-        type: DataTypes.DECIMAL(6, 2),
-        allowNull: true,
-      },
-      fat_g: {
-        type: DataTypes.DECIMAL(6, 2),
-        allowNull: true,
-      },
+      calories: { type: DataTypes.DECIMAL(7, 2), allowNull: true },
+      protein_g: { type: DataTypes.DECIMAL(6, 2), allowNull: true },
+      carbs_g: { type: DataTypes.DECIMAL(6, 2), allowNull: true },
+      fat_g: { type: DataTypes.DECIMAL(6, 2), allowNull: true },
       created_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW,
       },
     });
+    // FK to prescription_meals (always exists at this point)
+    await queryInterface.sequelize.query(`
+      ALTER TABLE prescription_meal_items
+        ADD CONSTRAINT fk_prescription_meal_items_meal
+        FOREIGN KEY (meal_id) REFERENCES prescription_meals(id) ON DELETE CASCADE
+    `);
+  }
+
+  // Add food_items FK (food_items table exists by migration 235, before 238)
+  try {
+    await queryInterface.sequelize.query(`
+      ALTER TABLE prescription_meal_items
+        ADD CONSTRAINT fk_prescription_meal_items_food
+        FOREIGN KEY (food_item_id) REFERENCES food_items(id) ON DELETE RESTRICT
+    `);
+  } catch {
+    // Constraint already exists
   }
 }
 
