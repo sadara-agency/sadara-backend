@@ -75,3 +75,6 @@ src/database/csv-import/data/
 
 # Database backups
 backup_*.dump
+
+# Claude Code local tooling (skills, settings, cache)
+.claude/
