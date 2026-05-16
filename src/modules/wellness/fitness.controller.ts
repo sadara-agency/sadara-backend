@@ -60,6 +60,16 @@ export async function deleteExercise(req: AuthRequest, res: Response) {
   invalidateMultiple(WELLNESS_CACHES).catch(() => {});
 }
 
+export async function syncExerciseDB(req: AuthRequest, res: Response) {
+  const result = await fitSvc.syncExercisesFromExerciseDB();
+  sendSuccess(
+    res,
+    result,
+    `Synced ${result.upserted} exercises from ExerciseDB`,
+  );
+  invalidateMultiple(WELLNESS_CACHES).catch(() => {});
+}
+
 // ══════════════════════════════════════════
 // WORKOUT TEMPLATES
 // ══════════════════════════════════════════
