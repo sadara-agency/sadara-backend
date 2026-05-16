@@ -50,6 +50,7 @@ interface ExerciseAttributes {
   videoUrl?: string | null;
   videoThumbnail?: string | null;
   photoUrl?: string | null;
+  gifUrl?: string | null;
   instructions?: string | null;
   instructionsAr?: string | null;
   isActive: boolean;
@@ -59,6 +60,7 @@ interface ExerciseAttributes {
   mechanic?: ExerciseMechanic | null;
   primaryMuscles?: string[] | null;
   secondaryMuscles?: string[] | null;
+  externalDbId?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -80,6 +82,7 @@ export class WellnessExercise
   declare videoUrl: string | null;
   declare videoThumbnail: string | null;
   declare photoUrl: string | null;
+  declare gifUrl: string | null;
   declare instructions: string | null;
   declare instructionsAr: string | null;
   declare isActive: boolean;
@@ -89,6 +92,7 @@ export class WellnessExercise
   declare mechanic: ExerciseMechanic | null;
   declare primaryMuscles: string[] | null;
   declare secondaryMuscles: string[] | null;
+  declare externalDbId: string | null;
 }
 
 WellnessExercise.init(
@@ -113,6 +117,7 @@ WellnessExercise.init(
     videoUrl: { type: DataTypes.STRING(500), field: "video_url" },
     videoThumbnail: { type: DataTypes.STRING(500), field: "video_thumbnail" },
     photoUrl: { type: DataTypes.STRING(500), field: "photo_url" },
+    gifUrl: { type: DataTypes.TEXT, field: "gif_url" },
     instructions: { type: DataTypes.TEXT },
     instructionsAr: { type: DataTypes.TEXT, field: "instructions_ar" },
     isActive: {
@@ -127,6 +132,11 @@ WellnessExercise.init(
     mechanic: { type: DataTypes.STRING(20), field: "mechanic" },
     primaryMuscles: { type: DataTypes.JSONB, field: "primary_muscles" },
     secondaryMuscles: { type: DataTypes.JSONB, field: "secondary_muscles" },
+    externalDbId: {
+      type: DataTypes.STRING(100),
+      field: "external_db_id",
+      unique: true,
+    },
   },
   {
     sequelize,

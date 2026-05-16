@@ -76,6 +76,9 @@ const envSchema = z.object({
   WYSCOUT_API_KEY: z.string().default(""),
   WYSCOUT_BASE_URL: z.string().default("https://apirest.wyscout.com/v3"),
 
+  // ExerciseDB OSS (free, no auth required — override only to use a self-hosted instance)
+  EXERCISEDB_BASE_URL: z.string().default("https://oss.exercisedb.dev/api/v1"),
+
   // Sportmonks Fixtures API (optional)
   SPORTMONKS_API_TOKEN: z.string().default(""),
 

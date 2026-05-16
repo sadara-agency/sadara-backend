@@ -4,7 +4,7 @@
 
 import { Router } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
-import { authenticate, authorizeModule } from "@middleware/auth";
+import { authenticate, authorize, authorizeModule } from "@middleware/auth";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { validate } from "@middleware/validate";
 import {
@@ -66,6 +66,24 @@ router.delete(
   "/exercises/:id",
   authorizeModule("wellness", "delete"),
   asyncHandler(ctrl.deleteExercise),
+);
+
+/**
+ * @swagger
+ * /wellness/exercises/sync-exercisedb:
+ *   post:
+ *     summary: Sync exercises from ExerciseDB OSS (Admin only)
+ *     tags: [Wellness]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Sync complete with upserted count
+ */
+router.post(
+  "/exercises/sync-exercisedb",
+  authorize("Admin"),
+  asyncHandler(ctrl.syncExerciseDB),
 );
 
 // ══════════════════════════════════════════

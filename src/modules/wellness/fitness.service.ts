@@ -5,7 +5,7 @@
 // Workout Logging, Progressive Overload
 // ═══════════════════════════════════════════════════════════════
 
-import { Op } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 import {
   WellnessExercise,
@@ -13,6 +13,7 @@ import {
   WellnessTemplateExercise,
   WellnessWorkoutAssignment,
 } from "./fitness.model";
+import type { Equipment, MuscleGroup } from "./fitness.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import type {
@@ -94,6 +95,163 @@ export async function updateExercise(id: string, body: UpdateExerciseInput) {
 export async function deleteExercise(id: string) {
   const exercise = await getExercise(id);
   await exercise.update({ isActive: false });
+}
+
+// ══════════════════════════════════════════
+// EXERCISEDB OSS SYNC
+// ══════════════════════════════════════════
+
+interface ExerciseDBItem {
+  exerciseId: string;
+  name: string;
+  bodyParts: string[];
+  targetMuscles: string[];
+  secondaryMuscles: string[];
+  equipments: string[];
+  instructions: string[];
+  gifUrl?: string;
+}
+
+function mapEqFromEDB(equipments: string[]): Equipment {
+  const raw = (equipments[0] ?? "").toUpperCase();
+  if (raw.includes("BARBELL")) return "barbell";
+  if (raw.includes("DUMBBELL")) return "dumbbell";
+  if (raw.includes("CABLE")) return "cable";
+  if (
+    raw.includes("LEVERAGE") ||
+    raw.includes("SMITH") ||
+    raw.includes("MACHINE")
+  )
+    return "machine";
+  if (raw.includes("BODY") || raw.includes("BODYWEIGHT")) return "bodyweight";
+  if (raw.includes("KETTLEBELL")) return "kettlebell";
+  if (raw.includes("BAND") || raw.includes("RESISTANCE")) return "band";
+  if (raw.includes("CARDIO")) return "cardio_machine";
+  return "other";
+}
+
+function mapMGFromEDB(
+  bodyParts: string[],
+  targetMuscles: string[],
+): MuscleGroup {
+  const part = (bodyParts[0] ?? "").toUpperCase();
+  const target = (targetMuscles[0] ?? "").toUpperCase();
+  if (part.includes("CHEST") || target.includes("PECTORAL")) return "chest";
+  if (
+    part.includes("BACK") ||
+    target.includes("LAT") ||
+    target.includes("TRAPEZIUS") ||
+    target.includes("RHOMBOID")
+  )
+    return "back";
+  if (part.includes("SHOULDER") || target.includes("DELTOID"))
+    return "shoulders";
+  if (target.includes("BICEP")) return "biceps";
+  if (target.includes("TRICEP")) return "triceps";
+  if (
+    part.includes("FOREARM") ||
+    target.includes("FOREARM") ||
+    target.includes("BRACHIORADIALIS")
+  )
+    return "forearms";
+  if (
+    part.includes("WAIST") ||
+    target.includes("ABS") ||
+    target.includes("OBLIQUE") ||
+    target.includes("ABDOMINAL")
+  )
+    return "core";
+  if (
+    part.includes("UPPER LEG") ||
+    target.includes("QUAD") ||
+    target.includes("HAMSTRING")
+  ) {
+    if (target.includes("HAMSTRING")) return "hamstrings";
+    if (target.includes("GLUTE")) return "glutes";
+    return "quads";
+  }
+  if (
+    part.includes("LOWER LEG") ||
+    target.includes("CALF") ||
+    target.includes("GASTROCNEMIUS") ||
+    target.includes("SOLEUS")
+  )
+    return "calves";
+  if (part.includes("UPPER ARM")) {
+    if (target.includes("BICEP")) return "biceps";
+    if (target.includes("TRICEP")) return "triceps";
+    return "shoulders";
+  }
+  if (part.includes("CARDIO")) return "cardio";
+  if (part.includes("FULL") || target.includes("FULL")) return "full_body";
+  return "other";
+}
+
+export async function syncExercisesFromExerciseDB(): Promise<{
+  upserted: number;
+  total: number;
+}> {
+  const baseUrl =
+    process.env.EXERCISEDB_BASE_URL ?? "https://oss.exercisedb.dev/api/v1";
+  const url = `${baseUrl}/exercises?limit=0`;
+
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new AppError(
+      `ExerciseDB fetch failed: ${response.status} ${response.statusText}`,
+      502,
+    );
+  }
+
+  const payload = (await response.json()) as
+    | ExerciseDBItem[]
+    | { data: ExerciseDBItem[] };
+  const source: ExerciseDBItem[] = Array.isArray(payload)
+    ? payload
+    : (payload as { data: ExerciseDBItem[] }).data;
+
+  const admin = await sequelize.query<{ id: string }>(
+    `SELECT id FROM users WHERE role = 'Admin' LIMIT 1`,
+    { type: QueryTypes.SELECT },
+  );
+  if (!admin.length) throw new AppError("No Admin user found in DB", 500);
+  const adminId = admin[0].id;
+
+  const records = source
+    .filter((ex) => !!ex.exerciseId)
+    .map((ex) => ({
+      name: ex.name,
+      muscleGroup: mapMGFromEDB(ex.bodyParts ?? [], ex.targetMuscles ?? []),
+      equipment: mapEqFromEDB(ex.equipments ?? []),
+      primaryMuscles: (ex.targetMuscles ?? []).length ? ex.targetMuscles : null,
+      secondaryMuscles: (ex.secondaryMuscles ?? []).length
+        ? ex.secondaryMuscles
+        : null,
+      instructions: (ex.instructions ?? []).length
+        ? ex.instructions.join("\n")
+        : null,
+      gifUrl:
+        ex.gifUrl ??
+        `${baseUrl}/image?exerciseId=${ex.exerciseId}&resolution=180`,
+      externalDbId: ex.exerciseId,
+      isActive: true,
+      createdBy: adminId,
+    }));
+
+  await WellnessExercise.bulkCreate(records, {
+    updateOnDuplicate: [
+      "name",
+      "muscleGroup",
+      "equipment",
+      "primaryMuscles",
+      "secondaryMuscles",
+      "instructions",
+      "gifUrl",
+    ],
+    ignoreDuplicates: false,
+  });
+
+  return { upserted: records.length, total: source.length };
 }
 
 // ══════════════════════════════════════════
