@@ -1671,6 +1671,12 @@ export interface AutoLinkResult {
   saffPlayerId?: string;
   score?: number;
   reason: string;
+  /**
+   * When outcome === "queued", carries the freshly-created (or refreshed)
+   * `player_match_review` row so the caller can open the resolve modal
+   * inline on the player profile — no second round-trip to the queue page.
+   */
+  review?: PlayerMatchReview;
 }
 
 /**
@@ -1787,7 +1793,7 @@ export async function autoLinkPlayerToSaffPlus(
 
   if (reviewHit) {
     const { candidate, nameScore } = reviewHit;
-    await upsertPendingReview({
+    const review = await upsertPendingReview({
       scrapedNameAr: candidate.nameAr || null,
       scrapedNameEn: candidate.nameEn || null,
       scrapedDob: candidate.dateOfBirth,
@@ -1814,6 +1820,7 @@ export async function autoLinkPlayerToSaffPlus(
       saffPlayerId: candidate.saffPlayerId,
       score: nameScore,
       reason: "below threshold — queued for review",
+      review,
     };
   }
 
