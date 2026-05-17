@@ -14,8 +14,6 @@ export async function up({
     player_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "players", key: "id" },
-      onDelete: "CASCADE",
     },
     amount_ml: {
       type: DataTypes.INTEGER,
