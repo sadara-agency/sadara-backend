@@ -9,6 +9,7 @@ import {
   WellnessWeightLog,
   WellnessCheckin,
   WellnessMealLog,
+  HydrationLog,
   type MealType,
 } from "./wellness.model";
 import { NutritionPrescription } from "./nutritionPrescription.model";
@@ -1377,4 +1378,42 @@ export async function getBlockReport(
       logCount: Number(w?.log_count || 0),
     },
   };
+}
+
+// ── Hydration Logging ──────────────────────────────────────────────────────────
+
+export async function logHydration(
+  userId: string,
+  data: { amountMl: number; loggedDate?: string },
+) {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  if (!playerId) throw new AppError("Player account not linked", 403);
+
+  const log = await HydrationLog.create({
+    playerId,
+    amountMl: data.amountMl,
+    loggedDate: data.loggedDate ?? new Date().toISOString().slice(0, 10),
+  });
+
+  return log;
+}
+
+export async function getMyHydrationLog(
+  userId: string,
+  date?: string,
+): Promise<{ date: string; totalMl: number }> {
+  const user = await User.findByPk(userId, { attributes: ["playerId"] });
+  const playerId = (user as any)?.playerId as string | null;
+  const targetDate = date ?? new Date().toISOString().slice(0, 10);
+  if (!playerId) return { date: targetDate, totalMl: 0 };
+
+  const [row] = await sequelize.query<{ total_ml: string }>(
+    `SELECT COALESCE(SUM(amount_ml), 0) AS total_ml
+     FROM hydration_logs
+     WHERE player_id = :playerId AND logged_date = :date`,
+    { replacements: { playerId, date: targetDate }, type: QueryTypes.SELECT },
+  );
+
+  return { date: targetDate, totalMl: Number(row?.total_ml ?? 0) };
 }

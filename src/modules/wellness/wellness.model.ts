@@ -482,6 +482,64 @@ WellnessCheckin.init(
   },
 );
 
+// ── Hydration Log ──
+
+interface HydrationLogAttributes {
+  id: string;
+  playerId: string;
+  amountMl: number;
+  loggedDate: string;
+  createdAt?: Date;
+}
+
+interface HydrationLogCreation extends Optional<
+  HydrationLogAttributes,
+  "id" | "createdAt"
+> {}
+
+export class HydrationLog
+  extends Model<HydrationLogAttributes, HydrationLogCreation>
+  implements HydrationLogAttributes
+{
+  declare id: string;
+  declare playerId: string;
+  declare amountMl: number;
+  declare loggedDate: string;
+  declare createdAt: Date;
+}
+
+HydrationLog.init(
+  {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+    },
+    playerId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      field: "player_id",
+    },
+    amountMl: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      field: "amount_ml",
+    },
+    loggedDate: {
+      type: DataTypes.DATEONLY,
+      allowNull: false,
+      field: "logged_date",
+    },
+  },
+  {
+    sequelize,
+    tableName: "hydration_logs",
+    underscored: true,
+    timestamps: true,
+    updatedAt: false,
+  },
+);
+
 // ── Associations ──
 
 WellnessMealLog.belongsTo(WellnessFoodItem, {
