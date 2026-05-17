@@ -299,6 +299,17 @@ export async function getMyCompliance(req: AuthRequest, res: Response) {
   sendSuccess(res, result);
 }
 
+export async function logHydration(req: AuthRequest, res: Response) {
+  const log = await svc.logHydration(req.user!.id, req.body);
+  sendCreated(res, log);
+}
+
+export async function getMyHydrationLog(req: AuthRequest, res: Response) {
+  const date = req.query.date as string | undefined;
+  const result = await svc.getMyHydrationLog(req.user!.id, date);
+  sendSuccess(res, result);
+}
+
 export async function getPlayerCompliance(req: AuthRequest, res: Response) {
   const { playerId } = req.params;
   const from =

@@ -89,6 +89,21 @@ export const mealLogDateSchema = z.object({
     .optional(),
 });
 
+export const logHydrationSchema = z.object({
+  amountMl: z.number().int().positive().max(5000),
+  loggedDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
+    .optional(),
+});
+
+export const hydrationDateSchema = z.object({
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")
+    .optional(),
+});
+
 export const complianceRangeSchema = z.object({
   from: z
     .string()

@@ -19,6 +19,8 @@ import {
   createMyMealLogSchema,
   mealLogDateSchema,
   complianceRangeSchema,
+  logHydrationSchema,
+  hydrationDateSchema,
 } from "./wellness.validation";
 import * as ctrl from "./wellness.controller";
 
@@ -115,6 +117,18 @@ router.delete(
   "/my/meals/:id",
   authorizeModule("wellness", "delete"),
   asyncHandler(ctrl.deleteMealLog),
+);
+router.post(
+  "/my/hydration",
+  authorizeModule("wellness", "create"),
+  validate(logHydrationSchema),
+  asyncHandler(ctrl.logHydration),
+);
+router.get(
+  "/my/hydration",
+  authorizeModule("wellness", "read"),
+  validate(hydrationDateSchema, "query"),
+  asyncHandler(ctrl.getMyHydrationLog),
 );
 
 // ══════════════════════════════════════════
