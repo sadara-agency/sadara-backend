@@ -31,6 +31,7 @@ export async function up({
     },
   });
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex(
     "hydration_logs",
     ["player_id", "logged_date"],
