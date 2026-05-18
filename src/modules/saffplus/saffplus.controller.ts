@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { AppError } from "@middleware/errorHandler";
 import { AuthRequest } from "@shared/types";
 import * as saffPlusService from "./saffplus.service";
 import * as playerReviewService from "./playerReview.service";
@@ -318,4 +319,58 @@ export async function autoLinkAllPlayersCtrl(req: AuthRequest, res: Response) {
     result,
     `linked=${result.linked} queued=${result.queued} skipped=${result.skipped} errors=${result.errors}`,
   );
+}
+
+// ── Link-by-URL ──
+
+export async function previewByUrlCtrl(req: AuthRequest, res: Response) {
+  const { url } = req.query as { url: string };
+  const idMatch = /\/entity\/player\/([^/?#]+)/.exec(url);
+  const saffPlayerId = idMatch ? idMatch[1] : url.trim();
+  if (!saffPlayerId) {
+    throw new AppError(
+      "Could not extract a SAFF+ player ID from the provided URL",
+      422,
+    );
+  }
+  const profile = await saffPlusService.previewPlayerProfile(saffPlayerId, {
+    fresh: false,
+  });
+  sendSuccess(res, profile);
+}
+
+export async function linkByUrlCtrl(req: AuthRequest, res: Response) {
+  const { playerId, saffPlusUrl } = req.body as {
+    playerId: string;
+    saffPlusUrl: string;
+  };
+  const idMatch = /\/entity\/player\/([^/?#]+)/.exec(saffPlusUrl);
+  const saffPlayerId = idMatch ? idMatch[1] : saffPlusUrl.trim();
+  if (!saffPlayerId) {
+    throw new AppError(
+      "Could not extract a SAFF+ player ID from the provided URL",
+      422,
+    );
+  }
+  // Guard: reject if player is already linked to a different SAFF+ ID.
+  const { Player } = await import("@modules/players/player.model");
+  const player = await Player.findByPk(playerId);
+  if (!player) throw new AppError("Player not found", 404);
+  const existingId = (player.externalIds as Record<string, unknown>)?.saffplus;
+  if (existingId)
+    throw new AppError("Player is already linked to a SAFF+ profile", 409);
+  const result = await saffPlusService.syncPlayerFromSaffPlus(
+    playerId,
+    saffPlayerId,
+    { overwrite: false },
+    req.user!,
+  );
+  await logAudit(
+    "UPDATE",
+    "players",
+    playerId,
+    buildAuditContext(req.user!, req.ip),
+    `SAFF+ link-by-url: saffPlayerId=${saffPlayerId}`,
+  );
+  sendSuccess(res, result, "Player linked to SAFF+");
 }

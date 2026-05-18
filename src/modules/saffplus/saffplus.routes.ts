@@ -11,6 +11,8 @@ import {
   saffPlayerIdParamSchema,
   sadaraPlayerIdParamSchema,
   autoLinkAllBodySchema,
+  previewByUrlSchema,
+  linkByUrlSchema,
 } from "./saffplus.validation";
 import {
   playerReviewQuerySchema,
@@ -146,6 +148,22 @@ router.post(
 );
 
 // ── Phase 4: Player profile enrichment ──
+
+// Fixed-path routes must come before param routes to avoid Express matching
+// "preview-by-url" or "link-by-url" as a saffPlayerId.
+router.get(
+  "/players/preview-by-url",
+  authorizeModule("saff-data", "read"),
+  validate(previewByUrlSchema, "query"),
+  asyncHandler(ctrl.previewByUrlCtrl),
+);
+
+router.post(
+  "/players/link-by-url",
+  authorizeModule("saff-data", "update"),
+  validate(linkByUrlSchema),
+  asyncHandler(ctrl.linkByUrlCtrl),
+);
 
 router.get(
   "/players/by-sadara/:sadaraPlayerId/live",

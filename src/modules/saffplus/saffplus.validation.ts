@@ -76,3 +76,17 @@ export const autoLinkAllBodySchema = z.object({
 });
 
 export type SyncPlayerInput = z.infer<typeof syncPlayerSchema>;
+
+// ── Link-by-URL ──
+
+export const previewByUrlSchema = z.object({
+  url: z.string().min(1),
+});
+
+export const linkByUrlSchema = z.object({
+  playerId: z.string().uuid(),
+  saffPlusUrl: z.string().min(1),
+});
+
+export type PreviewByUrlInput = z.infer<typeof previewByUrlSchema>;
+export type LinkByUrlInput = z.infer<typeof linkByUrlSchema>;
