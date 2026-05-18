@@ -82,6 +82,7 @@ import transferWindowRoutes from "@modules/transfer-windows/transferWindow.route
 import clubNeedRoutes from "@modules/club-needs/clubNeed.routes";
 import playerCoachAssignmentRoutes from "@modules/player-coach-assignments/playerCoachAssignment.routes";
 import playerInboxRoutes from "@modules/player-inbox/playerInbox.routes";
+import playerStatsRoutes from "@modules/playerStats/playerStats.routes";
 import staffMonitoringRoutes from "@modules/staffMonitoring/staffMonitoring.routes";
 import squadRoutes from "@modules/squads/squad.routes";
 import analystViewRoutes from "@modules/analystviews/analystview.routes";
@@ -474,6 +475,7 @@ app.use("/api/v1/transfer-windows", transferWindowRoutes);
 app.use("/api/v1/club-needs", clubNeedRoutes);
 app.use("/api/v1/player-coach-assignments", playerCoachAssignmentRoutes);
 app.use("/api/v1/player-inbox", playerInboxRoutes);
+app.use("/api/v1/player-stats", playerStatsRoutes);
 app.use("/api/v1/staff-monitoring", staffMonitoringRoutes);
 app.use("/api/v1/squads", squadRoutes);
 app.use("/api/v1/analyst-views", analystViewRoutes);
