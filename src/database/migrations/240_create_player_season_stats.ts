@@ -6,6 +6,9 @@ export async function up({
 }: {
   context: QueryInterface;
 }) {
+  // Guard: skip on fresh-DB CI runs where players table doesn't exist yet
+  if (!(await tableExists(queryInterface, "players"))) return;
+
   await queryInterface.createTable("player_season_stats", {
     id: {
       type: DataTypes.UUID,
