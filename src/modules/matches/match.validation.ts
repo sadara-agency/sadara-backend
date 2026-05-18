@@ -171,6 +171,7 @@ export const playerMatchesQuerySchema = z.object({
   competition: z.string().optional(),
   from: z.string().optional(),
   to: z.string().optional(),
+  season: z.string().optional(),
 });
 
 // ── Stats Leaderboard ──

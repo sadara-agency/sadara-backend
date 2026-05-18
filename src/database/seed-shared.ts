@@ -92,6 +92,37 @@ const RAW_PERMISSIONS: Perm[] = [
   }),
   ...forRoles("players", ["Manager"], { canCreate: true, canUpdate: true }),
 
+  ...forRoles("player-stats", ["Admin", "SportingDirector", "Manager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  ...forRoles(
+    "player-stats",
+    ["Analyst", "Coach", "TacticalCoach", "SkillCoach"],
+    {
+      canRead: true,
+      canUpdate: true,
+    },
+  ),
+  ...forRoles(
+    "player-stats",
+    [
+      "Scout",
+      "Player",
+      "GoalkeeperCoach",
+      "FitnessCoach",
+      "NutritionSpecialist",
+      "GymCoach",
+      "MentalCoach",
+      "Executive",
+    ],
+    {
+      canRead: true,
+    },
+  ),
+
   ...forRoles("clubs", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,

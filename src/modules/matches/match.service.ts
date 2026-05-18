@@ -643,6 +643,14 @@ export async function getPlayerMatches(playerId: string, queryParams: any) {
     if (queryParams.from) where.matchDate[Op.gte] = new Date(queryParams.from);
     if (queryParams.to) where.matchDate[Op.lte] = new Date(queryParams.to);
   }
+  if (queryParams.season && !queryParams.from && !queryParams.to) {
+    const [startYear] = String(queryParams.season).split("/");
+    const yr = parseInt(startYear, 10);
+    where.matchDate = {
+      [Op.gte]: new Date(`${yr}-07-01`),
+      [Op.lte]: new Date(`${yr + 1}-06-30`),
+    };
+  }
 
   const { count, rows } = await Match.findAndCountAll({
     where,
