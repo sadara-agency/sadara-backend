@@ -21,7 +21,9 @@ jest.mock("./playerStats.model", () => ({
 const mockMatchStatsSum = jest.fn();
 jest.mock("@modules/matches/playerMatchStats.model", () => ({
   __esModule: true,
-  default: { findAll: (...args: unknown[]) => mockMatchStatsSum(...args) },
+  PlayerMatchStats: {
+    findAll: (...args: unknown[]) => mockMatchStatsSum(...args),
+  },
 }));
 
 import {
@@ -123,7 +125,6 @@ describe("recomputeFromMatches", () => {
         matchesPlayed: 2,
         source: "computed",
       }),
-      expect.anything(),
     );
   });
 });
