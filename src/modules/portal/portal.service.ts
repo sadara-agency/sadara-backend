@@ -240,6 +240,7 @@ export async function getMySessions(userId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
   const now = new Date();
+  now.setHours(0, 0, 0, 0); // DATEONLY fields parse to midnight; compare date-to-date
 
   const sessions = await Session.findAll({
     where: { playerId } as any,
