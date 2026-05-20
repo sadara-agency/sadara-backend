@@ -624,11 +624,32 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
-  ...forRoles("meal-plans", ["Coach", "FitnessCoach", "GymCoach"], {
+  ...forRoles("meal-plans", ["FitnessCoach", "GymCoach"], {
     canRead: true,
+  }),
+  ...forRoles("meal-plans", ["Coach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
   }),
   ...forRoles("meal-plans", ["Player"], { canRead: true }),
   ...forRoles("meal-plans", ["Executive"], { canRead: true }),
+
+  ...forRoles(
+    "food-items",
+    ["Admin", "Manager", "SportingDirector", "NutritionSpecialist"],
+    {
+      canCreate: true,
+      canRead: true,
+      canUpdate: true,
+      canDelete: true,
+    },
+  ),
+  ...forRoles("food-items", ["Coach", "FitnessCoach", "GymCoach"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+  }),
 
   // ── RTP Protocols ──
   ...forRoles("rtp", ["Admin", "Manager", "SportingDirector"], {

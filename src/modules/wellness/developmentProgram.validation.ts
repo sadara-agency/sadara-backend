@@ -25,7 +25,7 @@ export const programTypeEnum = z.enum([
 
 export const createProgramSchema = z.object({
   name: z.string().min(1).max(255),
-  nameAr: z.string().max(255).optional(),
+  nameAr: z.string().max(255).nullish(),
   description: z.string().max(2000).nullish(),
   category: programCategoryEnum,
   estimatedMinutes: z.number().int().positive().optional(),
@@ -73,7 +73,7 @@ export type ListProgramsQueryDTO = z.infer<typeof listProgramsQuerySchema>;
 
 export const createDaySessionSchema = z.object({
   label: z.string().min(1).max(100),
-  labelAr: z.string().max(100).optional(),
+  labelAr: z.string().max(100).nullish(),
   dayOfWeek: z.number().int().min(0).max(6).optional(),
   orderIndex: z.number().int().min(0).optional(),
   estimatedMinutes: z.number().int().positive().optional(),
