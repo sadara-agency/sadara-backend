@@ -523,6 +523,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canDelete: true,
   }),
 
+  ...allRoles("users", { canRead: true }),
   ...forRoles("users", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
