@@ -7,6 +7,7 @@ import {
   WorkoutSetLog,
   PhaseRule,
 } from "./workoutPlan.model";
+import type { WorkoutSessionStatus } from "./workoutPlan.model";
 import { WellnessExercise } from "./fitness.model";
 import TrainingBlock from "./trainingBlock.model";
 import {
@@ -258,9 +259,11 @@ type ProjectedSession = {
   planDayId: string;
   playerId: string;
   scheduledDate: string;
-  status: "pending";
-  startedAt: null;
-  completedAt: null;
+  status: WorkoutSessionStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMin: number | null;
+  playerNotes: string | null;
   plan: { id: string; name: string; nameAr: string | null; goal: string };
   planDay: {
     id: string;
@@ -321,10 +324,15 @@ async function loadActivePrograms(
   });
 }
 
+function overlayKey(planId: string, planDayId: string, date: string): string {
+  return `${planId}::${planDayId}::${date}`;
+}
+
 function projectProgramsToSessions(
   programs: DevelopmentProgram[],
   playerId: string,
   weekStart: Date,
+  overlay?: Map<string, WorkoutSession>,
 ): ProjectedSession[] {
   const sessions: ProjectedSession[] = [];
 
@@ -364,15 +372,25 @@ function projectProgramsToSessions(
         };
       });
 
+      const materialized = overlay?.get(
+        overlayKey(program.id, ds.id, scheduledDate),
+      );
+
       sessions.push({
-        id: ds.id,
+        id: materialized?.id ?? ds.id,
         planId: program.id,
         planDayId: ds.id,
         playerId,
         scheduledDate,
-        status: "pending",
-        startedAt: null,
-        completedAt: null,
+        status: materialized?.status ?? "pending",
+        startedAt: materialized?.startedAt
+          ? materialized.startedAt.toISOString()
+          : null,
+        completedAt: materialized?.completedAt
+          ? materialized.completedAt.toISOString()
+          : null,
+        durationMin: materialized?.durationMin ?? null,
+        playerNotes: materialized?.playerNotes ?? null,
         plan: {
           id: program.id,
           name: program.name,
@@ -397,6 +415,29 @@ function projectProgramsToSessions(
 
 // ── Session actions ──
 
+// Load any materialized workout_sessions for the player within [weekStart, weekEnd]
+// and key them by (planId, planDayId, scheduledDate) so the projection can overlay
+// real status/duration onto the projected days.
+async function loadOverlayForWeek(
+  playerId: string,
+  weekStart: Date,
+): Promise<Map<string, WorkoutSession>> {
+  const weekEnd = addDays(weekStart, 6);
+  const rows = await WorkoutSession.findAll({
+    where: {
+      playerId,
+      scheduledDate: {
+        [Op.between]: [toDateString(weekStart), toDateString(weekEnd)],
+      },
+    },
+  });
+  const map = new Map<string, WorkoutSession>();
+  for (const row of rows ?? []) {
+    map.set(overlayKey(row.planId, row.planDayId, row.scheduledDate), row);
+  }
+  return map;
+}
+
 export async function getTodaysWorkout(
   playerId: string,
 ): Promise<ProjectedSession | null> {
@@ -405,7 +446,13 @@ export async function getTodaysWorkout(
   const today = toDateString(now);
 
   const programs = await loadActivePrograms(playerId);
-  const sessions = projectProgramsToSessions(programs, playerId, weekStart);
+  const overlay = await loadOverlayForWeek(playerId, weekStart);
+  const sessions = projectProgramsToSessions(
+    programs,
+    playerId,
+    weekStart,
+    overlay,
+  );
   return sessions.find((s) => s.scheduledDate === today) ?? null;
 }
 
@@ -416,7 +463,50 @@ export async function getWeeklyWorkouts(
   const weekStart = addDays(now, -now.getUTCDay());
 
   const programs = await loadActivePrograms(playerId);
-  return projectProgramsToSessions(programs, playerId, weekStart);
+  const overlay = await loadOverlayForWeek(playerId, weekStart);
+  return projectProgramsToSessions(programs, playerId, weekStart, overlay);
+}
+
+// ── Materialize-on-interaction ──
+//
+// The player's weekly list is projected from DevelopmentProgram day-sessions, so
+// each projected `id` is a program_day_sessions id with no matching
+// workout_sessions row. Before any write (start/log/complete) we resolve that
+// projection identity into a real, persistent workout_sessions row.
+
+export type ResolveSessionArgs = {
+  programId: string;
+  daySessionId: string;
+  scheduledDate: string;
+};
+
+export async function resolveOrMaterializeSession(
+  args: ResolveSessionArgs,
+  playerId: string,
+): Promise<WorkoutSession> {
+  const { programId, daySessionId, scheduledDate } = args;
+
+  // Ownership: the program must be one the player can access (owned directly or
+  // via their active training block) and contain the given day-session.
+  const programs = await loadActivePrograms(playerId);
+  const program = programs.find((p) => p.id === programId);
+  if (!program) throw new AppError("Workout program not found", 404);
+  const daySession = (program.daySessions ?? []).find(
+    (ds) => ds.id === daySessionId,
+  );
+  if (!daySession) throw new AppError("Workout day not found", 404);
+
+  const [session] = await WorkoutSession.findOrCreate({
+    where: { planId: programId, planDayId: daySessionId, scheduledDate },
+    defaults: {
+      planId: programId,
+      planDayId: daySessionId,
+      playerId,
+      scheduledDate,
+      status: "pending",
+    },
+  });
+  return session;
 }
 
 export async function startSession(sessionId: string, playerId: string) {
@@ -430,12 +520,22 @@ export async function startSession(sessionId: string, playerId: string) {
   return session;
 }
 
-export async function completeSession(sessionId: string, playerId: string) {
+export async function completeSession(
+  sessionId: string,
+  playerId: string,
+  extra?: { durationMin?: number | null; playerNotes?: string | null },
+) {
   const session = await WorkoutSession.findByPk(sessionId);
   if (!session) throw new AppError("Session not found", 404);
   if (session.playerId !== playerId) throw new AppError("Forbidden", 403);
 
-  await session.update({ status: "completed", completedAt: new Date() });
+  await session.update({
+    status: "completed",
+    completedAt: new Date(),
+    startedAt: session.startedAt ?? new Date(),
+    durationMin: extra?.durationMin ?? session.durationMin,
+    playerNotes: extra?.playerNotes ?? session.playerNotes,
+  });
   return session;
 }
 
@@ -486,6 +586,92 @@ export async function getSessionLogs(sessionId: string) {
     include: [{ model: WellnessExercise, as: "exercise" }],
     order: [["loggedAt", "ASC"]],
   });
+}
+
+// ── Workout history (player) ──
+
+export type WorkoutHistoryRow = {
+  id: string;
+  programId: string;
+  daySessionId: string;
+  planName: string;
+  planNameAr: string | null;
+  dayLabel: string | null;
+  status: WorkoutSessionStatus;
+  scheduledDate: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  durationMin: number | null;
+  exerciseCount: number;
+};
+
+export async function listWorkoutHistory(
+  playerId: string,
+  query: Record<string, unknown>,
+) {
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 20;
+
+  const { rows, count } = await WorkoutSession.findAndCountAll({
+    where: {
+      playerId,
+      status: { [Op.in]: ["completed", "in_progress", "skipped"] },
+    },
+    limit,
+    offset: (page - 1) * limit,
+    order: [["scheduledDate", "DESC"]],
+  });
+
+  // Resolve program names + day labels + per-day exercise counts in bulk.
+  const programIds = Array.from(new Set(rows.map((r) => r.planId)));
+  const dayIds = Array.from(new Set(rows.map((r) => r.planDayId)));
+
+  const programs = await DevelopmentProgram.findAll({
+    where: { id: { [Op.in]: programIds } },
+    attributes: ["id", "name", "nameAr"],
+  });
+  const days = await ProgramDaySession.findAll({
+    where: { id: { [Op.in]: dayIds } },
+    attributes: ["id", "label", "labelAr"],
+    include: [{ model: ProgramExercise, as: "exercises", attributes: ["id"] }],
+  });
+
+  const programMap = new Map(programs.map((p) => [p.id, p]));
+  const dayMap = new Map(
+    days.map((d) => [
+      d.id,
+      {
+        label: d.labelAr ?? d.label,
+        count:
+          (d as ProgramDaySession & { exercises?: ProgramExercise[] }).exercises
+            ?.length ?? 0,
+      },
+    ]),
+  );
+
+  const data: WorkoutHistoryRow[] = rows.map((r) => {
+    const program = programMap.get(r.planId);
+    const day = dayMap.get(r.planDayId);
+    return {
+      id: r.id,
+      programId: r.planId,
+      daySessionId: r.planDayId,
+      planName: program?.name ?? "—",
+      planNameAr: program?.nameAr ?? null,
+      dayLabel: day?.label ?? null,
+      status: r.status,
+      scheduledDate: r.scheduledDate,
+      startedAt: r.startedAt ? r.startedAt.toISOString() : null,
+      completedAt: r.completedAt ? r.completedAt.toISOString() : null,
+      durationMin: r.durationMin,
+      exerciseCount: day?.count ?? 0,
+    };
+  });
+
+  return {
+    data,
+    meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+  };
 }
 
 // ── Coach analytics ──

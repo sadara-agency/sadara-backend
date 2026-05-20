@@ -68,6 +68,20 @@ export const getWorkoutPlanSchema = z.object({
   id: z.string().uuid(),
 });
 
+// Resolve a projected day (program day-session) into a real workout session.
+export const resolveSessionBodySchema = z.object({
+  programId: z.string().uuid(),
+  daySessionId: z.string().uuid(),
+  scheduledDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+});
+
+export const completeSessionSchema = resolveSessionBodySchema.extend({
+  durationMin: z.number().int().min(0).max(600).nullable().optional(),
+  playerNotes: z.string().max(500).nullable().optional(),
+});
+
 export type CreateWorkoutPlanDTO = z.infer<typeof createWorkoutPlanSchema>;
 export type UpdateWorkoutPlanDTO = z.infer<typeof updateWorkoutPlanSchema>;
 export type LogSetDTO = z.infer<typeof logSetSchema>;
+export type ResolveSessionDTO = z.infer<typeof resolveSessionBodySchema>;
+export type CompleteSessionDTO = z.infer<typeof completeSessionSchema>;
