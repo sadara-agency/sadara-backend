@@ -8,6 +8,12 @@ import {
   PhaseRule,
 } from "./workoutPlan.model";
 import { WellnessExercise } from "./fitness.model";
+import TrainingBlock from "./trainingBlock.model";
+import {
+  DevelopmentProgram,
+  ProgramExercise,
+} from "./developmentProgram.model";
+import { ProgramDaySession } from "./programDaySession.model";
 import { AppError } from "@middleware/errorHandler";
 import type { AuthUser } from "@shared/types";
 import type {
@@ -219,64 +225,198 @@ async function generateSessions(plan: WorkoutPlan) {
   }
 }
 
-// ── Session actions ──
+// ── Player weekly/today workouts (sourced from the DevelopmentProgram system) ──
+//
+// The player Workouts page reads coach-assigned training directly from the
+// active TrainingBlock → DevelopmentProgram → ProgramDaySession tables and
+// projects each day-session into the WorkoutSession shape the frontend renders.
+// The legacy WorkoutPlan/WorkoutSession tables are not used for this read path.
 
-export async function getTodaysWorkout(playerId: string) {
-  const today = toDateString(new Date());
-  const session = await WorkoutSession.findOne({
-    where: {
-      playerId,
-      scheduledDate: today,
-      status: { [Op.in]: ["pending", "in_progress"] },
-    },
-    include: [
-      {
-        model: WorkoutPlan,
-        as: "plan",
-      },
-      {
-        model: WorkoutPlanDay,
-        as: "planDay",
-        include: [
-          {
-            model: WorkoutPlanExercise,
-            as: "exercises",
-            include: [{ model: WellnessExercise, as: "exercise" }],
-          },
-        ],
-      },
-    ],
-  });
-  return session;
+type ProjectedExercise = {
+  id: string;
+  planDayId: string;
+  exerciseId: string;
+  orderIndex: number;
+  targetSets: number;
+  targetReps: string;
+  targetWeightKg: number | null;
+  restSeconds: number | null;
+  notes: string | null;
+  exercise: {
+    id: string;
+    name: string;
+    nameAr: string | null;
+    muscleGroup: string | null;
+    equipment: string | null;
+    videoUrl: string | null;
+  } | null;
+};
+
+type ProjectedSession = {
+  id: string;
+  planId: string;
+  planDayId: string;
+  playerId: string;
+  scheduledDate: string;
+  status: "pending";
+  startedAt: null;
+  completedAt: null;
+  plan: { id: string; name: string; nameAr: string | null; goal: string };
+  planDay: {
+    id: string;
+    planId: string;
+    dayOfWeek: number;
+    isRest: false;
+    label: string | null;
+    exercises: ProjectedExercise[];
+  };
+};
+
+function categoryToGoal(category: string | null | undefined): string {
+  switch (category) {
+    case "hypertrophy":
+      return "hypertrophy";
+    case "cardio":
+      return "cardio";
+    case "recovery":
+      return "recovery";
+    case "strength":
+      return "strength";
+    default:
+      return "strength";
+  }
 }
 
-export async function getWeeklyWorkouts(playerId: string) {
-  const today = new Date();
-  const dow = today.getUTCDay();
-  const weekStart = toDateString(addDays(today, -dow));
-  const weekEnd = toDateString(addDays(today, 6 - dow));
+async function loadActivePrograms(
+  playerId: string,
+): Promise<DevelopmentProgram[]> {
+  const block = await TrainingBlock.findOne({
+    where: { playerId, status: "active" },
+    attributes: ["id"],
+  });
 
-  return WorkoutSession.findAll({
-    where: {
-      playerId,
-      scheduledDate: { [Op.between]: [weekStart, weekEnd] },
-    },
+  const where = block
+    ? { [Op.or]: [{ playerId }, { trainingBlockId: block.id }], isActive: true }
+    : { playerId, isActive: true };
+
+  return DevelopmentProgram.findAll({
+    where,
     include: [
-      { model: WorkoutPlan, as: "plan" },
       {
-        model: WorkoutPlanDay,
-        as: "planDay",
+        model: ProgramDaySession,
+        as: "daySessions",
         include: [
           {
-            model: WorkoutPlanExercise,
+            model: ProgramExercise,
             as: "exercises",
             include: [{ model: WellnessExercise, as: "exercise" }],
           },
         ],
       },
     ],
-    order: [["scheduledDate", "ASC"]],
+    order: [
+      ["createdAt", "DESC"],
+      [{ model: ProgramDaySession, as: "daySessions" }, "orderIndex", "ASC"],
+    ],
   });
+}
+
+function projectProgramsToSessions(
+  programs: DevelopmentProgram[],
+  playerId: string,
+  weekStart: Date,
+): ProjectedSession[] {
+  const sessions: ProjectedSession[] = [];
+
+  for (const program of programs) {
+    const daySessions = program.daySessions ?? [];
+    daySessions.forEach((ds, idx) => {
+      // dayOfWeek is 0=Sun…6=Sat; null → distribute by order across the week
+      const dow = ds.dayOfWeek != null ? ds.dayOfWeek : idx % 7;
+      const scheduledDate = toDateString(addDays(weekStart, dow));
+
+      const exercises: ProjectedExercise[] = (ds.exercises ?? []).map((ex) => {
+        const wex = (
+          ex as ProgramExercise & {
+            exercise?: WellnessExercise;
+          }
+        ).exercise;
+        return {
+          id: ex.id,
+          planDayId: ds.id,
+          exerciseId: ex.exerciseId,
+          orderIndex: ex.orderIndex,
+          targetSets: ex.targetSets,
+          targetReps: ex.targetReps,
+          targetWeightKg: ex.targetWeightKg,
+          restSeconds: ex.restSeconds,
+          notes: ex.notes,
+          exercise: wex
+            ? {
+                id: wex.id,
+                name: wex.name,
+                nameAr: wex.nameAr,
+                muscleGroup: wex.muscleGroup,
+                equipment: wex.equipment,
+                videoUrl: wex.videoUrl,
+              }
+            : null,
+        };
+      });
+
+      sessions.push({
+        id: ds.id,
+        planId: program.id,
+        planDayId: ds.id,
+        playerId,
+        scheduledDate,
+        status: "pending",
+        startedAt: null,
+        completedAt: null,
+        plan: {
+          id: program.id,
+          name: program.name,
+          nameAr: program.nameAr,
+          goal: categoryToGoal(program.category),
+        },
+        planDay: {
+          id: ds.id,
+          planId: program.id,
+          dayOfWeek: dow,
+          isRest: false,
+          label: ds.labelAr ?? ds.label,
+          exercises,
+        },
+      });
+    });
+  }
+
+  sessions.sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate));
+  return sessions;
+}
+
+// ── Session actions ──
+
+export async function getTodaysWorkout(
+  playerId: string,
+): Promise<ProjectedSession | null> {
+  const now = new Date();
+  const weekStart = addDays(now, -now.getUTCDay());
+  const today = toDateString(now);
+
+  const programs = await loadActivePrograms(playerId);
+  const sessions = projectProgramsToSessions(programs, playerId, weekStart);
+  return sessions.find((s) => s.scheduledDate === today) ?? null;
+}
+
+export async function getWeeklyWorkouts(
+  playerId: string,
+): Promise<ProjectedSession[]> {
+  const now = new Date();
+  const weekStart = addDays(now, -now.getUTCDay());
+
+  const programs = await loadActivePrograms(playerId);
+  return projectProgramsToSessions(programs, playerId, weekStart);
 }
 
 export async function startSession(sessionId: string, playerId: string) {
