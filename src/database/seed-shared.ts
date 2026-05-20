@@ -106,6 +106,12 @@ const RAW_PERMISSIONS: Perm[] = [
       canUpdate: true,
     },
   ),
+  ...forRoles("player-stats", ["Analyst"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles(
     "player-stats",
     [
@@ -171,7 +177,12 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
   ...forRoles("matches", ["FitnessCoach"], { canRead: true }),
-  ...forRoles("matches", ["Analyst"], { canRead: true, canUpdate: true }),
+  ...forRoles("matches", ["Analyst"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
   ...forRoles("matches", ["Scout", "Player", "GraphicDesigner", "Executive"], {
     canRead: true,
   }),
@@ -338,8 +349,14 @@ const RAW_PERMISSIONS: Perm[] = [
       canDelete: true,
     },
   ),
-  ...forRoles("training", ["Analyst", "Scout"], {
+  ...forRoles("training", ["Scout"], {
     canRead: true,
+  }),
+  ...forRoles("training", ["Analyst"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
   }),
   ...forRoles("training", ["Executive"], { canRead: true }),
   ...forRoles("training", ["Player"], {
@@ -417,6 +434,7 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("sessions", ["Admin", "Manager", "SportingDirector"], {
     canDelete: true,
   }),
+  ...forRoles("sessions", ["Analyst"], { canDelete: true }),
 
   // heatmaps — read for all roles, write for analyst/coaching/management,
   // delete only for Admin/Manager.

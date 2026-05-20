@@ -23,14 +23,22 @@ export const { list, getById, create, update, remove } = crud;
 
 // ── Today's workout (player) ──
 export async function todaysWorkout(req: AuthRequest, res: Response) {
-  const playerId = req.user!.id;
+  const playerId = (req.user as { playerId?: string } | undefined)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, null, "Player account not linked");
+    return;
+  }
   const session = await svc.getTodaysWorkout(playerId);
   sendSuccess(res, session);
 }
 
 // ── Weekly workouts (player) ──
 export async function weeklyWorkouts(req: AuthRequest, res: Response) {
-  const playerId = req.user!.id;
+  const playerId = (req.user as { playerId?: string } | undefined)?.playerId;
+  if (!playerId) {
+    sendSuccess(res, [], "Player account not linked");
+    return;
+  }
   const sessions = await svc.getWeeklyWorkouts(playerId);
   sendSuccess(res, sessions);
 }
