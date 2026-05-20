@@ -10,6 +10,8 @@ import {
   updateWorkoutPlanSchema,
   getWorkoutPlanSchema,
   logSetSchema,
+  resolveSessionBodySchema,
+  completeSessionSchema,
 } from "./workoutPlan.validation";
 
 const router = Router();
@@ -29,21 +31,61 @@ router.get(
   asyncHandler(ctrl.weeklyWorkouts),
 );
 
+/**
+ * @swagger
+ * /workout-plans/my/history:
+ *   get:
+ *     summary: Get the player's workout session history
+ *     tags: [WorkoutPlans]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Paginated workout history
+ */
+router.get(
+  "/my/history",
+  authorizeModule("workout-plans", "read"),
+  asyncHandler(ctrl.workoutHistory),
+);
+
+/**
+ * @swagger
+ * /workout-plans/my/sessions/resolve:
+ *   post:
+ *     summary: Resolve a projected program day into a real workout session
+ *     tags: [WorkoutPlans]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: The materialized workout session
+ */
 router.post(
-  "/my/sessions/:sessionId/start",
+  "/my/sessions/resolve",
   authorizeModule("workout-plans", "update"),
+  validate(resolveSessionBodySchema),
+  asyncHandler(ctrl.resolveSession),
+);
+
+router.post(
+  "/my/sessions/start",
+  authorizeModule("workout-plans", "update"),
+  validate(resolveSessionBodySchema),
   asyncHandler(ctrl.startSession),
 );
 
 router.post(
-  "/my/sessions/:sessionId/complete",
+  "/my/sessions/complete",
   authorizeModule("workout-plans", "update"),
+  validate(completeSessionSchema),
   asyncHandler(ctrl.completeSession),
 );
 
 router.post(
-  "/my/sessions/:sessionId/skip",
+  "/my/sessions/skip",
   authorizeModule("workout-plans", "update"),
+  validate(resolveSessionBodySchema),
   asyncHandler(ctrl.skipSession),
 );
 

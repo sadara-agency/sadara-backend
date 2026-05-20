@@ -10,6 +10,7 @@ jest.mock("./workoutPlan.model", () => ({
     findAll: jest.fn(),
     findOne: jest.fn(),
     findByPk: jest.fn(),
+    findOrCreate: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
   },
@@ -29,7 +30,7 @@ jest.mock("./developmentProgram.model", () => ({
 
 jest.mock("./programDaySession.model", () => ({
   __esModule: true,
-  ProgramDaySession: {},
+  ProgramDaySession: { findAll: jest.fn() },
 }));
 
 jest.mock("./fitness.model", () => ({
@@ -49,7 +50,13 @@ jest.mock("@middleware/errorHandler", () => ({
 
 import TrainingBlock from "./trainingBlock.model";
 import { DevelopmentProgram } from "./developmentProgram.model";
-import { getWeeklyWorkouts, getTodaysWorkout } from "./workoutPlan.service";
+import { WorkoutSession } from "./workoutPlan.model";
+import {
+  getWeeklyWorkouts,
+  getTodaysWorkout,
+  resolveOrMaterializeSession,
+  completeSession,
+} from "./workoutPlan.service";
 
 const PLAYER_ID = "11111111-1111-1111-1111-111111111111";
 const BLOCK_ID = "33333333-3333-3333-3333-333333333333";
@@ -66,6 +73,8 @@ function makeProgram(daySessions: unknown[]) {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // No materialized sessions by default — projection stays "pending".
+  (WorkoutSession.findAll as jest.Mock).mockResolvedValue([]);
 });
 
 describe("getWeeklyWorkouts", () => {
@@ -200,5 +209,166 @@ describe("getTodaysWorkout", () => {
 
     expect(result).not.toBeNull();
     expect(result?.planDay.label).toBe("Today Session");
+  });
+});
+
+describe("getWeeklyWorkouts — overlay", () => {
+  it("overlays a materialized session's real id and status onto the projected day", async () => {
+    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
+    const todayDow = new Date().getUTCDay();
+    (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
+      makeProgram([
+        {
+          id: "ds-1",
+          dayOfWeek: todayDow,
+          label: "Push",
+          labelAr: null,
+          orderIndex: 0,
+          exercises: [],
+        },
+      ]),
+    ]);
+
+    const now = new Date();
+    // scheduledDate must match the projected day (weekStart + todayDow = today)
+    const scheduledDate = now.toISOString().slice(0, 10);
+
+    (WorkoutSession.findAll as jest.Mock).mockResolvedValue([
+      {
+        id: "real-session-1",
+        planId: "prog-1",
+        planDayId: "ds-1",
+        scheduledDate,
+        status: "completed",
+        startedAt: new Date("2026-05-21T10:00:00Z"),
+        completedAt: new Date("2026-05-21T11:00:00Z"),
+        durationMin: 60,
+        playerNotes: "felt strong",
+      },
+    ]);
+
+    const result = await getWeeklyWorkouts(PLAYER_ID);
+    const day = result.find((s) => s.planDayId === "ds-1");
+
+    expect(day?.id).toBe("real-session-1");
+    expect(day?.status).toBe("completed");
+    expect(day?.durationMin).toBe(60);
+    expect(day?.completedAt).toBe("2026-05-21T11:00:00.000Z");
+  });
+});
+
+describe("resolveOrMaterializeSession", () => {
+  function mockOwnedProgram() {
+    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
+    (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
+      {
+        id: "prog-1",
+        name: "Split",
+        nameAr: null,
+        category: "strength",
+        daySessions: [{ id: "ds-1", dayOfWeek: 1, exercises: [] }],
+      },
+    ]);
+  }
+
+  it("findOrCreates exactly one real session for a projected day", async () => {
+    mockOwnedProgram();
+    const created = { id: "real-1", planId: "prog-1", planDayId: "ds-1" };
+    (WorkoutSession.findOrCreate as jest.Mock).mockResolvedValue([
+      created,
+      true,
+    ]);
+
+    const session = await resolveOrMaterializeSession(
+      {
+        programId: "prog-1",
+        daySessionId: "ds-1",
+        scheduledDate: "2026-05-21",
+      },
+      PLAYER_ID,
+    );
+
+    expect(WorkoutSession.findOrCreate).toHaveBeenCalledTimes(1);
+    expect(WorkoutSession.findOrCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          planId: "prog-1",
+          planDayId: "ds-1",
+          scheduledDate: "2026-05-21",
+        },
+      }),
+    );
+    expect(session).toBe(created);
+  });
+
+  it("404s when the program is not accessible to the player", async () => {
+    (TrainingBlock.findOne as jest.Mock).mockResolvedValue(null);
+    (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([]);
+
+    await expect(
+      resolveOrMaterializeSession(
+        {
+          programId: "nope",
+          daySessionId: "ds-1",
+          scheduledDate: "2026-05-21",
+        },
+        PLAYER_ID,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("404s when the day-session is not part of the program", async () => {
+    mockOwnedProgram();
+
+    await expect(
+      resolveOrMaterializeSession(
+        {
+          programId: "prog-1",
+          daySessionId: "ds-missing",
+          scheduledDate: "2026-05-21",
+        },
+        PLAYER_ID,
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("completeSession", () => {
+  it("writes status, completedAt, duration and notes", async () => {
+    const update = jest.fn().mockResolvedValue(undefined);
+    (WorkoutSession.findByPk as jest.Mock).mockResolvedValue({
+      id: "real-1",
+      playerId: PLAYER_ID,
+      status: "in_progress",
+      startedAt: new Date(),
+      durationMin: null,
+      playerNotes: null,
+      update,
+    });
+
+    await completeSession("real-1", PLAYER_ID, {
+      durationMin: 45,
+      playerNotes: "done",
+    });
+
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "completed",
+        durationMin: 45,
+        playerNotes: "done",
+      }),
+    );
+  });
+
+  it("403s when the session belongs to another player", async () => {
+    (WorkoutSession.findByPk as jest.Mock).mockResolvedValue({
+      id: "real-1",
+      playerId: "someone-else",
+      update: jest.fn(),
+    });
+
+    await expect(completeSession("real-1", PLAYER_ID)).rejects.toMatchObject({
+      status: 403,
+    });
   });
 });

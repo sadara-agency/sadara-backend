@@ -1,6 +1,6 @@
 import { createCrudController } from "@shared/utils/crudController";
 import { CachePrefix } from "@shared/utils/cache";
-import { sendSuccess } from "@shared/utils/apiResponse";
+import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { AppError } from "@middleware/errorHandler";
 import type { AuthRequest } from "@shared/types";
 import type { Response } from "express";
@@ -43,31 +43,64 @@ export async function weeklyWorkouts(req: AuthRequest, res: Response) {
   sendSuccess(res, sessions);
 }
 
+// The player id used by the projection lives on `user.playerId` (the user's
+// linked player record), NOT `user.id`. All materialized sessions are keyed by
+// it, so every player write path must use it.
+function requirePlayerId(req: AuthRequest): string {
+  const playerId = (req.user as { playerId?: string } | undefined)?.playerId;
+  if (!playerId) throw new AppError("Player account not linked", 403);
+  return playerId;
+}
+
+// ── Resolve / materialize (player) ──
+export async function resolveSession(req: AuthRequest, res: Response) {
+  const playerId = requirePlayerId(req);
+  const session = await svc.resolveOrMaterializeSession(req.body, playerId);
+  sendSuccess(res, session);
+}
+
 // ── Session actions (player) ──
 export async function startSession(req: AuthRequest, res: Response) {
-  const session = await svc.startSession(req.params.sessionId, req.user!.id);
+  const playerId = requirePlayerId(req);
+  const real = await svc.resolveOrMaterializeSession(req.body, playerId);
+  const session = await svc.startSession(real.id, playerId);
   sendSuccess(res, session, "Session started");
 }
 
 export async function completeSession(req: AuthRequest, res: Response) {
-  const session = await svc.completeSession(req.params.sessionId, req.user!.id);
+  const playerId = requirePlayerId(req);
+  const real = await svc.resolveOrMaterializeSession(req.body, playerId);
+  const session = await svc.completeSession(real.id, playerId, {
+    durationMin: req.body.durationMin ?? null,
+    playerNotes: req.body.playerNotes ?? null,
+  });
   sendSuccess(res, session, "Session completed");
 }
 
 export async function skipSession(req: AuthRequest, res: Response) {
-  const session = await svc.skipSession(req.params.sessionId, req.user!.id);
+  const playerId = requirePlayerId(req);
+  const real = await svc.resolveOrMaterializeSession(req.body, playerId);
+  const session = await svc.skipSession(real.id, playerId);
   sendSuccess(res, session, "Session skipped");
 }
 
-// ── Set logging (player) ──
+// ── Set logging (player) — :sessionId here is a REAL workout_sessions id ──
 export async function logSet(req: AuthRequest, res: Response) {
-  const log = await svc.logSet(req.params.sessionId, req.body, req.user!.id);
+  const playerId = requirePlayerId(req);
+  const log = await svc.logSet(req.params.sessionId, req.body, playerId);
   sendSuccess(res, log, "Set logged");
 }
 
 export async function getSessionLogs(req: AuthRequest, res: Response) {
   const logs = await svc.getSessionLogs(req.params.sessionId);
   sendSuccess(res, logs);
+}
+
+// ── Workout history (player) ──
+export async function workoutHistory(req: AuthRequest, res: Response) {
+  const playerId = requirePlayerId(req);
+  const result = await svc.listWorkoutHistory(playerId, req.query);
+  sendPaginated(res, result.data, result.meta);
 }
 
 // ── Coach analytics ──

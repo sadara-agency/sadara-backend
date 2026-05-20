@@ -270,13 +270,22 @@ interface WorkoutSessionAttributes {
   status: WorkoutSessionStatus;
   startedAt?: Date | null;
   completedAt?: Date | null;
+  durationMin?: number | null;
+  playerNotes?: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 interface WorkoutSessionCreation extends Optional<
   WorkoutSessionAttributes,
-  "id" | "status" | "createdAt" | "updatedAt"
+  | "id"
+  | "status"
+  | "startedAt"
+  | "completedAt"
+  | "durationMin"
+  | "playerNotes"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 export class WorkoutSession
@@ -291,6 +300,8 @@ export class WorkoutSession
   declare status: WorkoutSessionStatus;
   declare startedAt: Date | null;
   declare completedAt: Date | null;
+  declare durationMin: number | null;
+  declare playerNotes: string | null;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
 }
@@ -320,6 +331,16 @@ WorkoutSession.init(
       type: DataTypes.DATE,
       allowNull: true,
       field: "completed_at",
+    },
+    durationMin: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      field: "duration_min",
+    },
+    playerNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "player_notes",
     },
   },
   {
