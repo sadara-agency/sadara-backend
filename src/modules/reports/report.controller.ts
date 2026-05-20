@@ -71,6 +71,13 @@ export async function download(req: AuthRequest, res: Response): Promise<void> {
   }
 
   const filePath = report.filePath;
+
+  // Stale filePath from old code: absolute tmp path stored instead of GCS key.
+  // The file never reached GCS — treat as unavailable so UI can offer regeneration.
+  if (filePath.startsWith("/") && !filePath.startsWith("/uploads/")) {
+    throw new AppError("Report PDF not available", 400);
+  }
+
   const safeTitle = (report.title || "report").replace(/[^\w.-]+/g, "_");
   const fileName = `${safeTitle}.pdf`;
   const disposition = `attachment; filename="${encodeURIComponent(fileName)}"`;
@@ -245,6 +252,24 @@ export async function exportXlsx(
   );
   res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
   res.send(buffer);
+}
+
+export async function regenerate(
+  req: AuthRequest,
+  res: Response,
+): Promise<void> {
+  const report = await svc.regenerateReport(req.params.id);
+  Promise.all([
+    invalidateMultiple([CachePrefix.REPORTS]),
+    logAudit(
+      "UPDATE",
+      "technical_reports",
+      report.id,
+      buildAuditContext(req.user!, req.ip),
+      "Report regenerated",
+    ),
+  ]).catch(() => {});
+  sendSuccess(res, report, "Report regeneration started");
 }
 
 export async function generateSummary(

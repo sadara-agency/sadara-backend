@@ -240,6 +240,37 @@ export async function deleteReport(id: string) {
 }
 
 // ────────────────────────────────────────────────────────────
+// Regenerate Report
+// ────────────────────────────────────────────────────────────
+export async function regenerateReport(id: string) {
+  const report = await getReportById(id);
+  if (report.status === "Generating") {
+    throw new AppError("Report is already generating", 409);
+  }
+  const player = await Player.findByPk(report.playerId);
+  if (!player) throw new AppError("Player not found", 404);
+
+  await TechnicalReport.update(
+    { status: "Generating", filePath: null },
+    { where: { id } },
+  );
+
+  generatePdfInBackground(
+    id,
+    player,
+    {
+      playerId: report.playerId,
+      title: report.title,
+      periodType: report.periodType,
+      periodParams: report.periodParams,
+    },
+    report.createdBy,
+  );
+
+  return getReportById(id);
+}
+
+// ────────────────────────────────────────────────────────────
 // Gather report data: player profile + match stats + injuries
 // ────────────────────────────────────────────────────────────
 export async function gatherReportData(

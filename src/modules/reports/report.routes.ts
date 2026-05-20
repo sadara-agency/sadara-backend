@@ -109,6 +109,11 @@ router.delete(
   asyncHandler(ctrl.remove),
 );
 router.post(
+  "/:id/regenerate",
+  authorizeModule("reports", "update"),
+  asyncHandler(ctrl.regenerate),
+);
+router.post(
   "/:id/summary",
   authorizeModule("reports", "update"),
   asyncHandler(ctrl.generateSummary),
