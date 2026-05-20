@@ -74,6 +74,12 @@ jest.mock('../../src/modules/users/user.model', () => ({
 jest.mock('../../src/modules/players/player.model', () => ({
   Player: { findByPk: jest.fn(), findAndCountAll: jest.fn() },
 }));
+jest.mock('../../src/modules/wellness/bodyComposition.model', () => ({
+  BodyComposition: { findOne: jest.fn(), findAndCountAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() },
+}));
+jest.mock('../../src/modules/wellness/recoveryActivity.model', () => ({
+  RecoveryActivity: { findOne: jest.fn(), findAndCountAll: jest.fn(), findByPk: jest.fn(), create: jest.fn() },
+}));
 
 // ── Deferred imports ──
 import request from 'supertest';
