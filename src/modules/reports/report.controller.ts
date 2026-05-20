@@ -1,7 +1,6 @@
 import { Response } from "express";
-import path from "path";
-import fs from "fs";
 import { AuthRequest } from "@shared/types";
+import { getSignedUrl } from "@shared/utils/storage";
 import { AppError } from "@middleware/errorHandler";
 import {
   sendSuccess,
@@ -67,18 +66,10 @@ export async function download(req: AuthRequest, res: Response): Promise<void> {
     throw new AppError("Report PDF not available", 400);
   }
 
-  const filePath = path.resolve(report.filePath);
-  if (!fs.existsSync(filePath)) {
-    throw new AppError("Report file not found on disk", 404);
-  }
-
-  const fileName = `${report.title.replace(/[^a-zA-Z0-9\u0600-\u06FF_-]/g, "_")}.pdf`;
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader(
-    "Content-Disposition",
-    `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`,
-  );
-  res.sendFile(filePath);
+  // filePath is a GCS key (e.g. "reports/report_<uuid>.pdf").
+  // getSignedUrl returns a 15-min signed URL in prod or /uploads/... locally.
+  const url = await getSignedUrl(report.filePath, 15);
+  res.redirect(302, url);
 }
 
 // ── Predefined Reports ──

@@ -12,9 +12,41 @@ import {
 } from "@modules/reports/report.validation";
 import { generateReportPdf } from "@modules/reports/report.pdf";
 import { logger } from "@config/logger";
+import { Storage as GCSStorage } from "@google-cloud/storage";
+import { env } from "@config/env";
 import { generateReportFailedTask } from "@modules/reports/reportAutoTasks";
 import { callLlm } from "@shared/utils/llm";
 import type { AuthUser } from "@shared/types";
+
+// ── GCS upload helper for report PDFs ──
+
+async function uploadReportPdf(
+  reportId: string,
+  buffer: Buffer,
+): Promise<string> {
+  const key = `reports/report_${reportId}.pdf`;
+  const USE_GCS = !!(env.gcs.bucket && env.gcs.projectId);
+
+  if (USE_GCS) {
+    const gcs = new GCSStorage({ projectId: env.gcs.projectId });
+    await gcs
+      .bucket(env.gcs.bucket)
+      .file(key)
+      .save(buffer, {
+        contentType: "application/pdf",
+        resumable: false,
+        metadata: { cacheControl: "private, no-store" },
+      });
+  } else {
+    const { writeFile, mkdir } = await import("fs/promises");
+    const { join } = await import("path");
+    const dir = join(process.cwd(), "uploads", "reports");
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, `report_${reportId}.pdf`), buffer);
+  }
+
+  return key;
+}
 
 // ── Shared includes ──
 const REPORT_INCLUDES = [
@@ -154,9 +186,10 @@ async function generatePdfInBackground(
       input.periodType,
       input.periodParams,
     );
-    const filePath = await generateReportPdf(reportId, player, data);
+    const buffer = await generateReportPdf(reportId, player, data);
+    const gcsKey = await uploadReportPdf(reportId, buffer);
     await TechnicalReport.update(
-      { status: "Generated", filePath },
+      { status: "Generated", filePath: gcsKey },
       { where: { id: reportId } },
     );
   } catch (err: any) {
