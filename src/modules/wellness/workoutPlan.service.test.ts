@@ -10,6 +10,7 @@ jest.mock("./workoutPlan.model", () => ({
     findAll: jest.fn(),
     findOne: jest.fn(),
     findByPk: jest.fn(),
+    findOrCreate: jest.fn(),
     count: jest.fn(),
     create: jest.fn(),
   },
@@ -229,9 +230,8 @@ describe("getWeeklyWorkouts — overlay", () => {
     ]);
 
     const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setUTCDate(now.getUTCDate() - now.getUTCDay());
-    const scheduledDate = weekStart.toISOString().slice(0, 10);
+    // scheduledDate must match the projected day (weekStart + todayDow = today)
+    const scheduledDate = now.toISOString().slice(0, 10);
 
     (WorkoutSession.findAll as jest.Mock).mockResolvedValue([
       {
