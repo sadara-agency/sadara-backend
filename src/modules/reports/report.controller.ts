@@ -1,6 +1,10 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
-import { getSignedUrl } from "@shared/utils/storage";
+import {
+  resolveFileUrl,
+  streamFileBuffer,
+  isPrivateKey,
+} from "@shared/utils/storage";
 import { AppError } from "@middleware/errorHandler";
 import {
   sendSuccess,
@@ -66,10 +70,38 @@ export async function download(req: AuthRequest, res: Response): Promise<void> {
     throw new AppError("Report PDF not available", 400);
   }
 
-  // filePath is a GCS key (e.g. "reports/report_<uuid>.pdf").
-  // getSignedUrl returns a 15-min signed URL in prod or /uploads/... locally.
-  const url = await getSignedUrl(report.filePath, 15);
-  res.redirect(302, url);
+  const filePath = report.filePath;
+  const safeTitle = (report.title || "report").replace(/[^\w.-]+/g, "_");
+  const fileName = `${safeTitle}.pdf`;
+  const disposition = `attachment; filename="${encodeURIComponent(fileName)}"`;
+
+  // Private GCS key — stream directly with service-account credentials.
+  // Avoids signed-URL generation, which requires iam.serviceAccounts.signBlob
+  // (missing on the Cloud Run runtime SA → previously caused a 500).
+  if (isPrivateKey(filePath)) {
+    const buffer = await streamFileBuffer(filePath);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", disposition);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.send(buffer);
+    return;
+  }
+
+  // Local /uploads/ path or public URL — resolve and serve/redirect.
+  const url = await resolveFileUrl(filePath, 15);
+  if (url.startsWith("/uploads/")) {
+    const pathMod = await import("path");
+    const fs = await import("fs");
+    const localPath = pathMod.resolve(url.slice(1));
+    if (!fs.existsSync(localPath)) {
+      throw new AppError("Report file not found on disk", 404);
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", disposition);
+    res.sendFile(localPath);
+    return;
+  }
+  res.redirect(url);
 }
 
 // ── Predefined Reports ──
