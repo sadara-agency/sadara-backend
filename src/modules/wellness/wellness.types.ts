@@ -199,6 +199,16 @@ export interface PlayerDashboardResponse {
       nutritionRating: number | null;
       trainingType: string | null;
     } | null;
+    bodyComp: {
+      weightKg: number | null;
+      bodyFatPct: number | null;
+      leanMassKg: number | null;
+    } | null;
+    recovery: {
+      saunaMinutes: number | null;
+      poolMinutes: number | null;
+      walkMinutes: number | null;
+    } | null;
   };
   history: DailySummaryResponse[];
   profile: { targetCalories: number | null; targetProteinG: number | null };
