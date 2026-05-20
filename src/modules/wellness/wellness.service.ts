@@ -13,6 +13,8 @@ import {
   type MealType,
 } from "./wellness.model";
 import { NutritionPrescription } from "./nutritionPrescription.model";
+import { BodyComposition } from "./bodyComposition.model";
+import { getTodayRecoveryForPlayer } from "./recoveryActivity.service";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
@@ -636,6 +638,29 @@ export async function getPlayerDashboard(
     { replacements: { playerId, cutoff: cutoffStr }, type: QueryTypes.SELECT },
   );
 
+  // Latest InBody scan → body composition card
+  const latestScan = await BodyComposition.findOne({
+    where: { playerId },
+    order: [["scanDate", "DESC"]],
+  });
+  const bodyComp = latestScan
+    ? {
+        weightKg:
+          latestScan.weightKg != null ? Number(latestScan.weightKg) : null,
+        bodyFatPct:
+          latestScan.bodyFatPct != null ? Number(latestScan.bodyFatPct) : null,
+        leanMassKg:
+          latestScan.leanBodyMassKg != null
+            ? Number(latestScan.leanBodyMassKg)
+            : latestScan.skeletalMuscleMassKg != null
+              ? Number(latestScan.skeletalMuscleMassKg)
+              : null,
+      }
+    : null;
+
+  // Today's recovery totals → recovery card
+  const recovery = await getTodayRecoveryForPlayer(playerId, user);
+
   return {
     today: {
       totalCalories: 0,
@@ -654,6 +679,8 @@ export async function getPlayerDashboard(
             trainingType: todayPulse.trainingType,
           }
         : null,
+      bodyComp,
+      recovery,
     },
     history: history.map((h) => {
       const dayScore = calculateRingScore({

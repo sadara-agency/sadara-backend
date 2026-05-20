@@ -27,6 +27,7 @@ import {
 } from "@modules/wellness/workoutPlan.model";
 import { WellnessExercise } from "@modules/wellness/fitness.model";
 import { BodyComposition } from "@modules/wellness/bodyComposition.model";
+import { RecoveryActivity } from "@modules/wellness/recoveryActivity.model";
 import { Journey } from "@modules/journey/journey.model";
 import { EvolutionCycle } from "@modules/evolution-cycles/evolution-cycle.model";
 import {
