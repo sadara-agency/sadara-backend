@@ -1,6 +1,3 @@
-import path from "path";
-import fs from "fs";
-import { writeFile } from "fs/promises";
 import {
   escHtml,
   fmtDate,
@@ -11,9 +8,6 @@ import {
   mergeWithBrandPages,
 } from "@shared/utils/pdf";
 import { renderCoverPageBuffer } from "@shared/utils/pdfCover";
-
-const TMP = path.resolve(process.cwd(), "tmp");
-if (!fs.existsSync(TMP)) fs.mkdirSync(TMP, { recursive: true });
 
 // ── Helpers ──
 
@@ -181,7 +175,7 @@ export async function generateReportPdf(
   reportId: string,
   player: any,
   data: { profile: any; statsAgg: any; matchList: any[]; injuries: any[] },
-): Promise<string> {
+): Promise<Buffer> {
   const pages = [
     wrapHtml(buildProfilePage(data.profile, data.statsAgg), CSS),
     wrapHtml(buildMatchListPage(data.matchList), CSS),
@@ -216,19 +210,5 @@ export async function generateReportPdf(
   });
 
   const contentBuffers = await renderPagesToBuffers(pages);
-  const merged = await mergeWithBrandPages(contentBuffers, { coverBuffer });
-
-  const fileName = `report_${reportId}.pdf`;
-  const filePath = path.join(TMP, fileName);
-  await writeFile(filePath, merged);
-
-  // Clean up tmp file after 5 minutes
-  setTimeout(
-    () => {
-      fs.unlink(filePath, () => {});
-    },
-    5 * 60 * 1000,
-  ).unref();
-
-  return filePath;
+  return mergeWithBrandPages(contentBuffers, { coverBuffer });
 }
