@@ -20,12 +20,12 @@ const prescriptionMealSchema = z.object({
 
 export const issuePrescriptionSchema = z.object({
   playerId: z.string().uuid(),
-  trainingBlockId: z.string().uuid().optional(),
+  trainingBlockId: z.string().uuid().optional().nullable(),
   targetCalories: z.number().int().positive().optional(),
   targetProteinG: z.number().positive().optional(),
   targetCarbsG: z.number().positive().optional(),
   targetFatG: z.number().positive().optional(),
-  hydrationTargetMl: z.number().int().positive().optional(),
+  hydrationTargetMl: z.number().int().positive().optional().nullable(),
   preTrainingGuidance: z.string().max(2000).optional(),
   postTrainingGuidance: z.string().max(2000).optional(),
   notes: z.string().max(1000).optional(),

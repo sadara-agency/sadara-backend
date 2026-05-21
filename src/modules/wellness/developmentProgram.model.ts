@@ -33,6 +33,7 @@ interface DevelopmentProgramAttributes {
   programType: ProgramType;
   trainingBlockId?: string | null;
   playerId?: string | null;
+  startWeek?: number | null;
   isActive: boolean;
   createdBy: string;
   createdAt?: Date;
@@ -64,6 +65,7 @@ export class DevelopmentProgram
   declare programType: ProgramType;
   declare trainingBlockId: string | null;
   declare playerId: string | null;
+  declare startWeek: number | null;
   declare isActive: boolean;
   declare createdBy: string;
   declare readonly createdAt: Date;
@@ -118,6 +120,10 @@ DevelopmentProgram.init(
     playerId: {
       type: DataTypes.UUID,
       field: "player_id",
+    },
+    startWeek: {
+      type: DataTypes.INTEGER,
+      field: "start_week",
     },
     isActive: {
       type: DataTypes.BOOLEAN,
