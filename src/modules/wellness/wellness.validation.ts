@@ -288,7 +288,7 @@ export const createCheckinSchema = z.object({
   // Phase 5 — describe the *previous* day
   trainingType: z.enum(DAILY_PULSE_TRAINING_TYPES).optional(),
   nutritionRating: rating1to5.optional(),
-  trainingBlockId: z.string().uuid().optional(),
+  trainingBlockId: z.string().uuid().optional().nullable(),
 });
 
 export const createMyCheckinSchema = createCheckinSchema.omit({

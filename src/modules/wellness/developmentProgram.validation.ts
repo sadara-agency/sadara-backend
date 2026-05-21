@@ -32,7 +32,8 @@ export const createProgramSchema = z.object({
   durationWeeks: z.number().int().min(1).max(16).default(4),
   phase: programPhaseEnum.nullish(),
   programType: programTypeEnum.default("gym"),
-  trainingBlockId: z.string().uuid().optional(),
+  trainingBlockId: z.string().uuid().optional().nullable(),
+  startWeek: z.number().int().min(1).max(16).nullish(),
   isActive: z.boolean().default(true),
 });
 
