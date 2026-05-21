@@ -28,7 +28,7 @@ export const createProgramSchema = z.object({
   nameAr: z.string().max(255).nullish(),
   description: z.string().max(2000).nullish(),
   category: programCategoryEnum,
-  estimatedMinutes: z.number().int().positive().optional(),
+  estimatedMinutes: z.number().int().positive().nullish(),
   durationWeeks: z.number().int().min(1).max(16).default(4),
   phase: programPhaseEnum.nullish(),
   programType: programTypeEnum.default("gym"),
@@ -77,7 +77,7 @@ export const createDaySessionSchema = z.object({
   labelAr: z.string().max(100).nullish(),
   dayOfWeek: z.number().int().min(0).max(6).optional(),
   orderIndex: z.number().int().min(0).optional(),
-  estimatedMinutes: z.number().int().positive().optional(),
+  estimatedMinutes: z.number().int().positive().nullish(),
   notes: z.string().max(1000).optional(),
 });
 
