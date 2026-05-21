@@ -103,6 +103,15 @@ export async function getAssignedPlayerIds(user: AuthUser): Promise<string[]> {
 }
 
 /**
+ * Analyst sessions scope: working-group assignments + analyst_id FK.
+ * Matches the player picker so analysts see sessions for all their players.
+ */
+const analystAssignedPlayers: ScopeBuilder = async (u) => {
+  const ids = await getAssignedPlayerIds(u);
+  return { playerId: { [Op.in]: ids.length ? ids : [null] } };
+};
+
+/**
  * Restricted-referral scope: a referral is visible if any of
  *   - isRestricted = false (unrestricted, the default case)
  *   - user id is in the restrictedTo UUID array
@@ -237,7 +246,7 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
     GymCoach: coachPlayers,
     GoalkeeperCoach: coachPlayers,
     MentalCoach: coachPlayers,
-    Analyst: analystPlayers,
+    Analyst: analystAssignedPlayers,
     Finance: ownCreated,
     Legal: ownCreated,
     GraphicDesigner: ownCreated,
