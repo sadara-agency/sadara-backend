@@ -28,7 +28,7 @@ export const createProgramSchema = z.object({
   nameAr: z.string().max(255).nullish(),
   description: z.string().max(2000).nullish(),
   category: programCategoryEnum,
-  estimatedMinutes: z.number().int().positive().optional().nullable(),
+  estimatedMinutes: z.number().int().positive().optional(),
   durationWeeks: z.number().int().min(1).max(16).default(4),
   phase: programPhaseEnum.nullish(),
   programType: programTypeEnum.default("gym"),
