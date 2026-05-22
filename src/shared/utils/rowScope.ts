@@ -238,15 +238,15 @@ const SCOPE_RULES: Record<string, Record<string, ScopeBuilder>> = {
   sessions: {
     Player: ownPlayer,
     Scout: ownCreated,
-    Coach: coachPlayers,
-    SkillCoach: coachPlayers,
-    TacticalCoach: coachPlayers,
-    FitnessCoach: coachPlayers,
-    NutritionSpecialist: coachPlayers,
-    GymCoach: coachPlayers,
-    GoalkeeperCoach: coachPlayers,
-    MentalCoach: coachPlayers,
-    Analyst: analystAssignedPlayers,
+    Coach: ownCreated,
+    SkillCoach: ownCreated,
+    TacticalCoach: ownCreated,
+    FitnessCoach: ownCreated,
+    NutritionSpecialist: ownCreated,
+    GymCoach: ownCreated,
+    GoalkeeperCoach: ownCreated,
+    MentalCoach: ownCreated,
+    Analyst: ownCreated,
     Finance: ownCreated,
     Legal: ownCreated,
     GraphicDesigner: ownCreated,
@@ -455,9 +455,6 @@ export async function checkRowAccess(
 
     case "sessions":
       if (role === "Player") return record.playerId === user.playerId;
-      if (role === "Scout") return record.createdBy === user.id;
-      if (COACH_ROLES.includes(role) || role === "Analyst")
-        return isPlayerOwnedBy(record.playerId, user);
       return record.createdBy === user.id;
 
     case "wellness":
