@@ -107,6 +107,7 @@ export async function listByReferral(req: AuthRequest, res: Response) {
   const result = await sessionService.listByReferral(
     req.params.referralId,
     req.query as any,
+    req.user,
   );
   sendPaginated(res, result.data, result.meta);
 }
@@ -116,6 +117,7 @@ export async function listByPlayer(req: AuthRequest, res: Response) {
   const result = await sessionService.listByPlayer(
     req.params.playerId,
     req.query as any,
+    req.user,
   );
   sendPaginated(res, result.data, result.meta);
 }

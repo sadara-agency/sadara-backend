@@ -38,6 +38,18 @@ export async function getMySessions(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+// ── Respond to a Session (attendance + own notes) ──
+
+export async function respondToMySession(req: AuthRequest, res: Response) {
+  const data = await portalService.respondToSession(
+    req.user!.id,
+    req.params.id,
+    req.body,
+  );
+  invalidateMultiple([CachePrefix.PORTAL]).catch(() => {});
+  sendSuccess(res, data, "Response saved");
+}
+
 // ── My Documents ──
 
 export async function getMyDocuments(req: AuthRequest, res: Response) {

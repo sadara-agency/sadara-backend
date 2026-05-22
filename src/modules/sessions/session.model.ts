@@ -30,6 +30,8 @@ export type SessionCompletionStatus =
 
 export type SessionLocationType = "InPerson" | "Online" | "PhoneCall";
 
+export type PlayerAttendance = "Pending" | "Confirmed" | "Declined";
+
 // ── Attribute Interfaces ──
 
 export interface VideoTimestamp {
@@ -64,6 +66,9 @@ export interface SessionAttributes {
   outcomeTags: string[] | null;
   locationType: SessionLocationType | null;
   locationUrl: string | null;
+  playerAttendance: PlayerAttendance | null;
+  playerNotes: string | null;
+  playerRespondedAt: Date | null;
   createdBy: string | null;
   createdAt?: Date;
   updatedAt?: Date;
@@ -91,6 +96,9 @@ interface SessionCreationAttributes extends Optional<
   | "outcomeTags"
   | "locationType"
   | "locationUrl"
+  | "playerAttendance"
+  | "playerNotes"
+  | "playerRespondedAt"
   | "createdBy"
   | "createdAt"
   | "updatedAt"
@@ -126,6 +134,9 @@ export class Session
   declare outcomeTags: string[] | null;
   declare locationType: SessionLocationType | null;
   declare locationUrl: string | null;
+  declare playerAttendance: PlayerAttendance | null;
+  declare playerNotes: string | null;
+  declare playerRespondedAt: Date | null;
   declare createdBy: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
@@ -238,6 +249,22 @@ Session.init(
       type: DataTypes.TEXT,
       allowNull: true,
       field: "location_url",
+    },
+    playerAttendance: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      defaultValue: "Pending",
+      field: "player_attendance",
+    },
+    playerNotes: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "player_notes",
+    },
+    playerRespondedAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      field: "player_responded_at",
     },
     createdBy: {
       type: DataTypes.UUID,
