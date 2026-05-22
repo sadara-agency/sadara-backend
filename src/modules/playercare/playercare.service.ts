@@ -12,6 +12,8 @@ import {
   buildRowScope,
   mergeScope,
   checkRowAccess,
+  isBypassRole,
+  getAssignedPlayerIds,
 } from "@shared/utils/rowScope";
 import type { AuthUser } from "@shared/types";
 import type {
@@ -400,16 +402,33 @@ export async function getPlayerTimeline(playerId: string, user?: AuthUser) {
 
 // ── Stats ──
 
-export async function getCaseStats() {
-  const [statusStats] = await Promise.all([
-    sequelize.query<{ referral_type: string; status: string; count: string }>(
-      `SELECT referral_type, status, COUNT(*)::int AS count
-       FROM referrals
-       GROUP BY referral_type, status
-       ORDER BY referral_type, status`,
-      { type: QueryTypes.SELECT },
-    ),
-  ]);
+export async function getCaseStats(user?: AuthUser) {
+  const isOrgWide = !user || isBypassRole(user.role);
+
+  let whereClause = "";
+  const replacements: Record<string, unknown> = {};
+
+  if (!isOrgWide) {
+    const playerIds = await getAssignedPlayerIds(user);
+    if (playerIds.length === 0) {
+      return { byTypeAndStatus: [], totalActive: 0, totalMedical: 0, total: 0 };
+    }
+    whereClause = "WHERE player_id IN (:playerIds)";
+    replacements.playerIds = playerIds;
+  }
+
+  const statusStats = await sequelize.query<{
+    referral_type: string;
+    status: string;
+    count: string;
+  }>(
+    `SELECT referral_type, status, COUNT(*)::int AS count
+     FROM referrals
+     ${whereClause}
+     GROUP BY referral_type, status
+     ORDER BY referral_type, status`,
+    { replacements, type: QueryTypes.SELECT },
+  );
 
   const totalActive = statusStats
     .filter((r) => r.status !== "Closed")
