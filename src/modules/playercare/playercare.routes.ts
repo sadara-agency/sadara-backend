@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { authenticate, authorize, authorizeModule } from "@middleware/auth";
+import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
 import { dynamicFieldAccess } from "@middleware/fieldAccess";
 import { playerCareController } from "./playercare.controller";
@@ -26,11 +26,11 @@ router.get(
   playerCareController.list,
 );
 
-// Stats aggregates across all referrals org-wide. Restricted to bypass
-// roles because scoped aggregates would be misleading for coaches/analysts.
+// Stats are scoped per role in the service layer — bypass roles get org-wide
+// aggregates; coaches/analysts get stats scoped to their assigned players.
 router.get(
   "/stats",
-  authorize("Admin", "Manager", "Executive"),
+  authorizeModule("playercare", "read"),
   playerCareController.stats,
 );
 

@@ -90,8 +90,8 @@ export const playerCareController = {
   }),
 
   /** GET /api/v1/playercare/stats */
-  stats: asyncHandler(async (req: Request, res: Response) => {
-    const stats = await caseService.getCaseStats();
+  stats: asyncHandler(async (req: AuthRequest, res: Response) => {
+    const stats = await caseService.getCaseStats(req.user);
     sendSuccess(res, stats);
   }),
 };
