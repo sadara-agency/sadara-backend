@@ -38,6 +38,15 @@ const signContractSchema = z.object({
   signedDocumentUrl: z.string().optional(),
 });
 
+const sessionResponseSchema = z
+  .object({
+    attendance: z.enum(["Confirmed", "Declined"]).optional(),
+    notes: z.string().max(2000).optional(),
+  })
+  .refine((d) => d.attendance !== undefined || d.notes !== undefined, {
+    message: "Provide attendance or notes",
+  });
+
 // ── Public route: complete registration via invite token ──
 router.post(
   "/register",
@@ -147,6 +156,32 @@ router.get(
   authorize("Player"),
   cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
   asyncHandler(portalController.getMySessions),
+);
+/**
+ * @swagger
+ * /portal/sessions/{id}/response:
+ *   patch:
+ *     summary: Player responds to a session (attendance + own notes)
+ *     description: "Player confirms/declines attendance and/or saves their own notes. Notes are visible to Admin only."
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *     responses:
+ *       200:
+ *         description: Response saved
+ */
+router.patch(
+  "/sessions/:id/response",
+  authorize("Player"),
+  validate(sessionResponseSchema),
+  asyncHandler(portalController.respondToMySession),
 );
 router.get(
   "/documents",

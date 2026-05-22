@@ -275,6 +275,59 @@ export async function getMySessions(userId: string) {
 }
 
 // ══════════════════════════════════════════
+// RESPOND TO A SESSION (player two-way: attendance + own notes)
+// ══════════════════════════════════════════
+
+export async function respondToSession(
+  userId: string,
+  sessionId: string,
+  input: { attendance?: "Confirmed" | "Declined"; notes?: string },
+) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  const session = await Session.findByPk(sessionId);
+  if (!session) throw new AppError("Session not found", 404);
+  if (session.playerId !== playerId) {
+    throw new AppError("You can only respond to your own sessions", 403);
+  }
+
+  const patch: Record<string, unknown> = { playerRespondedAt: new Date() };
+  if (input.attendance !== undefined) patch.playerAttendance = input.attendance;
+  if (input.notes !== undefined) patch.playerNotes = input.notes;
+  await session.update(patch as any);
+
+  // Notify Admins only — player notes/declines are a private channel to
+  // management; the responsible staff and managers must NOT see them.
+  const declined = input.attendance === "Declined";
+  const wroteNotes =
+    input.notes !== undefined && (input.notes ?? "").trim().length > 0;
+  if (declined || wroteNotes) {
+    const playerName = player.fullName ?? "A player";
+    const playerNameAr = player.fullNameAr ?? player.fullName ?? "لاعب";
+    const title = declined
+      ? `${playerName} declined a session`
+      : `${playerName} added session notes`;
+    const titleAr = declined
+      ? `${playerNameAr} اعتذر عن جلسة`
+      : `${playerNameAr} أضاف ملاحظات على جلسة`;
+    notifyByRole(["Admin"], {
+      type: "system",
+      title,
+      titleAr,
+      link: `/dashboard/sessions`,
+      sourceType: "session-player-response",
+      sourceId: sessionId,
+      priority: "normal",
+    }).catch((err) =>
+      logger.error("Failed to notify admins of session response", err),
+    );
+  }
+
+  return session;
+}
+
+// ══════════════════════════════════════════
 // MY DOCUMENTS (read-only)
 // ══════════════════════════════════════════
 

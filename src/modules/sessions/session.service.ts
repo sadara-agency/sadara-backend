@@ -327,14 +327,22 @@ export async function deleteSession(id: string) {
 
 // ── List by Referral ──
 
-export async function listByReferral(referralId: string, query: SessionQuery) {
-  return listSessions({ ...query, referralId });
+export async function listByReferral(
+  referralId: string,
+  query: SessionQuery,
+  user?: AuthUser,
+) {
+  return listSessions({ ...query, referralId }, user);
 }
 
 // ── List by Player ──
 
-export async function listByPlayer(playerId: string, query: SessionQuery) {
-  return listSessions({ ...query, playerId });
+export async function listByPlayer(
+  playerId: string,
+  query: SessionQuery,
+  user?: AuthUser,
+) {
+  return listSessions({ ...query, playerId }, user);
 }
 
 // ── Stats ──
