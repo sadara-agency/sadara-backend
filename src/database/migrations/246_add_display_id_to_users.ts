@@ -1,3 +1,4 @@
+import { QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 
 /**
@@ -7,10 +8,11 @@ import { sequelize } from "@config/database";
  * Backfills existing users ordered by created_at.
  */
 export async function up() {
-  const [rows] = await sequelize.query(
+  const tableCheck = await sequelize.query<{ "?column?": number }>(
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
   );
-  if ((rows as unknown[]).length === 0) return;
+  if (tableCheck.length === 0) return;
 
   await sequelize.query(`
     ALTER TABLE users
@@ -23,12 +25,13 @@ export async function up() {
   `);
 
   // Backfill existing users
-  const [existingRows] = (await sequelize.query(`
-    SELECT id, EXTRACT(YEAR FROM created_at)::int AS yr
-    FROM users
-    WHERE display_id IS NULL
-    ORDER BY created_at ASC;
-  `)) as unknown as [Array<{ id: string; yr: number }>];
+  const existingRows = await sequelize.query<{ id: string; yr: number }>(
+    `SELECT id, EXTRACT(YEAR FROM created_at)::int AS yr
+     FROM users
+     WHERE display_id IS NULL
+     ORDER BY created_at ASC`,
+    { type: QueryTypes.SELECT },
+  );
 
   if (existingRows.length === 0) return;
 
@@ -67,10 +70,11 @@ export async function up() {
 }
 
 export async function down() {
-  const [rows] = await sequelize.query(
+  const tableCheck = await sequelize.query<{ "?column?": number }>(
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'users' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
   );
-  if ((rows as unknown[]).length === 0) return;
+  if (tableCheck.length === 0) return;
 
   await sequelize.query(`DROP INDEX IF EXISTS idx_users_display_id;`);
   await sequelize.query(`ALTER TABLE users DROP COLUMN IF EXISTS display_id;`);
