@@ -117,6 +117,10 @@ describe('Settings Service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSetAppSetting.mockResolvedValue(undefined);
+    mockGetAppSetting.mockResolvedValue(null);
+    mockUserFindByPk.mockResolvedValue(null);
+    mockBcryptCompare.mockResolvedValue(false);
+    mockSequelizeQuery.mockResolvedValue([]);
   });
 
   // ════════════════════════════════════════
@@ -198,11 +202,12 @@ describe('Settings Service', () => {
       mockBcryptCompare.mockResolvedValue(true);
       mockBcryptHash.mockResolvedValue('hashed_new');
 
-      await settingsService.changePassword('user-001', {
+      const result = await settingsService.changePassword('user-001', {
         currentPassword: 'OldPass123',
         newPassword: 'NewPass456',
       });
 
+      expect(result).toBeUndefined(); // changePassword is a void operation
       expect(mockBcryptCompare).toHaveBeenCalledWith('OldPass123', 'hashed_old');
       expect(userInstance.update).toHaveBeenCalledWith(expect.objectContaining({ passwordHash: 'hashed_new' }));
     });
@@ -279,7 +284,7 @@ describe('Settings Service', () => {
       expect(userInstance.update).toHaveBeenCalledWith(
         expect.objectContaining({ notificationPreferences: expect.objectContaining({ push: true }) }),
       );
-      expect(result).toMatchObject({ push: true, email: true });
+      expect(result).toEqual({ contracts: true, offers: true, email: true, push: true });
     });
 
     it('should throw 404 when user not found', async () => {
