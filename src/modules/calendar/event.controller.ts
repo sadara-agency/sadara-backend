@@ -21,7 +21,7 @@ const crud = createCrudController({
     delete: (id) => eventService.deleteEvent(id),
   },
   entity: "calendar",
-  cachePrefixes: [],
+  cachePrefixes: ["calendar"],
   label: (e) => e.title,
 });
 

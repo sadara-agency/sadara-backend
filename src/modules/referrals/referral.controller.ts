@@ -6,23 +6,23 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
-import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as referralService from "@modules/referrals/referral.service";
 
 // All handlers are custom because they need req.user for row-level scoping.
+// The crud factory's auto-invalidation never runs here (its create/update/remove
+// are not exported), so each handler busts the referral caches itself.
+// "referrals" matches the list + all "referrals:manager:*" GET caches;
+// "referral" matches the detail GET cache (singular prefix, see referral.routes.ts).
+const REFERRAL_CACHES = [
+  CachePrefix.REFERRALS,
+  "referral",
+  CachePrefix.DASHBOARD,
+];
 
-const crud = createCrudController({
-  service: {
-    list: (query) => referralService.listReferrals(query),
-    getById: (id) => referralService.getReferralById(id),
-    create: (body, userId) => referralService.createReferral(body, userId),
-    update: (id, body) => referralService.updateReferral(id, body),
-    delete: (id) => referralService.deleteReferral(id),
-  },
-  entity: "referrals",
-  cachePrefixes: [],
-  label: (r) => `${r.referralType} referral for player ${r.playerId}`,
-});
+function bustReferralCaches(): void {
+  void invalidateMultiple(REFERRAL_CACHES);
+}
 
 export async function list(req: AuthRequest, res: Response) {
   const result = await referralService.listReferrals(req.query, req.user);
@@ -52,6 +52,7 @@ export async function create(req: AuthRequest, res: Response) {
     `Created referral ${referral!.id}`,
   );
 
+  bustReferralCaches();
   sendCreated(res, referral, "Referral created");
 }
 
@@ -78,6 +79,7 @@ export async function update(req: AuthRequest, res: Response) {
     `Updated referral ${referral!.id}`,
   );
 
+  bustReferralCaches();
   sendSuccess(res, referral, "Referral updated");
 }
 
@@ -96,6 +98,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     `Referral status changed to ${referral!.status}`,
   );
 
+  bustReferralCaches();
   sendSuccess(res, referral, `Status updated to ${referral!.status}`);
 }
 
@@ -110,6 +113,7 @@ export async function remove(req: AuthRequest, res: Response) {
     "Referral deleted",
   );
 
+  bustReferralCaches();
   sendSuccess(res, result, "Referral deleted");
 }
 
@@ -147,5 +151,6 @@ export async function escalateReferral(req: AuthRequest, res: Response) {
     req.body,
     req.user!.id,
   );
+  bustReferralCaches();
   sendSuccess(res, referral, "Referral escalated");
 }

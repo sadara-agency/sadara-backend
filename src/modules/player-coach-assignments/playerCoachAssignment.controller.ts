@@ -1,5 +1,6 @@
 import type { Response } from "express";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple } from "@shared/utils/cache";
 import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import type { AuthRequest } from "@shared/types";
 import * as assignmentService from "./playerCoachAssignment.service";
@@ -19,7 +20,7 @@ const crud = createCrudController({
     delete: (id) => assignmentService.deleteAssignment(id),
   },
   entity: "player-coach-assignments",
-  cachePrefixes: [],
+  cachePrefixes: ["player-coach-assignments"],
   label: (a) => `${a.specialty} assignment`,
 });
 
@@ -48,6 +49,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     req.body as UpdateAssignmentStatusInput,
     req.user!,
   );
+  void invalidateMultiple(["player-coach-assignments"]);
   sendSuccess(res, updated, "Assignment status updated");
 }
 

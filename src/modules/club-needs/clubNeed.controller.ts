@@ -10,7 +10,7 @@ const crud = createCrudController({
     delete: (id) => clubNeedService.deleteClubNeed(id),
   },
   entity: "club-needs",
-  cachePrefixes: [],
+  cachePrefixes: ["club-needs"],
   label: (n) => n.position,
 });
 

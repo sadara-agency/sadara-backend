@@ -3,9 +3,12 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { AppError } from "@middleware/errorHandler";
 import { uploadFile } from "@shared/utils/storage";
 import * as taskService from "@modules/tasks/task.service";
+
+const TASK_CACHES = [CachePrefix.TASKS];
 
 const crud = createCrudController({
   service: {
@@ -16,7 +19,7 @@ const crud = createCrudController({
     delete: (id) => taskService.deleteTask(id),
   },
   entity: "tasks",
-  cachePrefixes: [],
+  cachePrefixes: TASK_CACHES,
   label: (t) => t.title,
 });
 
@@ -47,6 +50,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     `Task status changed to: ${requestedStatus}`,
   );
 
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task, "Task status updated");
 }
 
@@ -62,6 +66,7 @@ export async function approve(req: AuthRequest, res: Response) {
     "Task approved (review)",
   );
 
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task, "Task approved");
 }
 
@@ -78,6 +83,7 @@ export async function reject(req: AuthRequest, res: Response) {
     `Task sent back for rework: ${note}`,
   );
 
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task, "Task sent back for rework");
 }
 
@@ -97,12 +103,14 @@ export async function createSubTask(req: AuthRequest, res: Response) {
     `Sub-task created under ${req.params.id}`,
   );
 
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task, "Sub-task created", 201);
 }
 
 // ── Reorder Sub-Tasks ──
 export async function reorderSubTasks(req: AuthRequest, res: Response) {
   await taskService.reorderSubTasks(req.params.id, req.body.orderedIds);
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, null, "Sub-tasks reordered");
 }
 
@@ -134,6 +142,7 @@ export async function addDeliverable(req: AuthRequest, res: Response) {
     { url: result.url, thumbnailUrl: result.thumbnailUrl },
     caption,
   );
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task);
 }
 
@@ -152,6 +161,7 @@ export async function submitJustification(req: AuthRequest, res: Response) {
     "Task justification submitted",
   );
 
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task, "Justification saved");
 }
 
@@ -159,5 +169,6 @@ export async function submitJustification(req: AuthRequest, res: Response) {
 export async function removeDeliverable(req: AuthRequest, res: Response) {
   const { id, index } = req.params;
   const task = await taskService.removeDeliverable(id, parseInt(index, 10));
+  void invalidateMultiple(TASK_CACHES);
   sendSuccess(res, task);
 }

@@ -3,7 +3,15 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/injuries/injury.service";
+
+// Injuries can auto-create referrals, so referral caches must bust too.
+const INJURY_CACHES = [
+  CachePrefix.INJURIES,
+  CachePrefix.REFERRALS,
+  CachePrefix.DASHBOARD,
+];
 
 const crud = createCrudController({
   service: {
@@ -14,7 +22,7 @@ const crud = createCrudController({
     delete: (id) => svc.deleteInjury(id),
   },
   entity: "injuries",
-  cachePrefixes: [],
+  cachePrefixes: INJURY_CACHES,
   label: (i) => `${i.injuryType} for player ${i.playerId}`,
 });
 
@@ -40,6 +48,7 @@ export async function addUpdate(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Added progress update to injury ${req.params.id}`,
   );
+  void invalidateMultiple(INJURY_CACHES);
   sendCreated(res, result);
 }
 

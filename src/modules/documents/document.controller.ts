@@ -7,6 +7,7 @@ import {
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple } from "@shared/utils/cache";
 import { AppError } from "@middleware/errorHandler";
 import {
   uploadFile,
@@ -29,7 +30,7 @@ const crud = createCrudController({
     delete: (id) => svc.deleteDocument(id),
   },
   entity: "documents",
-  cachePrefixes: [],
+  cachePrefixes: ["documents"],
   label: (d) => d.name,
 });
 
@@ -48,11 +49,13 @@ export async function list(req: AuthRequest, res: Response) {
 // check the caller's read permission on the linked module (A-C2)
 export async function create(req: AuthRequest, res: Response) {
   const doc = await svc.createDocument(req.body, req.user!.id, req.user);
+  void invalidateMultiple(["documents"]);
   sendCreated(res, doc);
 }
 
 export async function update(req: AuthRequest, res: Response) {
   const doc = await svc.updateDocument(req.params.id, req.body, req.user);
+  void invalidateMultiple(["documents"]);
   sendSuccess(res, doc, "Document updated");
 }
 
@@ -115,6 +118,7 @@ export async function upload(req: AuthRequest, res: Response) {
     `Uploaded: ${doc!.name} (${file.originalname}, ${(result.size / 1024).toFixed(0)} KB)`,
   );
 
+  void invalidateMultiple(["documents"]);
   sendCreated(res, doc);
 }
 

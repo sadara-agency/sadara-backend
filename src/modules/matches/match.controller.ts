@@ -8,9 +8,17 @@ import {
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { logger } from "@config/logger";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as svc from "@modules/matches/match.service";
 import { generateAutoTasks } from "@modules/matches/matchAutoTasks";
 import { runSingleCompetition } from "@cron/engines/saudiLeagues.engine";
+
+const MATCH_CACHES = [CachePrefix.MATCHES, CachePrefix.DASHBOARD];
+
+// Status/stats changes can spawn auto-tasks, so those handlers pass [CachePrefix.TASKS] as extra.
+function bustMatchCaches(extra: string[] = []): void {
+  void invalidateMultiple([...MATCH_CACHES, ...extra]);
+}
 
 // Matches create doesn't take userId, so we adapt.
 const crud = createCrudController({
@@ -22,7 +30,7 @@ const crud = createCrudController({
     delete: (id) => svc.deleteMatch(id),
   },
   entity: "matches",
-  cachePrefixes: [],
+  cachePrefixes: MATCH_CACHES,
   label: (m) => `${m.competition || "Match"} on ${m.matchDate}`,
 });
 
@@ -57,6 +65,7 @@ export async function syncMatches(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Manual SAFF+ sync: ${result.upserted} upserted, ${result.unmapped} unmapped, ${result.errors.length} errors`,
   );
+  bustMatchCaches();
   sendSuccess(res, result, "Sync complete");
 }
 
@@ -69,6 +78,7 @@ export async function updateScore(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Score updated: ${match.homeScore}-${match.awayScore}`,
   );
+  bustMatchCaches();
   sendSuccess(res, match, "Score updated");
 }
 
@@ -99,6 +109,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
       });
   }
 
+  bustMatchCaches([CachePrefix.TASKS]);
   sendSuccess(res, match, `Match status updated to ${match.status}`);
 }
 
@@ -129,6 +140,7 @@ export async function assignPlayers(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Assigned ${req.body.players.length} players to match`,
   );
+  bustMatchCaches();
   sendSuccess(res, players, "Players assigned");
 }
 
@@ -138,6 +150,7 @@ export async function updatePlayer(req: AuthRequest, res: Response) {
     req.params.playerId,
     req.body,
   );
+  bustMatchCaches();
   sendSuccess(res, mp, "Player assignment updated");
 }
 
@@ -153,6 +166,7 @@ export async function removePlayer(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Removed player ${req.params.playerId} from match`,
   );
+  bustMatchCaches();
   sendSuccess(res, result, "Player removed from match");
 }
 
@@ -190,6 +204,7 @@ export async function upsertStats(req: AuthRequest, res: Response) {
       });
     });
 
+  bustMatchCaches([CachePrefix.TASKS]);
   sendSuccess(res, stats, "Stats saved");
 }
 
@@ -199,6 +214,7 @@ export async function updatePlayerStats(req: AuthRequest, res: Response) {
     req.params.playerId,
     req.body,
   );
+  bustMatchCaches();
   sendSuccess(res, stats, "Player stats updated");
 }
 
@@ -207,6 +223,7 @@ export async function deletePlayerStats(req: AuthRequest, res: Response) {
     req.params.id,
     req.params.playerId,
   );
+  bustMatchCaches();
   sendSuccess(res, result, "Player stats deleted");
 }
 
@@ -264,6 +281,7 @@ export async function createAnalysis(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Created ${req.body.type} analysis: ${req.body.title}`,
   );
+  bustMatchCaches();
   sendCreated(res, analysis);
 }
 
@@ -280,6 +298,7 @@ export async function updateAnalysis(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Updated analysis: ${analysis.title}`,
   );
+  bustMatchCaches();
   sendSuccess(res, analysis, "Analysis updated");
 }
 
@@ -295,6 +314,7 @@ export async function publishAnalysis(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Published analysis: ${analysis.title}`,
   );
+  bustMatchCaches();
   sendSuccess(res, analysis, "Analysis published");
 }
 
@@ -310,5 +330,6 @@ export async function removeAnalysis(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Analysis deleted",
   );
+  bustMatchCaches();
   sendSuccess(res, result, "Analysis deleted");
 }

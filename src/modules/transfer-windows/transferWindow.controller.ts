@@ -13,7 +13,7 @@ const crud = createCrudController({
     delete: (id) => transferWindowService.deleteTransferWindow(id),
   },
   entity: "transfer-windows",
-  cachePrefixes: [],
+  cachePrefixes: ["transfer-windows"],
   label: (item) => item.season ?? item.id,
 });
 

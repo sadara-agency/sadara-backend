@@ -3,12 +3,15 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { AppError } from "@middleware/errorHandler";
+import { invalidateMultiple } from "@shared/utils/cache";
 import * as svc from "@modules/approvals/approval.service";
 import * as chainSvc from "@modules/approvals/approvalChain.service";
 import {
   createTemplateSchema,
   updateTemplateSchema,
 } from "@modules/approvals/approvalChain.validation";
+
+const APPROVAL_CACHES = ["approvals"];
 
 // ── List Approvals ──
 
@@ -57,6 +60,7 @@ export async function approve(req: AuthRequest, res: Response) {
         : ""),
   );
 
+  void invalidateMultiple(APPROVAL_CACHES);
   sendSuccess(res, approval, "Approval granted");
 }
 
@@ -82,6 +86,7 @@ export async function reject(req: AuthRequest, res: Response) {
         : ""),
   );
 
+  void invalidateMultiple(APPROVAL_CACHES);
   sendSuccess(res, approval, "Approval rejected");
 }
 
@@ -106,6 +111,7 @@ export async function createTemplate(req: AuthRequest, res: Response) {
     `Created approval chain template: ${body.name} (${body.entityType}/${body.action})`,
   );
 
+  void invalidateMultiple(APPROVAL_CACHES);
   sendSuccess(res, template, "Template created", 201);
 }
 
@@ -121,6 +127,7 @@ export async function updateTemplate(req: AuthRequest, res: Response) {
     `Updated approval chain template: ${template!.name}`,
   );
 
+  void invalidateMultiple(APPROVAL_CACHES);
   sendSuccess(res, template, "Template updated");
 }
 
@@ -135,5 +142,6 @@ export async function deactivateTemplate(req: AuthRequest, res: Response) {
     `Deactivated approval chain template: ${template.name}`,
   );
 
+  void invalidateMultiple(APPROVAL_CACHES);
   sendSuccess(res, template, "Template deactivated");
 }
