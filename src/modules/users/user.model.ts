@@ -232,7 +232,6 @@ User.init(
       type: DataTypes.STRING(20),
       allowNull: true,
       defaultValue: null,
-      unique: true,
       field: "display_id",
     },
   },
