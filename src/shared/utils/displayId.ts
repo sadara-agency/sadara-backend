@@ -14,6 +14,7 @@ const ENTITY_PREFIX: Record<string, string> = {
   tasks: "TSK",
   injuries: "INJ",
   matchEvaluations: "MEVAL",
+  users: "U",
 };
 
 /**
