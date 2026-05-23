@@ -26,6 +26,7 @@ import {
 } from "@modules/users/user.validation";
 import { cacheDel } from "@shared/utils/cache";
 import { USER_ACTIVE_CACHE_KEY } from "@middleware/auth";
+import { generateDisplayId } from "@shared/utils/displayId";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {
@@ -111,8 +112,11 @@ export async function createUser(input: CreateUserInput, createdBy?: string) {
   const existing = await User.findOne({ where: { email: input.email } });
   if (existing) throw new AppError("Email already registered", 409);
 
-  // Hash the password
-  const passwordHash = await bcrypt.hash(input.password, env.bcrypt.saltRounds);
+  // Hash the password and generate display ID in parallel
+  const [passwordHash, displayId] = await Promise.all([
+    bcrypt.hash(input.password, env.bcrypt.saltRounds),
+    generateDisplayId("users"),
+  ]);
 
   // If role is Player, auto-create a linked player record
   if (input.role === "Player" && createdBy) {
@@ -152,6 +156,7 @@ export async function createUser(input: CreateUserInput, createdBy?: string) {
           avatarUrl: input.avatarUrl,
           isActive: input.isActive,
           playerId: player.id,
+          displayId,
         },
         { transaction: t },
       );
@@ -169,6 +174,7 @@ export async function createUser(input: CreateUserInput, createdBy?: string) {
     role: input.role as any,
     avatarUrl: input.avatarUrl,
     isActive: input.isActive,
+    displayId,
   });
 
   // Return without passwordHash

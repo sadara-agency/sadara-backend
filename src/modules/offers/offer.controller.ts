@@ -4,6 +4,7 @@ import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { logger } from "@config/logger";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import * as offerService from "@modules/offers/offer.service";
 import * as importerService from "@modules/offers/importer.service";
 import { AppError } from "@middleware/errorHandler";
@@ -12,6 +13,12 @@ import {
   resolveApprovalByEntity,
 } from "@modules/approvals/approval.service";
 import { Player } from "@modules/players/player.model";
+
+const OFFER_CACHES = [CachePrefix.OFFERS, CachePrefix.DASHBOARD];
+
+function bustOfferCaches(extra: string[] = []): void {
+  void invalidateMultiple([...OFFER_CACHES, ...extra]);
+}
 
 const crud = createCrudController({
   service: {
@@ -22,7 +29,7 @@ const crud = createCrudController({
     delete: (id) => offerService.deleteOffer(id),
   },
   entity: "offers",
-  cachePrefixes: [],
+  cachePrefixes: OFFER_CACHES,
   label: (o) => `${o.offerType} offer for player ${o.playerId}`,
 });
 
@@ -81,6 +88,7 @@ export async function updateStatus(req: AuthRequest, res: Response) {
     );
   }
 
+  bustOfferCaches();
   sendSuccess(res, offer, `Offer status updated to ${offer.status}`);
 }
 
@@ -90,6 +98,7 @@ export async function updatePhase(req: AuthRequest, res: Response) {
     req.body,
     req.user,
   );
+  bustOfferCaches();
   sendSuccess(res, offer, "Offer phase updated");
 }
 
@@ -110,6 +119,7 @@ export async function importCsv(req: AuthRequest, res: Response) {
   });
 
   const count = await importerService.importOffersFromCsv(rows, req.user!.id);
+  bustOfferCaches();
   sendSuccess(res, { imported: count }, `${count} deals imported`);
 }
 
@@ -125,5 +135,6 @@ export async function convertToContract(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Converted offer ${req.params.id} to contract ${result.contract.id}`,
   );
+  bustOfferCaches([CachePrefix.CONTRACTS]);
   sendCreated(res, result, "Offer converted to contract");
 }

@@ -43,6 +43,7 @@ interface UserAttributes {
   emailVerifiedAt: Date | null;
   emailVerificationToken: string | null;
   emailVerificationTokenExpiry: Date | null;
+  displayId?: string | null;
 }
 
 interface UserCreationAttributes extends Optional<
@@ -64,6 +65,7 @@ interface UserCreationAttributes extends Optional<
   | "emailVerifiedAt"
   | "emailVerificationToken"
   | "emailVerificationTokenExpiry"
+  | "displayId"
 > {}
 
 /** Fields stripped from every serialized User — never sent to the client. */
@@ -112,6 +114,7 @@ export class User
   declare emailVerifiedAt: Date | null;
   declare emailVerificationToken: string | null;
   declare emailVerificationTokenExpiry: Date | null;
+  declare displayId: string | null;
 
   /**
    * Strip all sensitive / internal fields before the model is serialized.
@@ -224,6 +227,12 @@ User.init(
       allowNull: true,
       defaultValue: null,
       field: "email_verification_token_expiry",
+    },
+    displayId: {
+      type: DataTypes.STRING(20),
+      allowNull: true,
+      defaultValue: null,
+      field: "display_id",
     },
   },
   {

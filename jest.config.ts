@@ -34,10 +34,10 @@ const config: Config = {
   ],
   coverageThreshold: {
     global: {
-      branches: 20, // Lowered from 21 — designs module covers itself at 100% but the global denominator is dominated by long-untested utils (mail/pdf/gcs/storage/rowScope) that swamp any single-module gain
-      functions: 28, // Lowered from 30 — new specialist modules (mental/video/tactical/training) pending tests
-      lines: 32,    // Lowered from 36 — same reason
-      statements: 32, // Lowered from 36 — same reason
+      branches: 18, // Actual: 23.23% → threshold: 23.23 - 5 = 18.23 → 18
+      functions: 28, // Actual: 33.26% → threshold: 33.26 - 5 = 28.26 → 28
+      lines: 32,    // Actual: 37.78% → threshold: 37.78 - 5 = 32.78 → 32
+      statements: 32, // Actual: 37.17% → threshold: 37.17 - 5 = 32.17 → 32
     },
   },
   testTimeout: 15000,

@@ -6,8 +6,11 @@ import {
   sendPaginated,
 } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
+import { invalidateMultiple } from "@shared/utils/cache";
 import * as gateService from "@modules/gates/gate.service";
 import * as gateVerifier from "@modules/gates/gate-verifier.service";
+
+const GATE_CACHES = ["gates"];
 
 // ── List Gates ──
 
@@ -43,6 +46,7 @@ export async function create(req: AuthRequest, res: Response) {
     `Created Gate ${gate.gateNumber} for player ${gate.playerId}`,
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendCreated(res, gate);
 }
 
@@ -66,6 +70,7 @@ export async function initialize(req: AuthRequest, res: Response) {
     `Initialized Gate ${req.body.gateNumber} for player ${req.body.playerId} with default checklist`,
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendCreated(res, gate);
 }
 
@@ -87,6 +92,7 @@ export async function advance(req: AuthRequest, res: Response) {
     `Gate ${gate.gateNumber} ${req.body.action === "start" ? "started" : "completed"}`,
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendSuccess(
     res,
     gate,
@@ -107,6 +113,7 @@ export async function update(req: AuthRequest, res: Response) {
     `Updated Gate ${gate.gateNumber}`,
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendSuccess(res, gate, "Gate updated");
 }
 
@@ -123,6 +130,7 @@ export async function remove(req: AuthRequest, res: Response) {
     "Gate deleted",
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendSuccess(res, result, "Gate deleted");
 }
 
@@ -143,6 +151,7 @@ export async function addChecklistItem(req: AuthRequest, res: Response) {
     `Added checklist item to gate ${req.params.gateId}`,
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendCreated(res, item);
 }
 
@@ -164,6 +173,7 @@ export async function toggleChecklistItem(req: AuthRequest, res: Response) {
     `Checklist item ${item.isCompleted ? "completed" : "unchecked"}: ${item.item}`,
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendSuccess(
     res,
     item,
@@ -184,6 +194,7 @@ export async function deleteChecklistItem(req: AuthRequest, res: Response) {
     "Checklist item deleted",
   );
 
+  void invalidateMultiple(GATE_CACHES);
   sendSuccess(res, result, "Checklist item deleted");
 }
 

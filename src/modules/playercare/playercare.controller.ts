@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { asyncHandler } from "@middleware/errorHandler";
 import type { AuthRequest } from "@shared/types";
+import { invalidateMultiple } from "@shared/utils/cache";
 import * as caseService from "./playercare.service";
 import {
   sendSuccess,
@@ -15,6 +16,8 @@ import {
   updateCaseSchema,
   updateCaseStatusSchema,
 } from "./playercare.validation";
+
+const PLAYERCARE_CACHES = ["playercare"];
 
 export const playerCareController = {
   /** GET /api/v1/playercare — list all cases */
@@ -37,6 +40,7 @@ export const playerCareController = {
       input,
       (req as any).user.id,
     );
+    void invalidateMultiple(PLAYERCARE_CACHES);
     sendCreated(res, caseRecord);
   }),
 
@@ -47,6 +51,7 @@ export const playerCareController = {
       input,
       (req as any).user.id,
     );
+    void invalidateMultiple(PLAYERCARE_CACHES);
     sendCreated(res, caseRecord);
   }),
 
@@ -58,6 +63,7 @@ export const playerCareController = {
       input,
       req.user,
     );
+    void invalidateMultiple(PLAYERCARE_CACHES);
     sendSuccess(res, caseRecord);
   }),
 
@@ -73,12 +79,14 @@ export const playerCareController = {
       closureNotes,
       req.user,
     );
+    void invalidateMultiple(PLAYERCARE_CACHES);
     sendSuccess(res, caseRecord);
   }),
 
   /** DELETE /api/v1/playercare/:id — delete case */
   delete: asyncHandler(async (req: AuthRequest, res: Response) => {
     await caseService.deleteCase(req.params.id, req.user);
+    void invalidateMultiple(PLAYERCARE_CACHES);
     sendSuccess(res, null, "Case deleted");
   }),
 

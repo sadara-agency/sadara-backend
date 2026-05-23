@@ -3,6 +3,7 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess, sendPaginated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple } from "@shared/utils/cache";
 import * as svc from "@modules/notes/note.service";
 import type { NoteQuery } from "@modules/notes/note.validation";
 
@@ -19,7 +20,7 @@ const crud = createCrudController({
     delete: (id) => svc.deleteNote(id, "", ""),
   },
   entity: "notes",
-  cachePrefixes: [],
+  cachePrefixes: ["notes"],
   label: (n) => `on ${n.ownerType} ${n.ownerId}`,
 });
 
@@ -49,6 +50,7 @@ export async function update(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Note updated",
   );
+  void invalidateMultiple(["notes"]);
   sendSuccess(res, note, "Note updated");
 }
 
@@ -65,5 +67,6 @@ export async function remove(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Note deleted",
   );
+  void invalidateMultiple(["notes"]);
   sendSuccess(res, result, "Note deleted");
 }

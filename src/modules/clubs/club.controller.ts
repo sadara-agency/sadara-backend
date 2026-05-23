@@ -3,8 +3,11 @@ import { AuthRequest } from "@shared/types";
 import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
 import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { createCrudController } from "@shared/utils/crudController";
+import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { AppError } from "@middleware/errorHandler";
 import * as clubService from "@modules/clubs/club.service";
+
+const CLUB_CACHES = [CachePrefix.CLUBS];
 
 const crud = createCrudController({
   service: {
@@ -15,7 +18,7 @@ const crud = createCrudController({
     delete: (id) => clubService.deleteClub(id),
   },
   entity: "clubs",
-  cachePrefixes: [],
+  cachePrefixes: CLUB_CACHES,
   label: (c) => c.name,
 });
 
@@ -39,6 +42,7 @@ export async function bulkRemove(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Bulk deleted ${result.count} clubs`,
   );
+  void invalidateMultiple(CLUB_CACHES);
   sendSuccess(res, result, `${result.count} clubs deleted`);
 }
 
@@ -58,6 +62,7 @@ export async function uploadLogo(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     "Updated club logo",
   );
+  void invalidateMultiple(CLUB_CACHES);
   sendSuccess(res, { logoUrl }, "Logo uploaded");
 }
 
@@ -72,6 +77,7 @@ export async function createContact(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Created contact: ${contact.name} for club ${req.params.id}`,
   );
+  void invalidateMultiple(CLUB_CACHES);
   sendCreated(res, contact);
 }
 
@@ -88,6 +94,7 @@ export async function updateContact(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Updated contact for club ${req.params.id}`,
   );
+  void invalidateMultiple(CLUB_CACHES);
   sendSuccess(res, contact, "Contact updated");
 }
 
@@ -103,6 +110,7 @@ export async function deleteContact(req: AuthRequest, res: Response) {
     buildAuditContext(req.user!, req.ip),
     `Deleted contact from club ${req.params.id}`,
   );
+  void invalidateMultiple(CLUB_CACHES);
   sendSuccess(res, result, "Contact deleted");
 }
 

@@ -45,6 +45,10 @@ jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },
 }));
 
+jest.mock('@shared/utils/displayId', () => ({
+  generateDisplayId: jest.fn().mockResolvedValue('U-26-0001'),
+}));
+
 import * as userService from '../../../src/modules/users/user.service';
 
 describe('User Service', () => {
