@@ -31,15 +31,19 @@ export async function upsertPlayerSeasonStats(
   return record;
 }
 
-export async function recomputeFromMatches(playerId: string, season: string) {
-  const [startYear] = season.split("/");
+export async function recomputeFromMatches(
+  playerId: string,
+  season: string,
+  force = false,
+) {
+  const startYear = parseInt(season.split("-")[0], 10);
   const from = `${startYear}-07-01`;
-  const to = `${parseInt(startYear) + 1}-06-30`;
+  const to = `${startYear + 1}-06-30`;
 
   const existing = await PlayerSeasonStats.findOne({
     where: { playerId, season },
   });
-  if (existing?.source === "manual") return;
+  if (!force && existing?.source === "manual") return;
 
   const rows = await PlayerMatchStats.findAll({
     where: {
