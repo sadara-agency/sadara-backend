@@ -89,6 +89,11 @@ export async function getKpiTrend(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+export async function matchesToAnalyze(req: AuthRequest, res: Response) {
+  const data = await service.getMatchesToAnalyze(req.user!);
+  sendSuccess(res, data);
+}
+
 export async function compare(req: AuthRequest, res: Response) {
   const { playerIds, season } = req.query as unknown as z.infer<
     typeof compareQuerySchema

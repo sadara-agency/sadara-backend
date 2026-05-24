@@ -1104,12 +1104,6 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("contracts", ["Approver"], { canRead: true }),
   ...forRoles("offers", ["Approver"], { canRead: true }),
 
-  // analyst-home: Analyst home dashboard aggregate (read-only)
-  ...forRoles("analyst-home", ["Analyst"], { canRead: true }),
-  ...forRoles("analyst-home", ["Admin", "Manager", "SportingDirector"], {
-    canRead: true,
-  }),
-
   // analyst: Analyst reports and insights module
   ...forRoles("analyst", ["Analyst"], {
     canRead: true,

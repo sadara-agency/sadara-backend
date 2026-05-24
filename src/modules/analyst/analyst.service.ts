@@ -205,6 +205,57 @@ export async function getPlayerProfile(
   );
 }
 
+export interface MatchToAnalyze {
+  id: string;
+  title: string;
+  matchDate: string;
+  homeClubId: string | null;
+  awayClubId: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
+}
+
+export async function getMatchesToAnalyze(
+  user: AuthUser,
+): Promise<MatchToAnalyze[]> {
+  const cacheKey = buildCacheKey(`${P}:matches-to-analyze`, {
+    userId: user.id,
+  });
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      const assignedPlayerIds = await getAssignedPlayerIds(user);
+      if (assignedPlayerIds.length === 0) return [];
+
+      const rows = await sequelize.query<Record<string, unknown>>(
+        `SELECT m.id,
+                COALESCE(m.home_team_name, '') || ' vs ' || COALESCE(m.away_team_name, '') AS title,
+                m.match_date,
+                m.home_club_id, m.away_club_id,
+                m.home_score, m.away_score
+         FROM matches m
+         WHERE m.status = 'completed'
+           AND EXISTS (
+             SELECT 1 FROM match_players mp
+             WHERE mp.match_id = m.id AND mp.player_id IN (:playerIds)
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM match_analyses ma WHERE ma.match_id = m.id
+           )
+         ORDER BY m.match_date ASC
+         LIMIT 8`,
+        {
+          type: QueryTypes.SELECT,
+          replacements: { playerIds: assignedPlayerIds },
+        },
+      );
+
+      return rows.map((r) => camelCaseKeys(r) as unknown as MatchToAnalyze);
+    },
+    CacheTTL.SHORT,
+  );
+}
+
 export async function comparePlayers(
   playerIds: string[],
   user: AuthUser,

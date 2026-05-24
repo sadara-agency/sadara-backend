@@ -30,6 +30,13 @@ router.use(authenticate);
 // ── Read endpoints ────────────────────────────────────────────────────────────
 
 router.get(
+  "/matches-to-analyze",
+  authorizeModule("players", "read"),
+  cacheRoute("analyst:matches-to-analyze", CacheTTL.SHORT),
+  ctrl.matchesToAnalyze,
+);
+
+router.get(
   "/players",
   authorizeModule("players", "read"),
   dynamicFieldAccess("players"),
