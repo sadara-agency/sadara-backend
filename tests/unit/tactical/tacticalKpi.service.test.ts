@@ -46,6 +46,11 @@ jest.mock('../../../src/modules/users/user.model', () => ({
   User: { name: 'User' },
 }));
 
+jest.mock('../../../src/modules/video/video.model', () => ({
+  VideoClip: { findAll: jest.fn() },
+  VideoTag: { name: 'VideoTag' },
+}));
+
 import * as kpiService from '../../../src/modules/tactical/kpis/tacticalKpi.service';
 
 // ── Fixtures ──
