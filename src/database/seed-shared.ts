@@ -1103,6 +1103,12 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("approvals", ["Approver"], { canRead: true, canUpdate: true }),
   ...forRoles("contracts", ["Approver"], { canRead: true }),
   ...forRoles("offers", ["Approver"], { canRead: true }),
+
+  // analyst-home: Analyst home dashboard aggregate (read-only)
+  ...forRoles("analyst-home", ["Analyst"], { canRead: true }),
+  ...forRoles("analyst-home", ["Admin", "Manager", "SportingDirector"], {
+    canRead: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {

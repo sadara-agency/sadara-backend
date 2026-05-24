@@ -96,6 +96,7 @@ import "@modules/heatmaps/heatmap.swagger";
 import agendaRoutes from "@modules/agenda/agenda.routes";
 import matchEvaluationRoutes from "@modules/matchEvaluations/matchEvaluation.routes";
 import "@modules/matchEvaluations/matchEvaluation.swagger";
+import analystHomeRoutes from "@modules/analyst-home/analyst-home.routes";
 import { locale } from "@middleware/locale";
 import { setupSwagger } from "@config/swagger";
 
@@ -488,6 +489,7 @@ app.use("/api/v1/personal-todos", personalTodoRoutes);
 app.use("/api/v1/heatmaps", heatmapRoutes);
 app.use("/api/v1/agenda", agendaRoutes);
 app.use("/api/v1/match-evaluations", matchEvaluationRoutes);
+app.use("/api/v1/analyst-home", analystHomeRoutes);
 
 // ── Signed documents — authenticated serving ──
 const SIGNED_DOCUMENT_EXTS = [".pdf", ".png", ".jpg", ".jpeg"] as const;
