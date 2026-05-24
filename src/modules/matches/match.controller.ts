@@ -244,6 +244,22 @@ export async function playerAggregateStats(req: AuthRequest, res: Response) {
   sendSuccess(res, stats);
 }
 
+export async function playerMatchRatings(req: AuthRequest, res: Response) {
+  const { from, to, competition, limit } = req.query as {
+    from?: string;
+    to?: string;
+    competition?: string;
+    limit?: string;
+  };
+  const ratings = await svc.getPlayerMatchRatings(req.params.playerId, {
+    from,
+    to,
+    competition,
+    limit: limit ? Number(limit) : undefined,
+  });
+  sendSuccess(res, ratings);
+}
+
 export async function playerShotMap(req: AuthRequest, res: Response) {
   const { playerId } = req.params;
   const { season } = req.query as { season?: string };

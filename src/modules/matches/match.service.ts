@@ -734,6 +734,13 @@ export async function getPlayerAggregateStats(
         "totalDribblesAttempted",
       ],
       [Sequelize.fn("SUM", Sequelize.col("key_passes")), "totalKeyPasses"],
+      // Advanced metrics (migration 247)
+      [Sequelize.fn("SUM", Sequelize.col("xg")), "totalXg"],
+      [Sequelize.fn("SUM", Sequelize.col("xa")), "totalXa"],
+      [
+        Sequelize.fn("SUM", Sequelize.col("progressive_passes")),
+        "totalProgressivePasses",
+      ],
       // Goalkeeper stats
       [Sequelize.fn("SUM", Sequelize.col("saves")), "totalSaves"],
       [
@@ -760,6 +767,66 @@ export async function getPlayerAggregateStats(
   });
 
   return result[0] ?? {};
+}
+
+/**
+ * Lean per-match rating history for a player, newest first — feeds the
+ * analyst Performance Matrix rating sparkline. Returns at most `limit`
+ * rows (default 5) that have a non-null rating.
+ */
+export async function getPlayerMatchRatings(
+  playerId: string,
+  params?: { from?: string; to?: string; competition?: string; limit?: number },
+) {
+  const matchWhere: Record<string, unknown> = {};
+  if (params?.from || params?.to) {
+    const dateRange: Record<symbol, Date> = {};
+    if (params?.from) dateRange[Op.gte] = new Date(params.from);
+    if (params?.to) dateRange[Op.lte] = new Date(params.to);
+    matchWhere.matchDate = dateRange;
+  }
+  if (params?.competition)
+    matchWhere.competition = { [Op.iLike]: `%${params.competition}%` };
+
+  const limit = Math.min(Math.max(params?.limit ?? 5, 1), 20);
+
+  const rows = await PlayerMatchStats.findAll({
+    where: { playerId, rating: { [Op.ne]: null } },
+    attributes: ["matchId", "rating"],
+    include: [
+      {
+        model: Match,
+        as: "match",
+        where: matchWhere,
+        attributes: [
+          "matchDate",
+          "homeTeamName",
+          "awayTeamName",
+          "homeScore",
+          "awayScore",
+        ],
+        required: true,
+      },
+    ],
+    order: [[{ model: Match, as: "match" }, "matchDate", "DESC"]],
+    limit,
+  });
+
+  // Oldest → newest so the sparkline reads left-to-right chronologically.
+  return rows
+    .map((row) => {
+      const match = row.get("match") as Match;
+      return {
+        matchId: row.matchId,
+        date: match.matchDate,
+        homeTeamName: match.homeTeamName,
+        awayTeamName: match.awayTeamName,
+        homeScore: match.homeScore,
+        awayScore: match.awayScore,
+        rating: row.rating == null ? null : Number(row.rating),
+      };
+    })
+    .reverse();
 }
 
 export async function getLeaderboard(params: {
