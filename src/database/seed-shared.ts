@@ -1109,6 +1109,19 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("analyst-home", ["Admin", "Manager", "SportingDirector"], {
     canRead: true,
   }),
+
+  // analyst: Analyst reports and insights module
+  ...forRoles("analyst", ["Analyst"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+  }),
+  ...forRoles("analyst", ["Admin", "Manager", "SportingDirector"], {
+    canRead: true,
+    canCreate: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
