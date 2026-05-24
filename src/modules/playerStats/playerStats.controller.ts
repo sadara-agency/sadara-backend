@@ -29,6 +29,7 @@ export async function upsertSeason(req: AuthRequest, res: Response) {
 
 export async function recompute(req: AuthRequest, res: Response) {
   const { playerId, season } = req.params;
-  service.recomputeFromMatches(playerId, season).catch(() => null);
+  const force = req.query.force === "true";
+  service.recomputeFromMatches(playerId, season, force).catch(() => null);
   sendSuccess(res, null, "Recompute triggered");
 }
