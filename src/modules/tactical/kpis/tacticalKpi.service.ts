@@ -1,6 +1,7 @@
 import { sequelize } from "@config/database";
-import { QueryTypes } from "sequelize";
+import { Op, QueryTypes } from "sequelize";
 import { TacticalKpi } from "./tacticalKpi.model";
+import { VideoClip, VideoTag } from "@modules/video/video.model";
 import { Player } from "@modules/players/player.model";
 import { Match } from "@modules/matches/match.model";
 import { User } from "@modules/users/user.model";
@@ -251,6 +252,110 @@ export async function computeTacticalKpis(
     ...kpiData,
   });
   return getTacticalKpiById(record.id);
+}
+
+// ── Video evidence for a KPI record ──
+
+// Maps KPI metric fields → the video tag types that provide evidence for them.
+const KPI_TAG_MAP: Record<string, string[]> = {
+  pressIntensity: ["pressing"],
+  defensiveContributionPct: ["defensive_action"],
+  chancesCreatedPer90: ["assist", "set_piece"],
+  xgContribution: ["goal", "assist"],
+  counterPressSuccess: ["pressing", "defensive_action"],
+  buildUpInvolvement: ["transition"],
+  progressivePassRate: ["transition"],
+  territorialControl: ["pressing", "transition"],
+};
+
+export interface VideoEvidenceItem {
+  clipId: string;
+  clipTitle: string;
+  clipTitleAr: string | null;
+  externalUrl: string | null;
+  tagId: string;
+  tagType: string;
+  timestampSec: number | null;
+  label: string | null;
+  labelAr: string | null;
+}
+
+export interface VideoEvidenceByMetric {
+  metric: string;
+  clips: VideoEvidenceItem[];
+}
+
+export async function getVideoEvidenceForKpi(
+  kpiId: string,
+): Promise<VideoEvidenceByMetric[]> {
+  const kpi = await TacticalKpi.findByPk(kpiId);
+  if (!kpi) throw new AppError("Tactical KPI record not found", 404);
+
+  // Collect all tag types we need to search for
+  const allTagTypes = [...new Set(Object.values(KPI_TAG_MAP).flat())];
+
+  // Base where clause: player must match; tags on the clip OR the tag itself
+  const clipWhere: Record<string, unknown> = {
+    status: "ready",
+    [Op.or as unknown as string]: [
+      { playerId: kpi.playerId },
+      { "$tags.player_id$": kpi.playerId },
+    ],
+  };
+
+  // If the KPI has a matchId, also include clips tagged to that match
+  if (kpi.matchId) {
+    clipWhere[Op.or as unknown as string] = [
+      { playerId: kpi.playerId },
+      { matchId: kpi.matchId },
+      { "$tags.player_id$": kpi.playerId },
+    ];
+  }
+
+  const clips = await VideoClip.findAll({
+    where: clipWhere,
+    include: [
+      {
+        model: VideoTag,
+        as: "tags",
+        where: { tagType: { [Op.in]: allTagTypes } },
+        required: true,
+      },
+    ],
+    subQuery: false,
+  });
+
+  // Group by metric
+  const result: VideoEvidenceByMetric[] = [];
+
+  for (const [metric, tagTypes] of Object.entries(KPI_TAG_MAP)) {
+    const items: VideoEvidenceItem[] = [];
+
+    for (const clip of clips) {
+      const matchingTags = (clip.tags ?? []).filter((t) =>
+        tagTypes.includes(t.tagType),
+      );
+      for (const tag of matchingTags) {
+        items.push({
+          clipId: clip.id,
+          clipTitle: clip.title,
+          clipTitleAr: clip.titleAr,
+          externalUrl: clip.externalUrl,
+          tagId: tag.id,
+          tagType: tag.tagType,
+          timestampSec: tag.timestampSec,
+          label: tag.label,
+          labelAr: tag.labelAr,
+        });
+      }
+    }
+
+    if (items.length > 0) {
+      result.push({ metric, clips: items });
+    }
+  }
+
+  return result;
 }
 
 // ── Player trend (last N matches) ──

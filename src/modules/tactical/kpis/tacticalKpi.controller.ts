@@ -105,3 +105,10 @@ export const playerTrend = asyncHandler(
     sendSuccess(res, trend);
   },
 );
+
+export const videoEvidence = asyncHandler(
+  async (req: AuthRequest, res: Response) => {
+    const evidence = await svc.getVideoEvidenceForKpi(req.params.id);
+    sendSuccess(res, evidence);
+  },
+);
