@@ -26,6 +26,13 @@ router.get(
 // GET /api/v1/tactical/kpis/:id
 router.get("/:id", authorizeModule("tactical", "read"), ctrl.getById);
 
+// GET /api/v1/tactical/kpis/:id/video-evidence
+router.get(
+  "/:id/video-evidence",
+  authorizeModule("tactical", "read"),
+  ctrl.videoEvidence,
+);
+
 // GET /api/v1/tactical/kpis/player/:playerId/match/:matchId
 router.get(
   "/player/:playerId/match/:matchId",
