@@ -102,6 +102,41 @@ router.get(
   dynamicFieldAccess("matches"),
   asyncHandler(ctrl.playerAggregateStats),
 );
+/**
+ * @swagger
+ * /matches/player/{playerId}/ratings:
+ *   get:
+ *     summary: Recent per-match rating history for a player (sparkline)
+ *     tags: [Matches]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: playerId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: competition
+ *         schema: { type: string }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 5, maximum: 20 }
+ *     responses:
+ *       200:
+ *         description: Per-match ratings ordered oldest to newest
+ */
+router.get(
+  "/player/:playerId/ratings",
+  authorizeModule("matches", "read"),
+  dynamicFieldAccess("matches"),
+  asyncHandler(ctrl.playerMatchRatings),
+);
 router.get(
   "/player/:playerId/shotmap",
   authorizeModule("matches", "read"),

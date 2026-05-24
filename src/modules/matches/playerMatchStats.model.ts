@@ -34,6 +34,12 @@ export interface PlayerMatchStatsAttributes {
   rating?: number | null;
   positionInMatch?: string | null;
   keyPasses?: number | null;
+  /** Expected goals for this match (migration 247). */
+  xg?: number | null;
+  /** Expected assists for this match (migration 247). */
+  xa?: number | null;
+  /** Progressive passes for this match (migration 247). */
+  progressivePasses?: number | null;
   saves?: number | null;
   cleanSheet?: boolean | null;
   goalsConceded?: number | null;
@@ -81,6 +87,9 @@ export class PlayerMatchStats
   declare rating: number | null;
   declare positionInMatch: string | null;
   declare keyPasses: number | null;
+  declare xg: number | null;
+  declare xa: number | null;
+  declare progressivePasses: number | null;
   declare saves: number | null;
   declare cleanSheet: boolean | null;
   declare goalsConceded: number | null;
@@ -139,6 +148,12 @@ PlayerMatchStats.init(
     rating: { type: DataTypes.DECIMAL(3, 1) },
     positionInMatch: { type: DataTypes.STRING(50), field: "position_in_match" },
     keyPasses: { type: DataTypes.INTEGER, field: "key_passes" },
+    xg: { type: DataTypes.DECIMAL(5, 2) },
+    xa: { type: DataTypes.DECIMAL(5, 2) },
+    progressivePasses: {
+      type: DataTypes.INTEGER,
+      field: "progressive_passes",
+    },
     saves: { type: DataTypes.INTEGER },
     cleanSheet: { type: DataTypes.BOOLEAN, field: "clean_sheet" },
     goalsConceded: { type: DataTypes.INTEGER, field: "goals_conceded" },
