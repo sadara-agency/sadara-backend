@@ -10,10 +10,10 @@ interface MatchToAnalyze {
   id: string;
   title: string;
   matchDate: string;
-  homeTeamId: string | null;
-  awayTeamId: string | null;
-  scoreHomeTeam: number | null;
-  scoreAwayTeam: number | null;
+  homeClubId: string | null;
+  awayClubId: string | null;
+  homeScore: number | null;
+  awayScore: number | null;
 }
 
 interface PlayerNeedingFollowup {
@@ -58,8 +58,11 @@ export async function getAnalystHome(user: AuthUser) {
       const [matchesToAnalyze, playersNeedingFollowup, countRows] =
         await Promise.all([
           sequelize.query<Record<string, unknown>>(
-            `SELECT m.id, m.title, m.match_date, m.home_team_id, m.away_team_id,
-                    m.score_home_team, m.score_away_team
+            `SELECT m.id,
+                    COALESCE(m.home_team_name, '') || ' vs ' || COALESCE(m.away_team_name, '') AS title,
+                    m.match_date,
+                    m.home_club_id, m.away_club_id,
+                    m.home_score, m.away_score
              FROM matches m
              WHERE m.status = 'completed'
                AND EXISTS (
