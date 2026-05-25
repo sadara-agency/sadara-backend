@@ -5,6 +5,7 @@ import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
 import { MatchAnalysis } from "@modules/matches/matchAnalysis.model";
 import { Club } from "@modules/clubs/club.model";
 import { Squad } from "@modules/squads/squad.model";
+import { findOrCreateSquad } from "@modules/squads/squad.service";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
@@ -242,22 +243,23 @@ export async function createMatch(input: any) {
   await findOrThrow(Club, input.awayClubId, "Away club");
 
   // Auto-resolve squad IDs to senior squad when not explicitly provided.
+  // Use findOrCreateSquad so a club without a senior squad gets one created
+  // rather than leaving the squad id null (which violates the
+  // matches_squad_required_when_club CHECK constraint — see migration 152).
   let { homeSquadId, awaySquadId } = input;
   if (!homeSquadId && input.homeClubId) {
-    const sq = await Squad.findOne({
-      where: { clubId: input.homeClubId, ageCategory: "senior" },
-      attributes: ["id"],
-      order: [["createdAt", "ASC"]],
+    const [sq] = await findOrCreateSquad(input.homeClubId, {
+      ageCategory: "senior",
+      division: "premier",
     });
-    homeSquadId = sq?.id ?? null;
+    homeSquadId = sq.id;
   }
   if (!awaySquadId && input.awayClubId) {
-    const sq = await Squad.findOne({
-      where: { clubId: input.awayClubId, ageCategory: "senior" },
-      attributes: ["id"],
-      order: [["createdAt", "ASC"]],
+    const [sq] = await findOrCreateSquad(input.awayClubId, {
+      ageCategory: "senior",
+      division: "premier",
     });
-    awaySquadId = sq?.id ?? null;
+    awaySquadId = sq.id;
   }
 
   // Enforce minimum 3-day gap between matches for each club
@@ -310,27 +312,27 @@ export async function updateMatch(id: string, input: any) {
 
   if (homeClubId !== undefined && !homeSquadId) {
     if (homeClubId === null) {
+      // Clearing the club must clear its squad to satisfy the CHECK constraint.
       homeSquadId = null;
     } else {
-      const sq = await Squad.findOne({
-        where: { clubId: homeClubId, ageCategory: "senior" },
-        attributes: ["id"],
-        order: [["createdAt", "ASC"]],
+      const [sq] = await findOrCreateSquad(homeClubId, {
+        ageCategory: "senior",
+        division: "premier",
       });
-      homeSquadId = sq?.id ?? null;
+      homeSquadId = sq.id;
     }
   }
 
   if (awayClubId !== undefined && !awaySquadId) {
     if (awayClubId === null) {
+      // Clearing the club must clear its squad to satisfy the CHECK constraint.
       awaySquadId = null;
     } else {
-      const sq = await Squad.findOne({
-        where: { clubId: awayClubId, ageCategory: "senior" },
-        attributes: ["id"],
-        order: [["createdAt", "ASC"]],
+      const [sq] = await findOrCreateSquad(awayClubId, {
+        ageCategory: "senior",
+        division: "premier",
       });
-      awaySquadId = sq?.id ?? null;
+      awaySquadId = sq.id;
     }
   }
 
