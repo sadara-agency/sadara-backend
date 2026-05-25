@@ -64,6 +64,43 @@ export const applyMatchToSeasonSchema = z.object({
   }),
 });
 
+// ── Envelope schema for the redesigned, accountable edit flow ──
+// Body carries only changed fields + mandatory justification + optional match link.
+// Field-level value rules (negative, percent range, lower-than-current) are enforced
+// in the service against the canonical field map, since they need the stored value.
+export const seasonStatsEditSchema = z
+  .object({
+    changes: z.record(z.string(), z.number()),
+    matchId: z.string().uuid().optional(),
+    justification: z.string().trim().min(10),
+    isCorrection: z.boolean().default(false),
+  })
+  .superRefine((val, ctx) => {
+    if (Object.keys(val.changes).length === 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["changes"],
+        message: "At least one field must be changed",
+      });
+    }
+    if (val.isCorrection && val.justification.trim().length < 30) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["justification"],
+        message:
+          "Corrections require a justification of at least 30 characters",
+      });
+    }
+  });
+
+export const editHistoryQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  fieldName: z.string().optional(),
+  matchId: z.string().uuid().optional(),
+  isCorrection: z.coerce.boolean().optional(),
+});
+
 export const seasonParamSchema = z.object({
   playerId: z.string().uuid(),
   season: z.string().min(4).max(10),
@@ -78,3 +115,7 @@ export type UpsertPlayerSeasonStatsDTO = z.infer<
 >;
 
 export type ApplyMatchToSeasonDTO = z.infer<typeof applyMatchToSeasonSchema>;
+
+export type SeasonStatsEditDTO = z.infer<typeof seasonStatsEditSchema>;
+
+export type EditHistoryQueryDTO = z.infer<typeof editHistoryQuerySchema>;
