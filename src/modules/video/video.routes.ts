@@ -11,6 +11,7 @@ import {
   listClipsSchema,
   createTagSchema,
   updateTagSchema,
+  tagSummaryByPlayerSchema,
 } from "./video.validation";
 
 const router = Router();
@@ -83,6 +84,34 @@ router.delete(
   "/clips/:id",
   authorizeModule("video", "delete"),
   videoController.deleteClip,
+);
+
+// ── Tag aggregation (per player) ──
+
+/**
+ * @swagger
+ * /video/tag-summary:
+ *   get:
+ *     summary: Aggregate tag counts across all clips for a player
+ *     tags: [Video]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: playerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Aggregated tag counts { total, byType }
+ */
+router.get(
+  "/tag-summary",
+  authorizeModule("video", "read"),
+  validate(tagSummaryByPlayerSchema, "query"),
+  cacheRoute("video-tags-summary", CacheTTL.SHORT),
+  videoController.getTagSummaryByPlayer,
 );
 
 // ── Tags (nested under clips) ──

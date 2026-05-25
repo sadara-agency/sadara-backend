@@ -1,6 +1,10 @@
 import { Response } from "express";
 import type { AuthRequest } from "@shared/types";
-import { sendSuccess, sendCreated } from "@shared/utils/apiResponse";
+import {
+  sendSuccess,
+  sendCreated,
+  sendPaginated,
+} from "@shared/utils/apiResponse";
 import { invalidateByPrefix, CachePrefix } from "@shared/utils/cache";
 import { buildAuditContext } from "@shared/utils/audit";
 import * as service from "./playerStats.service";
@@ -28,6 +32,29 @@ export async function upsertSeason(req: AuthRequest, res: Response) {
   );
   await invalidateByPrefix(CachePrefix.PLAYER_SEASON_STATS).catch(() => null);
   sendCreated(res, record, "Season stats saved");
+}
+
+export async function editSeason(req: AuthRequest, res: Response) {
+  const { playerId, season } = req.params;
+  const ctx = req.user ? buildAuditContext(req.user, req.ip) : undefined;
+  const record = await service.applySeasonStatsEdit(
+    playerId,
+    season,
+    req.body,
+    ctx,
+  );
+  await invalidateByPrefix(CachePrefix.PLAYER_SEASON_STATS).catch(() => null);
+  sendCreated(res, record, "Season stats saved");
+}
+
+export async function getEditHistory(req: AuthRequest, res: Response) {
+  const { playerId, season } = req.params;
+  const { data, meta } = await service.getStatEditHistory(
+    playerId,
+    season,
+    req.query,
+  );
+  sendPaginated(res, data, meta);
 }
 
 export async function applyMatch(req: AuthRequest, res: Response) {

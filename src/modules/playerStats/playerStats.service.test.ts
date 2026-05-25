@@ -31,6 +31,29 @@ jest.mock("@modules/audit/AuditLog.model", () => ({
   AuditLog: { create: jest.fn() },
 }));
 
+jest.mock("./playerStatEdit.model", () => ({
+  __esModule: true,
+  default: {
+    bulkCreate: jest.fn(),
+    findAndCountAll: jest.fn(),
+  },
+}));
+
+jest.mock("@modules/matches/matchPlayer.model", () => ({
+  __esModule: true,
+  MatchPlayer: { findAll: jest.fn() },
+}));
+
+jest.mock("@modules/matches/match.model", () => ({
+  __esModule: true,
+  Match: { findAll: jest.fn(), findByPk: jest.fn() },
+}));
+
+jest.mock("@modules/users/user.model", () => ({
+  __esModule: true,
+  User: { findByPk: jest.fn() },
+}));
+
 import {
   getPlayerSeasonStats,
   getAllPlayerSeasonStats,

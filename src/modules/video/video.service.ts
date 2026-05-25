@@ -199,3 +199,24 @@ export async function getTagSummaryForClip(clipId: string) {
     tags,
   };
 }
+
+export async function getTagSummaryByPlayer(playerId: string) {
+  const clips = await VideoClip.findAll({
+    where: { playerId },
+    attributes: ["id"],
+  });
+
+  if (clips.length === 0) {
+    return { total: 0, byType: {} as Record<string, number> };
+  }
+
+  const clipIds = clips.map((c) => c.id);
+  const tags = await VideoTag.findAll({ where: { clipId: clipIds } });
+
+  const byType: Record<string, number> = {};
+  for (const tag of tags) {
+    byType[tag.tagType] = (byType[tag.tagType] ?? 0) + 1;
+  }
+
+  return { total: tags.length, byType };
+}

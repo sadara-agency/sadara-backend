@@ -38,6 +38,12 @@ export const listClipsSchema = z.object({
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
 
+export const tagSummaryByPlayerSchema = z.object({
+  playerId: z.string().uuid(),
+});
+
+export type TagSummaryByPlayerQuery = z.infer<typeof tagSummaryByPlayerSchema>;
+
 export const createTagSchema = z.object({
   tagType: z.enum(TAG_TYPES),
   label: z.string().max(100).optional(),
