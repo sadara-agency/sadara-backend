@@ -36,7 +36,7 @@ export async function upsertPlayerSeasonStats(
   });
   const [record] = await PlayerSeasonStats.upsert(
     { playerId, season, ...data, source: "manual" },
-    { returning: true, conflictFields: ["player_id", "season"] },
+    { returning: true },
   );
 
   if (ctx) {
@@ -141,7 +141,7 @@ export async function applyMatchToSeason(
 
   const [record] = await PlayerSeasonStats.upsert(
     { playerId, season, ...next, source: "manual" },
-    { returning: true, conflictFields: ["player_id", "season"] },
+    { returning: true },
   );
 
   if (ctx) {

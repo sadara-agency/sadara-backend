@@ -97,7 +97,7 @@ describe('playerStats.service', () => {
 
       expect(mockUpsert).toHaveBeenCalledWith(
         expect.objectContaining({ playerId: 'p1', season: '2024/25', goals: 5, source: 'manual' }),
-        { returning: true, conflictFields: ['player_id', 'season'] },
+        { returning: true },
       );
       expect(result).toEqual(upserted);
     });
