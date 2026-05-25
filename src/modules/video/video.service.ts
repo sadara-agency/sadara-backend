@@ -4,6 +4,7 @@ import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { uploadFile } from "@shared/utils/storage";
+import { getVideoDurationSec } from "@shared/utils/videoDuration";
 import type {
   CreateClipDTO,
   UpdateClipDTO,
@@ -123,6 +124,10 @@ export async function uploadVideoFile(
   meta: { title: string; playerId?: string; matchId?: string },
   userId: string,
 ) {
+  // Probe duration from the in-memory buffer before it's uploaded (the buffer
+  // is streamed straight to GCS and never hits disk, so do it here).
+  const durationSec = getVideoDurationSec(file.buffer, file.mimetype);
+
   const result = await uploadFile({
     folder: "video-clips",
     originalName: file.originalname,
@@ -140,6 +145,7 @@ export async function uploadVideoFile(
     externalUrl: result.url,
     mimeType: result.mimeType,
     fileSizeMb: parseFloat((file.size / (1024 * 1024)).toFixed(2)),
+    durationSec,
     status: "ready",
     uploadedBy: userId,
   });
