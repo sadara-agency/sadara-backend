@@ -18,6 +18,37 @@ export async function up() {
   );
   if ((rows as unknown[]).length === 0) return;
 
+  // Discover the actual column types for status/priority/referral_type.
+  // On DBs created via SQL migrations these are VARCHAR; on DBs created via
+  // Sequelize model-sync they are native PG ENUMs (e.g. referral_status).
+  // Postgres will NOT implicitly cast text → enum inside INSERT ... SELECT,
+  // so we must cast each expression to the column's real type at runtime.
+  const colTypes = await sequelize.query<{
+    column_name: string;
+    data_type: string;
+    udt_name: string;
+  }>(
+    `SELECT column_name, data_type, udt_name
+       FROM information_schema.columns
+      WHERE table_name = 'referrals'
+        AND column_name IN ('referral_type', 'status', 'priority')`,
+    { type: QueryTypes.SELECT },
+  );
+
+  // For enum columns data_type = 'USER-DEFINED' and udt_name is the enum type.
+  // For varchar/text columns the expression already matches, so cast to text.
+  const castFor = (col: string): string => {
+    const meta = colTypes.find((c) => c.column_name === col);
+    if (meta && meta.data_type === "USER-DEFINED") {
+      return `::text::"${meta.udt_name}"`;
+    }
+    return "::text";
+  };
+
+  const typeCast = castFor("referral_type");
+  const statusCast = castFor("status");
+  const priorityCast = castFor("priority");
+
   // 1. Backfill: create a Medical referral for every injury without one
   await sequelize.query(`
     INSERT INTO referrals (
@@ -27,7 +58,7 @@ export async function up() {
     )
     SELECT
       gen_random_uuid(),
-      'Medical',
+      'Medical'${typeCast},
       i.player_id,
       i.id,
       'Auto-migrated: ' || i.injury_type || ' — ' || i.body_part,
@@ -36,13 +67,13 @@ export async function up() {
         WHEN i.status = 'Recovered' THEN 'Resolved'
         WHEN i.status = 'Chronic'   THEN 'InProgress'
         ELSE 'Open'
-      END),
+      END)${statusCast},
       (CASE
         WHEN i.severity = 'Critical' THEN 'Critical'
         WHEN i.severity = 'Severe'   THEN 'High'
         WHEN i.severity = 'Moderate' THEN 'Medium'
         ELSE 'Low'
-      END),
+      END)${priorityCast},
       i.created_by,
       i.created_at,
       i.updated_at
