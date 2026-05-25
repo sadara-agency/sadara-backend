@@ -150,10 +150,16 @@ export async function applySeasonStatsEdit(
 
   try {
     return await sequelize.transaction(async (t) => {
-      const [record] = await PlayerSeasonStats.upsert(
-        { playerId, season, ...changes, source: "manual" },
-        { returning: true, transaction: t },
-      );
+      // Sequelize upsert uses ON CONFLICT (pk) which breaks on a secondary unique
+      // index. Use findOrCreate + update instead so the (player_id, season) unique
+      // constraint is respected correctly.
+      const [row] = await PlayerSeasonStats.findOrCreate({
+        where: { playerId, season },
+        defaults: { playerId, season, ...changes, source: "manual" },
+        transaction: t,
+      });
+      await row.update({ ...changes, source: "manual" }, { transaction: t });
+      const record = row;
 
       const editRows = Object.entries(changes).map(([field, rawValue]) => {
         const beforeVal =
