@@ -108,9 +108,11 @@ jest.mock('../../../src/modules/matches/matchAutoTasks', () => ({
 }));
 
 const mockSquadFindOne = jest.fn();
+const mockSquadCreate = jest.fn();
 jest.mock('../../../src/modules/squads/squad.model', () => ({
   Squad: {
     findOne: (...a: unknown[]) => mockSquadFindOne(...a),
+    create: (...a: unknown[]) => mockSquadCreate(...a),
     name: 'Squad',
   },
 }));
@@ -216,6 +218,8 @@ describe('Match Service', () => {
   describe('createMatch', () => {
     it('should create match', async () => {
       mockClubFindByPk.mockResolvedValue(mockModelInstance(mockClub()));
+      // findOrCreateSquad calls Squad.findOne first; return a squad so Squad.create is never called.
+      mockSquadFindOne.mockResolvedValue({ id: 'squad-001' });
       mockMatchFindOne.mockResolvedValue(null); // no conflicting match within 3-day window
       const created = mockModelInstance(mockMatch());
       mockMatchCreate.mockResolvedValue(created);
