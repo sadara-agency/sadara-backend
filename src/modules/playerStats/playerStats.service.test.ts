@@ -31,6 +31,14 @@ jest.mock("@modules/audit/AuditLog.model", () => ({
   AuditLog: { create: jest.fn() },
 }));
 
+jest.mock("./playerStatEdit.model", () => ({
+  __esModule: true,
+  default: {
+    bulkCreate: jest.fn(),
+    findAndCountAll: jest.fn(),
+  },
+}));
+
 import {
   getPlayerSeasonStats,
   getAllPlayerSeasonStats,

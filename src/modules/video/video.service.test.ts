@@ -1,5 +1,14 @@
 // ── Model mocks ──
-jest.mock("@modules/video/video.model");
+jest.mock("@modules/video/video.model", () => ({
+  VideoClip: {
+    findAll: jest.fn(),
+    findByPk: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    destroy: jest.fn(),
+  },
+  VideoTag: { findAll: jest.fn(), bulkCreate: jest.fn(), destroy: jest.fn() },
+}));
 jest.mock("@modules/players/player.model");
 jest.mock("@modules/users/user.model");
 jest.mock("@shared/utils/storage");
