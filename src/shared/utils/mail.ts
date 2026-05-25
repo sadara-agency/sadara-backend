@@ -207,7 +207,7 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
  * Encoded as a data URI so it embeds directly in the HTML without an external
  * URL, which is stripped by Gmail/Outlook when images are blocked.
  */
-const SADARA_LOGO_SVG = `data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%233C3CFA'/%3E%3Ctext x='32' y='46' font-family='Arial%2C sans-serif' font-size='38' font-weight='700' fill='white' text-anchor='middle'%3ES%3C/text%3E%3C/svg%3E`;
+const SADARA_LOGO_SVG = `https://sadara-frontend.vercel.app/apple-touch-icon.svg`;
 
 function wrapInTemplate(content: string): string {
   return `
