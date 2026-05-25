@@ -177,3 +177,18 @@ export async function getTagSummary(
     next(err);
   }
 }
+
+export async function getTagSummaryByPlayer(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const data = await videoService.getTagSummaryByPlayer(
+      req.query.playerId as string,
+    );
+    return sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}
