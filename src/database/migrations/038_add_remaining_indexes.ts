@@ -132,27 +132,19 @@ const INDEXES = [
 ];
 
 export async function up() {
-  const t = await sequelize.transaction();
-  try {
-    for (const sql of INDEXES) {
-      const match = sql.match(/ON\s+(\w+)\s/i);
-      const table = match?.[1] ?? "";
+  for (const sql of INDEXES) {
+    const match = sql.match(/ON\s+(\w+)\s/i);
+    const table = match?.[1] ?? "";
 
-      // Guard ALL tables — some may not exist yet (sync-created or not yet migrated)
+    const rows = (
       await sequelize.query(
-        `DO $$ BEGIN
-           IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '${table}') THEN
-             EXECUTE '${sql.replace(/'/g, "''")}';
-           END IF;
-         END $$`,
-        { transaction: t },
-      );
-    }
+        `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${table}'`,
+      )
+    )[0] as unknown[];
 
-    await t.commit();
-  } catch (err) {
-    await t.rollback();
-    throw err;
+    if (rows.length > 0) {
+      await sequelize.query(sql);
+    }
   }
 }
 

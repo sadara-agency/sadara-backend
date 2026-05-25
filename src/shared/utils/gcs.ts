@@ -9,7 +9,13 @@ import { Storage } from "@google-cloud/storage";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
 
-const storage = new Storage();
+const storageOptions = env.gcs.credentialsJson
+  ? {
+      credentials: JSON.parse(env.gcs.credentialsJson),
+      projectId: env.gcs.projectId,
+    }
+  : {};
+const storage = new Storage(storageOptions);
 const BUCKET = env.gcs.trainingBucket;
 
 /**
