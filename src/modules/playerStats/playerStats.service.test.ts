@@ -26,6 +26,11 @@ jest.mock("@modules/matches/playerMatchStats.model", () => ({
   },
 }));
 
+jest.mock("@modules/audit/AuditLog.model", () => ({
+  __esModule: true,
+  AuditLog: { create: jest.fn() },
+}));
+
 import {
   getPlayerSeasonStats,
   getAllPlayerSeasonStats,
