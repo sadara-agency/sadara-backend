@@ -250,7 +250,7 @@ export async function getStatEditHistory(
   );
 
   const data = rows.map((r) => {
-    const j = r.toJSON() as Record<string, unknown>;
+    const j = r.toJSON() as unknown as Record<string, unknown>;
     return {
       ...j,
       beforeValue: j.beforeValue == null ? null : Number(j.beforeValue),
