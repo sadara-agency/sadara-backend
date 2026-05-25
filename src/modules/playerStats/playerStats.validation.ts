@@ -41,6 +41,29 @@ export const upsertPlayerSeasonStatsSchema = z.object({
   boxTouches: nonNegInt,
 });
 
+const rating = z.number().min(0).max(10).optional();
+
+export const applyMatchToSeasonSchema = z.object({
+  matchId: z.string().uuid(),
+  stats: z.object({
+    minutesPlayed: nonNegInt,
+    goals: nonNegInt,
+    assists: nonNegInt,
+    shotsTotal: nonNegInt,
+    shotsOnTarget: nonNegInt,
+    yellowCards: nonNegInt,
+    redCards: nonNegInt,
+    rating,
+    tacklesTotal: nonNegInt,
+    keyPasses: nonNegInt,
+    interceptions: nonNegInt,
+    saves: nonNegInt,
+    cleanSheet: z.boolean().optional(),
+    goalsConceded: nonNegInt,
+    penaltiesSaved: nonNegInt,
+  }),
+});
+
 export const seasonParamSchema = z.object({
   playerId: z.string().uuid(),
   season: z.string().min(4).max(10),
@@ -53,3 +76,5 @@ export const playerIdParamSchema = z.object({
 export type UpsertPlayerSeasonStatsDTO = z.infer<
   typeof upsertPlayerSeasonStatsSchema
 >;
+
+export type ApplyMatchToSeasonDTO = z.infer<typeof applyMatchToSeasonSchema>;
