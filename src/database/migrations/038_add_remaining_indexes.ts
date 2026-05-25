@@ -136,12 +136,13 @@ export async function up() {
     const match = sql.match(/ON\s+(\w+)\s/i);
     const table = match?.[1] ?? "";
 
-    const [rows] = await sequelize.query(
-      `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = :table`,
-      { replacements: { table }, type: "SELECT" as any },
-    );
+    const rows = (
+      await sequelize.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${table}'`,
+      )
+    )[0] as unknown[];
 
-    if ((rows as any[]).length > 0) {
+    if (rows.length > 0) {
       await sequelize.query(sql);
     }
   }
