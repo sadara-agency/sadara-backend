@@ -2,6 +2,7 @@
 // src/shared/utils/supabaseStorage.ts — Supabase Storage client (lazy singleton)
 // ─────────────────────────────────────────────────────────────
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
 import { env } from "@config/env";
 
 /** True when Supabase Storage is configured (otherwise storage.ts uses local disk). */
@@ -19,6 +20,9 @@ export function getSupabase(): SupabaseClient {
   if (!client) {
     client = createClient(env.supabase.url, env.supabase.serviceRoleKey, {
       auth: { persistSession: false, autoRefreshToken: false },
+      realtime: {
+        transport: WebSocket as unknown as typeof globalThis.WebSocket,
+      },
     });
   }
   return client;

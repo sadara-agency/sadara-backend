@@ -71,14 +71,20 @@ export async function upload(req: AuthRequest, res: Response) {
   const file = req.file;
   const body = req.body;
 
-  // Process + upload to GCS (or local fallback)
-  const result = await uploadFile({
-    folder: "documents",
-    originalName: file.originalname,
-    mimeType: file.mimetype,
-    buffer: file.buffer,
-    generateThumbnail: file.mimetype.startsWith("image/"),
-  });
+  // Process + upload to Supabase Storage (or local fallback)
+  let result;
+  try {
+    result = await uploadFile({
+      folder: "documents",
+      originalName: file.originalname,
+      mimeType: file.mimetype,
+      buffer: file.buffer,
+      generateThumbnail: file.mimetype.startsWith("image/"),
+    });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "Unknown storage error";
+    throw new AppError(`Storage upload failed: ${reason}`, 502);
+  }
 
   // Documents are private — result.url is a GCS key (e.g. "documents/uuid.pdf")
   // or a local relative path (e.g. "/uploads/documents/uuid.pdf").
