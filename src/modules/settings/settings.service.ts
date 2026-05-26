@@ -10,6 +10,7 @@ import { Journey } from "@modules/journey/journey.model";
 import { AppError } from "@middleware/errorHandler";
 import { getAppSetting, setAppSetting } from "@shared/utils/appSettings";
 import { resolveSmtpSecurity, resetTransporter } from "@shared/utils/mail";
+import { resolveFileUrl } from "@shared/utils/storage";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { parseCsvBuffer } from "../../database/csv-import/parse-csv";
 import {
@@ -80,8 +81,12 @@ export async function getProfile(userId: string) {
     { bind: [userId], type: QueryTypes.SELECT },
   )) as any[];
 
+  const json = user.toJSON() as Record<string, unknown>;
+  if (json.avatarUrl && typeof json.avatarUrl === "string") {
+    json.avatarUrl = await resolveFileUrl(json.avatarUrl);
+  }
   return {
-    ...user.toJSON(),
+    ...json,
     twoFactorEnabled: tfRow?.two_factor_enabled ?? false,
   };
 }
@@ -90,7 +95,11 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
   const user = await User.findByPk(userId);
   if (!user) throw new AppError("User not found", 404);
   await user.update(data);
-  return user;
+  const json = user.toJSON() as Record<string, unknown>;
+  if (json.avatarUrl && typeof json.avatarUrl === "string") {
+    json.avatarUrl = await resolveFileUrl(json.avatarUrl);
+  }
+  return json;
 }
 
 export async function changePassword(

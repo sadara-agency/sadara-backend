@@ -26,15 +26,16 @@ export async function getProfile(req: AuthRequest, res: Response) {
 }
 
 export async function updateProfile(req: AuthRequest, res: Response) {
-  const user = await settingsService.updateProfile(req.user!.id, req.body);
+  const userId = req.user!.id;
+  const updated = await settingsService.updateProfile(userId, req.body);
   await logAudit(
     "UPDATE",
     "users",
-    user.id,
+    userId,
     buildAuditContext(req.user!, req.ip),
     "Profile updated",
   );
-  sendSuccess(res, user, "Profile updated");
+  sendSuccess(res, updated, "Profile updated");
 }
 
 export async function changePassword(req: AuthRequest, res: Response) {

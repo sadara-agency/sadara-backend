@@ -27,11 +27,21 @@ import {
 import { cacheDel } from "@shared/utils/cache";
 import { USER_ACTIVE_CACHE_KEY } from "@middleware/auth";
 import { generateDisplayId } from "@shared/utils/displayId";
+import { resolveFileUrl } from "@shared/utils/storage";
 
 // ── Attributes to exclude from every response ──
 const SAFE_ATTRIBUTES = {
   exclude: ["passwordHash"],
 };
+
+async function resolveAvatar<T extends { avatarUrl?: string | null }>(
+  row: T,
+): Promise<T> {
+  if (row && row.avatarUrl) {
+    row.avatarUrl = (await resolveFileUrl(row.avatarUrl)) as T["avatarUrl"];
+  }
+  return row;
+}
 
 // ────────────────────────────────────────────────────────────
 // List Users
@@ -64,7 +74,19 @@ export async function listUsers(queryParams: any) {
     order: [[sort, order]],
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  const data = await Promise.all(
+    rows.map(async (r) => {
+      const plain = r.get({ plain: true }) as unknown as Record<
+        string,
+        unknown
+      > & {
+        avatarUrl?: string | null;
+      };
+      return resolveAvatar(plain);
+    }),
+  );
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -101,7 +123,13 @@ export async function getUserById(id: string) {
   });
 
   if (!user) throw new AppError("User not found", 404);
-  return user;
+  const plain = user.get({ plain: true }) as unknown as Record<
+    string,
+    unknown
+  > & {
+    avatarUrl?: string | null;
+  };
+  return resolveAvatar(plain);
 }
 
 // ────────────────────────────────────────────────────────────
@@ -282,15 +310,18 @@ export async function getActiveSessions() {
 
   const TEN_MIN = 10 * 60 * 1000;
 
-  return rows.map((r) => {
-    const lastActivityMs = new Date(r.lastActivity).getTime();
-    const ago = Date.now() - lastActivityMs;
-    return {
-      ...r,
-      sessionCount: Number(r.sessionCount),
-      status: ago <= TEN_MIN ? ("online" as const) : ("idle" as const),
-    };
-  });
+  return Promise.all(
+    rows.map(async (r) => {
+      const lastActivityMs = new Date(r.lastActivity).getTime();
+      const ago = Date.now() - lastActivityMs;
+      return {
+        ...r,
+        avatarUrl: r.avatarUrl ? await resolveFileUrl(r.avatarUrl) : null,
+        sessionCount: Number(r.sessionCount),
+        status: ago <= TEN_MIN ? ("online" as const) : ("idle" as const),
+      };
+    }),
+  );
 }
 
 // ────────────────────────────────────────────────────────────
