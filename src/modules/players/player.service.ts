@@ -16,6 +16,7 @@ import {
   createEmptyTechnicalAttributes,
 } from "@modules/players/utils/attributeConfig";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
+import { resolveFileUrl } from "@shared/utils/storage";
 import {
   cacheOrFetch,
   buildCacheKey,
@@ -306,7 +307,15 @@ export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
         };
       });
 
-      return { data, meta: buildMeta(count, page, limit) };
+      // Resolve photoUrl bare keys to public URLs
+      const resolvedData = await Promise.all(
+        data.map(async (item) => {
+          if (!item.photoUrl) return item;
+          return { ...item, photoUrl: await resolveFileUrl(item.photoUrl) };
+        }),
+      );
+
+      return { data: resolvedData, meta: buildMeta(count, page, limit) };
     },
     CacheTTL.MEDIUM,
   );
@@ -368,6 +377,9 @@ export async function getPlayerById(id: string, user?: AuthUser) {
 
   return {
     ...plain,
+    photoUrl: plain.photoUrl
+      ? await resolveFileUrl(plain.photoUrl)
+      : plain.photoUrl,
     portalStatus,
     contractStatus: stats.contractStatus ?? null,
     contractEnd: stats.contractEnd ?? null,

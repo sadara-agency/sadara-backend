@@ -3,7 +3,7 @@ import { AuthRequest } from "@shared/types";
 import {
   resolveFileUrl,
   streamFileBuffer,
-  isPrivateKey,
+  isStorageKey,
 } from "@shared/utils/storage";
 import { AppError } from "@middleware/errorHandler";
 import {
@@ -85,7 +85,7 @@ export async function download(req: AuthRequest, res: Response): Promise<void> {
   // Private GCS key — stream directly with service-account credentials.
   // Avoids signed-URL generation, which requires iam.serviceAccounts.signBlob
   // (missing on the Cloud Run runtime SA → previously caused a 500).
-  if (isPrivateKey(filePath)) {
+  if (isStorageKey(filePath)) {
     const buffer = await streamFileBuffer(filePath);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", disposition);

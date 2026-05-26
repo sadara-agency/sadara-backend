@@ -401,6 +401,10 @@ export function authHeader(role: string = 'Admin') {
 export function mockModelInstance(data: Record<string, any>) {
   return {
     ...data,
+    // Mirror a real Sequelize instance: attributes live under `dataValues`,
+    // referencing the same object the other helpers read from so mutations
+    // (e.g. service code rewriting dataValues.assetUrl) stay consistent.
+    dataValues: data,
     get: jest.fn((_opts?: { plain?: boolean }) => ({ ...data })),
     getDataValue: jest.fn((key: string) => data[key]),
     update: jest.fn(async (updates: Record<string, any>) => {

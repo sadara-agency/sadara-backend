@@ -22,6 +22,7 @@ import {
   checkRowAccess,
 } from "@shared/utils/rowScope";
 import { DocumentQuery } from "@modules/documents/document.validation";
+import { resolveFileUrl } from "@shared/utils/storage";
 
 const USER_ATTRS = ["id", "fullName"] as const;
 
@@ -231,7 +232,15 @@ export async function listDocuments(
     subQuery: false,
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  const data = await Promise.all(
+    rows.map(async (doc) => {
+      const plain = doc.get({ plain: true }) as any;
+      if (plain.fileUrl) plain.fileUrl = await resolveFileUrl(plain.fileUrl);
+      return plain;
+    }),
+  );
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 // ── Get by ID ──
@@ -269,7 +278,9 @@ export async function getDocumentById(id: string, user?: AuthUser) {
     }
   }
 
-  return doc;
+  const plain = doc.get({ plain: true }) as any;
+  if (plain.fileUrl) plain.fileUrl = await resolveFileUrl(plain.fileUrl);
+  return plain;
 }
 
 // ── Create (with real file data) ──

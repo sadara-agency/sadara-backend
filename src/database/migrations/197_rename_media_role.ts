@@ -39,28 +39,54 @@ async function enumValueExists(
   return row?.exists === true;
 }
 
+// Returns the native ENUM type backing a column, or null if the column is
+// VARCHAR/text (or the table/column doesn't exist). On model-sync DBs the
+// role columns are native PG enums; on SQL-migration DBs they are VARCHAR.
+async function columnEnumType(
+  qi: QueryInterface,
+  table: string,
+  column: string,
+): Promise<string | null> {
+  const [row] = await qi.sequelize.query<{
+    data_type: string;
+    udt_name: string;
+  }>(
+    `SELECT data_type, udt_name FROM information_schema.columns
+      WHERE table_schema = 'public' AND table_name = $1 AND column_name = $2`,
+    { type: QueryTypes.SELECT, bind: [table, column] },
+  );
+  if (row && row.data_type === "USER-DEFINED") return row.udt_name;
+  return null;
+}
+
 async function renameRole(
   qi: QueryInterface,
   fromValue: string,
   toValue: string,
 ): Promise<void> {
-  for (const { table, column } of VARCHAR_TABLES) {
-    if (await tableExists(qi, table)) {
-      await qi.sequelize.query(
-        `UPDATE ${table} SET ${column} = $1 WHERE ${column} = $2`,
-        { type: QueryTypes.UPDATE, bind: [toValue, fromValue] },
-      );
-    }
-  }
-
-  // Best-effort: rename legacy PG ENUM labels if those enum types still exist.
-  // PG 10+ supports ALTER TYPE ... RENAME VALUE.
+  // 1. Rename the PG ENUM label FIRST. ALTER TYPE ... RENAME VALUE updates
+  //    every row using that value in place — and it must run before any
+  //    UPDATE that references `toValue` as a literal, otherwise Postgres
+  //    rejects the literal with "invalid input value for enum" (it validates
+  //    the literal even when zero rows match).
   for (const enumName of ["user_role", "enum_users_role"]) {
     if (await enumValueExists(qi, enumName, fromValue)) {
       await qi.sequelize.query(
         `ALTER TYPE "${enumName}" RENAME VALUE '${fromValue}' TO '${toValue}'`,
       );
     }
+  }
+
+  // 2. For columns NOT backed by a native enum (i.e. VARCHAR/text), the rename
+  //    above did nothing, so migrate the data with a plain UPDATE. Enum-backed
+  //    columns are already handled by step 1 and must be skipped here.
+  for (const { table, column } of VARCHAR_TABLES) {
+    if (!(await tableExists(qi, table))) continue;
+    if (await columnEnumType(qi, table, column)) continue; // enum: already renamed
+    await qi.sequelize.query(
+      `UPDATE ${table} SET ${column} = $1 WHERE ${column} = $2`,
+      { type: QueryTypes.UPDATE, bind: [toValue, fromValue] },
+    );
   }
 }
 

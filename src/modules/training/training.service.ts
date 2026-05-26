@@ -975,31 +975,34 @@ export async function getLeaderboard(limit = 5) {
     { replacements: { limit }, type: "SELECT" as any },
   );
 
-  return (rows as any[]).map((r, i) => {
-    const completedCount = parseInt(r.completed_count, 10);
-    const totalEnrollments = parseInt(r.total_enrollments, 10);
-    const inProgressCount = parseInt(r.in_progress_count, 10);
+  return Promise.all(
+    (rows as any[]).map(async (r, i) => {
+      const completedCount = parseInt(r.completed_count, 10);
+      const totalEnrollments = parseInt(r.total_enrollments, 10);
+      const inProgressCount = parseInt(r.in_progress_count, 10);
 
-    const points =
-      completedCount * 500 + inProgressCount * (inProgressCount > 0 ? 100 : 0);
+      const points =
+        completedCount * 500 +
+        inProgressCount * (inProgressCount > 0 ? 100 : 0);
 
-    const badges: string[] = [];
-    if (parseInt(r.has_expert, 10)) badges.push("expert");
-    if (parseInt(r.has_fast, 10)) badges.push("fast_learner");
-    if (parseInt(r.has_on_fire, 10)) badges.push("on_fire");
+      const badges: string[] = [];
+      if (parseInt(r.has_expert, 10)) badges.push("expert");
+      if (parseInt(r.has_fast, 10)) badges.push("fast_learner");
+      if (parseInt(r.has_on_fire, 10)) badges.push("on_fire");
 
-    return {
-      rank: i + 1,
-      playerId: r.player_id,
-      name: `${r.first_name} ${r.last_name}`.trim(),
-      nameAr: r.first_name_ar
-        ? `${r.first_name_ar} ${r.last_name_ar || ""}`.trim()
-        : null,
-      photoUrl: r.photo_url,
-      points,
-      completedCount,
-      totalEnrollments,
-      badges,
-    };
-  });
+      return {
+        rank: i + 1,
+        playerId: r.player_id,
+        name: `${r.first_name} ${r.last_name}`.trim(),
+        nameAr: r.first_name_ar
+          ? `${r.first_name_ar} ${r.last_name_ar || ""}`.trim()
+          : null,
+        photoUrl: r.photo_url ? await resolveFileUrl(r.photo_url) : r.photo_url,
+        points,
+        completedCount,
+        totalEnrollments,
+        badges,
+      };
+    }),
+  );
 }

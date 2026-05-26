@@ -76,14 +76,6 @@ export {
   decryptFields,
 } from "./encryption";
 
-// GCS (Google Cloud Storage)
-export {
-  generateResumableUploadUrl,
-  generateSignedReadUrl,
-  deleteObject,
-  objectExists,
-} from "./gcs";
-
 // Mail
 export {
   sendMail,
@@ -141,7 +133,7 @@ export {
   uploadFile,
   deleteFile,
   getSignedUrl,
-  isPrivateKey,
+  isStorageKey,
   resolveFileUrl,
 } from "./storage";
 export type { UploadResult, UploadFolder, UploadOptions } from "./storage";

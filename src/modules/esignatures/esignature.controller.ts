@@ -34,6 +34,7 @@ export async function list(req: AuthRequest, res: Response) {
     req.user!.id,
     req.user!.role,
   );
+  await Promise.all(r.data.map(resolveDocUrl));
   sendPaginated(res, r.data, r.meta);
 }
 

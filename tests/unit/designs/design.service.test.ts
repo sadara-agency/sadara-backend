@@ -80,6 +80,7 @@ jest.mock("../../../src/config/logger", () => ({
 const mockUploadFile = jest.fn();
 jest.mock("../../../src/shared/utils/storage", () => ({
   uploadFile: (...a: unknown[]) => mockUploadFile(...a),
+  resolveFileUrl: (url: string) => Promise.resolve(url),
 }));
 
 // sharp — dynamically imported by uploadDesignAsset for dimensions
@@ -384,23 +385,19 @@ describe("Design Service", () => {
       mimetype: "image/png",
     };
 
-    it("uploads the asset and updates assetUrl + dimensions for an image", async () => {
+    it("uploads the asset and stores the bare key + dimensions for an image", async () => {
       const inst = mockModelInstance(designRow());
       mockDesignFindByPk.mockResolvedValue(inst);
       mockSharpMetadata.mockResolvedValue({ width: 1080, height: 1080 });
       mockUploadFile.mockResolvedValue({
-        url: "https://storage.googleapis.com/bucket/designs/abc.webp",
-        thumbnailUrl: "https://storage.googleapis.com/bucket/designs/thumb_abc.webp",
+        url: "designs/abc.webp",
+        thumbnailUrl: "designs/thumb_abc.webp",
         key: "designs/abc.webp",
         size: 12345,
         mimeType: "image/webp",
       });
 
-      await designService.uploadDesignAsset(
-        "design-001",
-        file,
-        "https://api.sadara.local",
-      );
+      await designService.uploadDesignAsset("design-001", file);
 
       expect(mockUploadFile).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -409,35 +406,11 @@ describe("Design Service", () => {
           mimeType: "image/png",
         }),
       );
+      // Stores the bare storage key; resolveFileUrl builds the public URL at read time.
       expect(inst.update).toHaveBeenCalledWith({
-        assetUrl: "https://storage.googleapis.com/bucket/designs/abc.webp",
+        assetUrl: "designs/abc.webp",
         assetWidth: 1080,
         assetHeight: 1080,
-      });
-    });
-
-    it("prefixes the request base URL when storage returns a relative path (local mode)", async () => {
-      const inst = mockModelInstance(designRow());
-      mockDesignFindByPk.mockResolvedValue(inst);
-      mockSharpMetadata.mockResolvedValue({ width: 800, height: 600 });
-      mockUploadFile.mockResolvedValue({
-        url: "/uploads/designs/local.webp",
-        thumbnailUrl: null,
-        key: "designs/local.webp",
-        size: 100,
-        mimeType: "image/webp",
-      });
-
-      await designService.uploadDesignAsset(
-        "design-001",
-        file,
-        "https://api.sadara.local",
-      );
-
-      expect(inst.update).toHaveBeenCalledWith({
-        assetUrl: "https://api.sadara.local/uploads/designs/local.webp",
-        assetWidth: 800,
-        assetHeight: 600,
       });
     });
 
@@ -445,26 +418,22 @@ describe("Design Service", () => {
       const inst = mockModelInstance(designRow());
       mockDesignFindByPk.mockResolvedValue(inst);
       mockUploadFile.mockResolvedValue({
-        url: "https://cdn/designs/x.pdf",
+        url: "designs/x.pdf",
         thumbnailUrl: null,
         key: "designs/x.pdf",
         size: 200,
         mimeType: "application/pdf",
       });
 
-      await designService.uploadDesignAsset(
-        "design-001",
-        {
-          buffer: Buffer.from("pdf"),
-          originalname: "kit.pdf",
-          mimetype: "application/pdf",
-        },
-        "https://api",
-      );
+      await designService.uploadDesignAsset("design-001", {
+        buffer: Buffer.from("pdf"),
+        originalname: "kit.pdf",
+        mimetype: "application/pdf",
+      });
 
       expect(mockSharpMetadata).not.toHaveBeenCalled();
       expect(inst.update).toHaveBeenCalledWith({
-        assetUrl: "https://cdn/designs/x.pdf",
+        assetUrl: "designs/x.pdf",
         assetWidth: null,
         assetHeight: null,
       });
@@ -474,7 +443,7 @@ describe("Design Service", () => {
       mockDesignFindByPk.mockResolvedValue(null);
 
       await expect(
-        designService.uploadDesignAsset("missing", file, "https://api"),
+        designService.uploadDesignAsset("missing", file),
       ).rejects.toThrow("Design not found");
       expect(mockUploadFile).not.toHaveBeenCalled();
     });

@@ -1,47 +1,25 @@
 // ─────────────────────────────────────────────────────────────
-// src/shared/utils/storage.ts — Cloud Storage abstraction (GCS + local fallback)
+// src/shared/utils/storage.ts — Cloud Storage abstraction (Supabase + local fallback)
 // ─────────────────────────────────────────────────────────────
-import { Storage as GCSStorage } from "@google-cloud/storage";
 import sharp from "sharp";
 import crypto from "crypto";
 import path from "path";
 import fs from "fs";
 import { env } from "@config/env";
 import { logger } from "@config/logger";
+import { USE_SUPABASE, getSupabase, publicUrlForKey } from "./supabaseStorage";
 
 // ── Config ──
 
-const USE_GCS = !!(env.gcs.bucket && env.gcs.projectId);
 const LOCAL_UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
-
-// Lazy-init GCS client (only when credentials are set)
-let gcsClient: GCSStorage | null = null;
-function getGCS(): GCSStorage {
-  if (!gcsClient) {
-    const opts: ConstructorParameters<typeof GCSStorage>[0] = {
-      projectId: env.gcs.projectId,
-    };
-
-    if (env.gcs.credentialsJson) {
-      // PaaS (Railway/Render): credentials passed as JSON string via env var
-      opts.credentials = JSON.parse(env.gcs.credentialsJson);
-    } else if (env.gcs.credentials) {
-      // Local dev: path to service account key file
-      opts.keyFilename = env.gcs.credentials;
-    }
-    // If neither set, uses Application Default Credentials (ADC)
-
-    gcsClient = new GCSStorage(opts);
-  }
-  return gcsClient;
-}
+const BUCKET = env.supabase.bucket;
 
 // ── Types ──
 
 export interface UploadResult {
   url: string;
   thumbnailUrl: string | null;
-  key: string; // GCS object key or local filename
+  key: string; // Supabase object key or local filename
   size: number;
   mimeType: string;
 }
@@ -57,24 +35,6 @@ export type UploadFolder =
   | "video-clips"
   | "designs"
   | "reports";
-
-/** Folders whose objects are made publicly readable on upload */
-const PUBLIC_FOLDERS: ReadonlySet<UploadFolder> = new Set([
-  "photos",
-  "avatars",
-  "training-media",
-  "video-clips",
-  "designs",
-]);
-
-/** Folders whose objects stay private — access via signed URLs only */
-const PRIVATE_FOLDERS: ReadonlySet<UploadFolder> = new Set([
-  "documents",
-  "signed-contracts",
-  "signed-documents",
-  "voice-memos",
-  "reports",
-]);
 
 export interface UploadOptions {
   folder: UploadFolder;
@@ -143,9 +103,8 @@ export async function uploadFile(opts: UploadOptions): Promise<UploadResult> {
     finalExt = ext || ".bin";
   }
 
-  const isPublic = PUBLIC_FOLDERS.has(folder);
   const key = `${folder}/${baseName}${finalExt}`;
-  const url = await writeToStorage(key, processedBuffer, finalMime, isPublic);
+  await writeToStorage(key, processedBuffer, finalMime);
 
   // Thumbnail (images only)
   let thumbnailUrl: string | null = null;
@@ -157,16 +116,12 @@ export async function uploadFile(opts: UploadOptions): Promise<UploadResult> {
       .toBuffer();
 
     const thumbKey = `${folder}/thumb_${baseName}.webp`;
-    thumbnailUrl = await writeToStorage(
-      thumbKey,
-      thumbBuffer,
-      "image/webp",
-      isPublic,
-    );
+    await writeToStorage(thumbKey, thumbBuffer, "image/webp");
+    thumbnailUrl = thumbKey;
   }
 
   return {
-    url,
+    url: key,
     thumbnailUrl,
     key,
     size: processedBuffer.length,
@@ -177,14 +132,10 @@ export async function uploadFile(opts: UploadOptions): Promise<UploadResult> {
 // ── Delete file ──
 
 export async function deleteFile(key: string): Promise<void> {
-  if (USE_GCS) {
-    try {
-      await getGCS()
-        .bucket(env.gcs.bucket)
-        .file(key)
-        .delete({ ignoreNotFound: true });
-    } catch (err) {
-      logger.warn(`[storage] Failed to delete GCS object: ${key}`, err);
+  if (USE_SUPABASE) {
+    const { error } = await getSupabase().storage.from(BUCKET).remove([key]);
+    if (error) {
+      logger.warn(`[storage] Failed to delete Supabase object: ${key}`, error);
     }
   } else {
     const filePath = path.join(LOCAL_UPLOAD_DIR, key);
@@ -196,68 +147,33 @@ export async function deleteFile(key: string): Promise<void> {
   }
 }
 
-// ── Generate signed URL (for private documents) ──
-
+// Public bucket: every object is reachable at a stable public URL.
+// Kept for API compatibility with callers that imported getSignedUrl.
 export async function getSignedUrl(
   key: string,
-  expiresInMinutes = 60,
+  _expiresInMinutes = 60,
 ): Promise<string> {
-  if (!USE_GCS) {
-    // Local: just return the relative path (caller must build full URL)
-    return `/uploads/${key}`;
-  }
-
-  const [url] = await getGCS()
-    .bucket(env.gcs.bucket)
-    .file(key)
-    .getSignedUrl({
-      version: "v4",
-      action: "read",
-      expires: Date.now() + expiresInMinutes * 60 * 1000,
-    });
-
-  return url;
+  if (!USE_SUPABASE) return `/uploads/${key}`;
+  return publicUrlForKey(key);
 }
 
-// ── Internal: write to GCS or local disk ──
+// ── Internal: write to Supabase or local disk ──
 
 async function writeToStorage(
   key: string,
   buffer: Buffer,
   contentType: string,
-  isPublic: boolean,
-): Promise<string> {
-  if (USE_GCS) {
-    const bucket = getGCS().bucket(env.gcs.bucket);
-    const file = bucket.file(key);
-
-    await file.save(buffer, {
-      contentType,
-      resumable: false, // Small files — no need for resumable
-      metadata: {
-        cacheControl: isPublic
-          ? "public, max-age=31536000, immutable" // CDN cache 1 year
-          : "private, no-store",
-      },
-    });
-
-    if (isPublic) {
-      // Make object publicly readable (fine-grained ACL buckets).
-      // Fails silently on uniform bucket-level access buckets — those
-      // rely on bucket IAM (allUsers → Storage Object Viewer) instead.
-      try {
-        await file.makePublic();
-      } catch {
-        logger.debug(
-          `[storage] makePublic() skipped for ${key} (uniform bucket-level access)`,
-        );
-      }
-      return `https://storage.googleapis.com/${env.gcs.bucket}/${key}`;
-    }
-
-    // Private files — return the GCS key, NOT a URL.
-    // Callers must use getSignedUrl(key) to generate time-limited access.
-    return key;
+): Promise<void> {
+  if (USE_SUPABASE) {
+    const { error } = await getSupabase()
+      .storage.from(BUCKET)
+      .upload(key, buffer, {
+        contentType,
+        upsert: true,
+        cacheControl: "31536000",
+      });
+    if (error) throw error;
+    return;
   }
 
   // Local fallback
@@ -265,70 +181,72 @@ async function writeToStorage(
   const dir = path.dirname(filePath);
   await fs.promises.mkdir(dir, { recursive: true });
   await fs.promises.writeFile(filePath, buffer);
+}
 
-  // Return relative path — caller builds full URL with req.protocol + host
-  return `/uploads/${key}`;
+/**
+ * Write a raw buffer to storage at an exact key (no image processing).
+ * Use for server-generated artifacts like PDFs. Returns the bare key.
+ */
+export async function writeBuffer(
+  key: string,
+  buffer: Buffer,
+  contentType: string,
+): Promise<string> {
+  await writeToStorage(key, buffer, contentType);
+  return key;
 }
 
 // ── Helpers ──
 
-/** Check if a stored URL/key is a private GCS key (needs signed URL) */
-export function isPrivateKey(urlOrKey: string): boolean {
-  return PRIVATE_FOLDERS.has(urlOrKey.split("/")[0] as UploadFolder);
+/**
+ * True when the reference is a bare storage key (e.g. "documents/abc.pdf"),
+ * as opposed to a full http(s) URL or a local /uploads/ path. Bare keys are
+ * streamed through the backend by some controllers.
+ */
+export function isStorageKey(urlOrKey: string): boolean {
+  if (!urlOrKey) return false;
+  if (urlOrKey.startsWith("http")) return false;
+  if (urlOrKey.startsWith("/uploads/")) return false;
+  return true;
 }
 
 /**
  * Resolve a stored file reference to an accessible URL.
- * - Public files: already a full URL, returned as-is.
- * - Private GCS keys: generates a signed URL (default 60 min).
- * - Local paths: returned as-is (served by Express static).
+ * - Empty: returned as-is.
+ * - Full http(s) URL (legacy GCS, external, or already-public): pass through.
+ * - Local /uploads/ path: pass through (dev static serving).
+ * - Bare key (e.g. "photos/abc.webp"): build the Supabase public URL.
  */
 export async function resolveFileUrl(
   urlOrKey: string,
-  expiresInMinutes = 60,
+  _expiresInMinutes = 60,
 ): Promise<string> {
   if (!urlOrKey) return urlOrKey;
-
-  // Already a full URL (public GCS or external URL) — pass through
   if (urlOrKey.startsWith("http")) return urlOrKey;
-
-  // Local path — pass through
   if (urlOrKey.startsWith("/uploads/")) return urlOrKey;
-
-  // Private GCS key — generate signed URL
-  if (USE_GCS && isPrivateKey(urlOrKey)) {
-    return getSignedUrl(urlOrKey, expiresInMinutes);
-  }
-
-  // Public GCS key — return direct public URL
-  if (USE_GCS && env.gcs.bucket) {
-    return `https://storage.googleapis.com/${env.gcs.bucket}/${urlOrKey}`;
-  }
-
+  if (USE_SUPABASE) return publicUrlForKey(urlOrKey);
   return urlOrKey;
 }
 
-/**
- * Download a private file as a Buffer.
- * Uses the service account's read access — no URL signing required.
- * Works in both GCS (Cloud Run) and local-disk mode.
- */
 export async function streamFileBuffer(key: string): Promise<Buffer> {
-  if (!USE_GCS) {
+  if (!USE_SUPABASE) {
     const { readFile } = await import("fs/promises");
     const { join } = await import("path");
     return readFile(join(process.cwd(), "uploads", key));
   }
-  const [buffer] = await getGCS().bucket(env.gcs.bucket).file(key).download();
-  return buffer as Buffer;
+  const { data, error } = await getSupabase()
+    .storage.from(BUCKET)
+    .download(key);
+  if (error || !data) throw error ?? new Error(`Download failed: ${key}`);
+  return Buffer.from(await data.arrayBuffer());
 }
 
 // ── Startup log ──
 
-if (USE_GCS) {
-  logger.info(`[storage] Using Google Cloud Storage bucket: ${env.gcs.bucket}`);
+if (USE_SUPABASE) {
+  logger.info(`[storage] Using Supabase Storage bucket: ${BUCKET}`);
 } else {
   logger.info(
-    "[storage] GCS not configured — using local disk storage (uploads/)",
+    "[storage] Supabase not configured — using local disk storage (uploads/)",
   );
 }

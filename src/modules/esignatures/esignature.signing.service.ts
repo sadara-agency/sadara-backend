@@ -17,7 +17,10 @@ import { assertSafeOutboundUrl } from "@shared/utils/safeOutboundUrl";
 // Hosts allowed for the legacy `fileUrl.startsWith("http")` branch — only
 // fully-qualified GCS URLs that pre-date the GCS-key migration. New uploads
 // write a relative key and go through the resolveFileUrl signed-URL path.
-const DOC_FETCH_ALLOWED_HOSTS = ["storage.googleapis.com"] as const;
+const DOC_FETCH_ALLOWED_HOSTS = [
+  "storage.googleapis.com",
+  "waebmzpnyeqbpkazqopq.supabase.co",
+] as const;
 
 const SIGNED_DIR = path.resolve(UPLOAD_DIR_PATH, "..", "signed-documents");
 if (!fs.existsSync(SIGNED_DIR)) {

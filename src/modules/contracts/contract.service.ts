@@ -31,6 +31,7 @@ import {
   checkRowAccess,
 } from "@shared/utils/rowScope";
 import { generateDisplayId } from "@shared/utils/displayId";
+import { resolveFileUrl } from "@shared/utils/storage";
 
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
@@ -123,7 +124,14 @@ export async function listContracts(
     subQuery: false,
   });
 
-  const data = rows.map(enrichContract);
+  const data = await Promise.all(
+    rows.map(async (row) => {
+      const plain = enrichContract(row);
+      if (plain.signedDocumentUrl)
+        plain.signedDocumentUrl = await resolveFileUrl(plain.signedDocumentUrl);
+      return plain;
+    }),
+  );
   return { data, meta: buildMeta(count, page, limit) };
 }
 
@@ -159,6 +167,11 @@ export async function getContractById(id: string, user?: AuthUser) {
 
   // Include approval chain status for UI visibility decisions
   const approvalChain = await isApprovalChainResolved("contract", id);
+
+  if (enriched.signedDocumentUrl)
+    enriched.signedDocumentUrl = await resolveFileUrl(
+      enriched.signedDocumentUrl,
+    );
 
   return { ...enriched, milestones, approvalStatus: approvalChain.status };
 }

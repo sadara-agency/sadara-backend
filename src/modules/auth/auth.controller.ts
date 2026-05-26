@@ -130,9 +130,8 @@ export async function uploadAvatar(req: AuthRequest, res: Response) {
     generateThumbnail: true,
   });
 
-  const avatarUrl = result.url.startsWith("http")
-    ? result.url
-    : `${req.protocol}://${req.get("host")}${result.url}`;
+  // Store the bare storage key; resolveFileUrl() builds the public URL at read time.
+  const avatarUrl = result.url;
 
   await authService.updateProfile(req.user!.id, { avatarUrl });
   await logAudit(

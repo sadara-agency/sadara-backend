@@ -133,18 +133,31 @@ const INDEXES = [
 
 export async function up() {
   for (const sql of INDEXES) {
-    const match = sql.match(/ON\s+(\w+)\s/i);
-    const table = match?.[1] ?? "";
+    const tableMatch = sql.match(/ON\s+(\w+)\s*\(([^)]+)\)/i);
+    const table = tableMatch?.[1] ?? "";
+    const columnsPart = tableMatch?.[2] ?? "";
+    const columns = columnsPart.split(",").map((c) => c.trim().split(/\s/)[0]);
 
-    const rows = (
+    if (!table) continue;
+
+    const tableRows = (
       await sequelize.query(
         `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = '${table}'`,
       )
     )[0] as unknown[];
 
-    if (rows.length > 0) {
-      await sequelize.query(sql);
-    }
+    if (tableRows.length === 0) continue;
+
+    // Check all referenced columns exist
+    const colRows = (
+      await sequelize.query(
+        `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = '${table}' AND column_name IN (${columns.map((c) => `'${c}'`).join(",")})`,
+      )
+    )[0] as unknown[];
+
+    if (colRows.length < columns.length) continue;
+
+    await sequelize.query(sql);
   }
 }
 

@@ -43,10 +43,8 @@ export async function uploadPhoto(req: AuthRequest, res: Response) {
     generateThumbnail: true,
   });
 
-  // For GCS: url is the full public URL; for local: prefix with server origin
-  const photoUrl = result.url.startsWith("http")
-    ? result.url
-    : `${req.protocol}://${req.get("host")}${result.url}`;
+  // Store the bare storage key; resolveFileUrl() builds the public URL at read time.
+  const photoUrl = result.url;
 
   const player = await playerService.updatePlayer(req.params.id, { photoUrl });
   await logAudit(

@@ -20,6 +20,7 @@ import {
   sendInviteEmail,
   sendEmailVerificationEmail,
 } from "@shared/utils/mail";
+import { resolveFileUrl } from "@shared/utils/storage";
 
 // ── Password hashing — argon2id (new) with bcrypt fallback (legacy) ──
 
@@ -431,13 +432,14 @@ export async function login(input: LoginInput) {
   });
 
   // Build a user-like response so frontend works seamlessly
+  const rawAvatarUrl = player?.photo_url || null;
   const playerUser = {
     id: playerAccount.id,
     email: playerAccount.email,
     fullName,
     fullNameAr,
     role: "Player",
-    avatarUrl: player?.photo_url || null,
+    avatarUrl: rawAvatarUrl ? await resolveFileUrl(rawAvatarUrl) : null,
     isActive: true,
     lastLogin: new Date(),
     playerId: playerAccount.playerId,
@@ -592,7 +594,11 @@ export async function refreshSession(rawToken: string) {
 export async function getProfile(userId: string) {
   // Check users table first (exclude sensitive fields)
   const user = await User.findByPk(userId);
-  if (user) return user;
+  if (user) {
+    const dv = (user as any).dataValues;
+    if (user.avatarUrl) dv.avatarUrl = await resolveFileUrl(user.avatarUrl);
+    return user;
+  }
 
   // Fall back to player_accounts
   const account = await PlayerAccount.findByPk(userId);
@@ -628,6 +634,7 @@ export async function getProfile(userId: string) {
     }
   }
 
+  const rawAvatarUrlForProfile = p?.photo_url || null;
   return {
     id: account.id,
     email: account.email,
@@ -636,7 +643,9 @@ export async function getProfile(userId: string) {
       ? `${p.first_name_ar || ""} ${p.last_name_ar || ""}`.trim() || null
       : null,
     role: "Player",
-    avatarUrl: p?.photo_url || null,
+    avatarUrl: rawAvatarUrlForProfile
+      ? await resolveFileUrl(rawAvatarUrlForProfile)
+      : null,
     isActive: account.status === "active",
     playerId: account.playerId,
   };
@@ -650,7 +659,11 @@ export async function updateProfile(
   const user = await User.findByPk(userId);
   if (!user) throw new AppError("User not found", 404);
   await user.update(data);
-  return user.toJSON();
+  const json = user.toJSON() as Record<string, unknown>;
+  if (json.avatarUrl && typeof json.avatarUrl === "string") {
+    json.avatarUrl = await resolveFileUrl(json.avatarUrl);
+  }
+  return json;
 }
 
 // ── Change Password (authenticated user) ──

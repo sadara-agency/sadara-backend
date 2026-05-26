@@ -13,7 +13,7 @@ import {
   uploadFile,
   resolveFileUrl,
   streamFileBuffer,
-  isPrivateKey,
+  isStorageKey,
 } from "@shared/utils/storage";
 import * as svc from "@modules/documents/document.service";
 import type { DocumentQuery } from "@modules/documents/document.validation";
@@ -159,7 +159,7 @@ export async function preview(req: AuthRequest, res: Response) {
 
   // Private GCS key — stream directly using service-account credentials
   // (avoids signed-URL generation which requires iam.serviceAccounts.signBlob)
-  if (isPrivateKey(doc.fileUrl)) {
+  if (isStorageKey(doc.fileUrl)) {
     const buffer = await streamFileBuffer(doc.fileUrl);
     res.setHeader("Content-Type", mimeType);
     res.setHeader("Content-Disposition", disposition);
