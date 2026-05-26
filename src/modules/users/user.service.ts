@@ -76,7 +76,10 @@ export async function listUsers(queryParams: any) {
 
   const data = await Promise.all(
     rows.map(async (r) => {
-      const plain = r.get({ plain: true }) as Record<string, unknown> & {
+      const plain = r.get({ plain: true }) as unknown as Record<
+        string,
+        unknown
+      > & {
         avatarUrl?: string | null;
       };
       return resolveAvatar(plain);
@@ -120,7 +123,10 @@ export async function getUserById(id: string) {
   });
 
   if (!user) throw new AppError("User not found", 404);
-  const plain = user.get({ plain: true }) as Record<string, unknown> & {
+  const plain = user.get({ plain: true }) as unknown as Record<
+    string,
+    unknown
+  > & {
     avatarUrl?: string | null;
   };
   return resolveAvatar(plain);
