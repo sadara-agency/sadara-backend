@@ -1,13 +1,21 @@
 import WatchlistVideoClip from "./watchlist-video-clip.model";
 import { AppError } from "@middleware/errorHandler";
-import { uploadFile, deleteFile } from "@shared/utils/storage";
+import { uploadFile, deleteFile, resolveFileUrl } from "@shared/utils/storage";
 import type { AddVideoClipLinkDTO } from "./watchlist-video-clip.validation";
 
 export async function listVideoClips(watchlistId: string) {
-  return WatchlistVideoClip.findAll({
+  const clips = await WatchlistVideoClip.findAll({
     where: { watchlistId },
     order: [["createdAt", "DESC"]],
   });
+
+  return Promise.all(
+    clips.map(async (clip) => {
+      const plain = clip.get({ plain: true }) as any;
+      if (plain.fileUrl) plain.fileUrl = await resolveFileUrl(plain.fileUrl);
+      return plain;
+    }),
+  );
 }
 
 export async function addVideoClipLink(

@@ -100,7 +100,11 @@ jest.mock('../../../src/modules/contracts/contract.signing.service', () => ({
   regenerateSignedPdf: jest.fn(),
 }));
 jest.mock('../../../src/config/env', () => ({
-  env: { bcrypt: { saltRounds: 10 }, frontend: { url: 'http://localhost:3000' } },
+  env: {
+    bcrypt: { saltRounds: 10 },
+    frontend: { url: 'http://localhost:3000' },
+    supabase: { url: '', serviceRoleKey: '', bucket: 'test-bucket' },
+  },
 }));
 jest.mock('../../../src/config/logger', () => ({
   logger: { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() },

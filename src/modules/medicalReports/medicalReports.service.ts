@@ -1,6 +1,6 @@
 import { AppError } from "@middleware/errorHandler";
 import { logger } from "@config/logger";
-import { uploadFile, deleteFile } from "@shared/utils/storage";
+import { uploadFile, deleteFile, resolveFileUrl } from "@shared/utils/storage";
 import { Document } from "@modules/documents/document.model";
 import { Player } from "@modules/players/player.model";
 import { sequelize } from "@config/database";
@@ -89,6 +89,18 @@ export async function getReport(id: string) {
     ],
   });
   if (!report) throw new AppError("Medical report not found", 404);
+
+  // Resolve document fileUrl from bare storage key to public URL
+  const doc = report.get("document") as any;
+  if (doc) {
+    const raw = doc.dataValues?.fileUrl ?? doc.fileUrl;
+    if (raw) {
+      const resolved = await resolveFileUrl(raw);
+      if (doc.dataValues) doc.dataValues.fileUrl = resolved;
+      else doc.fileUrl = resolved;
+    }
+  }
+
   return report;
 }
 

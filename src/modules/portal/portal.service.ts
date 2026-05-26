@@ -7,6 +7,7 @@ import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
 import { User } from "@modules/users/user.model";
 import { isEncrypted, decrypt } from "@shared/utils/encryption";
+import { resolveFileUrl } from "@shared/utils/storage";
 import { logger } from "@config/logger";
 import { Contract } from "@modules/contracts/contract.model";
 import { Match } from "@modules/matches/match.model";
@@ -335,11 +336,19 @@ export async function getMyDocuments(userId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
 
-  const documents = await Document.findAll({
+  const rawDocuments = await Document.findAll({
     where: { entityType: "Player", entityId: playerId } as any,
     include: [{ model: User, as: "uploader", attributes: ["id", "fullName"] }],
     order: [["createdAt", "DESC"]],
   });
+
+  const documents = await Promise.all(
+    rawDocuments.map(async (doc) => {
+      const plain = doc.get({ plain: true }) as any;
+      if (plain.fileUrl) plain.fileUrl = await resolveFileUrl(plain.fileUrl);
+      return plain;
+    }),
+  );
 
   const grouped = {
     contracts: documents.filter(
@@ -594,7 +603,7 @@ export async function getMyContracts(userId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
 
-  const contracts = await Contract.findAll({
+  const rawContracts = await Contract.findAll({
     where: { playerId },
     include: [
       {
@@ -605,6 +614,15 @@ export async function getMyContracts(userId: string) {
     ],
     order: [["createdAt", "DESC"]],
   });
+
+  const contracts = await Promise.all(
+    rawContracts.map(async (contract) => {
+      const plain = contract.get({ plain: true }) as any;
+      if (plain.signedDocumentUrl)
+        plain.signedDocumentUrl = await resolveFileUrl(plain.signedDocumentUrl);
+      return plain;
+    }),
+  );
 
   return { contracts };
 }

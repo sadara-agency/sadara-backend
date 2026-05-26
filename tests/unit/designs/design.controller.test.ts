@@ -136,7 +136,7 @@ describe("Design Controller", () => {
   });
 
   describe("uploadAsset", () => {
-    it("delegates to the service with the file buffer and base URL", async () => {
+    it("delegates to the service with the file buffer", async () => {
       (designService.uploadDesignAsset as jest.Mock).mockResolvedValue({
         id: "d1",
         title: "Match",
@@ -159,7 +159,6 @@ describe("Design Controller", () => {
           originalname: "poster.png",
           mimetype: "image/png",
         }),
-        "https://localhost",
       );
       expect(res.status).toHaveBeenCalledWith(200);
     });

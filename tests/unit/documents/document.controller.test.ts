@@ -4,7 +4,7 @@ jest.mock('../../../src/shared/utils/storage', () => ({
   uploadFile: jest.fn().mockResolvedValue({ url: 'http://cdn.test/doc.pdf', size: 2048, mimeType: 'application/pdf' }),
   resolveFileUrl: jest.fn().mockImplementation((url) => Promise.resolve(url)),
   streamFileBuffer: jest.fn().mockResolvedValue(Buffer.from('%PDF-test')),
-  isPrivateKey: jest.fn().mockReturnValue(false),
+  isStorageKey: jest.fn().mockReturnValue(false),
 }));
 jest.mock('../../../src/shared/utils/audit', () => ({
   logAudit: jest.fn().mockResolvedValue(undefined),

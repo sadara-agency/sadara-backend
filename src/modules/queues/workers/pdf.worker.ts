@@ -39,7 +39,7 @@ async function processJob(job: Job<PdfJobData>): Promise<PdfJobResult> {
     );
     const pageCount = 3; // profile + matchList + injury pages (+ brand pages from mergeWithBrandPages)
     const sizeBytes = fs.existsSync(filePath) ? fs.statSync(filePath).size : 0;
-    // TODO INFRA-001 follow-up: upload `filePath` to GCS via @google-cloud/storage
+    // TODO INFRA-001 follow-up: upload `filePath` to Supabase Storage via writeBuffer() in @shared/utils/storage
     const gcsKey = `reports/${requestedBy}/${job.id}.pdf`;
     return { pageCount, sizeBytes, gcsKey, url: "" };
   }

@@ -124,16 +124,11 @@ export async function uploadAsset(
   res: Response,
 ): Promise<void> {
   if (!req.file) throw new AppError("No file uploaded", 400);
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
-  const design = await designService.uploadDesignAsset(
-    req.params.id,
-    {
-      buffer: req.file.buffer,
-      originalname: req.file.originalname,
-      mimetype: req.file.mimetype,
-    },
-    baseUrl,
-  );
+  const design = await designService.uploadDesignAsset(req.params.id, {
+    buffer: req.file.buffer,
+    originalname: req.file.originalname,
+    mimetype: req.file.mimetype,
+  });
   sendSuccess(res, design, "Asset uploaded");
   sideEffects(req, "uploadAsset", design);
 }

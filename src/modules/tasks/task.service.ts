@@ -34,6 +34,7 @@ import {
   checkRowAccess,
 } from "@shared/utils/rowScope";
 import { upsertSourceAttendees } from "@modules/calendar/calendarScope";
+import { resolveFileUrl } from "@shared/utils/storage";
 
 // ── Shared includes for player + assignee names ──
 // `assignee` exposes role + email so list endpoints can filter by role and
@@ -70,6 +71,22 @@ const ALLOWED_SORTS = [
 const PRIORITY_ORDER = literal(
   `CASE "Task"."priority" WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END`,
 );
+
+// ── Resolve bare storage keys in deliverables to public URLs ──
+async function resolveDeliverables(task: any): Promise<any> {
+  const plain = task.get ? task.get({ plain: true }) : task;
+  if (!plain.deliverables?.length) return plain;
+  plain.deliverables = await Promise.all(
+    plain.deliverables.map(async (d: any) => {
+      const out = { ...d };
+      if (out.url) out.url = await resolveFileUrl(out.url);
+      if (out.thumbnailUrl)
+        out.thumbnailUrl = await resolveFileUrl(out.thumbnailUrl);
+      return out;
+    }),
+  );
+  return plain;
+}
 
 // ────────────────────────────────────────────────────────────
 // List Tasks
@@ -113,7 +130,8 @@ export async function listTasks(queryParams: any, user?: AuthUser) {
     subQuery: false,
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  const data = await Promise.all(rows.map(resolveDeliverables));
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 // ── Shared filter builder used by both listTasks and getTaskStats ──
@@ -337,7 +355,7 @@ export async function getTaskById(id: string, user?: AuthUser) {
   const hasAccess = await checkRowAccess("tasks", task, user);
   if (!hasAccess) throw new AppError("Task not found", 404);
 
-  return task;
+  return resolveDeliverables(task);
 }
 
 // ────────────────────────────────────────────────────────────

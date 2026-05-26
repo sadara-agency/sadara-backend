@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import Design from "./design.model";
+import { resolveFileUrl } from "@shared/utils/storage";
 import { Player } from "@modules/players/player.model";
 import { Match } from "@modules/matches/match.model";
 import { Club } from "@modules/clubs/club.model";
@@ -100,12 +101,24 @@ export async function listDesigns(query: DesignQuery, _user?: AuthUser) {
     subQuery: false,
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  const data = await Promise.all(
+    rows.map(async (row) => {
+      if (row.assetUrl) {
+        (row as any).dataValues.assetUrl = await resolveFileUrl(row.assetUrl);
+      }
+      return row;
+    }),
+  );
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 export async function getDesignById(id: string, _user?: AuthUser) {
   const item = await Design.findByPk(id, { include: includeAll });
   if (!item) throw new AppError("Design not found", 404);
+  if (item.assetUrl) {
+    (item as any).dataValues.assetUrl = await resolveFileUrl(item.assetUrl);
+  }
   return item;
 }
 
@@ -282,7 +295,6 @@ export async function postponeDesign(id: string) {
 export async function uploadDesignAsset(
   id: string,
   file: { buffer: Buffer; originalname: string; mimetype: string },
-  baseUrl: string,
 ) {
   const item = await getDesignById(id);
 
@@ -308,9 +320,8 @@ export async function uploadDesignAsset(
     generateThumbnail: true,
   });
 
-  const assetUrl = result.url.startsWith("http")
-    ? result.url
-    : `${baseUrl}${result.url}`;
+  // Store the bare storage key; resolveFileUrl() builds the public URL at read time.
+  const assetUrl = result.url;
 
   return item.update({ assetUrl, assetWidth: width, assetHeight: height });
 }

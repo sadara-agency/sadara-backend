@@ -110,6 +110,11 @@ const envSchema = z.object({
   GCS_CREDENTIALS_JSON: z.string().default(""), // For PaaS: JSON string of service account key
   GCS_TRAINING_BUCKET: z.string().default("sadara-training-media"),
 
+  // Supabase Storage (replaces GCS). Falls back to local disk if URL/key unset.
+  SUPABASE_URL: z.string().default(""),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().default(""),
+  SUPABASE_STORAGE_BUCKET: z.string().default("sadara-uploads"),
+
   // CSRF protection (enable enforcement after frontend is updated)
   CSRF_ENFORCE: z
     .enum(["true", "false"])
@@ -275,6 +280,12 @@ export const env = {
     credentials: validated.GOOGLE_APPLICATION_CREDENTIALS,
     credentialsJson: validated.GCS_CREDENTIALS_JSON,
     trainingBucket: validated.GCS_TRAINING_BUCKET,
+  },
+
+  supabase: {
+    url: validated.SUPABASE_URL,
+    serviceRoleKey: validated.SUPABASE_SERVICE_ROLE_KEY,
+    bucket: validated.SUPABASE_STORAGE_BUCKET,
   },
 
   csrf: {

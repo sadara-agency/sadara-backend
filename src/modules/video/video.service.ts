@@ -3,7 +3,7 @@ import { VideoClip, VideoTag } from "./video.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
-import { uploadFile } from "@shared/utils/storage";
+import { uploadFile, resolveFileUrl } from "@shared/utils/storage";
 import { getVideoDurationSec } from "@shared/utils/videoDuration";
 import type {
   CreateClipDTO,
@@ -55,6 +55,16 @@ export async function listClips(query: ListClipsQuery) {
     ],
   });
 
+  await Promise.all(
+    rows.map(async (clip) => {
+      const dv = (clip as any).dataValues;
+      if (clip.externalUrl)
+        dv.externalUrl = await resolveFileUrl(clip.externalUrl);
+      if (clip.thumbnailPath)
+        dv.thumbnailPath = await resolveFileUrl(clip.thumbnailPath);
+    }),
+  );
+
   return {
     data: rows,
     meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
@@ -90,6 +100,11 @@ export async function getClipById(id: string) {
     ],
   });
   if (!clip) throw new AppError("Video clip not found", 404);
+
+  const dv = (clip as any).dataValues;
+  if (clip.externalUrl) dv.externalUrl = await resolveFileUrl(clip.externalUrl);
+  if (clip.thumbnailPath)
+    dv.thumbnailPath = await resolveFileUrl(clip.thumbnailPath);
   return clip;
 }
 

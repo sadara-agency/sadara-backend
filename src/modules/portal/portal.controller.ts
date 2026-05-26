@@ -134,15 +134,23 @@ export async function uploadMyDocument(req: AuthRequest, res: Response) {
     );
   }
 
+  const uploaded = await uploadFile({
+    folder: "documents",
+    originalName: req.file.originalname,
+    mimeType: req.file.mimetype,
+    buffer: req.file.buffer,
+    generateThumbnail: false,
+  });
+
   const doc = await documentService.createDocument(
     {
       playerId: player.id,
       name: req.body.name || req.file.originalname,
       type: docType,
       status: "Pending",
-      fileUrl: `/uploads/documents/${req.file.filename}`,
-      fileSize: req.file.size,
-      mimeType: req.file.mimetype,
+      fileUrl: uploaded.url, // bare storage key; resolved at read time
+      fileSize: uploaded.size,
+      mimeType: uploaded.mimeType,
     },
     req.user!.id,
   );

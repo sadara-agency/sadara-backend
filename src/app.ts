@@ -113,7 +113,12 @@ app.use(
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https://storage.googleapis.com"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https://storage.googleapis.com",
+          "https://waebmzpnyeqbpkazqopq.supabase.co",
+        ],
         scriptSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         objectSrc: ["'none'"],

@@ -42,6 +42,7 @@ jest.mock('../../../src/modules/users/user.model', () => ({
 
 jest.mock('../../../src/shared/utils/storage', () => ({
   uploadFile: (...a: unknown[]) => mockUploadFile(...a),
+  resolveFileUrl: (url: string) => Promise.resolve(url),
 }));
 
 jest.mock('../../../src/middleware/errorHandler', () => ({
