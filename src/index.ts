@@ -1,5 +1,7 @@
 // src/index.ts
 
+import "./instrument";
+
 import app from "./app";
 import { env } from "@config/env";
 import { testConnection, sequelize } from "@config/database";

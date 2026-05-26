@@ -1,4 +1,5 @@
 import express from "express";
+import * as Sentry from "@sentry/node";
 import path from "path";
 import cors from "cors";
 import helmet from "helmet";
@@ -533,6 +534,9 @@ app.use("/admin/queues", queueRoutes);
 app.use((_req, res) => {
   res.status(404).json({ success: false, message: "Route not found" });
 });
+
+// ── Sentry Error Handler (must run before our errorHandler) ──
+Sentry.setupExpressErrorHandler(app);
 
 // ── Error Handler ──
 app.use(errorHandler);
