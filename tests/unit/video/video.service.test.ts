@@ -270,8 +270,8 @@ describe('Video Service', () => {
   // ── uploadVideoFile ──
 
   describe('uploadVideoFile', () => {
-    it('should upload file to GCS and create a clip record', async () => {
-      const created = mockModelInstance(mockClip({ storageProvider: 'gcs' }));
+    it('should upload file to Supabase and create a clip record', async () => {
+      const created = mockModelInstance(mockClip({ storageProvider: 'supabase' }));
       mockClipCreate.mockResolvedValue(created);
 
       const file = {
@@ -292,7 +292,7 @@ describe('Video Service', () => {
       );
       expect(mockClipCreate).toHaveBeenCalledWith(
         expect.objectContaining({
-          storageProvider: 'gcs',
+          storageProvider: 'supabase',
           title: 'Highlight',
           uploadedBy: 'user-001',
         }),

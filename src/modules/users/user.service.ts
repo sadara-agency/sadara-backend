@@ -34,11 +34,11 @@ const SAFE_ATTRIBUTES = {
   exclude: ["passwordHash"],
 };
 
-async function resolveAvatar<T extends { avatarUrl?: string | null }>(
-  row: T,
-): Promise<T> {
-  if (row && row.avatarUrl) {
-    row.avatarUrl = (await resolveFileUrl(row.avatarUrl)) as T["avatarUrl"];
+async function resolveAvatarOnPlain(
+  row: { avatarUrl?: string | null } & Record<string, unknown>,
+) {
+  if (row.avatarUrl) {
+    row.avatarUrl = await resolveFileUrl(row.avatarUrl);
   }
   return row;
 }
@@ -76,13 +76,10 @@ export async function listUsers(queryParams: any) {
 
   const data = await Promise.all(
     rows.map(async (r) => {
-      const plain = r.get({ plain: true }) as unknown as Record<
-        string,
-        unknown
-      > & {
+      const plain = r.get({ plain: true }) as unknown as {
         avatarUrl?: string | null;
-      };
-      return resolveAvatar(plain);
+      } & Record<string, unknown>;
+      return resolveAvatarOnPlain(plain);
     }),
   );
 
@@ -123,13 +120,10 @@ export async function getUserById(id: string) {
   });
 
   if (!user) throw new AppError("User not found", 404);
-  const plain = user.get({ plain: true }) as unknown as Record<
-    string,
-    unknown
-  > & {
+  const plain = user.get({ plain: true }) as unknown as {
     avatarUrl?: string | null;
-  };
-  return resolveAvatar(plain);
+  } & Record<string, unknown>;
+  return resolveAvatarOnPlain(plain);
 }
 
 // ────────────────────────────────────────────────────────────
