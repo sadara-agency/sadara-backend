@@ -1054,17 +1054,71 @@ export async function syncMatchMedia(matchId: string): Promise<{
     );
   }
 
+  const mediaType: "live_stream" | "vod_full" =
+    match.status === "live" ? "live_stream" : "vod_full";
+
+  // ── Tier A: Motto CDA (fast, no Puppeteer, returns DRM license URL) ──
+  const cdaVideos = await provider.resolveMatchVideoViaCda(
+    match.providerMatchId,
+  );
+
+  if (cdaVideos.length > 0) {
+    result.reason = "ok";
+    for (const v of cdaVideos) {
+      try {
+        const existing = await MatchMedia.findOne({
+          where: {
+            matchId: match.id,
+            providerSource: "saffplus",
+            externalMediaId: v.videoId,
+          },
+        });
+        if (existing) {
+          await existing.update({
+            mediaType,
+            url: v.playlistUrl,
+            drmLicenseUrl: v.licenseUrl,
+            streamProtocol: "hls",
+            cdnProvider: "mottocdn",
+            embedOnly: false,
+          });
+        } else {
+          await MatchMedia.create({
+            matchId: match.id,
+            mediaType,
+            streamProtocol: "hls",
+            url: v.playlistUrl,
+            drmLicenseUrl: v.licenseUrl,
+            posterUrl: null,
+            durationSeconds: null,
+            language: "ar",
+            requiresAuth: false,
+            embedOnly: false,
+            cdnProvider: "mottocdn",
+            expiresAt: null,
+            externalMediaId: v.videoId,
+            providerSource: "saffplus",
+          });
+        }
+        result.upserted++;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.warn(`[SAFF+] CDA media upsert failed: ${msg}`);
+        result.errors.push(msg);
+      }
+    }
+    logger.info(
+      `[SAFF+] syncMatchMedia(${matchId}): ${result.upserted} upserted via CDA`,
+    );
+    return result;
+  }
+
+  // ── Tier B: Puppeteer fallback (slower, no DRM license URL) ──
   const extracted = await extractMatchVideoUrl(match.providerMatchId);
   result.reason = extracted.reason;
 
   for (const v of extracted.videos) {
     try {
-      // Heuristic: if the match is currently live, mark this as a live
-      // stream; otherwise it's a VOD replay. The frontend uses media_type
-      // to pick the right player chrome.
-      const mediaType: "live_stream" | "vod_full" =
-        match.status === "live" ? "live_stream" : "vod_full";
-
       const where: Record<string, unknown> = {
         matchId: match.id,
         providerSource: "saffplus",
@@ -1099,13 +1153,13 @@ export async function syncMatchMedia(matchId: string): Promise<{
       result.upserted++;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      logger.warn(`[SAFF+] Media upsert failed: ${msg}`);
+      logger.warn(`[SAFF+] Puppeteer media upsert failed: ${msg}`);
       result.errors.push(msg);
     }
   }
 
   logger.info(
-    `[SAFF+] syncMatchMedia(${matchId}): ${result.upserted} upserted (reason=${result.reason})`,
+    `[SAFF+] syncMatchMedia(${matchId}): ${result.upserted} upserted via Puppeteer (reason=${result.reason})`,
   );
   return result;
 }

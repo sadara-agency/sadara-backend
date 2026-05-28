@@ -48,6 +48,7 @@ export interface MatchMediaAttributes {
   cdnProvider: string | null;
   expiresAt: Date | null;
   externalMediaId: string | null;
+  drmLicenseUrl: string | null;
   providerSource: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -64,6 +65,7 @@ interface MatchMediaCreationAttributes extends Optional<
   | "cdnProvider"
   | "expiresAt"
   | "externalMediaId"
+  | "drmLicenseUrl"
   | "providerSource"
   | "createdAt"
   | "updatedAt"
@@ -86,6 +88,7 @@ export class MatchMedia
   declare cdnProvider: string | null;
   declare expiresAt: Date | null;
   declare externalMediaId: string | null;
+  declare drmLicenseUrl: string | null;
   declare providerSource: string;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -160,6 +163,11 @@ MatchMedia.init(
       type: DataTypes.STRING(120),
       allowNull: true,
       field: "external_media_id",
+    },
+    drmLicenseUrl: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      field: "drm_license_url",
     },
     providerSource: {
       type: DataTypes.STRING(50),

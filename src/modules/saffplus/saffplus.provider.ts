@@ -3072,3 +3072,122 @@ export async function fetchPlayerProfile(
   void cacheSet(cacheKey, puppeteerProfile, PLAYER_PROFILE_TTL);
   return puppeteerProfile;
 }
+
+// ══════════════════════════════════════════
+// MOTTO CDA VIDEO RESOLVER
+// ══════════════════════════════════════════
+
+const MOTTO_CDA_EVENT =
+  "https://cda.mottostreaming.com/motto.cda.cms.event.v1.EventService/GetEvent";
+const MOTTO_CDA_BATCH_VIDEOS =
+  "https://cda.mottostreaming.com/motto.cda.streaming.video.v1.VideoService/BatchGetVideos";
+
+export interface CdaResolvedVideo {
+  videoId: string;
+  playlistUrl: string;
+  /** Widevine license server URL — required for in-browser DRM decryption. */
+  licenseUrl: string;
+  /** DRM token JWT — short-lived (~10 min), stored for reference. */
+  drmToken: string;
+}
+
+/**
+ * Resolve playable video URLs for a SAFF+ match via the Motto CDA API.
+ *
+ * Replaces the Puppeteer scraper for video extraction: the CDA returns the
+ * playlist URL + Widevine license URL in a single round-trip, no headless
+ * browser required. The Bearer token is the public platform key shipped in
+ * saffplus.sa's JS bundle — it authenticates the platform, not the user,
+ * so all matches are accessible without a user session.
+ *
+ * DRM note: the `drmToken` inside BatchGetVideos expires in ~10 minutes.
+ * We store the `licenseUrl` (permanent) and the token separately. The
+ * frontend attaches the token as a request header when acquiring the
+ * Widevine license from `drm-lic.mottostreaming.com`.
+ */
+export async function resolveMatchVideoViaCda(
+  providerMatchId: string,
+): Promise<CdaResolvedVideo[]> {
+  // Step 1: GetEvent → videoIds[]
+  const eventMessage = JSON.stringify({
+    eventId: providerMatchId,
+    locale: "ar",
+  });
+  const eventUrl = `${MOTTO_CDA_EVENT}?encoding=json&message=${encodeURIComponent(eventMessage)}`;
+
+  const eventRes = await fetch(eventUrl, {
+    headers: mottoCdaHeaders(),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!eventRes.ok) {
+    logger.warn(
+      `[SAFF+ CDA] GetEvent(${providerMatchId}) → HTTP ${eventRes.status}`,
+    );
+    return [];
+  }
+
+  const eventData = (await eventRes.json()) as Record<string, unknown>;
+  const event = eventData["event"] as Record<string, unknown> | undefined;
+  const videoIds = event?.["videoIds"] as string[] | undefined;
+  if (!videoIds || videoIds.length === 0) {
+    logger.info(
+      `[SAFF+ CDA] GetEvent(${providerMatchId}): no videoIds in response`,
+    );
+    return [];
+  }
+
+  // Step 2: BatchGetVideos → playlist + DRM license URL
+  // deviceId is arbitrary — Motto accepts any stable device string.
+  const videosMessage = JSON.stringify({
+    videoIds,
+    enable_ads: false,
+    locale: "ar",
+    deviceId: "device_sadara-backend",
+  });
+  const videosUrl = `${MOTTO_CDA_BATCH_VIDEOS}?encoding=json&message=${encodeURIComponent(videosMessage)}`;
+
+  const videosRes = await fetch(videosUrl, {
+    headers: mottoCdaHeaders(),
+    signal: AbortSignal.timeout(12_000),
+  });
+  if (!videosRes.ok) {
+    logger.warn(
+      `[SAFF+ CDA] BatchGetVideos(${videoIds.join(",")}) → HTTP ${videosRes.status}`,
+    );
+    return [];
+  }
+
+  const videosData = (await videosRes.json()) as Record<string, unknown>;
+  const videos = videosData["videos"] as
+    | Array<Record<string, unknown>>
+    | undefined;
+  if (!videos || videos.length === 0) return [];
+
+  const resolved: CdaResolvedVideo[] = [];
+  for (const video of videos) {
+    const videoId = video["id"] as string | undefined;
+    const playlists = video["playlists"] as
+      | Array<Record<string, unknown>>
+      | undefined;
+    if (!videoId || !playlists) continue;
+
+    for (const playlist of playlists) {
+      const drm = playlist["drm"] as Record<string, unknown> | undefined;
+      if (!drm) continue;
+      const widevine = drm["widevine"] as Record<string, unknown> | undefined;
+      if (!widevine) continue;
+      const playlistUrl = widevine["playlistUrl"] as string | undefined;
+      const licenseUrl = widevine["licenseUrl"] as string | undefined;
+      const drmToken = drm["token"] as string | undefined;
+      if (!playlistUrl || !licenseUrl || !drmToken) continue;
+
+      resolved.push({ videoId, playlistUrl, licenseUrl, drmToken });
+      break; // one playlist per video is enough
+    }
+  }
+
+  logger.info(
+    `[SAFF+ CDA] resolveMatchVideoViaCda(${providerMatchId}): resolved ${resolved.length} video(s)`,
+  );
+  return resolved;
+}
