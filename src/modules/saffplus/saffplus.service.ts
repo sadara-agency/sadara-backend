@@ -1237,6 +1237,217 @@ export async function getMatchMedia(matchId: string) {
 }
 
 // ══════════════════════════════════════════
+// HLS + DRM PROXY
+//
+// Motto CDN (playlists.mottocdn.com, segments-drm.mottocdn.com) and the
+// Widevine license server (drm-lic.mottostreaming.com) only serve with
+// Access-Control-Allow-Origin: https://saffplus.sa — they block requests
+// from our frontend origin. These three functions proxy the requests
+// server-side (no CORS) so the browser can play the DRM stream on Sadara.
+// ══════════════════════════════════════════
+
+const MOTTO_CDN_HOSTS = [
+  "playlists.mottocdn.com",
+  "segments-drm.mottocdn.com",
+  "segments.mottocdn.com",
+];
+const MOTTO_DRM_HOST = "drm-lic.mottostreaming.com";
+
+/** Shared headers that make Motto CDN think the request comes from saffplus.sa. */
+function mottoCdnHeaders(): Record<string, string> {
+  return {
+    Origin: "https://saffplus.sa",
+    Referer: "https://saffplus.sa/",
+    "User-Agent":
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  };
+}
+
+/**
+ * Fetch the HLS master/variant manifest from Motto CDN and rewrite all
+ * URLs so segment and sub-playlist requests route through our proxy.
+ *
+ * The `proxyBase` is the full URL prefix of our segment-proxy endpoint,
+ * e.g. `https://sadara-backend.fly.dev/api/v1/saffplus/stream/segment`.
+ * Each upstream URL is encoded as the `u` query param.
+ */
+export async function proxyHlsManifest(
+  matchId: string,
+  proxyBase: string,
+): Promise<{ contentType: string; body: string }> {
+  const media = await MatchMedia.findOne({
+    where: { matchId, streamProtocol: "hls", providerSource: "saffplus" },
+    order: [["createdAt", "DESC"]],
+  });
+  if (!media) throw new AppError("No HLS media found for this match", 404);
+
+  const upstreamUrl = media.url;
+  const res = await fetch(upstreamUrl, {
+    headers: mottoCdnHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) {
+    throw new AppError(`Motto CDN returned ${res.status} for manifest`, 502);
+  }
+
+  const raw = await res.text();
+  const manifestBase = upstreamUrl.substring(
+    0,
+    upstreamUrl.lastIndexOf("/") + 1,
+  );
+
+  // Rewrite every URL line in the manifest to go through our segment proxy.
+  // HLS manifests have two kinds of lines to rewrite:
+  //   1. URI="..." attributes inside tags (e.g. #EXT-X-KEY, #EXT-X-MEDIA)
+  //   2. Bare URL lines (segment paths and sub-playlist paths)
+  const rewritten = raw
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#") === false) {
+        // Bare URL line (segment or sub-playlist)
+        if (trimmed && !trimmed.startsWith("#")) {
+          const absolute = trimmed.startsWith("http")
+            ? trimmed
+            : manifestBase + trimmed;
+          return `${proxyBase}?u=${encodeURIComponent(absolute)}`;
+        }
+      }
+      // Rewrite URI="..." inside tag lines
+      return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
+        const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
+        return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}"`;
+      });
+    })
+    .join("\n");
+
+  const contentType =
+    res.headers.get("content-type") ?? "application/vnd.apple.mpegurl";
+  return { contentType, body: rewritten };
+}
+
+/**
+ * Proxy a single HLS segment or sub-playlist from Motto CDN.
+ * The upstream URL is passed as the `u` query param (validated against
+ * known Motto CDN hosts to prevent open-redirect abuse).
+ */
+export async function proxyHlsSegment(
+  upstreamUrl: string,
+  proxyBase: string,
+): Promise<{ contentType: string; body: Buffer }> {
+  // Security: only proxy URLs from known Motto CDN hosts.
+  let parsed: URL;
+  try {
+    parsed = new URL(upstreamUrl);
+  } catch {
+    throw new AppError("Invalid upstream URL", 400);
+  }
+  if (!MOTTO_CDN_HOSTS.some((h) => parsed.hostname === h)) {
+    throw new AppError(`Upstream host not allowed: ${parsed.hostname}`, 400);
+  }
+
+  const res = await fetch(upstreamUrl, {
+    headers: mottoCdnHeaders(),
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    throw new AppError(`Motto CDN returned ${res.status} for segment`, 502);
+  }
+
+  const contentType =
+    res.headers.get("content-type") ?? "application/octet-stream";
+  const arrayBuffer = await res.arrayBuffer();
+  let body = Buffer.from(arrayBuffer);
+
+  // If this is a sub-playlist (m3u8), rewrite its URLs too so segments
+  // inside it also route through our proxy.
+  if (contentType.includes("mpegurl") || upstreamUrl.includes(".m3u8")) {
+    const text = body.toString("utf8");
+    const manifestBase = upstreamUrl.substring(
+      0,
+      upstreamUrl.lastIndexOf("/") + 1,
+    );
+    const rewritten = text
+      .split("\n")
+      .map((line) => {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith("#")) {
+          const absolute = trimmed.startsWith("http")
+            ? trimmed
+            : manifestBase + trimmed;
+          return `${proxyBase}?u=${encodeURIComponent(absolute)}`;
+        }
+        return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
+          const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
+          return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}"`;
+        });
+      })
+      .join("\n");
+    body = Buffer.from(rewritten, "utf8");
+  }
+
+  return { contentType, body };
+}
+
+/**
+ * Proxy a Widevine EME license request to Motto's DRM license server.
+ *
+ * The browser's EME stack sends a binary challenge (the license request).
+ * We forward it to drm-lic.mottostreaming.com with the Bearer DRM token
+ * that was captured during syncMatchMedia (stored in match_media.drm_license_url
+ * and re-fetched fresh via CDA on each proxy call).
+ */
+export async function proxyDrmLicense(
+  matchId: string,
+  challengeBuffer: Buffer,
+): Promise<Buffer> {
+  // Re-fetch a fresh DRM token via CDA — the token in the DB expires in ~10 min.
+  const match = await Match.findByPk(matchId, {
+    attributes: ["id", "providerMatchId"],
+  });
+  if (!match?.providerMatchId) {
+    throw new AppError("Match has no SAFF+ id — sync media first", 422);
+  }
+
+  const cdaVideos = await provider.resolveMatchVideoViaCda(
+    match.providerMatchId,
+  );
+  if (cdaVideos.length === 0) {
+    throw new AppError("Could not resolve DRM token from Motto CDA", 502);
+  }
+
+  const { licenseUrl, drmToken } = cdaVideos[0];
+
+  // Validate the license URL host before proxying.
+  const parsed = new URL(licenseUrl);
+  if (parsed.hostname !== MOTTO_DRM_HOST) {
+    throw new AppError(`Unexpected DRM license host: ${parsed.hostname}`, 502);
+  }
+
+  const licRes = await fetch(licenseUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/octet-stream",
+      Authorization: `Bearer ${drmToken}`,
+      Origin: "https://saffplus.sa",
+      Referer: "https://saffplus.sa/",
+    },
+    body: challengeBuffer,
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!licRes.ok) {
+    logger.warn(
+      `[SAFF+ DRM] License server returned ${licRes.status} for match ${matchId}`,
+    );
+    throw new AppError(`DRM license server returned ${licRes.status}`, 502);
+  }
+
+  const arrayBuffer = await licRes.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+// ══════════════════════════════════════════
 // PLAYER PROFILE ENRICHMENT (entity/player/:id)
 // ══════════════════════════════════════════
 

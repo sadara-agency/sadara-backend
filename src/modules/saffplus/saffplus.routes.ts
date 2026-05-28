@@ -147,6 +147,30 @@ router.post(
   asyncHandler(ctrl.syncMatchMediaCtrl),
 );
 
+// ── HLS + DRM Proxy ──
+// These endpoints serve binary/text content, not JSON — they bypass the
+// standard JSON response helpers and write directly to res.
+
+router.get(
+  "/matches/:matchId/stream.m3u8",
+  authorizeModule("saff-data", "read"),
+  validate(matchIdParamSchema, "params"),
+  asyncHandler(ctrl.proxyMatchStream),
+);
+
+// No matchId param — the upstream URL is the `u` query param (allowlist-validated).
+router.get("/stream/segment", asyncHandler(ctrl.proxyStreamSegment));
+
+// express.raw() so EME challenge bytes arrive as a Buffer, not parsed JSON.
+router.post(
+  "/matches/:matchId/drm-license",
+  authorizeModule("saff-data", "read"),
+  validate(matchIdParamSchema, "params"),
+
+  require("express").raw({ type: "application/octet-stream", limit: "64kb" }),
+  asyncHandler(ctrl.proxyMatchDrmLicense),
+);
+
 // ── Phase 4: Player profile enrichment ──
 
 // Fixed-path routes must come before param routes to avoid Express matching
