@@ -339,6 +339,50 @@ export async function previewByUrlCtrl(req: AuthRequest, res: Response) {
   sendSuccess(res, profile);
 }
 
+// ── HLS + DRM Proxy ──
+
+export async function proxyMatchStream(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  const proxyBase = `${req.protocol}://${req.get("host")}/api/v1/saffplus/stream/segment`;
+  const { contentType, body } = await saffPlusService.proxyHlsManifest(
+    matchId,
+    proxyBase,
+  );
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.send(body);
+}
+
+export async function proxyStreamSegment(req: AuthRequest, res: Response) {
+  const { u } = req.query as { u?: string };
+  if (!u) throw new AppError("Missing upstream URL param `u`", 400);
+  const proxyBase = `${req.protocol}://${req.get("host")}/api/v1/saffplus/stream/segment`;
+  const { contentType, body } = await saffPlusService.proxyHlsSegment(
+    decodeURIComponent(u),
+    proxyBase,
+  );
+  res.setHeader("Content-Type", contentType);
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.send(body);
+}
+
+export async function proxyMatchDrmLicense(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  // Express doesn't buffer raw binary by default — the route must use
+  // express.raw() middleware before this handler.
+  const challenge =
+    req.body instanceof Buffer
+      ? req.body
+      : Buffer.from(req.body as ArrayBuffer);
+  const licenseResponse = await saffPlusService.proxyDrmLicense(
+    matchId,
+    challenge,
+  );
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.send(licenseResponse);
+}
+
 export async function linkByUrlCtrl(req: AuthRequest, res: Response) {
   const { playerId, saffPlusUrl } = req.body as {
     playerId: string;

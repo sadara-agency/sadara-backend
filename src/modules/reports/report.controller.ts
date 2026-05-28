@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AuthRequest } from "@shared/types";
+import { logger } from "@config/logger";
 import {
   resolveFileUrl,
   streamFileBuffer,
@@ -34,7 +35,18 @@ export async function getById(req: AuthRequest, res: Response) {
 }
 
 export async function create(req: AuthRequest, res: Response) {
-  const report = await svc.createReport(req.body, req.user!.id);
+  let report: Awaited<ReturnType<typeof svc.createReport>>;
+  try {
+    report = await svc.createReport(req.body, req.user!.id);
+  } catch (err: any) {
+    logger.error("[reports] create failed", {
+      error: err.message,
+      stack: err.stack,
+      body: req.body,
+      userId: req.user?.id,
+    });
+    throw err;
+  }
   Promise.all([
     invalidateMultiple([CachePrefix.REPORTS]),
     logAudit(

@@ -11,6 +11,51 @@ export type ReportStatus =
   | "Reviewing"
   | "Published";
 
+export type ReportType =
+  | "PreSigning"
+  | "MidSeason"
+  | "MatchReport"
+  | "Periodic"
+  | "Scouting";
+
+export type ReportVerdict =
+  | "Primary"
+  | "Monitor"
+  | "Reject"
+  | "Promote"
+  | "Hold";
+
+export interface RatingBucket {
+  [attribute: string]: number;
+}
+
+export interface StructuredContent {
+  header?: {
+    date?: string;
+    scoutName?: string;
+  };
+  ratings?: {
+    technical?: RatingBucket;
+    tactical?: RatingBucket;
+    physical?: RatingBucket;
+    mental?: RatingBucket;
+  };
+  qualitative?: {
+    overview?: string;
+    strengths?: string;
+    improvements?: string;
+    recommendation?: string;
+  };
+  kpis?: {
+    goals?: number;
+    assists?: number;
+    passAccuracy?: number;
+    minutesPlayed?: number;
+    keyPasses?: number;
+    tackles?: number;
+  };
+}
+
 interface TechnicalReportAttributes {
   id: string;
   playerId: string;
@@ -27,6 +72,13 @@ interface TechnicalReportAttributes {
   aiGeneratedAt: Date | null;
   publishedAt: Date | null;
   publishedBy: string | null;
+  reportType: ReportType | null;
+  matchContext: string | null;
+  overallScore: number | null;
+  verdict: ReportVerdict | null;
+  readiness: number | null;
+  potential: number | null;
+  structuredContent: StructuredContent | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -43,6 +95,13 @@ interface TechnicalReportCreation extends Optional<
   | "aiGeneratedAt"
   | "publishedAt"
   | "publishedBy"
+  | "reportType"
+  | "matchContext"
+  | "overallScore"
+  | "verdict"
+  | "readiness"
+  | "potential"
+  | "structuredContent"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -66,6 +125,13 @@ export class TechnicalReport
   declare aiGeneratedAt: Date | null;
   declare publishedAt: Date | null;
   declare publishedBy: string | null;
+  declare reportType: ReportType | null;
+  declare matchContext: string | null;
+  declare overallScore: number | null;
+  declare verdict: ReportVerdict | null;
+  declare readiness: number | null;
+  declare potential: number | null;
+  declare structuredContent: StructuredContent | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -145,6 +211,38 @@ TechnicalReport.init(
       type: DataTypes.UUID,
       allowNull: true,
       field: "published_by",
+    },
+    reportType: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      field: "report_type",
+    },
+    matchContext: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      field: "match_context",
+    },
+    overallScore: {
+      type: DataTypes.DECIMAL(4, 2),
+      allowNull: true,
+      field: "overall_score",
+    },
+    verdict: {
+      type: DataTypes.STRING(30),
+      allowNull: true,
+    },
+    readiness: {
+      type: DataTypes.SMALLINT,
+      allowNull: true,
+    },
+    potential: {
+      type: DataTypes.SMALLINT,
+      allowNull: true,
+    },
+    structuredContent: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      field: "structured_content",
     },
   },
   {
