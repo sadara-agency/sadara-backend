@@ -192,3 +192,18 @@ export async function getTagSummaryByPlayer(
     next(err);
   }
 }
+
+export async function getTagReview(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const data = await videoService.getTagReviewByPlayer(
+      req.query.playerId as string,
+    );
+    return sendSuccess(res, data);
+  } catch (err) {
+    next(err);
+  }
+}

@@ -1,4 +1,4 @@
-import { WhereOptions } from "sequelize";
+import { WhereOptions, Op } from "sequelize";
 import { VideoClip, VideoTag } from "./video.model";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
@@ -23,6 +23,15 @@ export async function listClips(query: ListClipsQuery) {
   if (query.matchId) where.matchId = query.matchId;
   if (query.playerId) where.playerId = query.playerId;
   if (query.status) where.status = query.status;
+
+  // Filter to only clips that have at least one tag of this type
+  if (query.tagType) {
+    const clipIds = await VideoTag.findAll({
+      where: { tagType: query.tagType },
+      attributes: ["clipId"],
+    }).then((tags) => [...new Set(tags.map((t) => t.clipId))]);
+    where.id = { [Op.in]: clipIds };
+  }
 
   const { rows, count } = await VideoClip.findAndCountAll({
     where,
@@ -240,4 +249,52 @@ export async function getTagSummaryByPlayer(playerId: string) {
   }
 
   return { total: tags.length, byType };
+}
+
+export interface TagReviewItem {
+  tagId: string;
+  tagType: string;
+  timestampSec: number | null;
+  notes: string | null;
+  createdAt: string;
+  clipId: string;
+  clipTitle: string;
+  clipTitleAr: string | null;
+}
+
+export async function getTagReviewByPlayer(
+  playerId: string,
+): Promise<TagReviewItem[]> {
+  const clips = await VideoClip.findAll({
+    where: { playerId },
+    attributes: ["id", "title", "titleAr", "createdAt"],
+    order: [["createdAt", "DESC"]],
+    include: [
+      {
+        model: VideoTag,
+        as: "tags",
+        attributes: ["id", "tagType", "timestampSec", "notes", "createdAt"],
+        separate: true,
+        order: [["timestampSec", "ASC"]],
+      },
+    ],
+  });
+
+  const result: TagReviewItem[] = [];
+  for (const clip of clips) {
+    const tags = ((clip as any).tags as VideoTag[]) ?? [];
+    for (const tag of tags) {
+      result.push({
+        tagId: tag.id,
+        tagType: tag.tagType,
+        timestampSec: tag.timestampSec,
+        notes: tag.notes,
+        createdAt: tag.createdAt.toISOString(),
+        clipId: clip.id,
+        clipTitle: clip.title,
+        clipTitleAr: clip.titleAr ?? null,
+      });
+    }
+  }
+  return result;
 }
