@@ -12,6 +12,7 @@ import {
   createTagSchema,
   updateTagSchema,
   tagSummaryByPlayerSchema,
+  tagReviewSchema,
 } from "./video.validation";
 
 const router = Router();
@@ -112,6 +113,32 @@ router.get(
   validate(tagSummaryByPlayerSchema, "query"),
   cacheRoute("video-tags-summary", CacheTTL.SHORT),
   videoController.getTagSummaryByPlayer,
+);
+
+/**
+ * @swagger
+ * /video/tag-review:
+ *   get:
+ *     summary: All tagged moments for a player across all clips
+ *     tags: [Video]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: playerId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Array of TagReviewItem
+ */
+router.get(
+  "/tag-review",
+  authorizeModule("video", "read"),
+  validate(tagReviewSchema, "query"),
+  cacheRoute("video-tags-review", CacheTTL.SHORT),
+  videoController.getTagReview,
 );
 
 // ── Tags (nested under clips) ──

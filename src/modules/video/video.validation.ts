@@ -34,6 +34,7 @@ export const listClipsSchema = z.object({
   matchId: z.string().uuid().optional(),
   playerId: z.string().uuid().optional(),
   status: z.enum(["processing", "ready", "failed"]).optional(),
+  tagType: z.enum(TAG_TYPES).optional(),
   page: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().positive().max(500).optional(),
 });
@@ -60,3 +61,9 @@ export type UpdateClipDTO = z.infer<typeof updateClipSchema>;
 export type ListClipsQuery = z.infer<typeof listClipsSchema>;
 export type CreateTagDTO = z.infer<typeof createTagSchema>;
 export type UpdateTagDTO = z.infer<typeof updateTagSchema>;
+
+export const tagReviewSchema = z.object({
+  playerId: z.string().uuid(),
+});
+
+export type TagReviewQuery = z.infer<typeof tagReviewSchema>;
