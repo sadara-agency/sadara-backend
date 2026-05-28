@@ -1967,6 +1967,7 @@ export async function importSaffPlusMatch(
       matchDate,
       venue: match.stadium ?? null,
       externalMatchId: saffMatchIdStr,
+      providerMatchId: saffMatchIdStr,
       providerSource: "saffplus",
     } as never);
     created = true;
@@ -1981,7 +1982,12 @@ export async function importSaffPlusMatch(
       status: "completed",
       homeScore: match.homeScore as number,
       awayScore: match.awayScore as number,
+      ...(dbMatch.providerMatchId ? {} : { providerMatchId: saffMatchIdStr }),
     });
+  } else if (!dbMatch.providerMatchId) {
+    // Self-heal: pre-fix rows stored externalMatchId without providerMatchId,
+    // which breaks sync-events / sync-media. Patch it on the next re-import.
+    await dbMatch.update({ providerMatchId: saffMatchIdStr });
   }
 
   // 6. Upsert the player's lineup row.
