@@ -935,7 +935,7 @@ export async function syncMatchEvents(matchId: string): Promise<{
   }
   if (!match.providerMatchId) {
     throw new AppError(
-      `Match ${matchId} has no provider_match_id — re-sync the parent competition first`,
+      `Match ${matchId} has no SAFF+ id stored. Re-import it from the player's SAFF+ profile, or re-sync the parent competition.`,
       422,
     );
   }
@@ -1049,7 +1049,7 @@ export async function syncMatchMedia(matchId: string): Promise<{
   if (!match) throw new AppError(`Match ${matchId} not found`, 404);
   if (!match.providerMatchId) {
     throw new AppError(
-      `Match ${matchId} has no provider_match_id — re-sync the parent competition first`,
+      `Match ${matchId} has no SAFF+ id stored. Re-import it from the player's SAFF+ profile, or re-sync the parent competition.`,
       422,
     );
   }
