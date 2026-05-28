@@ -3,7 +3,7 @@ import { sequelize } from "@config/database";
 import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 
-export type ClipStorageProvider = "gcs" | "external";
+export type ClipStorageProvider = "gcs" | "supabase" | "external";
 export type ClipStatus = "processing" | "ready" | "failed";
 export type VideoTagType =
   | "goal"

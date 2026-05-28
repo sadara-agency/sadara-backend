@@ -155,7 +155,7 @@ export async function uploadVideoFile(
     title: meta.title,
     playerId: meta.playerId ?? null,
     matchId: meta.matchId ?? null,
-    storageProvider: "gcs",
+    storageProvider: "supabase",
     storagePath: result.key,
     externalUrl: result.url,
     mimeType: result.mimeType,
