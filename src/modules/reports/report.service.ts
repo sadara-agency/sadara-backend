@@ -16,6 +16,22 @@ import { generateReportFailedTask } from "@modules/reports/reportAutoTasks";
 import { callLlm } from "@shared/utils/llm";
 import { writeBuffer } from "@shared/utils/storage";
 import type { AuthUser } from "@shared/types";
+import type { StructuredContent } from "@modules/reports/report.model";
+
+// ── Compute overall score from structured ratings ──
+
+export function computeOverallScore(
+  content: StructuredContent | null | undefined,
+): number | null {
+  if (!content?.ratings) return null;
+  const values: number[] = [];
+  for (const bucket of Object.values(content.ratings)) {
+    if (bucket) values.push(...Object.values(bucket));
+  }
+  if (values.length === 0) return null;
+  const avg = values.reduce((s, v) => s + v, 0) / values.length;
+  return Math.round(avg * 100) / 100;
+}
 
 // ── Storage helper for report PDFs ──
 
@@ -54,13 +70,19 @@ export async function listReports(queryParams: ReportQuery) {
     const where: any = {};
     if (queryParams.playerId) where.playerId = queryParams.playerId;
     if (queryParams.status) where.status = queryParams.status;
+    if (queryParams.reportType) where.reportType = queryParams.reportType;
 
     const { count, rows } = await TechnicalReport.findAndCountAll({
       where,
       include: REPORT_INCLUDES,
       limit,
       offset,
-      order: [["createdAt", "DESC"]],
+      order: [
+        [
+          queryParams.sort === "overall_score" ? "overall_score" : "createdAt",
+          "DESC",
+        ],
+      ],
       distinct: true,
     });
 
@@ -133,8 +155,15 @@ export async function createReport(
       periodType: input.periodType,
       periodParams: input.periodParams,
       notes: input.notes || null,
-      status: "Generating",
+      status: "Draft",
       createdBy,
+      reportType: input.reportType ?? null,
+      matchContext: input.matchContext ?? null,
+      verdict: input.verdict ?? null,
+      readiness: input.readiness ?? null,
+      potential: input.potential ?? null,
+      structuredContent: input.structuredContent ?? null,
+      overallScore: computeOverallScore(input.structuredContent),
     });
   } catch (err: any) {
     logger.error("Failed to create report record", {
@@ -146,8 +175,18 @@ export async function createReport(
     throw new AppError("Failed to create report", 500);
   }
 
-  // Fire-and-forget PDF generation — don't block the API response
-  generatePdfInBackground(report.id, player, input, createdBy);
+  // Fire-and-forget PDF generation — defer past the current microtask queue
+  // so an immediate crash inside generatePdfInBackground can never propagate
+  // to this request handler via an unhandled rejection.
+  setImmediate(() => {
+    generatePdfInBackground(report.id, player, input, createdBy).catch(
+      (e: Error) =>
+        logger.error("Unhandled rejection from generatePdfInBackground", {
+          error: e.message,
+          reportId: report.id,
+        }),
+    );
+  });
 
   return getReportById(report.id);
 }
@@ -160,12 +199,29 @@ async function generatePdfInBackground(
   createdBy: string,
 ) {
   try {
+    await TechnicalReport.update(
+      { status: "Generating" },
+      { where: { id: reportId } },
+    );
     const data = await gatherReportData(
       input.playerId,
       input.periodType,
       input.periodParams,
     );
-    const buffer = await generateReportPdf(reportId, player, data);
+    // Fetch the full report record to get structured fields persisted at create time
+    const reportRecord = await TechnicalReport.findByPk(reportId);
+    const buffer = await generateReportPdf(reportId, player, data, {
+      content: reportRecord?.structuredContent ?? null,
+      reportType: reportRecord?.reportType,
+      matchContext: reportRecord?.matchContext,
+      overallScore: reportRecord?.overallScore
+        ? Number(reportRecord.overallScore)
+        : null,
+      verdict: reportRecord?.verdict,
+      readiness: reportRecord?.readiness,
+      potential: reportRecord?.potential,
+      notes: reportRecord?.notes ?? null,
+    });
     const gcsKey = await uploadReportPdf(reportId, buffer);
     await TechnicalReport.update(
       { status: "Generated", filePath: gcsKey },
