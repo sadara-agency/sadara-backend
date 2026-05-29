@@ -829,12 +829,22 @@ export async function scrapeMatchEvents(
 
   // ── PRIMARY: Motto CDA API ──
   // Try multiple filter patterns — the exact type_id varies by competition.
+  // Also try the short numeric prefix of the id in case CDA stores by short key.
+  const shortId = providerMatchId.includes("-")
+    ? providerMatchId.split("-")[0]
+    : null;
   const eventFilters = [
     `type_id:match_event AND fields.match_id:${providerMatchId}`,
     `type_id:event AND fields.match_id:${providerMatchId}`,
     `type_id:timeline AND fields.match_id:${providerMatchId}`,
     `type_id:match_event AND fields.event_id:${providerMatchId}`,
     `type_id:match_incident AND fields.match_id:${providerMatchId}`,
+    ...(shortId
+      ? [
+          `type_id:match_event AND fields.match_id:${shortId}`,
+          `type_id:event AND fields.match_id:${shortId}`,
+        ]
+      : []),
   ];
   for (const filter of eventFilters) {
     const entities = await listMottoCdaEntities(filter, {
@@ -910,10 +920,45 @@ export async function scrapeMatchEvents(
 
   // ── FALLBACK: Puppeteer render + RSC + jsonResponses ──
   if (seen.size === 0) {
-    const paths = [
+    // The stored providerMatchId is the CDA entity `id` (e.g. "1659-aae2f57d7ff2"),
+    // but the saffplus.sa URL uses a separate `slug` field (e.g. "zTj0jaaP55TTrK-9Ci9Tm").
+    // Look up the match entity to get its slug so we hit the correct page URL.
+    let matchSlug: string | null = null;
+    const slugFilters = [
+      `type_id:match AND id:${providerMatchId}`,
+      `type_id:game AND id:${providerMatchId}`,
+      `type_id:fixture AND id:${providerMatchId}`,
+    ];
+    for (const filter of slugFilters) {
+      const entities = await listMottoCdaEntities(filter, {
+        locale: "ar",
+        pageSize: 1,
+      });
+      if (entities.length > 0) {
+        const e = entities[0];
+        const f = (e.fields as Record<string, unknown> | undefined) ?? {};
+        const merged: Record<string, unknown> = { ...f, ...e };
+        const slug =
+          (merged.slug as string) ?? (merged.url_slug as string) ?? null;
+        if (slug && slug !== providerMatchId) {
+          matchSlug = slug;
+          logger.info(
+            `[SAFF+] scrapeMatchEvents: resolved slug="${matchSlug}" for id="${providerMatchId}"`,
+          );
+        }
+        break;
+      }
+    }
+
+    const idPaths = [
       `/ar/event/match/${providerMatchId}`,
       `/en/event/match/${providerMatchId}`,
     ];
+    const slugPaths = matchSlug
+      ? [`/ar/event/match/${matchSlug}`, `/en/event/match/${matchSlug}`]
+      : [];
+    // Try slug first (correct URL), then fall back to stored id
+    const paths = [...slugPaths, ...idPaths];
     for (const path of paths) {
       let html: string;
       let jsonResponses: Array<{ url: string; data: unknown }> = [];
