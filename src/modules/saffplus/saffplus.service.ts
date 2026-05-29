@@ -1348,22 +1348,10 @@ export async function proxyHlsSegment(
     throw new AppError(`Upstream host not allowed: ${parsed.hostname}`, 400);
   }
 
-  // segments-drm.mottocdn.com requires Authorization: Bearer <drmToken>.
-  // Fetch a fresh token via CDA when matchId is available.
+  // segments-drm.mottocdn.com only checks Origin — the drmToken is a Widevine
+  // license token (used by drm-lic.mottostreaming.com), NOT a CDN access token.
+  // Sending it as Bearer causes 403. Just spoof Origin: saffplus.sa.
   const fetchHeaders: Record<string, string> = mottoCdnHeaders();
-  if (parsed.hostname === "segments-drm.mottocdn.com" && matchId) {
-    const match = await Match.findByPk(matchId, {
-      attributes: ["id", "providerMatchId"],
-    });
-    if (match?.providerMatchId) {
-      const cdaVideos = await provider.resolveMatchVideoViaCda(
-        match.providerMatchId,
-      );
-      if (cdaVideos.length > 0) {
-        fetchHeaders["Authorization"] = `Bearer ${cdaVideos[0].drmToken}`;
-      }
-    }
-  }
 
   const res = await fetch(upstreamUrl, {
     headers: fetchHeaders,
