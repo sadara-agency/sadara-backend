@@ -35,6 +35,19 @@ export async function up() {
 
   if (existingRows.length === 0) return;
 
+  // Ensure the sequence table exists. Migration 087 creates it, but its
+  // fresh-DB guard skips creation when `players` was absent at the time it
+  // ran, leaving the table missing even though 087 is recorded as executed.
+  // Create it defensively so this migration is self-sufficient and idempotent.
+  await sequelize.query(`
+    CREATE TABLE IF NOT EXISTS display_id_sequences (
+      entity   VARCHAR(20) NOT NULL,
+      year     INT         NOT NULL,
+      next_val INT         NOT NULL DEFAULT 1,
+      PRIMARY KEY (entity, year)
+    );
+  `);
+
   const yearCounters: Record<number, number> = {};
   const updates: Array<{ id: string; displayId: string }> = [];
 

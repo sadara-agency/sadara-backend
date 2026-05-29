@@ -177,6 +177,12 @@ export async function listMatchMedia(req: AuthRequest, res: Response) {
   sendSuccess(res, media);
 }
 
+export async function getMatchPlayback(req: AuthRequest, res: Response) {
+  const { matchId } = req.params;
+  const playback = await saffPlusService.getMatchPlayback(matchId);
+  sendSuccess(res, playback);
+}
+
 export async function syncMatchEventsCtrl(req: AuthRequest, res: Response) {
   const { matchId } = req.params;
   const result = await saffPlusService.syncMatchEvents(matchId);

@@ -1236,6 +1236,58 @@ export async function getMatchMedia(matchId: string) {
   });
 }
 
+// ── Direct-playback resolution (no server-side segment proxy) ──
+
+export interface MatchPlaybackInfo {
+  /** Direct Motto playlist URL — the browser fetches this and its segments
+   *  straight from the CDN (residential IP + reflected CORS = allowed). */
+  playlistUrl: string;
+  /** Widevine license server URL on drm-lic.mottostreaming.com. */
+  licenseUrl: string;
+  /** Short-lived (~10 min) Widevine token. The browser sends it as
+   *  `Authorization: Bearer <drmToken>` directly to the license server. */
+  drmToken: string;
+  /** Motto video id, for reference / debugging. */
+  videoId: string;
+}
+
+/**
+ * Resolve everything the browser needs to play a match replay DIRECTLY from
+ * Motto's CDN — no server-side segment or license proxy.
+ *
+ * Why direct: Motto's segment CDN (segments-drm.mottocdn.com) blocks our
+ * Fly.io datacenter egress IP with 403, but serves residential/browser IPs
+ * fine, and its CORS policy reflects our frontend origin. The license server
+ * (drm-lic.mottostreaming.com) returns ACAO:* and accepts the Authorization
+ * header. So the only piece that must stay server-side is minting the
+ * short-lived DRM token via the CDA metadata API (cda.mottostreaming.com),
+ * which is NOT IP-blocked.
+ */
+export async function getMatchPlayback(
+  matchId: string,
+): Promise<MatchPlaybackInfo> {
+  const match = await Match.findByPk(matchId, {
+    attributes: ["id", "providerMatchId", "providerSource"],
+  });
+  if (!match) throw new AppError(`Match ${matchId} not found`, 404);
+  if (!match.providerMatchId) {
+    throw new AppError(
+      `Match ${matchId} has no SAFF+ id stored. Re-import it from the player's SAFF+ profile, or re-sync the parent competition.`,
+      422,
+    );
+  }
+
+  const cdaVideos = await provider.resolveMatchVideoViaCda(
+    match.providerMatchId,
+  );
+  if (cdaVideos.length === 0) {
+    throw new AppError("Could not resolve playback from Motto CDA", 502);
+  }
+
+  const { playlistUrl, licenseUrl, drmToken, videoId } = cdaVideos[0];
+  return { playlistUrl, licenseUrl, drmToken, videoId };
+}
+
 // ══════════════════════════════════════════
 // HLS + DRM PROXY
 //
