@@ -1296,29 +1296,40 @@ export async function proxyHlsManifest(
     upstreamUrl.lastIndexOf("/") + 1,
   );
 
-  // Rewrite every URL line in the manifest to go through our segment proxy.
-  // HLS manifests have two kinds of lines to rewrite:
-  //   1. URI="..." attributes inside tags (e.g. #EXT-X-KEY, #EXT-X-MEDIA)
-  //   2. Bare URL lines (segment paths and sub-playlist paths)
-  // Embed matchId so the segment proxy can fetch a fresh DRM token for
-  // segments-drm.mottocdn.com without needing a separate lookup.
+  // Rewrite only sub-playlist URLs (.m3u8) to go through our manifest proxy
+  // so the browser can fetch them despite Motto CDN's CORS restriction.
+  // Segment URLs (.mp4 / .ts) are left as-is — the browser's Widevine CDM
+  // fetches them directly from segments-drm.mottocdn.com without CORS issues
+  // because media segment requests are not subject to CORS preflight.
   const midParam = `&mid=${encodeURIComponent(matchId)}`;
 
   const rewritten = raw
     .split("\n")
     .map((line) => {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#") === false) {
-        // Bare URL line (segment or sub-playlist)
-        if (trimmed && !trimmed.startsWith("#")) {
+      if (!trimmed) return line;
+
+      // Bare URL lines: only rewrite sub-playlists (.m3u8), not segments
+      if (!trimmed.startsWith("#")) {
+        const isPlaylist =
+          trimmed.includes(".m3u8") || trimmed.includes("m3u8");
+        if (isPlaylist) {
           const absolute = trimmed.startsWith("http")
             ? trimmed
             : manifestBase + trimmed;
           return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
         }
+        // Segment lines — make absolute but don't proxy (CDM fetches directly)
+        if (!trimmed.startsWith("http")) {
+          return manifestBase + trimmed;
+        }
+        return line;
       }
-      // Rewrite URI="..." inside tag lines
+
+      // URI="..." inside tag lines — only rewrite if it points to a sub-playlist
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
+        const isPlaylist = uri.includes(".m3u8") || uri.includes("m3u8");
+        if (!isPlaylist) return `URI="${uri}"`;
         const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
         return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}"`;
       });
