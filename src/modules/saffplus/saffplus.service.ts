@@ -1296,11 +1296,10 @@ export async function proxyHlsManifest(
     upstreamUrl.lastIndexOf("/") + 1,
   );
 
-  // Rewrite only sub-playlist URLs (.m3u8) to go through our manifest proxy
-  // so the browser can fetch them despite Motto CDN's CORS restriction.
-  // Segment URLs (.mp4 / .ts) are left as-is — the browser's Widevine CDM
-  // fetches them directly from segments-drm.mottocdn.com without CORS issues
-  // because media segment requests are not subject to CORS preflight.
+  // Rewrite ALL URLs (both sub-playlists and segments) through our backend proxy.
+  // segments-drm.mottocdn.com enforces CORS — browser XHRs from sadara-frontend.vercel.app
+  // are blocked. The proxy adds Origin: saffplus.sa and a fresh DRM bearer token for
+  // segment requests.
   const midParam = `&mid=${encodeURIComponent(matchId)}`;
 
   const rewritten = raw
@@ -1309,27 +1308,14 @@ export async function proxyHlsManifest(
       const trimmed = line.trim();
       if (!trimmed) return line;
 
-      // Bare URL lines: only rewrite sub-playlists (.m3u8), not segments
       if (!trimmed.startsWith("#")) {
-        const isPlaylist =
-          trimmed.includes(".m3u8") || trimmed.includes("m3u8");
-        if (isPlaylist) {
-          const absolute = trimmed.startsWith("http")
-            ? trimmed
-            : manifestBase + trimmed;
-          return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
-        }
-        // Segment lines — make absolute but don't proxy (CDM fetches directly)
-        if (!trimmed.startsWith("http")) {
-          return manifestBase + trimmed;
-        }
-        return line;
+        const absolute = trimmed.startsWith("http")
+          ? trimmed
+          : manifestBase + trimmed;
+        return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
       }
 
-      // URI="..." inside tag lines — only rewrite if it points to a sub-playlist
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
-        const isPlaylist = uri.includes(".m3u8") || uri.includes("m3u8");
-        if (!isPlaylist) return `URI="${uri}"`;
         const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
         return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}"`;
       });
@@ -1406,23 +1392,12 @@ export async function proxyHlsSegment(
       .map((line) => {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith("#")) {
-          const isPlaylist =
-            trimmed.includes(".m3u8") || trimmed.includes("m3u8");
-          if (isPlaylist) {
-            const absolute = trimmed.startsWith("http")
-              ? trimmed
-              : manifestBase + trimmed;
-            return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
-          }
-          // Segment lines — make absolute but don't proxy (CDM fetches directly)
-          if (!trimmed.startsWith("http")) {
-            return manifestBase + trimmed;
-          }
-          return line;
+          const absolute = trimmed.startsWith("http")
+            ? trimmed
+            : manifestBase + trimmed;
+          return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
         }
         return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
-          const isPlaylist = uri.includes(".m3u8") || uri.includes("m3u8");
-          if (!isPlaylist) return `URI="${uri}"`;
           const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
           return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}"`;
         });
