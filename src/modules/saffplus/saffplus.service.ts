@@ -1073,27 +1073,34 @@ export async function syncMatchMedia(matchId: string): Promise<{
             externalMediaId: v.videoId,
           },
         });
+        // Motto's segments-drm.mottocdn.com CDN blocks datacenter IPs
+        // (403 even with spoofed Origin: saffplus.sa). DRM streams must be
+        // played via the Motto iframe embed player which handles DRM internally.
+        const isDrmStream = Boolean(v.licenseUrl);
+        const embedUrl = isDrmStream
+          ? `https://player.mottostreaming.com/embed/${v.videoId}`
+          : v.playlistUrl;
         if (existing) {
           await existing.update({
             mediaType,
-            url: v.playlistUrl,
-            drmLicenseUrl: v.licenseUrl,
-            streamProtocol: "hls",
+            url: embedUrl,
+            drmLicenseUrl: isDrmStream ? null : v.licenseUrl,
+            streamProtocol: isDrmStream ? "iframe_embed" : "hls",
             cdnProvider: "mottocdn",
-            embedOnly: false,
+            embedOnly: isDrmStream,
           });
         } else {
           await MatchMedia.create({
             matchId: match.id,
             mediaType,
-            streamProtocol: "hls",
-            url: v.playlistUrl,
-            drmLicenseUrl: v.licenseUrl,
+            streamProtocol: isDrmStream ? "iframe_embed" : "hls",
+            url: embedUrl,
+            drmLicenseUrl: isDrmStream ? null : v.licenseUrl,
             posterUrl: null,
             durationSeconds: null,
             language: "ar",
             requiresAuth: false,
-            embedOnly: false,
+            embedOnly: isDrmStream,
             cdnProvider: "mottocdn",
             expiresAt: null,
             externalMediaId: v.videoId,
