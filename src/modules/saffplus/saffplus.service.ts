@@ -1300,6 +1300,10 @@ export async function proxyHlsManifest(
   // HLS manifests have two kinds of lines to rewrite:
   //   1. URI="..." attributes inside tags (e.g. #EXT-X-KEY, #EXT-X-MEDIA)
   //   2. Bare URL lines (segment paths and sub-playlist paths)
+  // Embed matchId so the segment proxy can fetch a fresh DRM token for
+  // segments-drm.mottocdn.com without needing a separate lookup.
+  const midParam = `&mid=${encodeURIComponent(matchId)}`;
+
   const rewritten = raw
     .split("\n")
     .map((line) => {
@@ -1310,13 +1314,13 @@ export async function proxyHlsManifest(
           const absolute = trimmed.startsWith("http")
             ? trimmed
             : manifestBase + trimmed;
-          return `${proxyBase}?u=${encodeURIComponent(absolute)}`;
+          return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
         }
       }
       // Rewrite URI="..." inside tag lines
       return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
         const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
-        return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}"`;
+        return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}"`;
       });
     })
     .join("\n");
@@ -1334,6 +1338,7 @@ export async function proxyHlsManifest(
 export async function proxyHlsSegment(
   upstreamUrl: string,
   proxyBase: string,
+  matchId?: string,
 ): Promise<{ contentType: string; body: Buffer }> {
   // Security: only proxy URLs from known Motto CDN hosts.
   let parsed: URL;
@@ -1346,8 +1351,25 @@ export async function proxyHlsSegment(
     throw new AppError(`Upstream host not allowed: ${parsed.hostname}`, 400);
   }
 
+  // segments-drm.mottocdn.com requires Authorization: Bearer <drmToken>.
+  // Fetch a fresh token via CDA when matchId is available.
+  const fetchHeaders: Record<string, string> = mottoCdnHeaders();
+  if (parsed.hostname === "segments-drm.mottocdn.com" && matchId) {
+    const match = await Match.findByPk(matchId, {
+      attributes: ["id", "providerMatchId"],
+    });
+    if (match?.providerMatchId) {
+      const cdaVideos = await provider.resolveMatchVideoViaCda(
+        match.providerMatchId,
+      );
+      if (cdaVideos.length > 0) {
+        fetchHeaders["Authorization"] = `Bearer ${cdaVideos[0].drmToken}`;
+      }
+    }
+  }
+
   const res = await fetch(upstreamUrl, {
-    headers: mottoCdnHeaders(),
+    headers: fetchHeaders,
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) {
@@ -1360,8 +1382,9 @@ export async function proxyHlsSegment(
   let body = Buffer.from(arrayBuffer);
 
   // If this is a sub-playlist (m3u8), rewrite its URLs too so segments
-  // inside it also route through our proxy.
+  // inside it also route through our proxy, preserving the matchId param.
   if (contentType.includes("mpegurl") || upstreamUrl.includes(".m3u8")) {
+    const midParam = matchId ? `&mid=${encodeURIComponent(matchId)}` : "";
     const text = body.toString("utf8");
     const manifestBase = upstreamUrl.substring(
       0,
@@ -1375,11 +1398,11 @@ export async function proxyHlsSegment(
           const absolute = trimmed.startsWith("http")
             ? trimmed
             : manifestBase + trimmed;
-          return `${proxyBase}?u=${encodeURIComponent(absolute)}`;
+          return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
         }
         return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
           const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
-          return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}"`;
+          return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}"`;
         });
       })
       .join("\n");

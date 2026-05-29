@@ -359,7 +359,7 @@ export async function proxyMatchStream(req: AuthRequest, res: Response) {
 }
 
 export async function proxyStreamSegment(req: AuthRequest, res: Response) {
-  const { u } = req.query as { u?: string };
+  const { u, mid } = req.query as { u?: string; mid?: string };
   if (!u) throw new AppError("Missing upstream URL param `u`", 400);
   const host = req.get("x-forwarded-host") ?? req.get("host");
   const proto = req.get("x-forwarded-proto") ?? req.protocol;
@@ -367,6 +367,7 @@ export async function proxyStreamSegment(req: AuthRequest, res: Response) {
   const { contentType, body } = await saffPlusService.proxyHlsSegment(
     decodeURIComponent(u),
     proxyBase,
+    mid,
   );
   res.setHeader("Content-Type", contentType);
   res.send(body);
