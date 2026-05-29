@@ -7,6 +7,7 @@
  */
 
 import { Op } from "sequelize";
+import { env } from "@config/env";
 import { logger } from "@config/logger";
 import { AppError } from "@middleware/errorHandler";
 import * as provider from "./saffplus.provider";
@@ -1284,8 +1285,16 @@ export async function getMatchPlayback(
     throw new AppError("Could not resolve playback from Motto CDA", 502);
   }
 
-  const { playlistUrl, licenseUrl, drmToken, videoId } = cdaVideos[0];
-  return { playlistUrl, licenseUrl, drmToken, videoId };
+  const { playlistUrl, licenseUrl, videoId } = cdaVideos[0];
+  // The DRM license server validates the platform API key (mottoBearerToken),
+  // NOT the short-lived JWT drmToken returned by BatchGetVideos. SAFF+ itself
+  // sends the static platform key as the Authorization header on license requests.
+  return {
+    playlistUrl,
+    licenseUrl,
+    drmToken: env.saffplus.mottoBearerToken,
+    videoId,
+  };
 }
 
 // ══════════════════════════════════════════
