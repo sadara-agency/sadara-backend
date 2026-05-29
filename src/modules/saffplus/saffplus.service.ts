@@ -7,6 +7,7 @@
  */
 
 import { Op } from "sequelize";
+import { env } from "@config/env";
 import { logger } from "@config/logger";
 import { AppError } from "@middleware/errorHandler";
 import * as provider from "./saffplus.provider";
