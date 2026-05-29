@@ -1101,42 +1101,6 @@ export async function syncMatchMedia(matchId: string): Promise<{
           });
         }
         result.upserted++;
-
-        // Also upsert an iframe embed row for DRM videos — the HLS row
-        // requires server-side Widevine decryption which is unsupported;
-        // the Motto iframe player handles DRM internally in the browser.
-        if (v.licenseUrl) {
-          const embedId = `${v.videoId}:embed`;
-          const embedUrl = `https://player.mottostreaming.com/embed/${v.videoId}`;
-          const existingEmbed = await MatchMedia.findOne({
-            where: {
-              matchId: match.id,
-              providerSource: "saffplus",
-              externalMediaId: embedId,
-            },
-          });
-          if (existingEmbed) {
-            await existingEmbed.update({ mediaType, url: embedUrl });
-          } else {
-            await MatchMedia.create({
-              matchId: match.id,
-              mediaType,
-              streamProtocol: "hls",
-              url: embedUrl,
-              drmLicenseUrl: null,
-              posterUrl: null,
-              durationSeconds: null,
-              language: "ar",
-              requiresAuth: false,
-              embedOnly: true,
-              cdnProvider: "mottostreaming",
-              expiresAt: null,
-              externalMediaId: embedId,
-              providerSource: "saffplus",
-            });
-          }
-          result.upserted++;
-        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         logger.warn(`[SAFF+] CDA media upsert failed: ${msg}`);
