@@ -232,6 +232,9 @@ function mottoCdaHeaders(): Record<string, string> {
   return {
     Accept: "application/json",
     Authorization: `Bearer ${env.saffplus.mottoBearerToken}`,
+    // Motto CDA gates access by Origin — without this the server returns 404/NOT_FOUND
+    Origin: "https://saffplus.sa",
+    Referer: "https://saffplus.sa/",
   };
 }
 
