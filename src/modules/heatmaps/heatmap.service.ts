@@ -160,7 +160,7 @@ export async function saveHeatmapData(
   const player = await Player.findByPk(body.playerId);
   if (!player) throw new AppError("Player not found", 404);
 
-  if (body.matchId) {
+  if (body.matchId && body.source !== "manual") {
     const match = await Match.findByPk(body.matchId);
     if (!match) throw new AppError("Match not found", 404);
   }
