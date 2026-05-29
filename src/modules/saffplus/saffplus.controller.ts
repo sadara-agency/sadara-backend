@@ -349,7 +349,6 @@ export async function proxyMatchStream(req: AuthRequest, res: Response) {
     proxyBase,
   );
   res.setHeader("Content-Type", contentType);
-  res.setHeader("Access-Control-Allow-Origin", "*");
   res.send(body);
 }
 
@@ -362,7 +361,6 @@ export async function proxyStreamSegment(req: AuthRequest, res: Response) {
     proxyBase,
   );
   res.setHeader("Content-Type", contentType);
-  res.setHeader("Access-Control-Allow-Origin", "*");
   res.send(body);
 }
 
@@ -379,7 +377,6 @@ export async function proxyMatchDrmLicense(req: AuthRequest, res: Response) {
     challenge,
   );
   res.setHeader("Content-Type", "application/octet-stream");
-  res.setHeader("Access-Control-Allow-Origin", "*");
   res.send(licenseResponse);
 }
 
