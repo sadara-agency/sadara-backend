@@ -133,6 +133,17 @@ router.get(
   asyncHandler(ctrl.listMatchMedia),
 );
 
+// Direct-playback: returns the Motto CDN playlist URL + a fresh Widevine
+// token so the browser streams segments and acquires the DRM license
+// directly from Motto (the backend's datacenter IP is blocked by the
+// segment CDN; the user's residential browser IP is not).
+router.get(
+  "/matches/:matchId/playback",
+  authorizeModule("saff-data", "read"),
+  validate(matchIdParamSchema, "params"),
+  asyncHandler(ctrl.getMatchPlayback),
+);
+
 router.post(
   "/matches/:matchId/sync-events",
   authorizeModule("saff-data", "create"),
