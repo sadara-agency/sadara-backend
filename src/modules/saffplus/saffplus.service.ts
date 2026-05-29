@@ -1406,12 +1406,23 @@ export async function proxyHlsSegment(
       .map((line) => {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith("#")) {
-          const absolute = trimmed.startsWith("http")
-            ? trimmed
-            : manifestBase + trimmed;
-          return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
+          const isPlaylist =
+            trimmed.includes(".m3u8") || trimmed.includes("m3u8");
+          if (isPlaylist) {
+            const absolute = trimmed.startsWith("http")
+              ? trimmed
+              : manifestBase + trimmed;
+            return `${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}`;
+          }
+          // Segment lines — make absolute but don't proxy (CDM fetches directly)
+          if (!trimmed.startsWith("http")) {
+            return manifestBase + trimmed;
+          }
+          return line;
         }
         return line.replace(/URI="([^"]+)"/g, (_match, uri) => {
+          const isPlaylist = uri.includes(".m3u8") || uri.includes("m3u8");
+          if (!isPlaylist) return `URI="${uri}"`;
           const absolute = uri.startsWith("http") ? uri : manifestBase + uri;
           return `URI="${proxyBase}?u=${encodeURIComponent(absolute)}${midParam}"`;
         });
