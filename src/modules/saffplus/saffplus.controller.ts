@@ -343,7 +343,13 @@ export async function previewByUrlCtrl(req: AuthRequest, res: Response) {
 
 export async function proxyMatchStream(req: AuthRequest, res: Response) {
   const { matchId } = req.params;
-  const proxyBase = `${req.protocol}://${req.get("host")}/api/v1/saffplus/stream/segment`;
+  // Use X-Forwarded-Host if present (set by Vercel's rewrite proxy) so that
+  // segment URLs in the rewritten manifest point back to the frontend origin
+  // rather than directly to this backend host — keeping requests same-origin
+  // and ensuring the auth cookie is included by hls.js.
+  const host = req.get("x-forwarded-host") ?? req.get("host");
+  const proto = req.get("x-forwarded-proto") ?? req.protocol;
+  const proxyBase = `${proto}://${host}/api/v1/saffplus/stream/segment`;
   const { contentType, body } = await saffPlusService.proxyHlsManifest(
     matchId,
     proxyBase,
