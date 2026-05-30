@@ -1,4 +1,4 @@
-import { Op, WhereOptions } from "sequelize";
+import { Op, Sequelize, WhereOptions } from "sequelize";
 import { sequelize } from "@config/database";
 import { QueryTypes } from "sequelize";
 import { Session } from "./session.model";
@@ -114,6 +114,11 @@ function buildWhere(query: SessionQuery): WhereOptions {
       { summaryAr: { [Op.iLike]: `%${query.search}%` } },
       { notes: { [Op.iLike]: `%${query.search}%` } },
       { notesAr: { [Op.iLike]: `%${query.search}%` } },
+      // Display ID (e.g. "SES-26-0001") + UUID-prefix fallback (e.g. "1bcb4b97")
+      { displayId: { [Op.iLike]: `${query.search}%` } },
+      Sequelize.where(Sequelize.cast(Sequelize.col("Session.id"), "text"), {
+        [Op.iLike]: `${query.search}%`,
+      }),
     ];
   }
 

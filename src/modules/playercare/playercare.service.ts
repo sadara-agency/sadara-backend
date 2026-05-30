@@ -8,6 +8,7 @@ import { Player } from "@modules/players/player.model";
 import { User } from "@modules/users/user.model";
 import { AppError } from "@middleware/errorHandler";
 import { buildMeta } from "@shared/utils/pagination";
+import { resolveFileUrl } from "@shared/utils/storage";
 import {
   buildRowScope,
   mergeScope,
@@ -33,6 +34,27 @@ const PLAYER_ATTRS = [
 ] as const;
 
 const USER_ATTRS = ["id", "fullName", "fullNameAr", "avatarUrl"] as const;
+
+// ── Avatar / photo URL resolution ──
+// Avatar and photo columns store bare storage keys (e.g. "avatars/abc.webp").
+// They must be resolved to public URLs before reaching the client, the same
+// way settings.service / user.service do for top-level user rows. The eager-
+// loaded assignee/creator/player here are nested, so resolve each in place.
+async function resolveCaseFileUrls(plain: Record<string, unknown>) {
+  const assignee = plain.assignee as { avatarUrl?: string | null } | null;
+  if (assignee?.avatarUrl) {
+    assignee.avatarUrl = await resolveFileUrl(assignee.avatarUrl);
+  }
+  const creator = plain.creator as { avatarUrl?: string | null } | null;
+  if (creator?.avatarUrl) {
+    creator.avatarUrl = await resolveFileUrl(creator.avatarUrl);
+  }
+  const player = plain.player as { photoUrl?: string | null } | null;
+  if (player?.photoUrl) {
+    player.photoUrl = await resolveFileUrl(player.photoUrl);
+  }
+  return plain;
+}
 
 // ── List Cases (single JOIN query) ──
 
@@ -109,7 +131,15 @@ export async function listCases(query: PlayerCareQuery, user?: AuthUser) {
     distinct: true,
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  const data = await Promise.all(
+    rows.map((r) =>
+      resolveCaseFileUrls(
+        r.get({ plain: true }) as unknown as Record<string, unknown>,
+      ),
+    ),
+  );
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 // ── Get Case by ID ──
@@ -154,7 +184,9 @@ export async function getCaseById(id: string, user?: AuthUser) {
   const allowed = await checkRowAccess("referrals", caseRecord, user);
   if (!allowed) throw new AppError("Case not found", 404);
 
-  return caseRecord;
+  return resolveCaseFileUrls(
+    caseRecord.get({ plain: true }) as unknown as Record<string, unknown>,
+  );
 }
 
 // ── Create Performance/Mental Case ──

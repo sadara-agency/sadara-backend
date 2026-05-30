@@ -238,6 +238,11 @@ export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
             ),
             { [Op.iLike]: `%${search}%` },
           ),
+          // Display ID (e.g. "P-26-0036") + UUID-prefix fallback (e.g. "1bcb4b97")
+          { displayId: { [Op.iLike]: `${search}%` } },
+          Sequelize.where(Sequelize.cast(Sequelize.col("Player.id"), "text"), {
+            [Op.iLike]: `${search}%`,
+          }),
         ];
       }
 

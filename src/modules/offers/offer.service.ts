@@ -55,6 +55,11 @@ export async function listOffers(queryParams: OfferQuery, user?: AuthUser) {
       { "$player.last_name$": { [Op.iLike]: `%${search}%` } },
       { "$fromClub.name$": { [Op.iLike]: `%${search}%` } },
       { "$toClub.name$": { [Op.iLike]: `%${search}%` } },
+      // Display ID (e.g. "OFR-26-0001") + UUID-prefix fallback (e.g. "1bcb4b97")
+      { displayId: { [Op.iLike]: `${search}%` } },
+      Sequelize.where(Sequelize.cast(Sequelize.col("Offer.id"), "text"), {
+        [Op.iLike]: `${search}%`,
+      }),
     ];
   }
 

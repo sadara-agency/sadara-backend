@@ -112,6 +112,7 @@ import { AppError } from '../../../src/middleware/errorHandler';
 
 const mockInstance = (data: Record<string, unknown>) => ({
   ...data,
+  get: jest.fn((_opts?: { plain?: boolean }) => ({ ...data })),
   update: jest.fn().mockResolvedValue({ ...data }),
   destroy: jest.fn().mockResolvedValue(undefined),
   save: jest.fn().mockResolvedValue({ ...data }),
@@ -209,7 +210,9 @@ describe('Playercare Service', () => {
       const result = await playcareService.getCaseById('case-001');
 
       expect(mockReferralFindByPk).toHaveBeenCalledWith('case-001', expect.any(Object));
-      expect(result).toBe(caseRecord);
+      // Service returns the URL-resolved plain projection (caseRecord.get({ plain: true })),
+      // not the Sequelize instance — compare by value, not identity.
+      expect(result).toEqual(caseRecord.get({ plain: true }));
     });
 
     it('should throw 404 when case is not found', async () => {
@@ -269,7 +272,8 @@ describe('Playercare Service', () => {
         expect.objectContaining({ referralType: 'Medical', playerId: 'player-001' }),
         expect.objectContaining({ transaction: expect.anything() }),
       );
-      expect(result).toBe(caseRecord);
+      // createMedicalCase returns getCaseById(...) → the plain projection, not the instance.
+      expect(result).toEqual(caseRecord.get({ plain: true }));
     });
 
     it('should throw 404 when player is not found', async () => {
@@ -292,7 +296,8 @@ describe('Playercare Service', () => {
       expect(caseRecord.update).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'InProgress' }),
       );
-      expect(result).toBe(caseRecord);
+      // updateCaseStatus returns getCaseById(...) → the plain projection, not the instance.
+      expect(result).toEqual(caseRecord.get({ plain: true }));
     });
 
     it('should set closedAt when status is Closed', async () => {

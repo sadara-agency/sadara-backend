@@ -273,6 +273,7 @@ describe("PlayerCoachAssignment Service", () => {
         acknowledgedAt: null,
         completedAt: null,
         update,
+        get: jest.fn((_opts?: { plain?: boolean }) => ({ id: "a1", coachUserId: "user-1", playerId: "p1", status: "Assigned", acknowledgedAt: null, completedAt: null })),
       };
       mockFindByPk.mockResolvedValue(assignment);
 
@@ -336,6 +337,7 @@ describe("PlayerCoachAssignment Service", () => {
         acknowledgedAt: null,
         completedAt: null,
         update,
+        get: jest.fn((_opts?: { plain?: boolean }) => ({ id: "a1", coachUserId: "someone-else", playerId: "p1", status: "Assigned", acknowledgedAt: null, completedAt: null })),
       });
 
       const adminUser = { ...baseUser, id: "admin", role: "Admin" } as any;

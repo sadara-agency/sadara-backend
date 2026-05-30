@@ -1,6 +1,7 @@
 import { QueryTypes } from "sequelize";
 import { sequelize } from "@config/database";
 import { camelCaseKeys } from "@shared/utils/caseTransform";
+import { resolveFileUrl } from "@shared/utils/storage";
 import { cacheOrFetch, buildCacheKey, CacheTTL } from "@shared/utils/cache";
 import { getAssignedPlayerIds } from "@shared/utils/rowScope";
 import { getAllPlayerSeasonStats } from "@modules/playerStats/playerStats.service";
@@ -49,7 +50,13 @@ export async function listAssignedPlayers(
         },
       );
 
-      return rows.map((r) => camelCaseKeys(r) as unknown as AssignedPlayerRow);
+      return Promise.all(
+        rows.map(async (r) => {
+          const row = camelCaseKeys(r) as unknown as AssignedPlayerRow;
+          if (!row.photoUrl) return row;
+          return { ...row, photoUrl: await resolveFileUrl(row.photoUrl) };
+        }),
+      );
     },
     CacheTTL.SHORT,
   );
@@ -189,8 +196,15 @@ export async function getPlayerProfile(
 
       if (!playerRows[0]) throw new AppError("Player not found", 404);
 
+      const player = camelCaseKeys(
+        playerRows[0],
+      ) as unknown as AssignedPlayerRow;
+      if (player.photoUrl) {
+        player.photoUrl = await resolveFileUrl(player.photoUrl);
+      }
+
       return {
-        player: camelCaseKeys(playerRows[0]) as unknown as AssignedPlayerRow,
+        player,
         recentMatchStats: recentMatchRows.map(
           (r) => camelCaseKeys(r) as unknown as RecentMatchStatRow,
         ),
@@ -327,28 +341,31 @@ export async function comparePlayers(
         },
       );
 
-      return rows.map((r) => {
-        const base = camelCaseKeys(r) as Record<string, unknown>;
-        return {
-          id: base.id as string,
-          firstName: base.firstName as string,
-          lastName: base.lastName as string,
-          firstNameAr: base.firstNameAr as string | null,
-          lastNameAr: base.lastNameAr as string | null,
-          photoUrl: base.photoUrl as string | null,
-          position: base.position as string | null,
-          seasonStats: base.seasonStats as Record<string, unknown> | null,
-          lastKpi: base.lastKpi as Record<string, unknown> | null,
-          recentMatchAvg: {
-            avgGoals: Number(base.avgGoals ?? 0),
-            avgAssists: Number(base.avgAssists ?? 0),
-            avgRating: Number(base.avgRating ?? 0),
-            avgXg: Number(base.avgXg ?? 0),
-            avgMinutesPlayed: Number(base.avgMinutesPlayed ?? 0),
-            matchCount: Number(base.matchCount ?? 0),
-          },
-        } satisfies ComparePlayerRow;
-      });
+      return Promise.all(
+        rows.map(async (r) => {
+          const base = camelCaseKeys(r) as Record<string, unknown>;
+          const rawPhoto = base.photoUrl as string | null;
+          return {
+            id: base.id as string,
+            firstName: base.firstName as string,
+            lastName: base.lastName as string,
+            firstNameAr: base.firstNameAr as string | null,
+            lastNameAr: base.lastNameAr as string | null,
+            photoUrl: rawPhoto ? await resolveFileUrl(rawPhoto) : rawPhoto,
+            position: base.position as string | null,
+            seasonStats: base.seasonStats as Record<string, unknown> | null,
+            lastKpi: base.lastKpi as Record<string, unknown> | null,
+            recentMatchAvg: {
+              avgGoals: Number(base.avgGoals ?? 0),
+              avgAssists: Number(base.avgAssists ?? 0),
+              avgRating: Number(base.avgRating ?? 0),
+              avgXg: Number(base.avgXg ?? 0),
+              avgMinutesPlayed: Number(base.avgMinutesPlayed ?? 0),
+              matchCount: Number(base.matchCount ?? 0),
+            },
+          } satisfies ComparePlayerRow;
+        }),
+      );
     },
     CacheTTL.SHORT,
   );

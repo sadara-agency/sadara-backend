@@ -23,6 +23,31 @@ import type {
   UpdateAssignmentStatusInput,
 } from "./playerCoachAssignment.validation";
 import { evictCalendarScope } from "@modules/calendar/calendarScope";
+import { resolveFileUrl } from "@shared/utils/storage";
+
+/**
+ * Convert each row's eager-loaded `player.photoUrl` from a bare storage key
+ * (e.g. "photos/abc.webp") into a full public URL. The players module does the
+ * same on its own endpoints (player.service.ts); this module must too, since
+ * the API returns the raw key otherwise and the browser can't load it.
+ * `resolveFileUrl` passes through empty values and full http(s) URLs unchanged.
+ */
+async function resolveAssignmentPhotos<
+  T extends { player?: { photoUrl?: string | null } | null },
+>(rows: T[]): Promise<T[]> {
+  return Promise.all(
+    rows.map(async (row) => {
+      if (!row.player?.photoUrl) return row;
+      return {
+        ...row,
+        player: {
+          ...row.player,
+          photoUrl: await resolveFileUrl(row.player.photoUrl),
+        },
+      };
+    }),
+  );
+}
 
 const PLAYER_INCLUDE = {
   model: Player,
@@ -67,7 +92,12 @@ export async function listAssignments(
     include: [PLAYER_INCLUDE as any, COACH_INCLUDE as any],
   });
 
-  return { data: rows, meta: buildMeta(count, page, limit) };
+  // Resolve bare photo keys to public URLs (see resolveAssignmentPhotos).
+  const data = await resolveAssignmentPhotos(
+    rows.map((r) => r.get({ plain: true }) as any),
+  );
+
+  return { data, meta: buildMeta(count, page, limit) };
 }
 
 export async function getAssignmentById(id: string, _user?: AuthUser) {
@@ -75,7 +105,8 @@ export async function getAssignmentById(id: string, _user?: AuthUser) {
     include: [PLAYER_INCLUDE as any, COACH_INCLUDE as any],
   });
   if (!item) throw new AppError("Assignment not found", 404);
-  return item;
+  // Resolve bare photo key to a public URL (see resolveAssignmentPhotos).
+  return (await resolveAssignmentPhotos([item.get({ plain: true }) as any]))[0];
 }
 
 export async function createAssignment(
@@ -291,20 +322,24 @@ export async function listMyAssignments(
     };
   });
 
+  // Resolve bare photo keys to public URLs before grouping, so both the flat
+  // list and the grouped output carry browser-loadable avatar URLs.
+  const resolved = await resolveAssignmentPhotos(data);
+
   // Optional client-side grouping. Only the current page is grouped — the
   // page is already a coherent slice ordered by `sort`/`order`. Total counts
   // remain in `meta` for pagination.
   let groups: Record<string, MyAssignmentRow[]> | undefined;
   if (query.groupBy && query.groupBy !== "none") {
     const key = query.groupBy === "status" ? "status" : "priority";
-    groups = data.reduce<Record<string, MyAssignmentRow[]>>((acc, row) => {
+    groups = resolved.reduce<Record<string, MyAssignmentRow[]>>((acc, row) => {
       const k = String(row[key as keyof MyAssignmentRow] ?? "unknown");
       (acc[k] ||= []).push(row);
       return acc;
     }, {});
   }
 
-  return { data, meta: buildMeta(count, page, limit), groups };
+  return { data: resolved, meta: buildMeta(count, page, limit), groups };
 }
 
 const STATUS_TRANSITIONS: Record<AssignmentStatus, AssignmentStatus[]> = {
@@ -380,11 +415,18 @@ export async function updateAssignmentStatus(
   // Evict calendar scope so the new status is reflected immediately
   evictCalendarScope(assignment.coachUserId).catch(() => void 0);
 
-  return assignment;
+  // Resolve bare photo key to a public URL (see resolveAssignmentPhotos). The
+  // status-update response feeds the same card components on refetch.
+  return (
+    await resolveAssignmentPhotos([assignment.get({ plain: true }) as any])
+  )[0];
 }
 
 export async function deleteAssignment(id: string) {
-  const item = await getAssignmentById(id);
+  // Fetch the model instance directly — getAssignmentById now returns a plain
+  // object (with a resolved photo URL), which has no .destroy() method.
+  const item = await PlayerCoachAssignment.findByPk(id);
+  if (!item) throw new AppError("Assignment not found", 404);
   const { coachUserId } = item;
   await item.destroy();
   // Evict calendar scope so removed player no longer appears

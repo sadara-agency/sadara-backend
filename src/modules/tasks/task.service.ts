@@ -190,6 +190,11 @@ function buildTaskWhere(queryParams: any, search?: string): any {
       { title: { [Op.iLike]: pattern } },
       { titleAr: { [Op.iLike]: pattern } },
       { description: { [Op.iLike]: pattern } },
+      // Display ID (e.g. "TSK-26-0001") + UUID-prefix fallback (e.g. "1bcb4b97")
+      { displayId: { [Op.iLike]: `${term}%` } },
+      Sequelize.where(Sequelize.cast(Sequelize.col("Task.id"), "text"), {
+        [Op.iLike]: `${term}%`,
+      }),
     ];
   }
 
