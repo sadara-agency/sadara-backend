@@ -32,7 +32,7 @@ const PLAYER_ATTRS = [
   "photoUrl",
 ] as const;
 
-const USER_ATTRS = ["id", "fullName", "fullNameAr"] as const;
+const USER_ATTRS = ["id", "fullName", "fullNameAr", "avatarUrl"] as const;
 
 // ── List Cases (single JOIN query) ──
 
