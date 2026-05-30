@@ -357,15 +357,18 @@ WellnessWorkoutAssignment.init(
       primaryKey: true,
     },
     playerId: { type: DataTypes.UUID, allowNull: false, field: "player_id" },
+    // Migration 139 renamed wellness_workout_assignments -> development_sessions
+    // and renamed these columns. Attribute names are kept for API/contract stability;
+    // only the underlying DB column mappings changed.
     templateId: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "template_id",
+      field: "program_id",
     },
     assignedDate: {
       type: DataTypes.DATEONLY,
       allowNull: false,
-      field: "assigned_date",
+      field: "scheduled_date",
     },
     status: {
       type: DataTypes.STRING(20),
@@ -377,13 +380,13 @@ WellnessWorkoutAssignment.init(
     assignedBy: {
       type: DataTypes.UUID,
       allowNull: false,
-      field: "assigned_by",
+      field: "prescribed_by",
     },
     notes: { type: DataTypes.TEXT },
   },
   {
     sequelize,
-    tableName: "wellness_workout_assignments",
+    tableName: "development_sessions",
     underscored: true,
     timestamps: true,
   },
@@ -519,7 +522,9 @@ WellnessTemplateExercise.belongsTo(WellnessExercise, {
   as: "exercise",
 });
 
+// program_id (renamed from template_id in migration 139) still holds the
+// original template ids, so the "template" association is preserved via that column.
 WellnessWorkoutAssignment.belongsTo(WellnessWorkoutTemplate, {
-  foreignKey: "template_id",
+  foreignKey: "program_id",
   as: "template",
 });
