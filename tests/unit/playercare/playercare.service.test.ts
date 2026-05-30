@@ -112,6 +112,7 @@ import { AppError } from '../../../src/middleware/errorHandler';
 
 const mockInstance = (data: Record<string, unknown>) => ({
   ...data,
+  get: jest.fn((_opts?: { plain?: boolean }) => ({ ...data })),
   update: jest.fn().mockResolvedValue({ ...data }),
   destroy: jest.fn().mockResolvedValue(undefined),
   save: jest.fn().mockResolvedValue({ ...data }),

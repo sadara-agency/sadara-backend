@@ -107,6 +107,11 @@ export async function listContracts(
       seqWhere(fn("lower", col("player.last_name")), {
         [Op.like]: pattern.toLowerCase(),
       }),
+      // Display ID (e.g. "CON-26-0001") + UUID-prefix fallback (e.g. "1bcb4b97")
+      { displayId: { [Op.iLike]: `${search}%` } },
+      seqWhere(Sequelize.cast(col("Contract.id"), "text"), {
+        [Op.iLike]: `${search}%`,
+      }),
     ];
   }
 

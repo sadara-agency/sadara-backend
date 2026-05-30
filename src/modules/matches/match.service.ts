@@ -102,6 +102,7 @@ export async function listMatches(queryParams: any) {
 
   if (search) {
     const like = { [Op.iLike]: `%${search}%` };
+    const prefixLike = { [Op.iLike]: `${search}%` };
     const searchConditions = [
       { competition: like },
       { venue: like },
@@ -109,6 +110,12 @@ export async function listMatches(queryParams: any) {
       { "$homeClub.name_ar$": like },
       { "$awayClub.name$": like },
       { "$awayClub.name_ar$": like },
+      // Display ID (e.g. "MTH-26-0001") + UUID-prefix fallback (e.g. "1bcb4b97")
+      { displayId: prefixLike },
+      Sequelize.where(
+        Sequelize.cast(Sequelize.col("Match.id"), "text"),
+        prefixLike,
+      ),
     ];
     if (where[Op.or]) {
       // Combine club filter with search using Op.and

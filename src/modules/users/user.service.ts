@@ -63,6 +63,11 @@ export async function listUsers(queryParams: any) {
       { fullName: { [Op.iLike]: pattern } },
       { fullNameAr: { [Op.iLike]: pattern } },
       { email: { [Op.iLike]: pattern } },
+      // Display ID (e.g. "U-26-0045") + UUID-prefix fallback (e.g. "1bcb4b97")
+      { displayId: { [Op.iLike]: `${search}%` } },
+      Sequelize.where(Sequelize.cast(Sequelize.col("id"), "text"), {
+        [Op.iLike]: `${search}%`,
+      }),
     ];
   }
 
