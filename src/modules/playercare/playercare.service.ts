@@ -133,7 +133,9 @@ export async function listCases(query: PlayerCareQuery, user?: AuthUser) {
 
   const data = await Promise.all(
     rows.map((r) =>
-      resolveCaseFileUrls(r.get({ plain: true }) as Record<string, unknown>),
+      resolveCaseFileUrls(
+        r.get({ plain: true }) as unknown as Record<string, unknown>,
+      ),
     ),
   );
 
@@ -183,7 +185,7 @@ export async function getCaseById(id: string, user?: AuthUser) {
   if (!allowed) throw new AppError("Case not found", 404);
 
   return resolveCaseFileUrls(
-    caseRecord.get({ plain: true }) as Record<string, unknown>,
+    caseRecord.get({ plain: true }) as unknown as Record<string, unknown>,
   );
 }
 
