@@ -20,6 +20,7 @@ import { Player } from "@modules/players/player.model";
 import { AppError } from "@middleware/errorHandler";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { checkRowAccess } from "@shared/utils/rowScope";
+import { resolveFileUrl } from "@shared/utils/storage";
 import { AuthUser } from "@shared/types";
 
 const WELLNESS_BYPASS = ["Admin", "Manager", "Executive"];
@@ -955,16 +956,18 @@ export async function getHeatmapData(days = 14, user?: AuthUser) {
     }
   }
 
-  return Array.from(playerMap.values()).map((p) => ({
-    playerId: p.playerId,
-    playerName: p.playerName,
-    playerNameAr: p.playerNameAr,
-    photoUrl: p.photoUrl,
-    dailyScores: allDates.map((date) => ({
-      date,
-      ringScore: p.scores.get(date) ?? 0,
+  return Promise.all(
+    Array.from(playerMap.values()).map(async (p) => ({
+      playerId: p.playerId,
+      playerName: p.playerName,
+      playerNameAr: p.playerNameAr,
+      photoUrl: p.photoUrl ? await resolveFileUrl(p.photoUrl) : p.photoUrl,
+      dailyScores: allDates.map((date) => ({
+        date,
+        ringScore: p.scores.get(date) ?? 0,
+      })),
     })),
-  }));
+  );
 }
 
 // ── Mood Heatmap (per-player daily mood scores from checkins) ──

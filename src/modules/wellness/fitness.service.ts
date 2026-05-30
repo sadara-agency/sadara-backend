@@ -384,7 +384,10 @@ export async function deleteTemplate(id: string) {
 // ══════════════════════════════════════════
 
 export async function listAssignments(queryParams: any) {
-  const { limit, offset, page } = parsePagination(queryParams, "assigned_date");
+  const { limit, offset, page } = parsePagination(
+    queryParams,
+    "scheduled_date",
+  );
   const where: any = {};
 
   if (queryParams.playerId) where.playerId = queryParams.playerId;

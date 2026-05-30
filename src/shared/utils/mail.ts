@@ -203,11 +203,15 @@ export async function sendMail(options: MailOptions): Promise<boolean> {
 // ═══════════════════════════════════════════════════════════
 
 /**
- * Sadara logo — inline SVG lettermark (64x64, rounded blue background + "S").
- * Encoded as a data URI so it embeds directly in the HTML without an external
- * URL, which is stripped by Gmail/Outlook when images are blocked.
+ * Sadara logo for emails — a hosted PNG (rounded blue background + white mark).
+ *
+ * MUST be a raster format (PNG), NOT an SVG: every major email client
+ * (Gmail, Outlook, Apple Mail, Yahoo) strips or refuses `<img>` SVG sources,
+ * which is why the logo previously rendered blank. The PNG is served from the
+ * deployed frontend's public assets (`frontend/public/email-logo.png`), built
+ * from config so it follows whichever frontend is deployed.
  */
-const SADARA_LOGO_SVG = `https://sadara-frontend.vercel.app/apple-touch-icon.svg`;
+const SADARA_LOGO_URL = `${env.frontend.url}/email-logo.png`;
 
 function wrapInTemplate(content: string): string {
   return `
@@ -229,7 +233,7 @@ function wrapInTemplate(content: string): string {
           <!-- Brand header (centred mark + wordmark) -->
           <tr>
             <td align="center" style="padding-bottom:36px;">
-              <img src="${SADARA_LOGO_SVG}" width="64" height="64" alt="Sadara" style="display:block; margin:0 auto 14px; border-radius:18px;" />
+              <img src="${SADARA_LOGO_URL}" width="64" height="64" alt="Sadara" style="display:block; margin:0 auto 14px; border-radius:18px;" />
               <div style="font-size:22px; font-weight:700; color:#ffffff; letter-spacing:-0.4px; line-height:1;">SADARA</div>
               <div style="font-size:10px; color:rgba(228,229,243,0.45); letter-spacing:3px; text-transform:uppercase; margin-top:6px;">Sports Management</div>
             </td>

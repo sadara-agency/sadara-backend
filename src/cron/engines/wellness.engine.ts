@@ -90,9 +90,9 @@ export async function aggregateDailySummaries(): Promise<{
       // Workout completion
       const [workoutRow]: any = await sequelize.query(
         `SELECT COUNT(*) AS cnt
-         FROM wellness_workout_assignments
+         FROM development_sessions
          WHERE player_id = :playerId
-           AND assigned_date = :date
+           AND scheduled_date = :date
            AND status = 'completed'`,
         {
           replacements: { playerId: player.player_id, date: today },
@@ -378,11 +378,11 @@ export async function checkMissedWorkout(): Promise<{ notified: number }> {
     `SELECT wa.id, wa.player_id, p.first_name, p.last_name,
             p.first_name_ar, p.last_name_ar, u.id AS user_id,
             wt.name AS template_name, wt.name_ar AS template_name_ar
-     FROM wellness_workout_assignments wa
+     FROM development_sessions wa
      JOIN players p ON p.id = wa.player_id
      LEFT JOIN users u ON u.player_id = p.id
-     LEFT JOIN wellness_workout_templates wt ON wt.id = wa.template_id
-     WHERE wa.assigned_date = :today
+     LEFT JOIN wellness_workout_templates wt ON wt.id = wa.program_id
+     WHERE wa.scheduled_date = :today
        AND wa.status = 'pending'
        AND p.status = 'active'`,
     { replacements: { today }, type: QueryTypes.SELECT },
