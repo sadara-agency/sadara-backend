@@ -143,6 +143,8 @@ export const playerMatchStatsSchema = z.object({
   foulsDrawn: z.number().int().min(0).optional(),
   yellowCards: z.number().int().min(0).optional(),
   redCards: z.number().int().min(0).optional(),
+  keyPasses: z.number().int().min(0).optional(),
+  saves: z.number().int().min(0).optional(),
   rating: z.number().min(0).max(10).optional(),
   positionInMatch: z.string().max(50).optional(),
   shotMap: z.array(shotEventSchema).optional(),

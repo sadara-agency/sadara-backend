@@ -64,6 +64,7 @@ export const CachePrefix = {
   WORKOUT_PLANS: "workout-plans",
   PLAYER_INBOX: "player-inbox",
   PLAYER_SEASON_STATS: "player-season-stats",
+  MATCH_EVENT_TAGS: "match-event-tags",
 } as const;
 
 // ── Core Operations ──
