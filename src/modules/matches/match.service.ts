@@ -604,6 +604,8 @@ export async function upsertStats(matchId: string, stats: Array<any>) {
       "foulsDrawn",
       "yellowCards",
       "redCards",
+      "keyPasses",
+      "saves",
       "rating",
       "positionInMatch",
       "shotMap",
