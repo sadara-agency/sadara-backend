@@ -511,6 +511,66 @@ describe('Match Service', () => {
       expect(result.data).toBeDefined();
       expect(result.meta).toBeDefined();
     });
+
+    // Regression guard for the "no matches" bug: a player must surface a match
+    // when they have EITHER a match_players row OR a player_match_stats row.
+    // Both includes must be non-required (LEFT JOIN) and inclusion must be
+    // decided by a UNION subquery over both tables.
+    it('should LEFT JOIN both child tables (not INNER JOIN match_players)', async () => {
+      mockMatchFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await matchService.getPlayerMatches('player-001', { page: 1, limit: 10 });
+
+      const opts = mockMatchFindAndCountAll.mock.calls[0][0] as {
+        include: { as: string; required?: boolean; where?: { playerId?: string } }[];
+        replacements?: Record<string, unknown>;
+      };
+      const matchPlayers = opts.include.find((i) => i.as === 'matchPlayers');
+      const stats = opts.include.find((i) => i.as === 'stats');
+
+      expect(matchPlayers?.required).toBe(false);
+      expect(stats?.required).toBe(false);
+      expect(matchPlayers?.where).toEqual({ playerId: 'player-001' });
+      expect(stats?.where).toEqual({ playerId: 'player-001' });
+    });
+
+    it('should restrict matches via a parameterized UNION over both tables', async () => {
+      const { Op } = require('sequelize');
+      mockMatchFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await matchService.getPlayerMatches('player-001', { page: 1, limit: 10 });
+
+      const opts = mockMatchFindAndCountAll.mock.calls[0][0] as {
+        where: Record<string | symbol, unknown>;
+        replacements?: Record<string, unknown>;
+      };
+
+      expect(opts.replacements).toEqual({ pid: 'player-001' });
+
+      const andClauses = opts.where[Op.and] as { val?: string }[];
+      expect(Array.isArray(andClauses)).toBe(true);
+      const literal = andClauses.find(
+        (c) => typeof c?.val === 'string' && c.val.includes('player_match_stats'),
+      );
+      expect(literal).toBeDefined();
+      expect(literal!.val).toContain('match_players');
+      expect(literal!.val).toContain(':pid');
+    });
+
+    it('should keep the season window while applying the UNION filter', async () => {
+      const { Op } = require('sequelize');
+      mockMatchFindAndCountAll.mockResolvedValue({ count: 0, rows: [] });
+
+      await matchService.getPlayerMatches('player-001', { season: '2025/2026' });
+
+      const opts = mockMatchFindAndCountAll.mock.calls[0][0] as {
+        where: Record<string | symbol, unknown>;
+      };
+      const matchDate = opts.where.matchDate as Record<symbol, Date>;
+      expect(matchDate[Op.gte]).toEqual(new Date('2025-07-01'));
+      expect(matchDate[Op.lte]).toEqual(new Date('2026-06-30'));
+      expect(Array.isArray(opts.where[Op.and])).toBe(true);
+    });
   });
 
   describe('getPlayerAggregateStats', () => {

@@ -661,6 +661,25 @@ export async function getPlayerMatches(playerId: string, queryParams: any) {
     };
   }
 
+  // A match is relevant to this player if they have EITHER a participation
+  // row (match_players) OR a stats row (player_match_stats) for it. Different
+  // ingestion paths populate only one of the two — manual stats entry and
+  // applyMatchToSeason write only player_match_stats, while SAFF league sync
+  // writes only match_players — so an INNER JOIN on either table alone
+  // silently drops the matches that came in via the other path. Decide
+  // inclusion at the Match level via a UNION subquery, and keep both child
+  // includes non-required so they only populate row data.
+  where[Op.and] = [
+    ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+    Sequelize.literal(
+      `"Match".id IN (
+         SELECT match_id FROM match_players WHERE player_id = :pid
+         UNION
+         SELECT match_id FROM player_match_stats WHERE player_id = :pid
+       )`,
+    ),
+  ];
+
   const { count, rows } = await Match.findAndCountAll({
     where,
     limit,
@@ -673,7 +692,7 @@ export async function getPlayerMatches(playerId: string, queryParams: any) {
         model: MatchPlayer,
         as: "matchPlayers",
         where: { playerId },
-        required: true,
+        required: false,
         attributes: ["availability", "positionInMatch", "minutesPlayed"],
       },
       {
@@ -683,6 +702,7 @@ export async function getPlayerMatches(playerId: string, queryParams: any) {
         required: false,
       },
     ],
+    replacements: { pid: playerId },
     subQuery: false,
     distinct: true,
   });
