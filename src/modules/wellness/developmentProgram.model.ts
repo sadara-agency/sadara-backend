@@ -35,6 +35,7 @@ interface DevelopmentProgramAttributes {
   playerId?: string | null;
   startWeek?: number | null;
   isActive: boolean;
+  isTemplate: boolean;
   createdBy: string;
   createdAt?: Date;
   updatedAt?: Date;
@@ -44,6 +45,7 @@ interface DevelopmentProgramCreation extends Optional<
   DevelopmentProgramAttributes,
   | "id"
   | "isActive"
+  | "isTemplate"
   | "durationWeeks"
   | "programType"
   | "createdAt"
@@ -67,6 +69,7 @@ export class DevelopmentProgram
   declare playerId: string | null;
   declare startWeek: number | null;
   declare isActive: boolean;
+  declare isTemplate: boolean;
   declare createdBy: string;
   declare readonly createdAt: Date;
   declare readonly updatedAt: Date;
@@ -130,6 +133,12 @@ DevelopmentProgram.init(
       allowNull: false,
       defaultValue: true,
       field: "is_active",
+    },
+    isTemplate: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: "is_template",
     },
     createdBy: {
       type: DataTypes.UUID,

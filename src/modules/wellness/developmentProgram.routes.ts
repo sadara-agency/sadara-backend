@@ -9,6 +9,8 @@ import * as ctrl from "./developmentProgram.controller";
 import {
   createProgramSchema,
   updateProgramSchema,
+  cloneProgramSchema,
+  updateExerciseSchema,
   addExerciseToProgramSchema,
   reorderExercisesSchema,
   listProgramsQuerySchema,
@@ -109,6 +111,48 @@ router.post(
 
 /**
  * @swagger
+ * /development-programs/{id}/clone:
+ *   post:
+ *     summary: Clone a program (deep-copies day sessions + exercises)
+ *     description: >
+ *       Use template (clone onto a player), Save as reusable (asTemplate=true →
+ *       playerId null), or Duplicate. Never carries a training block.
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               playerId:
+ *                 type: string
+ *                 format: uuid
+ *                 nullable: true
+ *               asTemplate:
+ *                 type: boolean
+ *                 default: false
+ *     responses:
+ *       201:
+ *         description: Cloned program
+ *       404:
+ *         description: Source program not found
+ */
+router.post(
+  "/:id/clone",
+  authorizeModule("wellness", "create"),
+  validate(cloneProgramSchema),
+  asyncHandler(ctrl.clone),
+);
+
+/**
+ * @swagger
  * /development-programs/{id}:
  *   patch:
  *     summary: Update a development program
@@ -182,6 +226,36 @@ router.post(
   authorizeModule("wellness", "update"),
   validate(addExerciseToProgramSchema),
   asyncHandler(ctrl.addExercise),
+);
+
+/**
+ * @swagger
+ * /development-programs/{id}/exercises/{programExerciseId}:
+ *   patch:
+ *     summary: Update one prescribed exercise inline (sets/reps/rest/weight/notes)
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: path
+ *         name: programExerciseId
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     responses:
+ *       200:
+ *         description: Exercise updated
+ *       404:
+ *         description: Exercise not found in program
+ */
+router.patch(
+  "/:id/exercises/:programExerciseId",
+  authorizeModule("wellness", "update"),
+  validate(updateExerciseSchema),
+  asyncHandler(ctrl.updateExercise),
 );
 
 /**
