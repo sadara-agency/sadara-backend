@@ -90,7 +90,7 @@ describe("DevelopmentProgram Controller", () => {
       const res = mockRes();
       await ctrl.getById(mockReq({ params: { id: PROGRAM_ID } }), res);
       expect(res.status).toHaveBeenCalledWith(200);
-      expect(svc.getProgramById).toHaveBeenCalledWith(PROGRAM_ID);
+      expect(svc.getProgramById).toHaveBeenCalledWith(PROGRAM_ID, { id: "user-001", fullName: "Coach", role: "GymCoach" });
     });
 
     it("propagates 404 when program does not exist", async () => {
