@@ -31,9 +31,7 @@ interface DevelopmentProgramAttributes {
   durationWeeks: number;
   phase?: ProgramPhase | null;
   programType: ProgramType;
-  trainingBlockId?: string | null;
   playerId?: string | null;
-  startWeek?: number | null;
   isActive: boolean;
   isTemplate: boolean;
   createdBy: string;
@@ -65,9 +63,7 @@ export class DevelopmentProgram
   declare durationWeeks: number;
   declare phase: ProgramPhase | null;
   declare programType: ProgramType;
-  declare trainingBlockId: string | null;
   declare playerId: string | null;
-  declare startWeek: number | null;
   declare isActive: boolean;
   declare isTemplate: boolean;
   declare createdBy: string;
@@ -116,17 +112,9 @@ DevelopmentProgram.init(
       field: "program_type",
       validate: { isIn: [["gym", "field", "rehab", "recovery", "mixed"]] },
     },
-    trainingBlockId: {
-      type: DataTypes.UUID,
-      field: "training_block_id",
-    },
     playerId: {
       type: DataTypes.UUID,
       field: "player_id",
-    },
-    startWeek: {
-      type: DataTypes.INTEGER,
-      field: "start_week",
     },
     isActive: {
       type: DataTypes.BOOLEAN,

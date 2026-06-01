@@ -2,14 +2,13 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 import { FoodItem } from "./foodItem.model";
 
-export type TriggeringReason = "manual" | "scan" | "injury" | "block_change";
+export type TriggeringReason = "manual" | "scan" | "injury";
 
 // ─── NutritionPrescription ────────────────────────────────────────────────────
 
 export interface NutritionPrescriptionAttributes {
   id: string;
   playerId: string;
-  trainingBlockId: string | null;
   versionNumber: number;
   issuedBy: string;
   triggeringReason: TriggeringReason;
@@ -31,7 +30,6 @@ export interface NutritionPrescriptionAttributes {
 interface NutritionPrescriptionCreationAttributes extends Optional<
   NutritionPrescriptionAttributes,
   | "id"
-  | "trainingBlockId"
   | "versionNumber"
   | "triggeringScanId"
   | "targetCalories"
@@ -57,7 +55,6 @@ export class NutritionPrescription
 {
   declare id: string;
   declare playerId: string;
-  declare trainingBlockId: string | null;
   declare versionNumber: number;
   declare issuedBy: string;
   declare triggeringReason: TriggeringReason;
@@ -89,10 +86,6 @@ NutritionPrescription.init(
       type: DataTypes.UUID,
       allowNull: false,
       field: "player_id",
-    },
-    trainingBlockId: {
-      type: DataTypes.UUID,
-      field: "training_block_id",
     },
     versionNumber: {
       type: DataTypes.INTEGER,

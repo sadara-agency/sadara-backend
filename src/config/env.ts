@@ -159,6 +159,16 @@ const envSchema = z.object({
   // Anthropic LLM (optional — required for AI summary generation)
   ANTHROPIC_API_KEY: z.string().default(""),
 
+  // InBody OCR (deterministic, tesseract.js). All optional.
+  //   OCR_TIMEOUT_MS — per-image OCR ceiling so the extract request can't hang.
+  //   OCR_LANG_PATH  — override the eng/ara traineddata dir (default: bundled).
+  //   OCR_DISABLE    — kill-switch: skip OCR entirely (returns "ocr-failed").
+  OCR_TIMEOUT_MS: z.coerce.number().int().min(1000).default(25000),
+  OCR_LANG_PATH: z.string().default(""),
+  OCR_DISABLE: z
+    .preprocess((v) => String(v) === "true", z.boolean())
+    .default(false),
+
   // Production admin seed (optional)
   PROD_ADMIN_EMAIL: z.string().default("admin@sadara.com"),
   PROD_ADMIN_PASSWORD: z.string().default(""),
@@ -316,6 +326,12 @@ export const env = {
 
   anthropic: {
     apiKey: validated.ANTHROPIC_API_KEY,
+  },
+
+  ocr: {
+    timeoutMs: validated.OCR_TIMEOUT_MS,
+    langPath: validated.OCR_LANG_PATH || undefined,
+    disabled: validated.OCR_DISABLE,
   },
 
   saffplus: {

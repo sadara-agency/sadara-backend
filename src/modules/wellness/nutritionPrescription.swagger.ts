@@ -23,12 +23,8 @@
  *           nullable: true
  *         triggeringReason:
  *           type: string
- *           enum: [manual, scan, injury, block_change]
+ *           enum: [manual, scan, injury]
  *         triggeringScanId:
- *           type: string
- *           format: uuid
- *           nullable: true
- *         trainingBlockId:
  *           type: string
  *           format: uuid
  *           nullable: true
@@ -79,10 +75,6 @@
  *         playerId:
  *           type: string
  *           format: uuid
- *         trainingBlockId:
- *           type: string
- *           format: uuid
- *           nullable: true
  *         targetCalories:
  *           type: integer
  *           minimum: 1
@@ -113,7 +105,7 @@
  *       properties:
  *         triggeringReason:
  *           type: string
- *           enum: [manual, scan, injury, block_change]
+ *           enum: [manual, scan, injury]
  *           default: manual
  *         triggeringScanId:
  *           type: string

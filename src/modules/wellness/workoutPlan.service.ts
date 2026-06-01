@@ -9,7 +9,6 @@ import {
 } from "./workoutPlan.model";
 import type { WorkoutSessionStatus } from "./workoutPlan.model";
 import { WellnessExercise } from "./fitness.model";
-import TrainingBlock from "./trainingBlock.model";
 import {
   DevelopmentProgram,
   ProgramExercise,
@@ -229,9 +228,9 @@ async function generateSessions(plan: WorkoutPlan) {
 // ── Player weekly/today workouts (sourced from the DevelopmentProgram system) ──
 //
 // The player Workouts page reads coach-assigned training directly from the
-// active TrainingBlock → DevelopmentProgram → ProgramDaySession tables and
-// projects each day-session into the WorkoutSession shape the frontend renders.
-// The legacy WorkoutPlan/WorkoutSession tables are not used for this read path.
+// active DevelopmentProgram → ProgramDaySession tables and projects each
+// day-session into the WorkoutSession shape the frontend renders. The legacy
+// WorkoutPlan/WorkoutSession tables are not used for this read path.
 
 type ProjectedExercise = {
   id: string;
@@ -293,17 +292,8 @@ function categoryToGoal(category: string | null | undefined): string {
 async function loadActivePrograms(
   playerId: string,
 ): Promise<DevelopmentProgram[]> {
-  const block = await TrainingBlock.findOne({
-    where: { playerId, status: "active" },
-    attributes: ["id"],
-  });
-
-  const where = block
-    ? { [Op.or]: [{ playerId }, { trainingBlockId: block.id }], isActive: true }
-    : { playerId, isActive: true };
-
   return DevelopmentProgram.findAll({
-    where,
+    where: { playerId, isActive: true },
     include: [
       {
         model: ProgramDaySession,

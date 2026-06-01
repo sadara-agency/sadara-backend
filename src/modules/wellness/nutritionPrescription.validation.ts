@@ -1,11 +1,6 @@
 import { z } from "zod";
 
-export const triggeringReasonEnum = z.enum([
-  "manual",
-  "scan",
-  "injury",
-  "block_change",
-]);
+export const triggeringReasonEnum = z.enum(["manual", "scan", "injury"]);
 
 const prescriptionMealItemSchema = z.object({
   foodItemId: z.string().uuid(),
@@ -20,7 +15,6 @@ const prescriptionMealSchema = z.object({
 
 export const issuePrescriptionSchema = z.object({
   playerId: z.string().uuid(),
-  trainingBlockId: z.string().uuid().optional().nullable(),
   targetCalories: z.number().int().positive().optional().nullable(),
   targetProteinG: z.number().positive().optional().nullable(),
   targetCarbsG: z.number().positive().optional().nullable(),

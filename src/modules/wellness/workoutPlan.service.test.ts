@@ -17,11 +17,6 @@ jest.mock("./workoutPlan.model", () => ({
   WorkoutSetLog: { create: jest.fn(), findAll: jest.fn() },
 }));
 
-jest.mock("./trainingBlock.model", () => ({
-  __esModule: true,
-  default: { findOne: jest.fn() },
-}));
-
 jest.mock("./developmentProgram.model", () => ({
   __esModule: true,
   DevelopmentProgram: { findAll: jest.fn() },
@@ -48,7 +43,6 @@ jest.mock("@middleware/errorHandler", () => ({
   },
 }));
 
-import TrainingBlock from "./trainingBlock.model";
 import { DevelopmentProgram } from "./developmentProgram.model";
 import { WorkoutSession } from "./workoutPlan.model";
 import {
@@ -59,7 +53,6 @@ import {
 } from "./workoutPlan.service";
 
 const PLAYER_ID = "11111111-1111-1111-1111-111111111111";
-const BLOCK_ID = "33333333-3333-3333-3333-333333333333";
 
 function makeProgram(daySessions: unknown[]) {
   return {
@@ -79,7 +72,6 @@ beforeEach(() => {
 
 describe("getWeeklyWorkouts", () => {
   it("projects active program day-sessions into WorkoutSession-shaped objects", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
       makeProgram([
         {
@@ -135,8 +127,7 @@ describe("getWeeklyWorkouts", () => {
     ).toBeLessThan(0);
   });
 
-  it("returns [] when there is no active block and no directly-assigned program", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue(null);
+  it("returns [] when the player has no assigned program", async () => {
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([]);
 
     const result = await getWeeklyWorkouts(PLAYER_ID);
@@ -144,8 +135,7 @@ describe("getWeeklyWorkouts", () => {
     expect(result).toEqual([]);
   });
 
-  it("includes directly player-assigned programs when no active block exists", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue(null);
+  it("includes directly player-assigned programs", async () => {
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
       makeProgram([
         {
@@ -168,7 +158,6 @@ describe("getWeeklyWorkouts", () => {
 
 describe("getTodaysWorkout", () => {
   it("returns null when no day-session maps to today", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
     // Pick a dayOfWeek guaranteed not to be today by covering the opposite
     const notToday = (new Date().getUTCDay() + 3) % 7;
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
@@ -190,7 +179,6 @@ describe("getTodaysWorkout", () => {
   });
 
   it("returns today's session when a day-session maps to today", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
     const todayDow = new Date().getUTCDay();
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
       makeProgram([
@@ -214,7 +202,6 @@ describe("getTodaysWorkout", () => {
 
 describe("getWeeklyWorkouts — overlay", () => {
   it("overlays a materialized session's real id and status onto the projected day", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
     const todayDow = new Date().getUTCDay();
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
       makeProgram([
@@ -259,7 +246,6 @@ describe("getWeeklyWorkouts — overlay", () => {
 
 describe("resolveOrMaterializeSession", () => {
   function mockOwnedProgram() {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue({ id: BLOCK_ID });
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([
       {
         id: "prog-1",
@@ -302,7 +288,6 @@ describe("resolveOrMaterializeSession", () => {
   });
 
   it("404s when the program is not accessible to the player", async () => {
-    (TrainingBlock.findOne as jest.Mock).mockResolvedValue(null);
     (DevelopmentProgram.findAll as jest.Mock).mockResolvedValue([]);
 
     await expect(

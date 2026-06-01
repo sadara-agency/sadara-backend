@@ -17,7 +17,7 @@ import { Gate, GateChecklist } from "@modules/gates/gate.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
 import { SessionFeedback } from "@modules/sessions/feedback/sessionFeedback.model";
-import TrainingBlock from "@modules/wellness/trainingBlock.model";
+
 import {
   WorkoutPlan,
   WorkoutPlanDay,
@@ -646,23 +646,6 @@ export function setupAssociations() {
     foreignKey: "watchlistId",
     as: "watchlist",
   });
-
-  // ── Training Blocks (Wellness Phase 2) ──
-  Player.hasMany(TrainingBlock, {
-    foreignKey: "playerId",
-    as: "trainingBlocks",
-  });
-  TrainingBlock.belongsTo(Player, { foreignKey: "playerId", as: "player" });
-  TrainingBlock.belongsTo(BodyComposition, {
-    foreignKey: "startScanId",
-    as: "startScan",
-  });
-  TrainingBlock.belongsTo(BodyComposition, {
-    foreignKey: "endScanId",
-    as: "endScan",
-  });
-  TrainingBlock.belongsTo(User, { foreignKey: "createdBy", as: "creator" });
-  TrainingBlock.belongsTo(User, { foreignKey: "closedBy", as: "closer" });
 
   // ── Medical Reports ──
   MedicalReport.hasMany(MedicalLabResult, {
