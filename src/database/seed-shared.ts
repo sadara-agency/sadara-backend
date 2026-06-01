@@ -503,17 +503,16 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
   }),
   ...forRoles("documents", ["Analyst"], { canRead: true, canCreate: true }),
+  // Wellness staff who record InBody scans need to attach the report file
+  // (POST /documents/upload requires documents:create).
   ...forRoles(
     "documents",
-    [
-      "Finance",
-      "Coach",
-      "SkillCoach",
-      "TacticalCoach",
-      "FitnessCoach",
-      "GraphicDesigner",
-      "Executive",
-    ],
+    ["FitnessCoach", "GymCoach", "NutritionSpecialist", "Coach"],
+    { canRead: true, canCreate: true },
+  ),
+  ...forRoles(
+    "documents",
+    ["Finance", "SkillCoach", "TacticalCoach", "GraphicDesigner", "Executive"],
     { canRead: true },
   ),
 
