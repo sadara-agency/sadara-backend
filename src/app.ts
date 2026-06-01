@@ -64,7 +64,7 @@ import wellnessRoutes from "@modules/wellness/wellness.routes";
 import fitnessRoutes from "@modules/wellness/fitness.routes";
 import bodyCompositionRoutes from "@modules/wellness/bodyComposition.routes";
 import recoveryActivityRoutes from "@modules/wellness/recoveryActivity.routes";
-import trainingBlockRoutes from "@modules/wellness/trainingBlock.routes";
+
 import nutritionPrescriptionRoutes from "@modules/wellness/nutritionPrescription.routes";
 import developmentProgramRoutes from "@modules/wellness/developmentProgram.routes";
 import workoutPlanRoutes from "@modules/wellness/workoutPlan.routes";
@@ -467,7 +467,7 @@ app.use("/api/v1/wellness", wellnessRoutes);
 app.use("/api/v1/wellness", fitnessRoutes);
 app.use("/api/v1/body-compositions", bodyCompositionRoutes);
 app.use("/api/v1/recovery-activities", recoveryActivityRoutes);
-app.use("/api/v1/training-blocks", trainingBlockRoutes);
+
 app.use("/api/v1/nutrition-prescriptions", nutritionPrescriptionRoutes);
 app.use("/api/v1/development-programs", developmentProgramRoutes);
 app.use("/api/v1/workout-plans", workoutPlanRoutes);
