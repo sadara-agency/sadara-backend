@@ -79,10 +79,6 @@ jest.mock("@modules/wellness/developmentProgram.model", () => ({
   DevelopmentProgram: { findAll: jest.fn(), name: "DevelopmentProgram" },
   ProgramExercise: { name: "ProgramExercise" },
 }));
-jest.mock("@modules/wellness/trainingBlock.model", () => ({
-  TrainingBlock: { findAll: jest.fn(), name: "TrainingBlock" },
-  TrainingBlockExercise: { name: "TrainingBlockExercise" },
-}));
 jest.mock("@modules/wellness/programDaySession.model", () => ({
   ProgramDaySession: { findAll: jest.fn(), name: "ProgramDaySession" },
 }));

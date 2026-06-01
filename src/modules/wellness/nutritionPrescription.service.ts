@@ -260,7 +260,6 @@ export async function issueNewVersion(
 
   const newVersion = await NutritionPrescription.create({
     playerId,
-    trainingBlockId: current.trainingBlockId,
     versionNumber: current.versionNumber + 1,
     issuedBy: userId ?? current.issuedBy,
     triggeringReason: reason,

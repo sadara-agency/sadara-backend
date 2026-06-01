@@ -32,9 +32,7 @@ export const createProgramSchema = z.object({
   durationWeeks: z.number().int().min(1).max(16).default(4),
   phase: programPhaseEnum.nullish(),
   programType: programTypeEnum.default("gym"),
-  trainingBlockId: z.string().uuid().optional().nullable(),
   playerId: z.string().uuid().optional().nullable(),
-  startWeek: z.number().int().min(1).max(16).nullish(),
   isActive: z.boolean().default(true),
   isTemplate: z.boolean().optional(),
 });
@@ -72,7 +70,6 @@ export const reorderExercisesSchema = z.object({
 export const listProgramsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(500).default(20),
-  trainingBlockId: z.string().uuid().optional(),
   programType: programTypeEnum.optional(),
   isActive: z.coerce.boolean().optional(),
   playerId: z.string().uuid().optional(),

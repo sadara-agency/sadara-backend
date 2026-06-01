@@ -26,18 +26,9 @@ export async function listPrograms(
   query: ListProgramsQueryDTO,
   user?: AuthUser,
 ) {
-  const {
-    page,
-    limit,
-    trainingBlockId,
-    programType,
-    isActive,
-    playerId,
-    isTemplate,
-  } = query;
+  const { page, limit, programType, isActive, playerId, isTemplate } = query;
   const where: any = {};
 
-  if (trainingBlockId !== undefined) where.trainingBlockId = trainingBlockId;
   if (programType !== undefined) where.programType = programType;
   if (isActive !== undefined) where.isActive = isActive;
   if (playerId !== undefined) where.playerId = playerId;
@@ -123,8 +114,7 @@ export async function createProgram(
  * - "Use template" → clone(template → player): { playerId } set, asTemplate false.
  * - "Save as reusable" → clone(player program → template): asTemplate true, playerId null.
  * - "Duplicate" → clone onto the same player.
- * Never carries a trainingBlockId (coach flow is block-free). When `user` is
- * provided the source is permission-checked via getProgramById.
+ * When `user` is provided the source is permission-checked via getProgramById.
  */
 export async function cloneProgram(
   sourceId: string,
@@ -146,9 +136,7 @@ export async function cloneProgram(
         durationWeeks: source.durationWeeks,
         phase: source.phase,
         programType: source.programType,
-        trainingBlockId: null,
         playerId: asTemplate ? null : (opts.playerId ?? null),
-        startWeek: source.startWeek,
         isActive: true,
         isTemplate: asTemplate,
         createdBy: userId,

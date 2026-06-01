@@ -394,7 +394,6 @@ interface WellnessCheckinAttributes {
   // Phase 5 fields
   trainingType: DailyPulseTrainingType | null;
   nutritionRating: number | null;
-  trainingBlockId: string | null;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -414,7 +413,6 @@ interface WellnessCheckinCreation extends Optional<
   | "createdBy"
   | "trainingType"
   | "nutritionRating"
-  | "trainingBlockId"
   | "createdAt"
   | "updatedAt"
 > {}
@@ -438,7 +436,6 @@ export class WellnessCheckin
   declare createdBy: string | null;
   declare trainingType: DailyPulseTrainingType | null;
   declare nutritionRating: number | null;
-  declare trainingBlockId: string | null;
   declare createdAt: Date;
   declare updatedAt: Date;
 }
@@ -472,7 +469,6 @@ WellnessCheckin.init(
     createdBy: { type: DataTypes.UUID, field: "created_by" },
     trainingType: { type: DataTypes.STRING(20), field: "training_type" },
     nutritionRating: { type: DataTypes.SMALLINT, field: "nutrition_rating" },
-    trainingBlockId: { type: DataTypes.UUID, field: "training_block_id" },
   },
   {
     sequelize,

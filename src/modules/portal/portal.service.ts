@@ -21,7 +21,6 @@ import {
   ProgramExercise,
 } from "@modules/wellness/developmentProgram.model";
 import { WellnessExercise } from "@modules/wellness/fitness.model";
-import { TrainingBlock } from "@modules/wellness/trainingBlock.model";
 import { ProgramDaySession } from "@modules/wellness/programDaySession.model";
 import { ProgramExerciseLog } from "@modules/wellness/programExerciseLog.model";
 import { AppError } from "@middleware/errorHandler";
@@ -1434,46 +1433,20 @@ export async function getMyPrograms(userId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
 
-  // Get all training blocks for this player (for block-linked programs)
-  const blocks = await TrainingBlock.findAll({
-    where: { playerId },
-    attributes: ["id", "goal", "status", "startedAt", "plannedEndAt"],
-    order: [["startedAt", "DESC"]],
-  });
-  const blockIds = blocks.map((b) => b.id);
-
-  // Programs linked directly via player_id OR via a training block owned by this player
-  const whereClause =
-    blockIds.length > 0
-      ? { [Op.or]: [{ playerId }, { trainingBlockId: { [Op.in]: blockIds } }] }
-      : { playerId };
-
   const programs = await DevelopmentProgram.findAll({
-    where: whereClause,
+    where: { playerId },
     order: [["createdAt", "DESC"]],
   });
 
-  // Attach block metadata to each program for the timeline view
-  const blockMap = new Map(blocks.map((b) => [b.id, b]));
-  const programsWithBlock = programs.map((p) => {
-    const block = p.trainingBlockId ? blockMap.get(p.trainingBlockId) : null;
-    return { ...p.toJSON(), trainingBlock: block ? block.toJSON() : null };
-  });
-
+  const programsJson = programs.map((p) => p.toJSON());
   const active = programs.filter((p) => p.isActive).length;
 
-  return { programs: programsWithBlock, total: programs.length, active };
+  return { programs: programsJson, total: programs.length, active };
 }
 
 export async function getMyProgramById(userId: string, programId: string) {
   const player = await getLinkedPlayer(userId);
   const playerId = getPlayerId(player);
-
-  const blocks = await TrainingBlock.findAll({
-    where: { playerId },
-    attributes: ["id", "goal", "status", "startedAt", "plannedEndAt"],
-  });
-  const blockIds = blocks.map((b) => b.id);
 
   // Build a fresh include object each time — Sequelize mutates include option
   // objects in place during query normalization, so reusing one object for both
@@ -1502,18 +1475,9 @@ export async function getMyProgramById(userId: string, programId: string) {
 
   if (!program) throw new AppError("Program not found", 404);
 
-  const isOwn = program.playerId === playerId;
-  const isViaBlock =
-    program.trainingBlockId !== null &&
-    program.trainingBlockId !== undefined &&
-    blockIds.includes(program.trainingBlockId);
-  if (!isOwn && !isViaBlock) {
+  if (program.playerId !== playerId) {
     throw new AppError("Program not found", 404);
   }
-
-  const block = program.trainingBlockId
-    ? blocks.find((b) => b.id === program.trainingBlockId)
-    : null;
 
   // Attach per-exercise log counts so the player UI can show "X sets logged"
   const logCounts = await ProgramExerciseLog.findAll({
@@ -1551,5 +1515,5 @@ export async function getMyProgramById(userId: string, programId: string) {
       }));
   }
 
-  return { ...programJson, trainingBlock: block ? block.toJSON() : null };
+  return programJson;
 }

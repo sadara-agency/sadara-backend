@@ -1,6 +1,7 @@
 import {
   containsInBodyMarkers,
   extractInBodyValues,
+  mergeExtracted,
 } from "./inbodyExtract.service";
 
 // Snapshots of realistic text shapes the extractor sees:
@@ -194,5 +195,122 @@ describe("inbodyExtract — magnitude guards", () => {
     const result = extractInBodyValues(text);
     expect(result.measuredBmrKcal).toBeUndefined();
     expect(result.metabolicAge).toBe(27);
+  });
+});
+
+// Realistic Arabic InBody270 OCR shape: value-then-reference-range rows,
+// an InBody score "83/100", a BMI "24.1", height "174cm" and age "30" — all
+// of which contain numbers that fall inside a stored field's range and would
+// poison extraction without the parens/score/negative-label guards.
+const ARABIC_INBODY270_REFRANGE_TEXT = `
+InBody 270
+تاريخ الاختبار/الوقت
+2023.10.04 04:53
+درجة اختبار InBody
+83/100
+الوزن
+73.1 ( 56.6~76.6 )
+كتلة الهيكل العضلي
+35.0 ( 30.6~37.4 )
+النسبة المئوية للدهون بالجسم
+16.3
+إجمالي المياه بالجسم
+44.9 L (37.4~45.8)
+البروتين
+12.3 ( 10.1~12.3 )
+المعادن
+4.04 ( 3.46~4.23 )
+مؤشر كتلة الجسم
+24.1
+الطول
+174cm
+العمر
+30
+مستوى الدهون الحشوية
+4
+معدل حجم الخصر – الورك
+0.88
+معدل الأيض الأساسي للقياس
+1620
+العمر الأيضي (سنة)
+27
+`.trim();
+
+describe("inbodyExtract — extractInBodyValues (Arabic InBody270 ref-range shape)", () => {
+  const result = extractInBodyValues(ARABIC_INBODY270_REFRANGE_TEXT);
+
+  it("picks the measured value outside the reference-range parentheses", () => {
+    expect(result.weightKg).toBe(73.1);
+    expect(result.skeletalMuscleMassKg).toBe(35.0);
+    expect(result.totalBodyWaterKg).toBe(44.9);
+    expect(result.proteinKg).toBe(12.3);
+    expect(result.mineralKg).toBe(4.04);
+    expect(result.bodyFatPct).toBe(16.3);
+  });
+
+  it("extracts metabolic markers and date", () => {
+    expect(result.measuredBmrKcal).toBe(1620);
+    expect(result.visceralFatLevel).toBe(4);
+    expect(result.waistHipRatio).toBe(0.88);
+    expect(result.metabolicAge).toBe(27);
+    expect(result.scanDate).toBe("2023-10-04");
+  });
+
+  it("does NOT mistake BMI, score, or height for weight", () => {
+    expect(result.weightKg).not.toBe(24.1); // BMI
+    expect(result.weightKg).not.toBe(83); // score numerator
+    expect(result.weightKg).not.toBe(174); // height cm
+  });
+
+  it("does NOT let the '/100' score pollute BMR", () => {
+    // 100 is well below the BMR range [600,4000] so it could never be picked,
+    // but the score line must not be selected as any field's source either.
+    expect(result.measuredBmrKcal).toBe(1620);
+  });
+});
+
+describe("inbodyExtract — score line before the weight value", () => {
+  it("still extracts weight when '83/100' precedes it", () => {
+    const text = [
+      "درجة اختبار InBody",
+      "83/100",
+      "الوزن",
+      "73.1 ( 56.6~76.6 )",
+    ].join("\n");
+    const result = extractInBodyValues(text);
+    expect(result.weightKg).toBe(73.1);
+  });
+});
+
+describe("inbodyExtract — prefer value outside parentheses", () => {
+  it("returns the leftmost out-of-paren value, not a reference bound", () => {
+    const text = "الوزن\n73.1 ( 56.6~76.6 )";
+    const result = extractInBodyValues(text);
+    expect(result.weightKg).toBe(73.1);
+  });
+});
+
+describe("inbodyExtract — mergeExtracted", () => {
+  it("fills a field the primary left undefined from the secondary", () => {
+    const primary = { weightKg: 73.1 };
+    const secondary = { weightKg: 72.0, bodyFatPct: 16.3 };
+    const merged = mergeExtracted(primary, secondary);
+    expect(merged.weightKg).toBe(73.1); // primary wins on conflict
+    expect(merged.bodyFatPct).toBe(16.3); // secondary fills the gap
+  });
+
+  it("fills a null primary field from the secondary", () => {
+    const primary = { weightKg: null };
+    const secondary = { weightKg: 72.0 };
+    const merged = mergeExtracted(primary, secondary);
+    expect(merged.weightKg).toBe(72.0);
+  });
+
+  it("falls back to the secondary scanDate when primary lacks it", () => {
+    const primary = { weightKg: 73.1 };
+    const secondary = { scanDate: "2023-10-04" };
+    const merged = mergeExtracted(primary, secondary);
+    expect(merged.scanDate).toBe("2023-10-04");
+    expect(merged.weightKg).toBe(73.1);
   });
 });

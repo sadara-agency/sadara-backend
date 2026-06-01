@@ -8,14 +8,13 @@ import {
 
 const PLAYER_UUID = "550e8400-e29b-41d4-a716-446655440001";
 const SCAN_UUID = "550e8400-e29b-41d4-a716-446655440002";
-const BLOCK_UUID = "550e8400-e29b-41d4-a716-446655440003";
 
 describe("NutritionPrescription Schemas", () => {
   // ── triggeringReasonEnum ──
 
   describe("triggeringReasonEnum", () => {
     it("accepts all valid triggering reasons", () => {
-      const reasons = ["manual", "scan", "injury", "block_change"] as const;
+      const reasons = ["manual", "scan", "injury"] as const;
       for (const reason of reasons) {
         expect(triggeringReasonEnum.safeParse(reason).success).toBe(true);
       }
@@ -43,7 +42,6 @@ describe("NutritionPrescription Schemas", () => {
       expect(
         issuePrescriptionSchema.safeParse({
           playerId: PLAYER_UUID,
-          trainingBlockId: BLOCK_UUID,
           targetCalories: 2200,
           targetProteinG: 180,
           targetCarbsG: 250,
@@ -95,14 +93,6 @@ describe("NutritionPrescription Schemas", () => {
       ).toBe(false);
     });
 
-    it("rejects non-UUID trainingBlockId", () => {
-      expect(
-        issuePrescriptionSchema.safeParse({
-          playerId: PLAYER_UUID,
-          trainingBlockId: "bad-id",
-        }).success,
-      ).toBe(false);
-    });
   });
 
   // ── updatePrescriptionSchema ──
@@ -176,13 +166,11 @@ describe("NutritionPrescription Schemas", () => {
       ).toBe(false);
     });
 
-    it("accepts injury and block_change as valid reasons", () => {
-      for (const reason of ["injury", "block_change"] as const) {
-        expect(
-          reissuePrescriptionSchema.safeParse({ triggeringReason: reason })
-            .success,
-        ).toBe(true);
-      }
+    it("accepts injury as a valid reason", () => {
+      expect(
+        reissuePrescriptionSchema.safeParse({ triggeringReason: "injury" })
+          .success,
+      ).toBe(true);
     });
   });
 

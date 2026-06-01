@@ -31,9 +31,6 @@ router.use(authenticate);
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: trainingBlockId
- *         schema: { type: string, format: uuid }
- *       - in: query
  *         name: programType
  *         schema: { type: string, enum: [gym, field, rehab, recovery, mixed] }
  *       - in: query

@@ -91,7 +91,6 @@ describe("cloneProgram", () => {
       durationWeeks: 4,
       phase: null,
       programType: "gym",
-      startWeek: null,
       isTemplate: true,
       createdBy: USER_ID,
       exercises: [],
@@ -141,7 +140,6 @@ describe("cloneProgram", () => {
       expect.objectContaining({
         playerId: PLAYER_ID,
         isTemplate: false,
-        trainingBlockId: null,
         createdBy: USER_ID,
         name: "3-Day Gym",
       }),

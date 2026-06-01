@@ -13,15 +13,13 @@ async function resolvePlayerAndValidateAccess(
   const player = await getLinkedPlayer(userId);
   const playerId: string = player.getDataValue("id") ?? (player as any).id;
 
-  // Verify the program belongs to this player (direct or via training block)
+  // Verify the program belongs to this player
   const program = await DevelopmentProgram.findByPk(programId, {
-    attributes: ["id", "playerId", "trainingBlockId"],
+    attributes: ["id", "playerId"],
   });
   if (!program) throw new AppError("Program not found", 404);
 
-  // Check ownership: direct assignment or training-block link
-  const isOwn = program.playerId === playerId;
-  if (!isOwn && !program.trainingBlockId) {
+  if (program.playerId !== playerId) {
     throw new AppError("Program not found", 404);
   }
 
