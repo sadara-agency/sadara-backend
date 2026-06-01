@@ -33,11 +33,26 @@ export const createProgramSchema = z.object({
   phase: programPhaseEnum.nullish(),
   programType: programTypeEnum.default("gym"),
   trainingBlockId: z.string().uuid().optional().nullable(),
+  playerId: z.string().uuid().optional().nullable(),
   startWeek: z.number().int().min(1).max(16).nullish(),
   isActive: z.boolean().default(true),
+  isTemplate: z.boolean().optional(),
 });
 
 export const updateProgramSchema = createProgramSchema.partial();
+
+export const cloneProgramSchema = z.object({
+  playerId: z.string().uuid().nullish(),
+  asTemplate: z.boolean().default(false),
+});
+
+export const updateExerciseSchema = z.object({
+  targetSets: z.number().int().positive().optional(),
+  targetReps: z.string().min(1).max(20).optional(),
+  targetWeightKg: z.number().positive().nullish(),
+  restSeconds: z.number().int().positive().nullish(),
+  notes: z.string().max(500).nullish(),
+});
 
 export const addExerciseToProgramSchema = z.object({
   exerciseId: z.string().uuid(),
@@ -60,10 +75,14 @@ export const listProgramsQuerySchema = z.object({
   trainingBlockId: z.string().uuid().optional(),
   programType: programTypeEnum.optional(),
   isActive: z.coerce.boolean().optional(),
+  playerId: z.string().uuid().optional(),
+  isTemplate: z.coerce.boolean().optional(),
 });
 
 export type CreateProgramDTO = z.infer<typeof createProgramSchema>;
 export type UpdateProgramDTO = z.infer<typeof updateProgramSchema>;
+export type CloneProgramDTO = z.infer<typeof cloneProgramSchema>;
+export type UpdateExerciseDTO = z.infer<typeof updateExerciseSchema>;
 export type AddExerciseToProgramDTO = z.infer<
   typeof addExerciseToProgramSchema
 >;

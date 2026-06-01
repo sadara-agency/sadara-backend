@@ -1,3 +1,5 @@
+import { Op } from "sequelize";
+import { sequelize } from "@config/database";
 import {
   DevelopmentProgram,
   ProgramExercise,
@@ -7,6 +9,8 @@ import { WellnessExercise } from "./fitness.model";
 import type {
   CreateProgramDTO,
   UpdateProgramDTO,
+  CloneProgramDTO,
+  UpdateExerciseDTO,
   AddExerciseToProgramDTO,
   ListProgramsQueryDTO,
   CreateDaySessionDTO,
@@ -15,14 +19,40 @@ import type {
 import { AppError } from "@middleware/errorHandler";
 import { buildMeta } from "@shared/utils/pagination";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
+import { buildRowScope, checkRowAccess } from "@shared/utils/rowScope";
+import type { AuthUser } from "@shared/types";
 
-export async function listPrograms(query: ListProgramsQueryDTO) {
-  const { page, limit, trainingBlockId, programType, isActive } = query;
+export async function listPrograms(
+  query: ListProgramsQueryDTO,
+  user?: AuthUser,
+) {
+  const {
+    page,
+    limit,
+    trainingBlockId,
+    programType,
+    isActive,
+    playerId,
+    isTemplate,
+  } = query;
   const where: any = {};
 
   if (trainingBlockId !== undefined) where.trainingBlockId = trainingBlockId;
   if (programType !== undefined) where.programType = programType;
   if (isActive !== undefined) where.isActive = isActive;
+  if (playerId !== undefined) where.playerId = playerId;
+  if (isTemplate !== undefined) where.isTemplate = isTemplate;
+
+  // Row-scope: non-bypass roles see only their assigned players' programs.
+  // Templates have playerId = null (excluded by the playerId-IN scope), so the
+  // creator is allowed to see their own templates via an explicit OR branch.
+  const scope = await buildRowScope("wellness", user);
+  if (scope) {
+    where[Op.and] = [
+      ...(Array.isArray(where[Op.and]) ? where[Op.and] : []),
+      { [Op.or]: [scope, { isTemplate: true, createdBy: user!.id }] },
+    ];
+  }
 
   const { rows, count } = await DevelopmentProgram.findAndCountAll({
     where,
@@ -34,7 +64,10 @@ export async function listPrograms(query: ListProgramsQueryDTO) {
   return { data: rows, meta: buildMeta(count, page, limit) };
 }
 
-export async function getProgramById(id: string): Promise<DevelopmentProgram> {
+export async function getProgramById(
+  id: string,
+  user?: AuthUser,
+): Promise<DevelopmentProgram> {
   const program = await DevelopmentProgram.findByPk(id, {
     include: [
       {
@@ -60,6 +93,16 @@ export async function getProgramById(id: string): Promise<DevelopmentProgram> {
     ],
   });
   if (!program) throw new AppError("Program not found", 404);
+
+  // Access check only when a user is supplied (controller calls). Internal
+  // calls (createProgram/clone returning the fresh row) pass no user.
+  if (user) {
+    const isOwnTemplate = program.isTemplate && program.createdBy === user.id;
+    if (!isOwnTemplate) {
+      const allowed = await checkRowAccess("wellness", program, user);
+      if (!allowed) throw new AppError("Program not found", 404);
+    }
+  }
   return program;
 }
 
@@ -73,6 +116,97 @@ export async function createProgram(
   });
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
   return getProgramById(program.id);
+}
+
+/**
+ * Deep-copy a program (its day sessions + exercises) into a new program.
+ * - "Use template" → clone(template → player): { playerId } set, asTemplate false.
+ * - "Save as reusable" → clone(player program → template): asTemplate true, playerId null.
+ * - "Duplicate" → clone onto the same player.
+ * Never carries a trainingBlockId (coach flow is block-free). When `user` is
+ * provided the source is permission-checked via getProgramById.
+ */
+export async function cloneProgram(
+  sourceId: string,
+  opts: CloneProgramDTO,
+  userId: string,
+  user?: AuthUser,
+): Promise<DevelopmentProgram> {
+  const source = await getProgramById(sourceId, user);
+  const asTemplate = opts.asTemplate ?? false;
+
+  const created = await sequelize.transaction(async (tx) => {
+    const program = await DevelopmentProgram.create(
+      {
+        name: source.name,
+        nameAr: source.nameAr,
+        description: source.description,
+        category: source.category,
+        estimatedMinutes: source.estimatedMinutes,
+        durationWeeks: source.durationWeeks,
+        phase: source.phase,
+        programType: source.programType,
+        trainingBlockId: null,
+        playerId: asTemplate ? null : (opts.playerId ?? null),
+        startWeek: source.startWeek,
+        isActive: true,
+        isTemplate: asTemplate,
+        createdBy: userId,
+      },
+      { transaction: tx },
+    );
+
+    // Copy day sessions, mapping old → new ids so exercises re-link correctly.
+    const sessionIdMap = new Map<string, string>();
+    for (const ds of source.daySessions ?? []) {
+      const newSession = await ProgramDaySession.create(
+        {
+          programId: program.id,
+          dayOfWeek: ds.dayOfWeek,
+          label: ds.label,
+          labelAr: ds.labelAr,
+          orderIndex: ds.orderIndex,
+          estimatedMinutes: ds.estimatedMinutes,
+          notes: ds.notes,
+        },
+        { transaction: tx },
+      );
+      sessionIdMap.set(ds.id, newSession.id);
+    }
+
+    // getProgramById returns program-level `exercises` AND nested
+    // daySessions[].exercises — de-dup by id to avoid double-copying.
+    const seen = new Set<string>();
+    const allExercises = [
+      ...(source.exercises ?? []),
+      ...(source.daySessions ?? []).flatMap((d) => d.exercises ?? []),
+    ];
+    for (const pe of allExercises) {
+      if (seen.has(pe.id)) continue;
+      seen.add(pe.id);
+      await ProgramExercise.create(
+        {
+          programId: program.id,
+          exerciseId: pe.exerciseId,
+          daySessionId: pe.daySessionId
+            ? (sessionIdMap.get(pe.daySessionId) ?? null)
+            : null,
+          orderIndex: pe.orderIndex,
+          targetSets: pe.targetSets,
+          targetReps: pe.targetReps,
+          targetWeightKg: pe.targetWeightKg,
+          restSeconds: pe.restSeconds,
+          notes: pe.notes,
+        },
+        { transaction: tx },
+      );
+    }
+
+    return program;
+  });
+
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return getProgramById(created.id);
 }
 
 export async function updateProgram(
@@ -156,6 +290,25 @@ export async function addExerciseToProgram(
 
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
   return exercise;
+}
+
+/**
+ * Update one prescribed exercise row (sets/reps/rest/weight/notes) for the
+ * flat inline editor. Matched by the ProgramExercise PK so the same exercise
+ * appearing in two day sessions is edited unambiguously.
+ */
+export async function updateExerciseInProgram(
+  programId: string,
+  programExerciseId: string,
+  data: UpdateExerciseDTO,
+): Promise<ProgramExercise> {
+  const row = await ProgramExercise.findOne({
+    where: { id: programExerciseId, programId },
+  });
+  if (!row) throw new AppError("Exercise not found in this program", 404);
+  await row.update(data);
+  invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
+  return row;
 }
 
 export async function removeExerciseFromProgram(

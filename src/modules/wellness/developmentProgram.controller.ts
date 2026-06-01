@@ -9,13 +9,32 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import * as svc from "./developmentProgram.service";
 
 export async function list(req: AuthRequest, res: Response) {
-  const result = await svc.listPrograms(req.query as any);
+  const result = await svc.listPrograms(req.query as any, req.user);
   sendPaginated(res, result.data, result.meta);
 }
 
 export async function getById(req: AuthRequest, res: Response) {
-  const program = await svc.getProgramById(req.params.id);
+  const program = await svc.getProgramById(req.params.id, req.user);
   sendSuccess(res, program);
+}
+
+export async function clone(req: AuthRequest, res: Response) {
+  const program = await svc.cloneProgram(
+    req.params.id,
+    req.body,
+    req.user!.id,
+    req.user,
+  );
+  sendCreated(res, program);
+  logAudit(
+    "CREATE",
+    "wellness",
+    program.id,
+    buildAuditContext(req.user!, req.ip),
+    `Cloned development program from ${req.params.id}${
+      req.body.asTemplate ? " as reusable template" : ""
+    }`,
+  ).catch(() => {});
 }
 
 export async function create(req: AuthRequest, res: Response) {
@@ -57,6 +76,15 @@ export async function remove(req: AuthRequest, res: Response) {
 export async function addExercise(req: AuthRequest, res: Response) {
   const exercise = await svc.addExerciseToProgram(req.params.id, req.body);
   sendCreated(res, exercise);
+}
+
+export async function updateExercise(req: AuthRequest, res: Response) {
+  const exercise = await svc.updateExerciseInProgram(
+    req.params.id,
+    req.params.programExerciseId,
+    req.body,
+  );
+  sendSuccess(res, exercise, "Exercise updated");
 }
 
 export async function removeExercise(req: AuthRequest, res: Response) {
