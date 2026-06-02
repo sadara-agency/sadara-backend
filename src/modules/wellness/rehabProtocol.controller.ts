@@ -12,7 +12,7 @@ import type { ListRehabProtocolsQueryDTO } from "./rehabProtocol.validation";
 
 export async function list(req: AuthRequest, res: Response): Promise<void> {
   const result = await rehabService.listRehabProtocols(
-    req.query as ListRehabProtocolsQueryDTO,
+    req.query as unknown as ListRehabProtocolsQueryDTO,
     req.user,
   );
   sendPaginated(res, result.data, result.meta);

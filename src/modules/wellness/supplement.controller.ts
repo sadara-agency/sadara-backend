@@ -10,7 +10,9 @@ import * as supplementService from "./supplement.service";
 
 export async function list(req: AuthRequest, res: Response): Promise<void> {
   const result = await supplementService.listSupplements(
-    req.query as Parameters<typeof supplementService.listSupplements>[0],
+    req.query as unknown as Parameters<
+      typeof supplementService.listSupplements
+    >[0],
     req.user,
   );
   sendPaginated(res, result.data, result.meta);

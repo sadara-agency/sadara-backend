@@ -10,7 +10,7 @@ import type { ListPostureAssessmentsQueryDTO } from "./postureAssessment.validat
 
 export async function list(req: AuthRequest, res: Response): Promise<void> {
   const result = await postureService.listPostureAssessments(
-    req.query as ListPostureAssessmentsQueryDTO,
+    req.query as unknown as ListPostureAssessmentsQueryDTO,
     req.user,
   );
   sendPaginated(res, result.data, result.meta);
@@ -22,7 +22,7 @@ export async function listForPlayer(
 ): Promise<void> {
   const result = await postureService.listPostureAssessmentsForPlayer(
     req.params.playerId,
-    req.query as ListPostureAssessmentsQueryDTO,
+    req.query as unknown as ListPostureAssessmentsQueryDTO,
     req.user,
   );
   sendPaginated(res, result.data, result.meta);
