@@ -60,6 +60,7 @@ jest.mock('../../../src/modules/matches/playerMatchStats.model', () => ({
     findOne: (...a: unknown[]) => mockStatsFindOne(...a),
     bulkCreate: (...a: unknown[]) => mockStatsBulkCreate(...a),
     findAndCountAll: jest.fn().mockResolvedValue({ count: 0, rows: [] }),
+    sequelize: require('../../../src/config/database').sequelize,
   },
 }));
 
@@ -576,14 +577,27 @@ describe('Match Service', () => {
   describe('getPlayerAggregateStats', () => {
     it('should return aggregated stats', async () => {
       const { sequelize } = require('../../../src/config/database');
+
+      // Mock findAll for the aggregated stats query
+      mockStatsFindAll.mockResolvedValue([{
+        matchesPlayed: 10,
+        totalGoals: 5,
+        totalAssists: 3,
+        totalMinutes: 900,
+        averageRating: 7.5,
+        totalYellowCards: 2,
+        totalRedCards: 0,
+      }]);
+
+      // Mock query for the distinct matches count
       sequelize.query.mockResolvedValue([{
-        matchesPlayed: '10', totalGoals: '5', totalAssists: '3', totalMinutes: '900',
-        averageRating: '7.5', totalYellowCards: '2', totalRedCards: '0',
+        matchesPlayed: 10,
       }]);
 
       const result = await matchService.getPlayerAggregateStats('player-001');
 
       expect(result).toBeDefined();
+      expect(result).toHaveProperty('matchesPlayed');
     });
   });
 
