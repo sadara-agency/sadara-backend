@@ -1,4 +1,4 @@
-import { Op, Sequelize } from "sequelize";
+import { Op, QueryTypes, Sequelize } from "sequelize";
 import { Match, type MatchAttributes } from "@modules/matches/match.model";
 import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
@@ -797,7 +797,47 @@ export async function getPlayerAggregateStats(
     raw: true,
   });
 
-  return result[0] ?? {};
+  const stats = result[0] ?? {};
+
+  // Appearances are counted across BOTH participation tables. A match links
+  // to a player via match_players (SAFF league sync) OR player_match_stats
+  // (manual entry / applyMatchToSeason) — different ingestion paths populate
+  // only one. COUNT(player_match_stats) alone under-counts appearances for
+  // league-synced players, so the card showed "0 matches" while the player
+  // list and the match-history strip (both UNION-based) showed the real
+  // count. Count distinct matches across the union instead, honouring the
+  // same date/competition filter applied to the stat aggregation above.
+  const conditions: string[] = [
+    `m.id IN (
+        SELECT match_id FROM match_players      WHERE player_id = :pid
+        UNION
+        SELECT match_id FROM player_match_stats WHERE player_id = :pid
+      )`,
+  ];
+  const replacements: Record<string, unknown> = { pid: playerId };
+  if (params?.from) {
+    conditions.push("m.match_date >= :from");
+    replacements.from = new Date(params.from);
+  }
+  if (params?.to) {
+    conditions.push("m.match_date <= :to");
+    replacements.to = new Date(params.to);
+  }
+  if (params?.competition) {
+    conditions.push("m.competition ILIKE :competition");
+    replacements.competition = `%${params.competition}%`;
+  }
+
+  const countRows = await PlayerMatchStats.sequelize!.query<{
+    matchesPlayed: number;
+  }>(
+    `SELECT COUNT(DISTINCT m.id)::int AS "matchesPlayed"
+       FROM matches m
+      WHERE ${conditions.join(" AND ")}`,
+    { replacements, type: QueryTypes.SELECT },
+  );
+
+  return { ...stats, matchesPlayed: countRows[0]?.matchesPlayed ?? 0 };
 }
 
 /**
