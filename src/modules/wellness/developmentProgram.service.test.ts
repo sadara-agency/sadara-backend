@@ -17,7 +17,16 @@ jest.mock("./developmentProgram.model", () => ({
 
 jest.mock("./programDaySession.model", () => ({
   __esModule: true,
-  ProgramDaySession: { create: jest.fn() },
+  ProgramDaySession: { create: jest.fn(), findOne: jest.fn() },
+}));
+
+jest.mock("./programDayCompletion.model", () => ({
+  __esModule: true,
+  ProgramDayCompletion: {
+    findAll: jest.fn(),
+    findOrCreate: jest.fn(),
+    destroy: jest.fn(),
+  },
 }));
 
 jest.mock("./fitness.model", () => ({
@@ -62,11 +71,13 @@ import {
   ProgramExercise,
 } from "./developmentProgram.model";
 import { ProgramDaySession } from "./programDaySession.model";
+import { ProgramDayCompletion } from "./programDayCompletion.model";
 import {
   cloneProgram,
   updateExerciseInProgram,
   listPrograms,
 } from "./developmentProgram.service";
+import * as svc from "./developmentProgram.service";
 import { buildRowScope, checkRowAccess } from "@shared/utils/rowScope";
 
 const USER_ID = "22222222-2222-2222-2222-222222222222";
@@ -288,5 +299,110 @@ describe("updateExerciseInProgram", () => {
     await expect(
       updateExerciseInProgram("prog-1", "missing", { targetSets: 5 }),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+describe("completions", () => {
+  const player = { id: "u1", playerId: "p1", role: "Player" } as any;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    // getProgramById's row-scope check must pass for player "p1".
+    (checkRowAccess as jest.Mock).mockResolvedValue(true);
+    (buildRowScope as jest.Mock).mockResolvedValue(null);
+  });
+
+  it("markDayComplete: 403 when user has no playerId", async () => {
+    await expect(
+      svc.markDayComplete(
+        "prog1",
+        { daySessionId: "ds1", completedDate: "2026-06-03" },
+        { id: "u2", playerId: null, role: "Coach" } as any,
+      ),
+    ).rejects.toMatchObject({ status: 403 });
+  });
+
+  it("markDayComplete: 422 when day session not in program", async () => {
+    (DevelopmentProgram.findByPk as jest.Mock).mockResolvedValue({
+      id: "prog1",
+      playerId: "p1",
+      isTemplate: false,
+    });
+    (ProgramDaySession.findOne as jest.Mock).mockResolvedValue(null);
+    await expect(
+      svc.markDayComplete(
+        "prog1",
+        { daySessionId: "dsX", completedDate: "2026-06-03" },
+        player,
+      ),
+    ).rejects.toMatchObject({ status: 422 });
+  });
+
+  it("markDayComplete: idempotent findOrCreate returns the row", async () => {
+    (DevelopmentProgram.findByPk as jest.Mock).mockResolvedValue({
+      id: "prog1",
+      playerId: "p1",
+      isTemplate: false,
+    });
+    (ProgramDaySession.findOne as jest.Mock).mockResolvedValue({
+      id: "ds1",
+      programId: "prog1",
+    });
+    const row = { id: "c1", daySessionId: "ds1", completedDate: "2026-06-03" };
+    (ProgramDayCompletion.findOrCreate as jest.Mock).mockResolvedValue([
+      row,
+      true,
+    ]);
+    const result = await svc.markDayComplete(
+      "prog1",
+      { daySessionId: "ds1", completedDate: "2026-06-03" },
+      player,
+    );
+    expect(result).toEqual(row);
+    expect(ProgramDayCompletion.findOrCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          playerId: "p1",
+          daySessionId: "ds1",
+          completedDate: "2026-06-03",
+        },
+        defaults: expect.objectContaining({
+          programId: "prog1",
+          playerId: "p1",
+          daySessionId: "ds1",
+          completedDate: "2026-06-03",
+        }),
+      }),
+    );
+  });
+
+  it("unmarkDayComplete: destroys the row and resolves ok", async () => {
+    (DevelopmentProgram.findByPk as jest.Mock).mockResolvedValue({
+      id: "prog1",
+      playerId: "p1",
+      isTemplate: false,
+    });
+    (ProgramDayCompletion.destroy as jest.Mock).mockResolvedValue(1);
+    const result = await svc.unmarkDayComplete(
+      "prog1",
+      { daySessionId: "ds1", completedDate: "2026-06-03" },
+      player,
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("listCompletions: returns mapped rows for the player's program", async () => {
+    (DevelopmentProgram.findByPk as jest.Mock).mockResolvedValue({
+      id: "prog1",
+      playerId: "p1",
+      isTemplate: false,
+    });
+    (ProgramDayCompletion.findAll as jest.Mock).mockResolvedValue([
+      { daySessionId: "ds1", completedDate: "2026-06-03" },
+    ]);
+    const result = await svc.listCompletions("prog1", {}, player);
+    expect(result).toEqual([
+      { daySessionId: "ds1", completedDate: "2026-06-03" },
+    ]);
   });
 });

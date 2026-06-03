@@ -131,3 +131,24 @@ export async function deleteDaySession(req: AuthRequest, res: Response) {
   );
   sendSuccess(res, result, "Day session deleted");
 }
+
+// ── Player day-completion handlers ──
+
+export async function listCompletions(req: AuthRequest, res: Response) {
+  const rows = await svc.listCompletions(
+    req.params.id,
+    req.query as any,
+    req.user,
+  );
+  sendSuccess(res, rows);
+}
+
+export async function markCompletion(req: AuthRequest, res: Response) {
+  const row = await svc.markDayComplete(req.params.id, req.body, req.user);
+  sendCreated(res, row);
+}
+
+export async function unmarkCompletion(req: AuthRequest, res: Response) {
+  const result = await svc.unmarkDayComplete(req.params.id, req.body, req.user);
+  sendSuccess(res, result, "Completion removed");
+}

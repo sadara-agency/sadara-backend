@@ -106,3 +106,22 @@ export const daySessionParamsSchema = z.object({
 
 export type CreateDaySessionDTO = z.infer<typeof createDaySessionSchema>;
 export type UpdateDaySessionDTO = z.infer<typeof updateDaySessionSchema>;
+
+// ── Day completion schemas ──
+
+const isoDate = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "completedDate must be YYYY-MM-DD");
+
+export const markCompletionSchema = z.object({
+  daySessionId: z.string().uuid(),
+  completedDate: isoDate,
+});
+
+export const completionQuerySchema = z.object({
+  from: isoDate.optional(),
+  to: isoDate.optional(),
+});
+
+export type MarkCompletionDTO = z.infer<typeof markCompletionSchema>;
+export type CompletionQueryDTO = z.infer<typeof completionQuerySchema>;

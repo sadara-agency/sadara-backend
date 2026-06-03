@@ -16,6 +16,8 @@ import {
   listProgramsQuerySchema,
   createDaySessionSchema,
   updateDaySessionSchema,
+  markCompletionSchema,
+  completionQuerySchema,
 } from "./developmentProgram.validation";
 
 const router = Router();
@@ -423,6 +425,104 @@ router.delete(
   "/:id/day-sessions/:sessionId",
   authorizeModule("wellness", "update"),
   asyncHandler(ctrl.deleteDaySession),
+);
+
+// ── Player day-completion routes (self-service) ──
+
+/**
+ * @swagger
+ * /development-programs/{id}/completions:
+ *   get:
+ *     summary: List the current player's day completions for a program
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: from
+ *         schema: { type: string, format: date }
+ *       - in: query
+ *         name: to
+ *         schema: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: Array of { daySessionId, completedDate }
+ */
+router.get(
+  "/:id/completions",
+  authorizeModule("wellness", "read"),
+  validate(completionQuerySchema, "query"),
+  asyncHandler(ctrl.listCompletions),
+);
+
+/**
+ * @swagger
+ * /development-programs/{id}/completions:
+ *   post:
+ *     summary: Mark a day session complete for the current player (idempotent)
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               daySessionId: { type: string, format: uuid }
+ *               completedDate: { type: string, format: date }
+ *     responses:
+ *       201:
+ *         description: The completion row
+ */
+router.post(
+  "/:id/completions",
+  authorizeModule("wellness", "update"),
+  validate(markCompletionSchema),
+  asyncHandler(ctrl.markCompletion),
+);
+
+/**
+ * @swagger
+ * /development-programs/{id}/completions:
+ *   delete:
+ *     summary: Undo a day-session completion for the current player
+ *     tags: [DevelopmentPrograms]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               daySessionId: { type: string, format: uuid }
+ *               completedDate: { type: string, format: date }
+ *     responses:
+ *       200:
+ *         description: '{ ok: true }'
+ */
+router.delete(
+  "/:id/completions",
+  authorizeModule("wellness", "update"),
+  validate(markCompletionSchema),
+  asyncHandler(ctrl.unmarkCompletion),
 );
 
 export default router;
