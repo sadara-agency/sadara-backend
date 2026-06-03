@@ -43,8 +43,7 @@
  *               phone: { type: string }
  *               guardianName: { type: string }
  *               guardianPhone: { type: string }
- *               heightCm: { type: number }
- *               weightKg: { type: number }
+ *               guardianRelation: { type: string }
  *     responses:
  *       200: { description: Profile updated }
  *

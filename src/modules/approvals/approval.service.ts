@@ -198,6 +198,20 @@ export async function resolveApproval(
   if (approval.status !== "Pending")
     throw new AppError("Approval already resolved", 409);
 
+  // Player profile-change approvals may only be resolved by leadership.
+  if (
+    approval.entityType === "player" &&
+    approval.action === "update_profile"
+  ) {
+    const LEADERSHIP = ["Admin", "Manager", "SportingDirector"];
+    if (!userRole || !LEADERSHIP.includes(userRole)) {
+      throw new AppError(
+        "Only leadership may resolve player profile changes",
+        403,
+      );
+    }
+  }
+
   // Multi-step: delegate to step resolution
   if (approval.totalSteps > 1) {
     if (!userRole)
@@ -213,6 +227,26 @@ export async function resolveApproval(
     resolvedAt: new Date(),
     comment: comment || null,
   });
+
+  // Decoupled auto-apply for player profile-change approvals (dynamic import avoids a circular dep).
+  if (
+    approval.entityType === "player" &&
+    approval.action === "update_profile"
+  ) {
+    import("@modules/profileChangeRequests/profileChangeRequest.service")
+      .then((mod) => {
+        if (decision === "Approved") {
+          return mod.applyProfileChangeRequest(approval.id, userId);
+        }
+        return mod.rejectProfileChangeRequest(approval.id, userId, comment);
+      })
+      .catch((err) =>
+        logger.error("Profile-change apply/reject failed", {
+          approvalId: approval.id,
+          error: (err as Error).message,
+        }),
+      );
+  }
 
   // Notify requester
   const statusLabel = decision === "Approved" ? "approved" : "rejected";

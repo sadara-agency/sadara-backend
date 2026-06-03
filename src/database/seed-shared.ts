@@ -239,6 +239,19 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
 
+  // ── Profile Change Requests (player self-edit approval workflow) ──
+  // Players submit via the Player-authorized /profile-change-requests routes
+  // (no module permission needed). Leadership reviews via /approvals; READ +
+  // UPDATE here lets them view and resolve the change records.
+  ...forRoles(
+    "profileChangeRequests",
+    ["Admin", "Manager", "SportingDirector"],
+    {
+      canRead: true,
+      canUpdate: true,
+    },
+  ),
+
   ...forRoles("scouting", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,

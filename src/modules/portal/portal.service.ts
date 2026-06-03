@@ -949,13 +949,13 @@ export async function completePlayerRegistration(
 // UPDATE MY PROFILE (editable fields only)
 // ══════════════════════════════════════════
 
+// heightCm/weightKg are intentionally NOT self-editable here — they now require
+// leadership approval via the profile-change-requests workflow.
 const EDITABLE_FIELDS = [
   "phone",
   "guardianName",
   "guardianPhone",
   "guardianRelation",
-  "heightCm",
-  "weightKg",
 ] as const;
 
 export async function updateMyProfile(
