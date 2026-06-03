@@ -408,7 +408,10 @@ describe("getMyProfile", () => {
     return {
       ...data,
       getDataValue: (k: string) => (k === "id" ? data.id : undefined),
-      get: ({ plain }: { plain: boolean }) => (plain ? data : data),
+      get: ({ plain }: { plain: boolean }) => {
+        if (!plain) throw new Error("Test mock: only plain: true is supported");
+        return data;
+      },
     };
   }
 
@@ -425,7 +428,7 @@ describe("getMyProfile", () => {
       // second call: Player.findByPk inside getMyProfile (the profile fetch)
       .mockResolvedValueOnce(makePlayerInstance());
     (Contract.findOne as jest.Mock).mockResolvedValue(null);
-    // sequelize.query returns [rows, metadata]; the service uses QueryTypes.SELECT so it returns rows directly
+    // QueryTypes.SELECT returns the rows array directly; destructured as [stats] in the service to get the first row
     const { sequelize } = require("@config/database");
     (sequelize.query as jest.Mock).mockResolvedValue([
       {
