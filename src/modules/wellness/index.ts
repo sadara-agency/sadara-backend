@@ -29,6 +29,9 @@ export * from "./wellness.types";
 export * as wellnessService from "./wellness.service";
 export * as fitnessService from "./fitness.service";
 
+// Program day completion model
+export { ProgramDayCompletion } from "./programDayCompletion.model";
+
 // Workout Plan models
 export {
   WorkoutPlan,
