@@ -49,7 +49,7 @@ export async function submitProfileChange(
   for (const field of ALLOWED_FIELDS) {
     if (incoming[field] === undefined) continue;
     const next = incoming[field];
-    const current = player.getDataValue(field as keyof Player) as unknown;
+    const current = player.getDataValue(field) as unknown;
     if (current !== next) {
       changes[field] = { from: current ?? null, to: next };
     }
