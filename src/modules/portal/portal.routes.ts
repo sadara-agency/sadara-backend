@@ -28,8 +28,6 @@ const updateProfileSchema = z.object({
   guardianName: z.string().optional(),
   guardianPhone: z.string().optional(),
   guardianRelation: z.string().optional(),
-  heightCm: z.number().min(100).max(250).optional(),
-  weightKg: z.number().min(30).max(200).optional(),
 });
 
 const signContractSchema = z.object({
