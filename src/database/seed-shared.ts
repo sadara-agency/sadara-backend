@@ -617,6 +617,7 @@ const RAW_PERMISSIONS: Perm[] = [
     canCreate: true,
     canRead: true,
     canUpdate: true,
+    canDelete: true,
   }),
   ...forRoles(
     "wellness",
