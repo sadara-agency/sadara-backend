@@ -293,6 +293,12 @@ export async function importFixtures(
         if (existing.status !== status) updates.status = status;
         if (competitionId && !existing.competitionId)
           updates.competitionId = competitionId;
+        // Backfill crests on rows imported before logo storage existed —
+        // never overwrite an existing logo with a null/empty value.
+        if (!existing.homeTeamLogo && home?.image_path)
+          updates.homeTeamLogo = home.image_path;
+        if (!existing.awayTeamLogo && away?.image_path)
+          updates.awayTeamLogo = away.image_path;
 
         if (Object.keys(updates).length > 0) {
           await existing.update(updates, { transaction: t });
@@ -318,6 +324,8 @@ export async function importFixtures(
             awayClubId,
             homeTeamName: home?.name ?? null,
             awayTeamName: away?.name ?? null,
+            homeTeamLogo: home?.image_path ?? null,
+            awayTeamLogo: away?.image_path ?? null,
             competitionId,
             competition: f.league?.name ?? "",
             season: seasonName,
