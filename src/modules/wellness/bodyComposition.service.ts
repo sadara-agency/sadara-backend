@@ -17,6 +17,19 @@ import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { issueNewVersion } from "./nutritionPrescription.service";
 import { logger } from "@config/logger";
 
+// Cache prefixes to bust on any scan mutation. WELLNESS/DASHBOARD cover the
+// aggregate wellness + dashboard caches, but the body-composition GET routes
+// cache under their own literal cacheRoute() prefixes — these must be evicted
+// explicitly or the player scan list (and squad list) serve a stale empty
+// result until the 5-min TTL expires. Keep in sync with bodyComposition.routes.ts.
+const SCAN_CACHE_PREFIXES = [
+  CachePrefix.WELLNESS,
+  CachePrefix.DASHBOARD,
+  "body-compositions",
+  "body-compositions-player",
+  "body-composition",
+];
+
 function buildDateRange(from?: string, to?: string): Record<symbol, string> {
   const range: Record<symbol, string> = {};
   if (from) range[Op.gte as unknown as symbol] = from;
@@ -84,9 +97,7 @@ export async function createScan(data: CreateScanDTO, userId: string) {
 
   const scan = await BodyComposition.create({ ...data, recordedBy: userId });
 
-  invalidateMultiple([CachePrefix.WELLNESS, CachePrefix.DASHBOARD]).catch(
-    () => {},
-  );
+  invalidateMultiple(SCAN_CACHE_PREFIXES).catch(() => {});
 
   issueNewVersion(scan.playerId, "scan", scan.id, userId).catch((err) =>
     logger.error("Prescription reissue failed after scan creation", err),
@@ -107,9 +118,7 @@ export async function updateScan(id: string, data: UpdateScanDTO) {
 
   await scan.update(data);
 
-  invalidateMultiple([CachePrefix.WELLNESS, CachePrefix.DASHBOARD]).catch(
-    () => {},
-  );
+  invalidateMultiple(SCAN_CACHE_PREFIXES).catch(() => {});
 
   return scan;
 }
@@ -118,9 +127,7 @@ export async function deleteScan(id: string) {
   const scan = await getScanById(id);
   await scan.destroy();
 
-  invalidateMultiple([CachePrefix.WELLNESS, CachePrefix.DASHBOARD]).catch(
-    () => {},
-  );
+  invalidateMultiple(SCAN_CACHE_PREFIXES).catch(() => {});
 
   return { id };
 }
