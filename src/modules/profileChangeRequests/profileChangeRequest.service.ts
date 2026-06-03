@@ -1,3 +1,4 @@
+import { logger } from "@config/logger";
 import { AppError } from "@middleware/errorHandler";
 import { getLinkedPlayer } from "@modules/portal/portal.service";
 import { createApprovalRequest } from "@modules/approvals/approval.service";
@@ -58,7 +59,8 @@ export async function submitProfileChange(
     throw new AppError("No changes to submit", 422);
   }
 
-  // One pending request per player at a time.
+  // App-level guard (no DB unique constraint). Acceptable for a single-user player action;
+  // createApprovalRequest also dedups one Pending approval per (entityType, entityId).
   const existing = await ProfileChangeRequest.findOne({
     where: { playerId, status: "Pending" },
   });
@@ -73,6 +75,8 @@ export async function submitProfileChange(
   const lastName = (player.getDataValue("lastName") as string | null) ?? "";
   const playerName = `${firstName} ${lastName}`.trim();
 
+  // Notification is routed to Admin (createApprovalRequest takes a single role).
+  // Any leadership role in LEADERSHIP_ROLES may RESOLVE the approval (authorized at the route layer).
   const approval = await createApprovalRequest({
     entityType: "player",
     entityId: playerId,
@@ -122,7 +126,11 @@ export async function applyProfileChangeRequest(
 
   // Bust portal + players caches so the new values surface immediately.
   // A cache miss/Redis outage must never break a successful apply.
-  invalidateMultiple([CachePrefix.PORTAL, CachePrefix.PLAYERS]).catch(() => {});
+  invalidateMultiple([CachePrefix.PORTAL, CachePrefix.PLAYERS]).catch((err) =>
+    logger.warn("profile-change cache invalidation failed", {
+      error: (err as Error).message,
+    }),
+  );
 
   return req;
 }

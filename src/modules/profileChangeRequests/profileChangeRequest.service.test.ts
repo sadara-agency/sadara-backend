@@ -163,6 +163,45 @@ describe("submitProfileChange", () => {
       }),
     );
   });
+
+  it("throws 422 when dateOfBirth matches the current value (DATEONLY no-op)", async () => {
+    (getLinkedPlayer as jest.Mock).mockResolvedValue(
+      makeLinkedPlayer({ dateOfBirth: "2000-01-01" }),
+    );
+
+    await expect(
+      submitProfileChange("user-1", { dateOfBirth: "2000-01-01" }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+
+    expect(ProfileChangeRequest.findOne).not.toHaveBeenCalled();
+    expect(createApprovalRequest).not.toHaveBeenCalled();
+    expect(ProfileChangeRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("records the dateOfBirth from→to diff when the value changes", async () => {
+    (getLinkedPlayer as jest.Mock).mockResolvedValue(
+      makeLinkedPlayer({ dateOfBirth: "2000-01-01" }),
+    );
+    (ProfileChangeRequest.findOne as jest.Mock).mockResolvedValue(null);
+    (createApprovalRequest as jest.Mock).mockResolvedValue({ id: "appr-3" });
+    (ProfileChangeRequest.create as jest.Mock).mockImplementation(
+      async (payload: unknown) => ({ id: "pcr-3", ...(payload as object) }),
+    );
+
+    const result = await submitProfileChange("user-1", {
+      dateOfBirth: "2001-02-03",
+    });
+
+    expect(createApprovalRequest).toHaveBeenCalled();
+    expect(ProfileChangeRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        changes: {
+          dateOfBirth: { from: "2000-01-01", to: "2001-02-03" },
+        },
+      }),
+    );
+    expect(result).toMatchObject({ id: "pcr-3" });
+  });
 });
 
 describe("applyProfileChangeRequest", () => {
