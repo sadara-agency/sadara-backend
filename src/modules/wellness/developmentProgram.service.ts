@@ -5,6 +5,7 @@ import {
   ProgramExercise,
 } from "./developmentProgram.model";
 import { ProgramDaySession } from "./programDaySession.model";
+import { ProgramDayCompletion } from "./programDayCompletion.model";
 import { WellnessExercise } from "./fitness.model";
 import type {
   CreateProgramDTO,
@@ -15,6 +16,8 @@ import type {
   ListProgramsQueryDTO,
   CreateDaySessionDTO,
   UpdateDaySessionDTO,
+  MarkCompletionDTO,
+  CompletionQueryDTO,
 } from "./developmentProgram.validation";
 import { AppError } from "@middleware/errorHandler";
 import { buildMeta } from "@shared/utils/pagination";
@@ -397,4 +400,87 @@ export async function deleteDaySession(
   await session.destroy();
   invalidateMultiple([CachePrefix.WELLNESS]).catch(() => {});
   return { id: sessionId };
+}
+
+// ── Day completion service functions ──
+
+/** Resolve the caller's playerId and enforce program ownership. */
+async function assertPlayerProgram(
+  programId: string,
+  user: AuthUser | undefined,
+): Promise<string> {
+  if (!user?.playerId) {
+    throw new AppError("Player profile required", 403);
+  }
+  // getProgramById enforces wellness row-scope (player sees only own programs).
+  await getProgramById(programId, user);
+  return user.playerId;
+}
+
+export async function listCompletions(
+  programId: string,
+  query: CompletionQueryDTO,
+  user?: AuthUser,
+) {
+  const playerId = await assertPlayerProgram(programId, user);
+  const where: any = { playerId, programId };
+  if (query.from || query.to) {
+    where.completedDate = {};
+    if (query.from) where.completedDate[Op.gte] = query.from;
+    if (query.to) where.completedDate[Op.lte] = query.to;
+  }
+  const rows = await ProgramDayCompletion.findAll({
+    where,
+    attributes: ["daySessionId", "completedDate"],
+    order: [["completedDate", "DESC"]],
+  });
+  return rows.map((r) => ({
+    daySessionId: r.daySessionId,
+    completedDate: r.completedDate,
+  }));
+}
+
+export async function markDayComplete(
+  programId: string,
+  data: MarkCompletionDTO,
+  user?: AuthUser,
+) {
+  const playerId = await assertPlayerProgram(programId, user);
+  const session = await ProgramDaySession.findOne({
+    where: { id: data.daySessionId, programId },
+  });
+  if (!session) {
+    throw new AppError("Day session not found in this program", 422);
+  }
+  const [row] = await ProgramDayCompletion.findOrCreate({
+    where: {
+      playerId,
+      daySessionId: data.daySessionId,
+      completedDate: data.completedDate,
+    },
+    defaults: {
+      playerId,
+      daySessionId: data.daySessionId,
+      programId,
+      completedDate: data.completedDate,
+      completedAt: new Date(),
+    },
+  });
+  return row;
+}
+
+export async function unmarkDayComplete(
+  programId: string,
+  data: MarkCompletionDTO,
+  user?: AuthUser,
+) {
+  const playerId = await assertPlayerProgram(programId, user);
+  await ProgramDayCompletion.destroy({
+    where: {
+      playerId,
+      daySessionId: data.daySessionId,
+      completedDate: data.completedDate,
+    },
+  });
+  return { ok: true };
 }
