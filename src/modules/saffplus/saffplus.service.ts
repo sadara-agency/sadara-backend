@@ -564,44 +564,76 @@ void Squad;
 /**
  * Resolve a club by Arabic name → English name → pg_trgm fuzzy similarity.
  * Per-call Map cache avoids repeated DB hits within the same sync run.
+ *
+ * When a `logo` is provided and the matched Sadara club has no logo yet,
+ * the club's `logoUrl` is backfilled from the SAFF+ team crest. This mirrors
+ * the legacy SAFF sync behaviour (see saff.service.ts) and is what makes the
+ * match-schedule / score-card views (which read `Club.logoUrl`, not the live
+ * SAFF+ feed) display real club crests instead of initials.
  */
 async function resolveClubByNames(
   nameAr: string | undefined,
   nameEn: string | undefined,
   cache: Map<string, string | null>,
+  logo?: string,
 ): Promise<string | null> {
   const key = `${nameAr ?? ""}|${nameEn ?? ""}`;
-  if (cache.has(key)) return cache.get(key)!;
+  // Cache holds the resolved id only. We still attempt a logo backfill on a
+  // cache hit so the first fixture without a logo doesn't permanently block a
+  // later fixture (same teams) that does carry one within the same run.
+  const cached = cache.get(key);
 
   let club: Club | null = null;
+  let id = cached ?? null;
 
-  // Try Arabic name first
-  if (nameAr) {
-    club = await Club.findOne({ where: { nameAr } });
+  if (cached !== undefined) {
+    // Resolved earlier this run. Only re-load the row if we have a logo to
+    // potentially backfill and the cached id is non-null.
+    if (logo && id) club = await Club.findByPk(id);
+  } else {
+    // Try Arabic name first
+    if (nameAr) {
+      club = await Club.findOne({ where: { nameAr } });
+    }
+
+    // Try English name
+    if (!club && nameEn) {
+      club = await Club.findOne({ where: { name: nameEn } });
+    }
+
+    // Fuzzy fallback via pg_trgm (threshold 0.6)
+    if (!club && (nameAr || nameEn)) {
+      const searchName = nameAr ?? nameEn!;
+      const [rows] = (await sequelize.query(
+        `SELECT id FROM clubs
+         WHERE similarity(COALESCE(name_ar, name), :name) > 0.6
+         ORDER BY similarity(COALESCE(name_ar, name), :name) DESC
+         LIMIT 1`,
+        { replacements: { name: searchName } },
+      )) as [Array<{ id: string }>, unknown];
+      if (rows.length > 0) {
+        club = await Club.findByPk(rows[0].id);
+      }
+    }
+
+    id = club?.id ?? null;
+    cache.set(key, id);
   }
 
-  // Try English name
-  if (!club && nameEn) {
-    club = await Club.findOne({ where: { name: nameEn } });
-  }
-
-  // Fuzzy fallback via pg_trgm (threshold 0.6)
-  if (!club && (nameAr || nameEn)) {
-    const searchName = nameAr ?? nameEn!;
-    const [rows] = (await sequelize.query(
-      `SELECT id FROM clubs
-       WHERE similarity(COALESCE(name_ar, name), :name) > 0.6
-       ORDER BY similarity(COALESCE(name_ar, name), :name) DESC
-       LIMIT 1`,
-      { replacements: { name: searchName } },
-    )) as [Array<{ id: string }>, unknown];
-    if (rows.length > 0) {
-      club = await Club.findByPk(rows[0].id);
+  // Opportunistic logo backfill: only when the club currently has no logo.
+  // Never overwrite an existing/manually-uploaded logo.
+  if (club && logo && !club.logoUrl) {
+    try {
+      await club.update({ logoUrl: logo });
+    } catch (err) {
+      logger.warn(
+        `[SAFF+] failed to backfill logo for club ${club.id}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   }
 
-  const id = club?.id ?? null;
-  cache.set(key, id);
   return id;
 }
 
@@ -752,11 +784,13 @@ export async function syncCompetitionMatches(
         fixture.homeTeamNameAr,
         fixture.homeTeamName,
         clubCache,
+        fixture.homeTeamLogo,
       );
       const awayClubId = await resolveClubByNames(
         fixture.awayTeamNameAr,
         fixture.awayTeamName,
         clubCache,
+        fixture.awayTeamLogo,
       );
 
       if (!homeClubId || !awayClubId) result.unmapped++;
@@ -818,6 +852,8 @@ export async function syncCompetitionMatches(
         awayClubId,
         homeTeamName: fixture.homeTeamName || null,
         awayTeamName: fixture.awayTeamName || null,
+        homeTeamLogo: fixture.homeTeamLogo ?? null,
+        awayTeamLogo: fixture.awayTeamLogo ?? null,
         homeScore,
         awayScore,
         venue: fixture.stadium ?? null,
@@ -842,6 +878,14 @@ export async function syncCompetitionMatches(
         ) {
           delete (safeValues as Partial<typeof safeValues>).homeScore;
           delete (safeValues as Partial<typeof safeValues>).awayScore;
+        }
+        // Never wipe an existing crest with a null from a later fetch that
+        // happened to omit the logo — only overwrite when we have a new value.
+        if (!matchValues.homeTeamLogo) {
+          delete (safeValues as Partial<typeof safeValues>).homeTeamLogo;
+        }
+        if (!matchValues.awayTeamLogo) {
+          delete (safeValues as Partial<typeof safeValues>).awayTeamLogo;
         }
         await existing.update(safeValues);
       } else {

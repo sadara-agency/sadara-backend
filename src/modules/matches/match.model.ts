@@ -24,6 +24,10 @@ export interface MatchAttributes {
   providerMatchId?: string | null;
   homeTeamName?: string | null;
   awayTeamName?: string | null;
+  /** Crest URL for the home team — used when no joined Club logo exists (e.g. SAFF+ orphan imports). */
+  homeTeamLogo?: string | null;
+  /** Crest URL for the away team — used when no joined Club logo exists (e.g. SAFF+ orphan imports). */
+  awayTeamLogo?: string | null;
   providerSource?: string | null;
   displayId?: string | null;
   // Cup/knockout fields
@@ -76,6 +80,8 @@ export class Match
   declare providerMatchId: string | null;
   declare homeTeamName: string | null;
   declare awayTeamName: string | null;
+  declare homeTeamLogo: string | null;
+  declare awayTeamLogo: string | null;
   declare providerSource: string | null;
   declare displayId: string | null;
   // Cup/knockout fields
@@ -177,6 +183,14 @@ Match.init(
     awayTeamName: {
       type: DataTypes.STRING(255),
       field: "away_team_name",
+    },
+    homeTeamLogo: {
+      type: DataTypes.STRING(500),
+      field: "home_team_logo",
+    },
+    awayTeamLogo: {
+      type: DataTypes.STRING(500),
+      field: "away_team_logo",
     },
     providerSource: {
       type: DataTypes.STRING(50),

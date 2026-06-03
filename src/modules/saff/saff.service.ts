@@ -1961,6 +1961,8 @@ export async function importSaffPlusMatch(
     dbMatch = await Match.create({
       homeTeamName: match.homeTeamName,
       awayTeamName: match.awayTeamName,
+      homeTeamLogo: match.homeTeamLogo ?? null,
+      awayTeamLogo: match.awayTeamLogo ?? null,
       homeScore: hasScores ? (match.homeScore as number) : null,
       awayScore: hasScores ? (match.awayScore as number) : null,
       status,
@@ -1983,11 +1985,31 @@ export async function importSaffPlusMatch(
       homeScore: match.homeScore as number,
       awayScore: match.awayScore as number,
       ...(dbMatch.providerMatchId ? {} : { providerMatchId: saffMatchIdStr }),
+      // Backfill crests on rows imported before logo storage existed.
+      ...(!dbMatch.homeTeamLogo && match.homeTeamLogo
+        ? { homeTeamLogo: match.homeTeamLogo }
+        : {}),
+      ...(!dbMatch.awayTeamLogo && match.awayTeamLogo
+        ? { awayTeamLogo: match.awayTeamLogo }
+        : {}),
     });
-  } else if (!dbMatch.providerMatchId) {
-    // Self-heal: pre-fix rows stored externalMatchId without providerMatchId,
-    // which breaks sync-events / sync-media. Patch it on the next re-import.
-    await dbMatch.update({ providerMatchId: saffMatchIdStr });
+  } else if (
+    !dbMatch.providerMatchId ||
+    (!dbMatch.homeTeamLogo && match.homeTeamLogo) ||
+    (!dbMatch.awayTeamLogo && match.awayTeamLogo)
+  ) {
+    // Self-heal: pre-fix rows stored externalMatchId without providerMatchId
+    // (breaks sync-events / sync-media) and/or were imported before logo
+    // storage existed. Patch both on the next re-import.
+    await dbMatch.update({
+      ...(dbMatch.providerMatchId ? {} : { providerMatchId: saffMatchIdStr }),
+      ...(!dbMatch.homeTeamLogo && match.homeTeamLogo
+        ? { homeTeamLogo: match.homeTeamLogo }
+        : {}),
+      ...(!dbMatch.awayTeamLogo && match.awayTeamLogo
+        ? { awayTeamLogo: match.awayTeamLogo }
+        : {}),
+    });
   }
 
   // 6. Upsert the player's lineup row.
