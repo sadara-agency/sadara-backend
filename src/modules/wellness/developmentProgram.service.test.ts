@@ -366,6 +366,12 @@ describe("completions", () => {
           daySessionId: "ds1",
           completedDate: "2026-06-03",
         },
+        defaults: expect.objectContaining({
+          programId: "prog1",
+          playerId: "p1",
+          daySessionId: "ds1",
+          completedDate: "2026-06-03",
+        }),
       }),
     );
   });
