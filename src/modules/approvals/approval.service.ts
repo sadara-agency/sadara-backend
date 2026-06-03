@@ -214,6 +214,26 @@ export async function resolveApproval(
     comment: comment || null,
   });
 
+  // Decoupled auto-apply for player profile-change approvals (dynamic import avoids a circular dep).
+  if (
+    approval.entityType === "player" &&
+    approval.action === "update_profile"
+  ) {
+    import("@modules/profileChangeRequests/profileChangeRequest.service")
+      .then((mod) => {
+        if (decision === "Approved") {
+          return mod.applyProfileChangeRequest(approval.id, userId);
+        }
+        return mod.rejectProfileChangeRequest(approval.id, userId, comment);
+      })
+      .catch((err) =>
+        logger.error("Profile-change apply/reject failed", {
+          approvalId: approval.id,
+          error: (err as Error).message,
+        }),
+      );
+  }
+
   // Notify requester
   const statusLabel = decision === "Approved" ? "approved" : "rejected";
   const statusLabelAr = decision === "Approved" ? "تمت الموافقة" : "تم الرفض";
