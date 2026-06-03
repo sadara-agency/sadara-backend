@@ -43,6 +43,10 @@ jest.mock("@shared/utils/encryption", () => ({
   decrypt: jest.fn((s: string) => s),
 }));
 
+jest.mock("@shared/utils/storage", () => ({
+  resolveFileUrl: jest.fn(async (key: string) => `https://cdn.test/${key}`),
+}));
+
 jest.mock("@shared/utils/pdf", () => ({
   enqueueContractPdfRegen: jest.fn(),
 }));
@@ -90,15 +94,18 @@ import {
   requestProfileLink,
   getMySessions,
   getMyAgent,
+  getMyProfile,
 } from "./portal.service";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
 import { Session } from "@modules/sessions/session.model";
+import { Contract } from "@modules/contracts/contract.model";
 import {
   notifyByRole,
   notifyUser,
 } from "@modules/notifications/notification.service";
 import { cacheGet, cacheSet } from "@shared/utils/cache";
+import { resolveFileUrl } from "@shared/utils/storage";
 
 describe("requestProfileLink", () => {
   beforeEach(() => {
@@ -378,5 +385,111 @@ describe("getMySessions", () => {
     const result = await getMySessions("user-s2");
 
     expect(result).toEqual({ upcoming: [], past: [], total: 0 });
+  });
+});
+
+describe("getMyProfile", () => {
+  const BARE_KEY = "photos/player-uuid.webp";
+  const RESOLVED_URL = `https://cdn.test/${BARE_KEY}`;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makePlayerInstance(overrides: Record<string, unknown> = {}) {
+    const data = {
+      id: "p-me",
+      firstName: "Khalid",
+      lastName: "Al-Ghamdi",
+      photoUrl: BARE_KEY,
+      currentClubId: "club-1",
+      ...overrides,
+    };
+    return {
+      ...data,
+      getDataValue: (k: string) => (k === "id" ? data.id : undefined),
+      get: ({ plain }: { plain: boolean }) => {
+        if (!plain) throw new Error("Test mock: only plain: true is supported");
+        return data;
+      },
+    };
+  }
+
+  it("resolves photoUrl via resolveFileUrl when a bare key is present", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-me",
+      email: "player@example.com",
+      role: "Player",
+      playerId: "p-me",
+    });
+    (Player.findByPk as jest.Mock)
+      // first call: getLinkedPlayer (finds by playerId)
+      .mockResolvedValueOnce(makePlayerInstance())
+      // second call: Player.findByPk inside getMyProfile (the profile fetch)
+      .mockResolvedValueOnce(makePlayerInstance());
+    (Contract.findOne as jest.Mock).mockResolvedValue(null);
+    // QueryTypes.SELECT returns the rows array directly; destructured as [stats] in the service to get the first row
+    const { sequelize } = require("@config/database");
+    (sequelize.query as jest.Mock).mockResolvedValue([
+      {
+        activeContracts: "1",
+        totalDocuments: "3",
+        openTasks: "0",
+        currentGate: "2",
+      },
+    ]);
+
+    const result = await getMyProfile("user-me");
+
+    expect(resolveFileUrl).toHaveBeenCalledWith(BARE_KEY);
+    expect(result.player).not.toBeNull();
+    expect((result.player as Record<string, unknown>).photoUrl).toBe(
+      RESOLVED_URL,
+    );
+  });
+
+  it("leaves photoUrl as null when player has no photo", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-me2",
+      email: "player2@example.com",
+      role: "Player",
+      playerId: "p-me2",
+    });
+    (Player.findByPk as jest.Mock)
+      .mockResolvedValueOnce(
+        makePlayerInstance({ id: "p-me2", photoUrl: null }),
+      )
+      .mockResolvedValueOnce(
+        makePlayerInstance({ id: "p-me2", photoUrl: null }),
+      );
+    (Contract.findOne as jest.Mock).mockResolvedValue(null);
+    const { sequelize } = require("@config/database");
+    (sequelize.query as jest.Mock).mockResolvedValue([
+      {
+        activeContracts: "0",
+        totalDocuments: "0",
+        openTasks: "0",
+        currentGate: "-1",
+      },
+    ]);
+
+    const result = await getMyProfile("user-me2");
+
+    expect(resolveFileUrl).not.toHaveBeenCalled();
+    expect((result.player as Record<string, unknown>).photoUrl).toBeNull();
+  });
+
+  it("throws 403 for non-Player role users", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-admin",
+      email: "admin@example.com",
+      role: "Admin",
+      playerId: null,
+    });
+
+    await expect(getMyProfile("user-admin")).rejects.toMatchObject({
+      statusCode: 403,
+    });
+    expect(resolveFileUrl).not.toHaveBeenCalled();
   });
 });
