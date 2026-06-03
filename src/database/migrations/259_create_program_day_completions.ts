@@ -1,4 +1,5 @@
 import { QueryInterface, DataTypes } from "sequelize";
+import { indexExists } from "../migrationHelpers";
 
 export async function up({
   context: queryInterface,
@@ -20,16 +21,31 @@ export async function up({
     updated_at: { type: DataTypes.DATE, allowNull: false },
   });
 
-  await queryInterface.addIndex("program_day_completions", {
-    fields: ["player_id", "day_session_id", "completed_date"],
-    unique: true,
-    name: "program_day_completions_player_session_date_uniq",
-  });
+  // Indexes — guarded so the migration is safe to re-run (linter requires a guard).
+  if (
+    !(await indexExists(
+      queryInterface,
+      "program_day_completions_player_session_date_uniq",
+    ))
+  ) {
+    await queryInterface.addIndex("program_day_completions", {
+      fields: ["player_id", "day_session_id", "completed_date"],
+      unique: true,
+      name: "program_day_completions_player_session_date_uniq",
+    });
+  }
 
-  await queryInterface.addIndex("program_day_completions", {
-    fields: ["player_id", "program_id"],
-    name: "program_day_completions_player_program_idx",
-  });
+  if (
+    !(await indexExists(
+      queryInterface,
+      "program_day_completions_player_program_idx",
+    ))
+  ) {
+    await queryInterface.addIndex("program_day_completions", {
+      fields: ["player_id", "program_id"],
+      name: "program_day_completions_player_program_idx",
+    });
+  }
 }
 
 export async function down({
