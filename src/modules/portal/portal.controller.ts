@@ -120,7 +120,7 @@ export async function generateInvite(req: AuthRequest, res: Response) {
 
 // ── Upload My Document ──
 
-const ALLOWED_DOC_TYPES = ["ID", "Passport", "Medical"];
+const ALLOWED_DOC_TYPES = ["ID", "Passport", "Medical", "Contract", "Other"];
 
 export async function uploadMyDocument(req: AuthRequest, res: Response) {
   const player = await portalService.getLinkedPlayer(req.user!.id);
