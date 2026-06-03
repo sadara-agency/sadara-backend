@@ -161,8 +161,17 @@ export async function getMyProfile(userId: string) {
     ),
   ]);
 
+  const plain = profile ? profile.get({ plain: true }) : null;
+
   return {
-    player: profile,
+    player: plain
+      ? {
+          ...plain,
+          photoUrl: plain.photoUrl
+            ? await resolveFileUrl(plain.photoUrl)
+            : plain.photoUrl,
+        }
+      : plain,
     contract: activeContract,
     stats: stats || {},
   };
