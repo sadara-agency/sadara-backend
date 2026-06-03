@@ -122,19 +122,26 @@ import { PlayerAccount } from '../../../src/modules/portal/playerAccount.model';
 const mockPlayerAccountFindByPk = PlayerAccount.findByPk as jest.Mock;
 
 // Helper
-const mockPlayerInst = (overrides: any = {}) => ({
-  id: 'player-001',
-  firstName: 'Ahmed',
-  lastName: 'Ali',
-  firstNameAr: 'أحمد',
-  lastNameAr: 'علي',
-  email: 'ahmed@test.com',
-  currentClubId: 'club-001',
-  position: 'ST',
-  getDataValue: (k: string) => (overrides[k] ?? ({ id: 'player-001', firstName: 'Ahmed', lastName: 'Ali' } as any)[k]),
-  update: jest.fn().mockResolvedValue({}),
-  ...overrides,
-});
+const mockPlayerInst = (overrides: any = {}) => {
+  const base = {
+    id: 'player-001',
+    firstName: 'Ahmed',
+    lastName: 'Ali',
+    firstNameAr: 'أحمد',
+    lastNameAr: 'علي',
+    email: 'ahmed@test.com',
+    currentClubId: 'club-001',
+    position: 'ST',
+  };
+  const inst = {
+    ...base,
+    getDataValue: (k: string) => (overrides[k] ?? ({ id: 'player-001', firstName: 'Ahmed', lastName: 'Ali' } as any)[k]),
+    get: ({ plain }: { plain?: boolean } = {}) => (plain ? { ...base, ...overrides } : inst),
+    update: jest.fn().mockResolvedValue({}),
+    ...overrides,
+  };
+  return inst;
+};
 
 describe('Portal Service', () => {
   beforeEach(() => { jest.clearAllMocks(); });

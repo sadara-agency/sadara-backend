@@ -98,6 +98,8 @@ import {
   MatchEvaluation,
   PlayerPerformanceSummary,
 } from "@modules/matchEvaluations/matchEvaluation.model";
+// Registered for Sequelize model loading (no direct FK associations defined here)
+import "@modules/profileChangeRequests/profileChangeRequest.model";
 
 let associationsReady = false;
 
