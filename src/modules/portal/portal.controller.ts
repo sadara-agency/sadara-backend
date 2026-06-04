@@ -16,6 +16,27 @@ export async function getMyProfile(req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+// ── My Supplements ──
+
+export async function getMySupplements(req: AuthRequest, res: Response) {
+  const data = await portalService.getMySupplements(req.user!.id);
+  sendSuccess(res, data);
+}
+
+// ── My Posture ──
+
+export async function getMyPosture(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyPosture(req.user!.id);
+  sendSuccess(res, data);
+}
+
+// ── My Rehab ──
+
+export async function getMyRehab(req: AuthRequest, res: Response) {
+  const data = await portalService.getMyRehab(req.user!.id);
+  sendSuccess(res, data);
+}
+
 // ── My Schedule ──
 
 /**
