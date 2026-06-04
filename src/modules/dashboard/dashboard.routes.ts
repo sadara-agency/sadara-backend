@@ -6,6 +6,7 @@ import { CacheTTL } from "@shared/utils/cache";
 import * as dashboardController from "@modules/dashboard/dashboard.controller";
 import * as configController from "@modules/dashboard/dashboardConfig.controller";
 import * as transferPortfolioController from "@modules/dashboard/transferPortfolio.controller";
+import * as portfolioAnalyticsController from "@modules/dashboard/portfolioAnalytics.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -227,6 +228,115 @@ router.get(
   authorizeModule("dashboard", "read"),
   cacheRoute("tf-portfolio", CacheTTL.SHORT),
   transferPortfolioController.getStats,
+);
+
+// ── Player Portfolio Analytics ──
+// Roster-wide aggregation. Service layer caches each query group via
+// cacheOrFetch; the route-level cacheRoute adds a per-response layer.
+// Nav/RouteGuard restrict the page to Admin/Manager/SportingDirector/
+// Executive on the frontend; endpoints stay authorizeModule('dashboard','read').
+
+/**
+ * @swagger
+ * /dashboard/portfolio/all:
+ *   get:
+ *     summary: Batched portfolio analytics (distributions + KPIs + positions + rankings at default period)
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Combined portfolio analytics payload
+ */
+router.get(
+  "/portfolio/all",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(portfolioAnalyticsController.getAll),
+);
+
+/**
+ * @swagger
+ * /dashboard/portfolio/distributions:
+ *   get:
+ *     summary: Current-state categorical distributions across the active roster
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Distribution buckets keyed by dimension
+ */
+router.get(
+  "/portfolio/distributions",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.LONG),
+  asyncHandler(portfolioAnalyticsController.getDistributions),
+);
+
+/**
+ * @swagger
+ * /dashboard/portfolio/kpis:
+ *   get:
+ *     summary: Portfolio KPI counters (avg age, avg rating, ready-for-marketing, under negotiation, etc.)
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: KPI counter object
+ */
+router.get(
+  "/portfolio/kpis",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.LONG),
+  asyncHandler(portfolioAnalyticsController.getKpis),
+);
+
+/**
+ * @swagger
+ * /dashboard/portfolio/positions:
+ *   get:
+ *     summary: Position insights — all present positions, most- and least-represented
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Position insight buckets
+ */
+router.get(
+  "/portfolio/positions",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.LONG),
+  asyncHandler(portfolioAnalyticsController.getPositions),
+);
+
+/**
+ * @swagger
+ * /dashboard/portfolio/rankings:
+ *   get:
+ *     summary: Top-rated and most-improved players over a time window
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: period
+ *         schema:
+ *           type: integer
+ *           enum: [30, 90, 365]
+ *           default: 90
+ *         description: Window in days (whitelisted; invalid values fall back to 90)
+ *     responses:
+ *       200:
+ *         description: Ranked player lists for the resolved period
+ */
+router.get(
+  "/portfolio/rankings",
+  authorizeModule("dashboard", "read"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(portfolioAnalyticsController.getRankings),
 );
 
 export default router;
