@@ -117,6 +117,60 @@ router.get(
 );
 /**
  * @swagger
+ * /portal/supplements:
+ *   get:
+ *     summary: Get the linked player's active supplements
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Active supplements for the player
+ */
+router.get(
+  "/supplements",
+  authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
+  asyncHandler(portalController.getMySupplements),
+);
+/**
+ * @swagger
+ * /portal/posture:
+ *   get:
+ *     summary: Get the linked player's posture assessment history
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Posture assessments (latest + history)
+ */
+router.get(
+  "/posture",
+  authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.MEDIUM, { perUser: true }),
+  asyncHandler(portalController.getMyPosture),
+);
+/**
+ * @swagger
+ * /portal/rehab:
+ *   get:
+ *     summary: Get the linked player's active rehab protocols
+ *     tags: [Portal]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Active rehab protocols with phases and exercises
+ */
+router.get(
+  "/rehab",
+  authorize("Player"),
+  cacheRoute(CachePrefix.PORTAL, CacheTTL.SHORT, { perUser: true }),
+  asyncHandler(portalController.getMyRehab),
+);
+/**
+ * @swagger
  * /portal/schedule:
  *   get:
  *     summary: "[DEPRECATED] Get player schedule"

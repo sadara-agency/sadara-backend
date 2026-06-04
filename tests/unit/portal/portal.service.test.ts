@@ -83,6 +83,17 @@ jest.mock('../../../src/modules/wellness/programDaySession.model', () => ({
 jest.mock('../../../src/modules/wellness/programExerciseLog.model', () => ({
   ProgramExerciseLog: { findAll: jest.fn(), name: 'ProgramExerciseLog' },
 }));
+jest.mock('../../../src/modules/wellness/supplement.model', () => ({
+  Supplement: { findAll: jest.fn(), name: 'Supplement' },
+}));
+jest.mock('../../../src/modules/wellness/postureAssessment.model', () => ({
+  PostureAssessment: { findAll: jest.fn(), name: 'PostureAssessment' },
+}));
+jest.mock('../../../src/modules/wellness/rehabProtocol.model', () => ({
+  RehabProtocol: { findAll: jest.fn(), name: 'RehabProtocol' },
+  RehabPhase: { name: 'RehabPhase' },
+  RehabPhaseExercise: { name: 'RehabPhaseExercise' },
+}));
 jest.mock('../../../src/modules/portal/playerAccount.model', () => ({
   PlayerAccount: {
     findOne: jest.fn(),

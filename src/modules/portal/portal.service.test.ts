@@ -89,17 +89,34 @@ jest.mock("@modules/wellness/programDaySession.model", () => ({
 jest.mock("@modules/wellness/programExerciseLog.model", () => ({
   ProgramExerciseLog: { findAll: jest.fn(), name: "ProgramExerciseLog" },
 }));
+jest.mock("@modules/wellness/supplement.model", () => ({
+  Supplement: { findAll: jest.fn(), name: "Supplement" },
+}));
+jest.mock("@modules/wellness/postureAssessment.model", () => ({
+  PostureAssessment: { findAll: jest.fn(), name: "PostureAssessment" },
+}));
+jest.mock("@modules/wellness/rehabProtocol.model", () => ({
+  RehabProtocol: { findAll: jest.fn(), name: "RehabProtocol" },
+  RehabPhase: { name: "RehabPhase" },
+  RehabPhaseExercise: { name: "RehabPhaseExercise" },
+}));
 
 import {
   requestProfileLink,
   getMySessions,
   getMyAgent,
   getMyProfile,
+  getMySupplements,
+  getMyPosture,
+  getMyRehab,
 } from "./portal.service";
 import { User } from "@modules/users/user.model";
 import { Player } from "@modules/players/player.model";
 import { Session } from "@modules/sessions/session.model";
 import { Contract } from "@modules/contracts/contract.model";
+import { Supplement } from "@modules/wellness/supplement.model";
+import { PostureAssessment } from "@modules/wellness/postureAssessment.model";
+import { RehabProtocol } from "@modules/wellness/rehabProtocol.model";
 import {
   notifyByRole,
   notifyUser,
@@ -491,5 +508,234 @@ describe("getMyProfile", () => {
       statusCode: 403,
     });
     expect(resolveFileUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe("getMySupplements", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makeSupplementRow(data: Record<string, unknown>) {
+    return {
+      ...data,
+      get: ({ plain }: { plain: boolean }) => {
+        if (!plain) throw new Error("Test mock: only plain: true is supported");
+        return data;
+      },
+    };
+  }
+
+  it("returns only the linked player's active supplements", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-sup1",
+      email: "p@example.com",
+      role: "Player",
+      playerId: "p-sup1",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-sup1",
+      getDataValue: (k: string) => (k === "id" ? "p-sup1" : undefined),
+    });
+
+    (Supplement.findAll as jest.Mock).mockResolvedValue([
+      makeSupplementRow({
+        id: "sup-1",
+        playerId: "p-sup1",
+        name: "Creatine",
+        priority: "essential",
+        timing: "morning",
+        isActive: true,
+      }),
+      makeSupplementRow({
+        id: "sup-2",
+        playerId: "p-sup1",
+        name: "Vitamin D",
+        priority: "recommended",
+        timing: "evening",
+        isActive: true,
+      }),
+    ]);
+
+    const result = await getMySupplements("user-sup1");
+
+    expect(Supplement.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { playerId: "p-sup1", isActive: true },
+      }),
+    );
+    expect(result.total).toBe(2);
+    expect(result.supplements.map((s: any) => s.id)).toEqual([
+      "sup-1",
+      "sup-2",
+    ]);
+  });
+
+  it("returns an empty result when the player has no active supplements", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-sup2",
+      email: "p2@example.com",
+      role: "Player",
+      playerId: "p-sup2",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-sup2",
+      getDataValue: (k: string) => (k === "id" ? "p-sup2" : undefined),
+    });
+    (Supplement.findAll as jest.Mock).mockResolvedValue([]);
+
+    const result = await getMySupplements("user-sup2");
+
+    expect(result).toEqual({ supplements: [], total: 0 });
+  });
+});
+
+describe("getMyPosture", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makePostureRow(data: Record<string, unknown>) {
+    return {
+      ...data,
+      get: ({ plain }: { plain: boolean }) => {
+        if (!plain) throw new Error("Test mock: only plain: true is supported");
+        return data;
+      },
+    };
+  }
+
+  it("returns the linked player's posture history with latest first", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-pos1",
+      email: "p@example.com",
+      role: "Player",
+      playerId: "p-pos1",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-pos1",
+      getDataValue: (k: string) => (k === "id" ? "p-pos1" : undefined),
+    });
+
+    (PostureAssessment.findAll as jest.Mock).mockResolvedValue([
+      makePostureRow({
+        id: "pos-1",
+        playerId: "p-pos1",
+        scanDate: "2026-06-01",
+        overallGrade: "B",
+      }),
+      makePostureRow({
+        id: "pos-2",
+        playerId: "p-pos1",
+        scanDate: "2026-05-01",
+        overallGrade: "C",
+      }),
+    ]);
+
+    const result = await getMyPosture("user-pos1");
+
+    expect(PostureAssessment.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { playerId: "p-pos1" },
+      }),
+    );
+    expect(result.total).toBe(2);
+    expect(result.history).toHaveLength(2);
+    expect(result.latest.id).toBe("pos-1");
+  });
+
+  it("returns an empty result when the player has no posture assessments", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-pos2",
+      email: "p2@example.com",
+      role: "Player",
+      playerId: "p-pos2",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-pos2",
+      getDataValue: (k: string) => (k === "id" ? "p-pos2" : undefined),
+    });
+    (PostureAssessment.findAll as jest.Mock).mockResolvedValue([]);
+
+    const result = await getMyPosture("user-pos2");
+
+    expect(result).toEqual({ latest: null, history: [], total: 0 });
+  });
+});
+
+describe("getMyRehab", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  function makeRehabRow(data: Record<string, unknown>) {
+    return {
+      ...data,
+      toJSON: () => data,
+    };
+  }
+
+  it("returns the linked player's active protocols with phases sorted by orderIndex", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-reh1",
+      email: "p@example.com",
+      role: "Player",
+      playerId: "p-reh1",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-reh1",
+      getDataValue: (k: string) => (k === "id" ? "p-reh1" : undefined),
+    });
+
+    (RehabProtocol.findAll as jest.Mock).mockResolvedValue([
+      makeRehabRow({
+        id: "r1",
+        playerId: "p-reh1",
+        status: "active",
+        phases: [
+          {
+            orderIndex: 1,
+            exercises: [
+              { id: "ex-b", orderIndex: 1 },
+              { id: "ex-a", orderIndex: 0 },
+            ],
+          },
+          { orderIndex: 0, exercises: [] },
+        ],
+      }),
+    ]);
+
+    const result = await getMyRehab("user-reh1");
+
+    expect(RehabProtocol.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { playerId: "p-reh1", status: "active" },
+      }),
+    );
+    expect(result.total).toBe(1);
+    // Phases sorted by orderIndex (0 before 1)
+    expect(result.protocols[0].phases[0].orderIndex).toBe(0);
+    expect(result.protocols[0].phases[1].orderIndex).toBe(1);
+    // Exercises within the orderIndex:1 phase (now at phases[1]) sorted too
+    expect(result.protocols[0].phases[1].exercises[0].orderIndex).toBe(0);
+    expect(result.protocols[0].phases[1].exercises[1].orderIndex).toBe(1);
+  });
+
+  it("returns an empty result when the player has no active rehab protocols", async () => {
+    (User.findByPk as jest.Mock).mockResolvedValue({
+      id: "user-reh2",
+      email: "p2@example.com",
+      role: "Player",
+      playerId: "p-reh2",
+    });
+    (Player.findByPk as jest.Mock).mockResolvedValue({
+      id: "p-reh2",
+      getDataValue: (k: string) => (k === "id" ? "p-reh2" : undefined),
+    });
+    (RehabProtocol.findAll as jest.Mock).mockResolvedValue([]);
+
+    const result = await getMyRehab("user-reh2");
+
+    expect(result).toEqual({ protocols: [], total: 0 });
   });
 });

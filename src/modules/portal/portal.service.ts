@@ -23,6 +23,13 @@ import {
 import { WellnessExercise } from "@modules/wellness/fitness.model";
 import { ProgramDaySession } from "@modules/wellness/programDaySession.model";
 import { ProgramExerciseLog } from "@modules/wellness/programExerciseLog.model";
+import { Supplement } from "@modules/wellness/supplement.model";
+import { PostureAssessment } from "@modules/wellness/postureAssessment.model";
+import {
+  RehabProtocol,
+  RehabPhase,
+  RehabPhaseExercise,
+} from "@modules/wellness/rehabProtocol.model";
 import { AppError } from "@middleware/errorHandler";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { PlayerAccount } from "@modules/portal/playerAccount.model";
@@ -1022,6 +1029,85 @@ export async function getMyInjuries(userId: string) {
     active,
     avgRecoveryDays: avgRecovery,
   };
+}
+
+// ══════════════════════════════════════════
+// MY SUPPLEMENTS (active supplement protocols)
+// ══════════════════════════════════════════
+
+export async function getMySupplements(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  const rows = await Supplement.findAll({
+    where: { playerId, isActive: true },
+    order: [
+      ["priority", "ASC"],
+      ["timing", "ASC"],
+      ["name", "ASC"],
+    ],
+  });
+
+  const supplements = rows.map((r) => r.get({ plain: true }));
+  return { supplements, total: supplements.length };
+}
+
+// ══════════════════════════════════════════
+// MY POSTURE (assessment history)
+// ══════════════════════════════════════════
+
+export async function getMyPosture(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  const rows = await PostureAssessment.findAll({
+    where: { playerId },
+    order: [["scanDate", "DESC"]],
+  });
+
+  const history = rows.map((r) => r.get({ plain: true }));
+  return { latest: history[0] ?? null, history, total: history.length };
+}
+
+// ══════════════════════════════════════════
+// MY REHAB (active rehab protocols with phases + exercises)
+// ══════════════════════════════════════════
+
+export async function getMyRehab(userId: string) {
+  const player = await getLinkedPlayer(userId);
+  const playerId = getPlayerId(player);
+
+  const rows = await RehabProtocol.findAll({
+    where: { playerId, status: "active" },
+    include: [
+      {
+        model: RehabPhase,
+        as: "phases",
+        include: [{ model: RehabPhaseExercise, as: "exercises" }],
+      },
+    ],
+    order: [["createdAt", "DESC"]],
+  });
+
+  // Sort phases + their exercises by orderIndex in JS — ordering a query that
+  // mixes nested hasMany includes makes Sequelize emit a bad ORDER BY.
+  const protocols = rows.map((r) => r.toJSON()) as any[];
+  for (const p of protocols) {
+    if (Array.isArray(p.phases)) {
+      p.phases.sort(
+        (a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0),
+      );
+      for (const ph of p.phases) {
+        if (Array.isArray(ph.exercises)) {
+          ph.exercises.sort(
+            (a: any, b: any) => (a.orderIndex ?? 0) - (b.orderIndex ?? 0),
+          );
+        }
+      }
+    }
+  }
+
+  return { protocols, total: protocols.length };
 }
 
 // ══════════════════════════════════════════
