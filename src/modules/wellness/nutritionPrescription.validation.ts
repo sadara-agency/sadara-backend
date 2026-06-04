@@ -3,8 +3,15 @@ import { z } from "zod";
 export const triggeringReasonEnum = z.enum(["manual", "scan", "injury"]);
 
 const prescriptionMealItemSchema = z.object({
-  foodItemId: z.string().uuid(),
+  // null = manually-entered food (no library entry)
+  foodItemId: z.string().uuid().nullable().optional(),
+  name: z.string().max(255).optional(),
   servings: z.number().positive(),
+  // Pre-calculated macros supplied by the client for manual items
+  calories: z.number().min(0).optional().nullable(),
+  proteinG: z.number().min(0).optional().nullable(),
+  carbsG: z.number().min(0).optional().nullable(),
+  fatG: z.number().min(0).optional().nullable(),
 });
 
 const prescriptionMealSchema = z.object({

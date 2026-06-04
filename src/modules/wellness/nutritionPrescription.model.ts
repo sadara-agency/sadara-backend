@@ -252,7 +252,8 @@ PrescriptionMeal.init(
 export interface PrescriptionMealItemAttributes {
   id: string;
   mealId: string;
-  foodItemId: string;
+  foodItemId: string | null;
+  name: string | null;
   servings: number;
   calories: number | null;
   proteinG: number | null;
@@ -263,7 +264,14 @@ export interface PrescriptionMealItemAttributes {
 
 interface PrescriptionMealItemCreationAttributes extends Optional<
   PrescriptionMealItemAttributes,
-  "id" | "calories" | "proteinG" | "carbsG" | "fatG" | "createdAt"
+  | "id"
+  | "foodItemId"
+  | "name"
+  | "calories"
+  | "proteinG"
+  | "carbsG"
+  | "fatG"
+  | "createdAt"
 > {}
 
 export class PrescriptionMealItem
@@ -275,7 +283,8 @@ export class PrescriptionMealItem
 {
   declare id: string;
   declare mealId: string;
-  declare foodItemId: string;
+  declare foodItemId: string | null;
+  declare name: string | null;
   declare servings: number;
   declare calories: number | null;
   declare proteinG: number | null;
@@ -300,8 +309,12 @@ PrescriptionMealItem.init(
     },
     foodItemId: {
       type: DataTypes.UUID,
-      allowNull: false,
+      allowNull: true,
       field: "food_item_id",
+    },
+    name: {
+      type: DataTypes.STRING(255),
+      allowNull: true,
     },
     servings: {
       type: DataTypes.DECIMAL(5, 2),
