@@ -182,15 +182,35 @@ export async function issuePrescription(
         );
 
         if (meal.items.length > 0) {
-          const foodIds = meal.items.map((i) => i.foodItemId);
-          const foods = await FoodItem.findAll({
-            where: { id: foodIds },
-            transaction: t,
-          });
-          const foodMap = new Map(foods.map((f) => [f.id, f]));
+          // Only look up library items (null foodItemId = manual entry)
+          const libraryIds = meal.items
+            .map((i) => i.foodItemId)
+            .filter((id): id is string => !!id);
+
+          const foodMap = new Map<string, FoodItem>();
+          if (libraryIds.length > 0) {
+            const foods = await FoodItem.findAll({
+              where: { id: libraryIds },
+              transaction: t,
+            });
+            foods.forEach((f) => foodMap.set(f.id, f));
+          }
 
           await PrescriptionMealItem.bulkCreate(
             meal.items.map((item) => {
+              if (!item.foodItemId) {
+                // Manual item: store client-supplied macros as-is
+                return {
+                  mealId: mealRow.id,
+                  foodItemId: null,
+                  name: item.name ?? null,
+                  servings: item.servings,
+                  calories: item.calories ?? null,
+                  proteinG: item.proteinG ?? null,
+                  carbsG: item.carbsG ?? null,
+                  fatG: item.fatG ?? null,
+                };
+              }
               const food = foodMap.get(item.foodItemId);
               const scale = food
                 ? item.servings * (food.defaultServingG / 100)
@@ -198,6 +218,7 @@ export async function issuePrescription(
               return {
                 mealId: mealRow.id,
                 foodItemId: item.foodItemId,
+                name: null,
                 servings: item.servings,
                 calories:
                   food?.calories != null
@@ -291,6 +312,7 @@ export async function issueNewVersion(
           m.items.map((item) => ({
             mealId: newMeal.id,
             foodItemId: item.foodItemId,
+            name: item.name,
             servings: item.servings,
             calories: item.calories,
             proteinG: item.proteinG,
