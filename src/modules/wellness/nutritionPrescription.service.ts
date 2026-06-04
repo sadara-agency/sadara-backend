@@ -479,10 +479,8 @@ export async function getFoodItemById(id: string) {
 }
 
 export async function createFoodItem(data: CreateFoodItemDTO) {
-  const fdcId = Date.now();
   const { defaultServingG, ...rest } = data;
   const item = await FoodItem.create({
-    fdcId,
     source: "manual",
     ...rest,
     defaultServingG: defaultServingG ?? 100,

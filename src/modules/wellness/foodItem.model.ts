@@ -3,7 +3,7 @@ import { sequelize } from "@config/database";
 
 export interface FoodItemAttributes {
   id: string;
-  fdcId: number;
+  fdcId: number | null;
   name: string;
   nameAr: string | null;
   category: string | null;
@@ -24,6 +24,7 @@ export interface FoodItemAttributes {
 interface FoodItemCreationAttributes extends Optional<
   FoodItemAttributes,
   | "id"
+  | "fdcId"
   | "nameAr"
   | "category"
   | "calories"
@@ -43,7 +44,7 @@ export class FoodItem
   implements FoodItemAttributes
 {
   declare id: string;
-  declare fdcId: number;
+  declare fdcId: number | null;
   declare name: string;
   declare nameAr: string | null;
   declare category: string | null;
@@ -70,7 +71,7 @@ FoodItem.init(
     },
     fdcId: {
       type: DataTypes.INTEGER,
-      allowNull: false,
+      allowNull: true,
       unique: true,
       field: "fdc_id",
     },
