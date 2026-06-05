@@ -265,15 +265,17 @@ async function fetchDistributions(): Promise<PortfolioDistributions> {
   // Players by position — for pitch hover tooltips.
   type PosPlayerRow = {
     id: string;
-    full_name: string;
-    full_name_ar: string | null;
+    first_name: string;
+    last_name: string;
+    first_name_ar: string | null;
+    last_name_ar: string | null;
     position: string | null;
   };
   const posPlayerRows = await sequelize.query<PosPlayerRow>(
-    `SELECT id, full_name, full_name_ar, position
+    `SELECT id, first_name, last_name, first_name_ar, last_name_ar, position
      FROM players
      WHERE ${ACTIVE_SCOPE} AND position IS NOT NULL AND position <> ''
-     ORDER BY full_name`,
+     ORDER BY first_name, last_name`,
     { type: QueryTypes.SELECT },
   );
   const playersByPosition: Record<string, PositionPlayer[]> = {};
@@ -282,8 +284,11 @@ async function fetchDistributions(): Promise<PortfolioDistributions> {
     if (!playersByPosition[pos]) playersByPosition[pos] = [];
     playersByPosition[pos].push({
       id: r.id,
-      name: r.full_name,
-      nameAr: r.full_name_ar,
+      name: `${r.first_name} ${r.last_name}`,
+      nameAr:
+        r.first_name_ar && r.last_name_ar
+          ? `${r.first_name_ar} ${r.last_name_ar}`
+          : null,
     });
   }
 
