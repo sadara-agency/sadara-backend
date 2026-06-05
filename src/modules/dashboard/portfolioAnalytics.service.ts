@@ -24,6 +24,7 @@ import { POSITION_GROUPS } from "@modules/players/utils/attributeConfig";
 export interface DistributionBucket {
   key: string;
   count: number;
+  logoUrl?: string;
 }
 
 export interface PortfolioDistributions {
@@ -177,12 +178,17 @@ async function fetchDistributions(): Promise<PortfolioDistributions> {
   ]);
 
   // City + club come from the joined club row.
-  const clubRows = await sequelize.query<CountRow>(
-    `SELECT c.name AS key, COUNT(*)::int AS count
+  type ClubRow = {
+    key: string | null;
+    count: string | number;
+    logo_url: string | null;
+  };
+  const clubRows = await sequelize.query<ClubRow>(
+    `SELECT c.name AS key, c.logo_url, COUNT(*)::int AS count
      FROM players p
      LEFT JOIN clubs c ON c.id = p.current_club_id
      WHERE p.${ACTIVE_SCOPE}
-     GROUP BY c.name
+     GROUP BY c.name, c.logo_url
      ORDER BY count DESC`,
     { type: QueryTypes.SELECT },
   );
@@ -251,7 +257,14 @@ async function fetchDistributions(): Promise<PortfolioDistributions> {
   return {
     nationality: foldToTopN(toBuckets(nationalityRows, "Unknown"), 15),
     city: foldToTopN(toBuckets(cityRows, "Unknown"), 15),
-    club: foldToTopN(toBuckets(clubRows, "Unattached"), 15),
+    club: foldToTopN(
+      clubRows.map((r) => ({
+        key: r.key == null || r.key === "" ? "Unattached" : r.key,
+        count: Number(r.count),
+        ...(r.logo_url ? { logoUrl: r.logo_url } : {}),
+      })),
+      15,
+    ),
     contractType: toBuckets(contractTypeRows, "Unknown"),
     position: toBuckets(positionRows, "Unassigned"),
     ageGroup: orderBuckets(ageRows, AGE_GROUP_ORDER),
