@@ -27,6 +27,12 @@ export interface DistributionBucket {
   logoUrl?: string;
 }
 
+export interface PositionPlayer {
+  id: string;
+  name: string;
+  nameAr: string | null;
+}
+
 export interface PortfolioDistributions {
   nationality: DistributionBucket[];
   city: DistributionBucket[];
@@ -39,6 +45,8 @@ export interface PortfolioDistributions {
   playerType: DistributionBucket[];
   mandateStatus: DistributionBucket[];
   careerStage: DistributionBucket[];
+  /** Players grouped by their position — used for pitch hover tooltips. */
+  playersByPosition: Record<string, PositionPlayer[]>;
 }
 
 export interface PortfolioKpis {
@@ -254,6 +262,31 @@ async function fetchDistributions(): Promise<PortfolioDistributions> {
     { type: QueryTypes.SELECT },
   );
 
+  // Players by position — for pitch hover tooltips.
+  type PosPlayerRow = {
+    id: string;
+    full_name: string;
+    full_name_ar: string | null;
+    position: string | null;
+  };
+  const posPlayerRows = await sequelize.query<PosPlayerRow>(
+    `SELECT id, full_name, full_name_ar, position
+     FROM players
+     WHERE ${ACTIVE_SCOPE} AND position IS NOT NULL AND position <> ''
+     ORDER BY full_name`,
+    { type: QueryTypes.SELECT },
+  );
+  const playersByPosition: Record<string, PositionPlayer[]> = {};
+  for (const r of posPlayerRows) {
+    const pos = r.position!;
+    if (!playersByPosition[pos]) playersByPosition[pos] = [];
+    playersByPosition[pos].push({
+      id: r.id,
+      name: r.full_name,
+      nameAr: r.full_name_ar,
+    });
+  }
+
   return {
     nationality: foldToTopN(toBuckets(nationalityRows, "Unknown"), 15),
     city: foldToTopN(toBuckets(cityRows, "Unknown"), 15),
@@ -272,6 +305,7 @@ async function fetchDistributions(): Promise<PortfolioDistributions> {
     height: orderBuckets(heightRows, HEIGHT_ORDER),
     playerType: toBuckets(playerTypeRows, "Unknown"),
     mandateStatus: toBuckets(mandateStatusRows, "None"),
+    playersByPosition,
     careerStage: toBuckets(careerRows, "Unclassified"),
   };
 }
