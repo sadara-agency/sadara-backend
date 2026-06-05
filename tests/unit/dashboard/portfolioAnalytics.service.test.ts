@@ -80,7 +80,8 @@ describe("portfolioAnalytics.service", () => {
         .mockResolvedValueOnce([{ key: "Riyadh", count: 7 }]) // city
         .mockResolvedValueOnce([{ key: "22-25", count: 9 }]) // age
         .mockResolvedValueOnce([{ key: "180-189", count: 6 }]) // height
-        .mockResolvedValueOnce([{ key: "PeakPerformer", count: 3 }]); // career
+        .mockResolvedValueOnce([{ key: "PeakPerformer", count: 3 }]) // career
+        .mockResolvedValueOnce([]); // posPlayerRows (pitch tooltip)
     };
 
     it("returns all 11 distribution dimensions on the happy path", async () => {
@@ -104,7 +105,7 @@ describe("portfolioAnalytics.service", () => {
       expect(result.careerStage).toEqual([
         { key: "PeakPerformer", count: 3 },
       ]);
-      expect(q).toHaveBeenCalledTimes(11);
+      expect(q).toHaveBeenCalledTimes(12);
     });
 
     it("coalesces null keys to explicit buckets and casts counts to numbers", async () => {
@@ -118,7 +119,8 @@ describe("portfolioAnalytics.service", () => {
         .mockResolvedValueOnce([{ key: null, count: "2" }]) // city → Unknown
         .mockResolvedValueOnce([]) // age empty
         .mockResolvedValueOnce([]) // height empty
-        .mockResolvedValueOnce([{ key: "Unclassified", count: "8" }]); // career
+        .mockResolvedValueOnce([{ key: "Unclassified", count: "8" }]) // career
+        .mockResolvedValueOnce([]); // posPlayerRows (pitch tooltip)
 
       const result = await svc.getDistributions();
 
@@ -150,7 +152,8 @@ describe("portfolioAnalytics.service", () => {
         .mockResolvedValueOnce([]) // city
         .mockResolvedValueOnce([]) // age
         .mockResolvedValueOnce([]) // height
-        .mockResolvedValueOnce([]); // career
+        .mockResolvedValueOnce([]) // career
+        .mockResolvedValueOnce([]); // posPlayerRows (pitch tooltip)
 
       const result = await svc.getDistributions();
 
@@ -176,7 +179,8 @@ describe("portfolioAnalytics.service", () => {
           { key: "22-25", count: 3 },
         ]) // age — out of order
         .mockResolvedValueOnce([]) // height
-        .mockResolvedValueOnce([]); // career
+        .mockResolvedValueOnce([]) // career
+        .mockResolvedValueOnce([]); // posPlayerRows (pitch tooltip)
 
       const result = await svc.getDistributions();
 
