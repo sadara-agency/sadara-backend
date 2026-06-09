@@ -139,6 +139,9 @@ describe('ContractTemplate Service', () => {
         contractType: 'Transfer',
         category: 'Club',
         defaultValues: { baseSalary: 500000, salaryCurrency: 'SAR' },
+        bodyHtml: null,
+        bodyJson: null,
+        isDefault: false,
         createdBy: 'user-001',
       });
     });
