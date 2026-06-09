@@ -34,6 +34,12 @@ jest.mock('../../../src/modules/contracts/contract.model', () => ({
   },
 }));
 
+// contract.service imports ContractTemplate; mock it so its .init() at
+// import time doesn't run against the bare mocked sequelize.
+jest.mock('../../../src/modules/contracts/contractTemplate.model', () => ({
+  ContractTemplate: { findByPk: jest.fn(), findAll: jest.fn(), create: jest.fn() },
+}));
+
 const mockPlayerFindByPk = jest.fn();
 jest.mock('../../../src/modules/players/player.model', () => ({
   Player: {

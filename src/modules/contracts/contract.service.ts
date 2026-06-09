@@ -7,6 +7,8 @@ import {
   where as seqWhere,
 } from "sequelize";
 import { Contract } from "@modules/contracts/contract.model";
+import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
+import { sanitizeContractHtml } from "@modules/contracts/contractSanitize";
 import { Player } from "@modules/players/player.model";
 import { Club } from "@modules/clubs/club.model";
 import { Squad } from "@modules/squads/squad.model";
@@ -236,6 +238,21 @@ export async function createContract(
     squadId = seniorSquad?.id ?? null;
   }
 
+  // Resolve body: explicit input wins; otherwise copy from the chosen template.
+  let bodyHtml: string | null = input.bodyHtml ?? null;
+  let bodyJson: Record<string, unknown> | null =
+    (input.bodyJson as Record<string, unknown> | undefined) ?? null;
+  const templateId: string | null = input.templateId ?? null;
+  if (templateId && (bodyHtml === null || bodyJson === null)) {
+    const tpl = await ContractTemplate.findByPk(templateId, {
+      attributes: ["id", "bodyHtml", "bodyJson"],
+    });
+    if (!tpl) throw new AppError("Contract template not found", 404);
+    if (bodyHtml === null) bodyHtml = tpl.bodyHtml ?? null;
+    if (bodyJson === null) bodyJson = tpl.bodyJson ?? null;
+  }
+  if (bodyHtml) bodyHtml = sanitizeContractHtml(bodyHtml);
+
   // Overlap check + creation in a transaction to prevent race conditions.
   // Date-less drafts cannot overlap — only enforce when both dates are provided.
   const contract = await sequelize.transaction(async (t) => {
@@ -282,6 +299,9 @@ export async function createContract(
         notes: input.notes,
         createdBy,
         squadId,
+        templateId,
+        bodyHtml,
+        bodyJson,
       },
       { transaction: t },
     );
@@ -304,6 +324,17 @@ export async function createContract(
 export async function updateContract(id: string, input: UpdateContractInput) {
   const contract = await findOrThrow(Contract, id, "Contract");
 
+  // Body is immutable once frozen (agent has signed).
+  if (
+    contract.bodyFrozenAt &&
+    (input.bodyHtml !== undefined || input.bodyJson !== undefined)
+  ) {
+    throw new AppError(
+      "Contract body is locked — it was frozen when the agent signed and cannot be edited",
+      422,
+    );
+  }
+
   // Prevent commission changes on locked contracts (signed/terminated)
   if (
     contract.commissionLocked &&
@@ -318,6 +349,10 @@ export async function updateContract(id: string, input: UpdateContractInput) {
   const newPct = input.commissionPct ?? contract.commissionPct;
   const newSalary = input.baseSalary ?? contract.baseSalary;
   const updateData: any = { ...input };
+
+  if (typeof input.bodyHtml === "string") {
+    updateData.bodyHtml = sanitizeContractHtml(input.bodyHtml);
+  }
 
   if (input.commissionPct !== undefined || input.baseSalary !== undefined) {
     updateData.totalCommission =

@@ -7,10 +7,8 @@ import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
 } from "@modules/contracts/contractTemplate.validation";
-import {
-  applyMinimalTags,
-  renderContractPdf,
-} from "@modules/contracts/contractDocument.service";
+import { renderContractPdf } from "@modules/contracts/contractDocument.service";
+import { resolveMergeTags } from "@modules/contracts/contractMergeTags";
 
 export async function listTemplates(_req: AuthRequest, res: Response) {
   const data = await svc.listContractTemplates();
@@ -63,18 +61,24 @@ export async function deactivateTemplate(req: AuthRequest, res: Response) {
 
 const PREVIEW_PLACEHOLDERS: Record<string, string> = {
   "player.name": "اسم اللاعب",
+  "player.nameEn": "Player Name",
   "player.nationalId": "1234567890",
   "player.nationality": "سعودي",
   "player.phone": "05XXXXXXXX",
-  "contract.startDate": "2026/01/01",
-  "contract.endDate": "2028/01/01",
+  "contract.startDate": "01 / 06 / 2026م",
+  "contract.endDate": "01 / 06 / 2028م",
+  "contract.duration": "سنتان (24 شهرًا)",
   "commission.pct": "10",
+  "contract.displayId": "CON-26-0001",
+  "agent.name": "Ahmed Osman Hadoug",
+  "agent.license": "202411-8478",
+  today: "10 / 06 / 2026م",
 };
 
 export async function previewTemplatePdf(req: AuthRequest, res: Response) {
   const template = await svc.getContractTemplate(req.params.id);
   const body = template.bodyHtml ?? "<p>(empty template)</p>";
-  const resolved = applyMinimalTags(body, PREVIEW_PLACEHOLDERS);
+  const resolved = resolveMergeTags(body, PREVIEW_PLACEHOLDERS);
   const buffer = await renderContractPdf(resolved);
   res.setHeader("Content-Type", "application/pdf");
   res.setHeader("Content-Length", buffer.length);

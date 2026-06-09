@@ -30,6 +30,7 @@ import { Club } from "@modules/clubs/club.model";
 import { Player } from "@modules/players/player.model";
 import { Contract } from "@modules/contracts/contract.model";
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
+import { REPRESENTATION_BODY_HTML } from "@modules/contracts/contractMergeTags";
 import { Match } from "@modules/matches/match.model";
 import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
@@ -910,8 +911,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       contractType: "Representation",
       category: "Agency" as const,
       isDefault: true,
-      bodyHtml:
-        "<h1>عقد تمثيل رياضي حصري</h1><p>الطرف الثاني: {{player.name}} — هوية {{player.nationalId}}</p>",
+      bodyHtml: REPRESENTATION_BODY_HTML,
       bodyJson: null,
       defaultValues: { commissionPct: 10, exclusivity: "Exclusive" as const },
     },

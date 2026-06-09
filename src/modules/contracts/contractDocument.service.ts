@@ -2,7 +2,6 @@ import {
   renderFlowingHtmlToBuffer,
   mergeWithBrandPages,
   wrapHtml,
-  escHtml,
 } from "@shared/utils/pdf";
 import {
   buildFormalSadaraCss,
@@ -31,22 +30,9 @@ export function selectBodyHtml(src: BodySource): string | null {
   return null;
 }
 
-/**
- * MINIMAL merge-tag substitution — Session 3 replaces this with the shared
- * registry resolver (contractMergeTags.ts). Until then, this fills the handful
- * of tags the preview needs and leaves unknown tags visible.
- * NOTE: superseded by Session 3 — do not extend here; extend the registry.
- */
-export function applyMinimalTags(
-  html: string,
-  data: Record<string, string>,
-): string {
-  return html.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key: string) => {
-    const val = data[key];
-    if (val === undefined) return match; // unknown tag stays visible
-    return val === "" ? '<span class="blank"></span>' : escHtml(val);
-  });
-}
+// Re-exported from the registry — kept as a named export so existing import
+// sites stay stable. The real logic now lives in contractMergeTags.
+export { resolveMergeTags as applyMinimalTags } from "./contractMergeTags";
 
 /** Wrap a resolved contract body in the Formal Sadara document shell. */
 export function buildContractHtml(resolvedBodyHtml: string): string {
