@@ -21,8 +21,11 @@ interface ContractTemplateAttributes {
   name: string;
   nameAr: string | null;
   contractType: string;
-  category: "Club" | "Sponsorship";
+  category: "Club" | "Sponsorship" | "Agency";
   defaultValues: ContractTemplateDefaultValues;
+  bodyJson: Record<string, unknown> | null;
+  bodyHtml: string | null;
+  isDefault: boolean;
   isActive: boolean;
   createdBy: string | null;
   createdAt?: Date;
@@ -31,7 +34,15 @@ interface ContractTemplateAttributes {
 
 interface ContractTemplateCreation extends Optional<
   ContractTemplateAttributes,
-  "id" | "nameAr" | "isActive" | "createdBy" | "createdAt" | "updatedAt"
+  | "id"
+  | "nameAr"
+  | "bodyJson"
+  | "bodyHtml"
+  | "isDefault"
+  | "isActive"
+  | "createdBy"
+  | "createdAt"
+  | "updatedAt"
 > {}
 
 export class ContractTemplate
@@ -42,8 +53,11 @@ export class ContractTemplate
   declare name: string;
   declare nameAr: string | null;
   declare contractType: string;
-  declare category: "Club" | "Sponsorship";
+  declare category: "Club" | "Sponsorship" | "Agency";
   declare defaultValues: ContractTemplateDefaultValues;
+  declare bodyJson: Record<string, unknown> | null;
+  declare bodyHtml: string | null;
+  declare isDefault: boolean;
   declare isActive: boolean;
   declare createdBy: string | null;
   declare createdAt: Date;
@@ -79,6 +93,24 @@ ContractTemplate.init(
       allowNull: false,
       defaultValue: {},
       field: "default_values",
+    },
+    bodyJson: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
+      field: "body_json",
+    },
+    bodyHtml: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
+      field: "body_html",
+    },
+    isDefault: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+      field: "is_default",
     },
     isActive: {
       type: DataTypes.BOOLEAN,

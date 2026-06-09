@@ -29,6 +29,7 @@ import { User } from "@modules/users/user.model";
 import { Club } from "@modules/clubs/club.model";
 import { Player } from "@modules/players/player.model";
 import { Contract } from "@modules/contracts/contract.model";
+import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
 import { Match } from "@modules/matches/match.model";
 import { MatchPlayer } from "@modules/matches/matchPlayer.model";
 import { PlayerMatchStats } from "@modules/matches/playerMatchStats.model";
@@ -899,6 +900,58 @@ async function seedAllData(tx: Transaction): Promise<void> {
     })),
     opts,
   );
+
+  // ── Contract Templates (4 starter agency templates) ──
+  const CONTRACT_TEMPLATE_SEED = [
+    {
+      id: IDS.contractTemplates[0],
+      name: "Exclusive Representation Agreement",
+      nameAr: "عقد تمثيل رياضي حصري",
+      contractType: "Representation",
+      category: "Agency",
+      isDefault: true,
+      bodyHtml:
+        "<h1>عقد تمثيل رياضي حصري</h1><p>الطرف الثاني: {{player.name}} — هوية {{player.nationalId}}</p>",
+      bodyJson: null,
+      defaultValues: { commissionPct: 10, exclusivity: "Exclusive" },
+    },
+    {
+      id: IDS.contractTemplates[1],
+      name: "Career Management Services",
+      nameAr: "عقد خدمات إدارة المسار الاحترافي",
+      contractType: "CareerManagement",
+      category: "Agency",
+      isDefault: true,
+      bodyHtml:
+        "<h1>عقد خدمات إدارة المسار الاحترافي</h1><p>الطرف الثاني: {{player.name}}</p>",
+      bodyJson: null,
+      defaultValues: {},
+    },
+    {
+      id: IDS.contractTemplates[2],
+      name: "Image Rights Agreement",
+      nameAr: "عقد إدارة الصورة",
+      contractType: "ImageRights",
+      category: "Agency",
+      isDefault: true,
+      bodyHtml: "<h1>عقد إدارة الصورة</h1><p>الطرف الثاني: {{player.name}}</p>",
+      bodyJson: null,
+      defaultValues: {},
+    },
+    {
+      id: IDS.contractTemplates[3],
+      name: "Representation Termination Notice",
+      nameAr: "نموذج إخلاء طرف",
+      contractType: "Termination",
+      category: "Agency",
+      isDefault: true,
+      bodyHtml: "<h1>نموذج إخلاء طرف</h1><p>الطرف الثاني: {{player.name}}</p>",
+      bodyJson: null,
+      defaultValues: {},
+    },
+  ];
+  await ContractTemplate.bulkCreate(CONTRACT_TEMPLATE_SEED, opts);
+
   console.log("  ✅ Contracts seeded (12)");
 
   // ── 5. Matches (8) ──
