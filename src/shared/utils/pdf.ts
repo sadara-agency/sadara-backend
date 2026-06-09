@@ -61,6 +61,54 @@ const ASSETS_DIR = resolveAssetDir();
 export const COVER_PDF_PATH = path.join(ASSETS_DIR, "cover_page.pdf");
 export const BACK_PDF_PATH = path.join(ASSETS_DIR, "back_page.pdf");
 
+// ── Arabic font embedding (Puppeteer needs base64 data URIs; file:// is
+//    unreliable in the Chromium sandbox) ──────────────────────────────────
+function resolveFontDir(): string {
+  const distPath = path.resolve(__dirname, "..", "..", "assets", "font");
+  const srcPath = path.resolve(process.cwd(), "src", "assets", "font");
+  if (fs.existsSync(distPath)) return distPath;
+  return srcPath;
+}
+
+let cachedFontFaceCss: string | null = null;
+
+/**
+ * Returns @font-face CSS embedding IBM Plex Sans Arabic (regular + bold) as
+ * base64 data URIs so Puppeteer shapes Arabic correctly. Cached after first read.
+ */
+export function getArabicFontFaceCss(): string {
+  if (cachedFontFaceCss !== null) return cachedFontFaceCss;
+  const dir = resolveFontDir();
+  const toDataUri = (file: string): string => {
+    const full = path.join(dir, file);
+    try {
+      const buf = fs.readFileSync(full);
+      return `data:font/ttf;base64,${buf.toString("base64")}`;
+    } catch {
+      throw new AppError(
+        `Arabic font asset missing: ${file}. Place IBM Plex Sans Arabic ttf files in src/assets/font/`,
+        500,
+      );
+    }
+  };
+  const regular = toDataUri("IBMPlexSansArabic-Medium.ttf");
+  const bold = toDataUri("IBMPlexSansArabic-Bold.ttf");
+  cachedFontFaceCss = `
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-weight: 400;
+  font-style: normal;
+  src: url("${regular}") format("truetype");
+}
+@font-face {
+  font-family: "IBM Plex Sans Arabic";
+  font-weight: 700;
+  font-style: normal;
+  src: url("${bold}") format("truetype");
+}`;
+  return cachedFontFaceCss;
+}
+
 // ── HTML utilities ──
 
 export function wrapHtml(body: string, css: string): string {
@@ -179,6 +227,65 @@ export async function renderPagesToBuffers(
     ),
   );
 
+  return Promise.race([renderWork(), timeout]);
+}
+
+export interface FlowRenderOptions extends RenderOptions {
+  /** HTML for the repeated page header (Puppeteer headerTemplate). */
+  headerHtml?: string;
+  /** HTML for the repeated page footer (Puppeteer footerTemplate). */
+  footerHtml?: string;
+  /** Page margins (CSS units). Defaults give breathing room + header space. */
+  margin?: { top: string; bottom: string; left: string; right: string };
+}
+
+/**
+ * Render ONE tall HTML document and let Puppeteer paginate it across as many
+ * A4 pages as needed. Used for editable contracts whose length is unknown.
+ * Distinct from renderPagesToBuffers (which forces one fixed page per string).
+ */
+export async function renderFlowingHtmlToBuffer(
+  html: string,
+  options?: FlowRenderOptions,
+): Promise<Uint8Array> {
+  const {
+    extraArgs = ["--font-render-hinting=none"],
+    settleMs = 300,
+    timeoutMs = 30_000,
+    headerHtml,
+    footerHtml,
+    margin = { top: "22mm", bottom: "20mm", left: "18mm", right: "18mm" },
+  } = options || {};
+
+  const renderWork = async (): Promise<Uint8Array> => {
+    const browser = await getSharedBrowser(extraArgs);
+    const page = await browser.newPage();
+    try {
+      await page.setContent(html, {
+        waitUntil: "networkidle0",
+        timeout: 15000,
+      });
+      await page.evaluate(`new Promise(r => setTimeout(r, ${settleMs}))`);
+      const pdf = await page.pdf({
+        format: "A4",
+        margin,
+        printBackground: true,
+        displayHeaderFooter: Boolean(headerHtml || footerHtml),
+        headerTemplate: headerHtml ?? "<span></span>",
+        footerTemplate: footerHtml ?? "<span></span>",
+      });
+      return pdf;
+    } finally {
+      await page.close().catch(() => {});
+    }
+  };
+
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new AppError("Contract PDF render timed out", 504)),
+      timeoutMs,
+    ),
+  );
   return Promise.race([renderWork(), timeout]);
 }
 

@@ -34,20 +34,25 @@ router.get(
 );
 router.post(
   "/templates",
-  authorize("Admin"),
+  authorize("Admin", "Manager", "SportingDirector", "Executive", "Legal"),
   validate(createContractTemplateSchema),
   asyncHandler(templateController.createTemplate),
 );
 router.put(
   "/templates/:id",
-  authorize("Admin"),
+  authorize("Admin", "Manager", "SportingDirector", "Executive", "Legal"),
   validate(updateContractTemplateSchema),
   asyncHandler(templateController.updateTemplate),
 );
 router.delete(
   "/templates/:id",
-  authorize("Admin"),
+  authorize("Admin", "Manager", "SportingDirector", "Executive", "Legal"),
   asyncHandler(templateController.deactivateTemplate),
+);
+router.post(
+  "/templates/:id/preview-pdf",
+  authorize("Admin", "Manager", "SportingDirector", "Executive", "Legal"),
+  asyncHandler(templateController.previewTemplatePdf),
 );
 
 // ── Read (cached) ──

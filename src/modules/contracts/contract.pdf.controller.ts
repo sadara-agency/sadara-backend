@@ -14,6 +14,11 @@ import {
   COVER_PDF_PATH,
   BACK_PDF_PATH,
 } from "@shared/utils/pdf";
+import {
+  selectBodyHtml,
+  applyMinimalTags,
+  renderContractPdf,
+} from "./contractDocument.service";
 
 // Map file extensions to MIME types for uploaded signed-contract downloads
 const UPLOAD_MIME_BY_EXT: Record<string, string> = {
@@ -291,6 +296,34 @@ export async function generateContractPdfBuffer(
       "Brand asset back_page.pdf not found. Place it in src/assets/pdf/",
       500,
     );
+  }
+
+  // New editable-body path: if the contract has a frozen snapshot or an
+  // editable body, render it via the Formal Sadara stylesheet. Otherwise
+  // fall through to the legacy pg2/pg3 generator below (unchanged).
+  const bodyFields = contract as {
+    bodyHtmlSnapshot?: string | null;
+    bodyHtml?: string | null;
+  };
+  const selectedBody = selectBodyHtml({
+    bodyHtmlSnapshot: bodyFields.bodyHtmlSnapshot ?? null,
+    bodyHtml: bodyFields.bodyHtml ?? null,
+  });
+  if (selectedBody) {
+    const d = getData(contract);
+    // Minimal tag fill for preview; Session 3 swaps in the registry resolver.
+    const tagData: Record<string, string> = {
+      "player.name": d.pn,
+      "player.nationalId": d.pid,
+      "player.nationality": d.nat,
+      "player.phone": d.ph,
+      "contract.startDate": d.sd,
+      "contract.endDate": d.ed,
+      "commission.pct": String(d.cpct),
+    };
+    const resolved = applyMinimalTags(selectedBody, tagData);
+    const buffer = await renderContractPdf(resolved);
+    return { buffer, playerName: d.pn };
   }
 
   const d = getData(contract);
