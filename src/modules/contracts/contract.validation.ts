@@ -67,6 +67,9 @@ export const createContractSchema = z
     parentContractId: z.string().uuid().optional(),
     outstandingAmount: z.number().min(0).optional(),
     outstandingCurrency: z.enum(CURRENCIES).optional(),
+    bodyHtml: z.string().optional(),
+    bodyJson: z.record(z.unknown()).optional(),
+    templateId: z.string().uuid().optional().nullable(),
   })
   .refine(
     (data) =>
@@ -103,6 +106,9 @@ export const updateContractSchema = z.object({
   signedDocumentUrl: z.string().nullable().optional(),
   signingMethod: z.string().nullable().optional(),
   signedAt: z.string().nullable().optional(),
+  bodyHtml: z.string().optional(),
+  bodyJson: z.record(z.unknown()).optional(),
+  templateId: z.string().uuid().optional().nullable(),
 });
 
 // ── Transition Status ──

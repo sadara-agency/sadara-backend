@@ -9,9 +9,10 @@ const CONTRACT_TYPES = [
   "Sponsorship",
   "ImageRights",
   "MedicalAuth",
+  "Termination",
 ] as const;
 
-const CATEGORIES = ["Club", "Sponsorship"] as const;
+const CATEGORIES = ["Club", "Sponsorship", "Agency"] as const;
 
 const defaultValuesSchema = z
   .object({
@@ -36,6 +37,9 @@ export const createContractTemplateSchema = z.object({
   contractType: z.enum(CONTRACT_TYPES),
   category: z.enum(CATEGORIES),
   defaultValues: defaultValuesSchema.optional().default({}),
+  bodyHtml: z.string().optional(),
+  bodyJson: z.record(z.unknown()).optional(),
+  isDefault: z.boolean().optional(),
 });
 
 export const updateContractTemplateSchema = z.object({
@@ -44,6 +48,9 @@ export const updateContractTemplateSchema = z.object({
   contractType: z.enum(CONTRACT_TYPES).optional(),
   category: z.enum(CATEGORIES).optional(),
   defaultValues: defaultValuesSchema.optional(),
+  bodyHtml: z.string().optional(),
+  bodyJson: z.record(z.unknown()).optional(),
+  isDefault: z.boolean().optional(),
   isActive: z.boolean().optional(),
 });
 

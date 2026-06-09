@@ -69,6 +69,12 @@ interface ContractAttributes {
   parentContractId: string | null;
   squadId?: string | null; // Phase 4 — which squad this contract is scoped to
   // Meta
+  // Editable body (agency contracts)
+  bodyJson: Record<string, unknown> | null;
+  bodyHtml: string | null;
+  bodyHtmlSnapshot: string | null;
+  bodyFrozenAt: Date | null;
+  templateId: string | null;
   notes: string | null;
   createdBy: string | null;
   displayId?: string | null;
@@ -117,6 +123,11 @@ interface ContractCreationAttributes extends Optional<
   | "declarationText"
   | "parentContractId"
   | "squadId"
+  | "bodyJson"
+  | "bodyHtml"
+  | "bodyHtmlSnapshot"
+  | "bodyFrozenAt"
+  | "templateId"
   | "notes"
   | "createdBy"
   | "displayId"
@@ -186,6 +197,11 @@ export class Contract
   declare declarationText: string | null;
   declare parentContractId: string | null;
   declare squadId: string | null;
+  declare bodyJson: Record<string, unknown> | null;
+  declare bodyHtml: string | null;
+  declare bodyHtmlSnapshot: string | null;
+  declare bodyFrozenAt: Date | null;
+  declare templateId: string | null;
   declare notes: string | null;
   declare createdBy: string | null;
   declare displayId: string | null;
@@ -410,6 +426,36 @@ Contract.init(
     },
     notes: {
       type: DataTypes.TEXT,
+    },
+    bodyJson: {
+      type: DataTypes.JSONB,
+      allowNull: true,
+      defaultValue: null,
+      field: "body_json",
+    },
+    bodyHtml: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
+      field: "body_html",
+    },
+    bodyHtmlSnapshot: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+      defaultValue: null,
+      field: "body_html_snapshot",
+    },
+    bodyFrozenAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
+      field: "body_frozen_at",
+    },
+    templateId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      defaultValue: null,
+      field: "template_id",
     },
     displayId: { type: DataTypes.STRING(20), unique: true },
     createdBy: {

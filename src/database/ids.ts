@@ -54,6 +54,7 @@ export const IDS = {
   // NOTE: UUID prefixes must be hex-only (0-9, a-f). 8 chars each.
   players: generateIds("b0000001", 20),
   contracts: generateIds("c1000001", 12),
+  contractTemplates: generateIds("c2000001", 4),
   matches: generateIds("d0000001", 8),
   offers: generateIds("0f000001", 5),
   tasks: generateIds("e0000001", 8),
