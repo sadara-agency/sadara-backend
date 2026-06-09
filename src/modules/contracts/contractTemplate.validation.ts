@@ -54,9 +54,14 @@ export const updateContractTemplateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const previewTemplatePdfSchema = z.object({
+  bodyHtml: z.string().optional(),
+});
+
 export type CreateContractTemplateInput = z.infer<
   typeof createContractTemplateSchema
 >;
 export type UpdateContractTemplateInput = z.infer<
   typeof updateContractTemplateSchema
 >;
+export type PreviewTemplatePdfInput = z.infer<typeof previewTemplatePdfSchema>;

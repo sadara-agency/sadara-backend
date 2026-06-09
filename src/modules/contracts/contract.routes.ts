@@ -16,6 +16,7 @@ import * as templateController from "@modules/contracts/contractTemplate.control
 import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
+  previewTemplatePdfSchema,
 } from "@modules/contracts/contractTemplate.validation";
 import { transitionContract } from "@modules/contracts/contract.transition.controller";
 import { generatePdf } from "@modules/contracts/contract.pdf.controller";
@@ -52,6 +53,7 @@ router.delete(
 router.post(
   "/templates/:id/preview-pdf",
   authorize("Admin", "Manager", "SportingDirector", "Executive", "Legal"),
+  validate(previewTemplatePdfSchema),
   asyncHandler(templateController.previewTemplatePdf),
 );
 

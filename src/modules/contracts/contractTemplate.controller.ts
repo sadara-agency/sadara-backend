@@ -9,6 +9,7 @@ import {
 } from "@modules/contracts/contractTemplate.validation";
 import { renderContractPdf } from "@modules/contracts/contractDocument.service";
 import { resolveMergeTags } from "@modules/contracts/contractMergeTags";
+import { sanitizeContractHtml } from "@modules/contracts/contractSanitize";
 
 export async function listTemplates(_req: AuthRequest, res: Response) {
   const data = await svc.listContractTemplates();
@@ -77,7 +78,12 @@ const PREVIEW_PLACEHOLDERS: Record<string, string> = {
 
 export async function previewTemplatePdf(req: AuthRequest, res: Response) {
   const template = await svc.getContractTemplate(req.params.id);
-  const body = template.bodyHtml ?? "<p>(empty template)</p>";
+  const posted = (req.body?.bodyHtml as string | undefined) ?? undefined;
+  const rawBody =
+    typeof posted === "string" && posted.trim().length > 0
+      ? posted
+      : (template.bodyHtml ?? "<p>(empty template)</p>");
+  const body = sanitizeContractHtml(rawBody);
   const resolved = resolveMergeTags(body, PREVIEW_PLACEHOLDERS);
   const buffer = await renderContractPdf(resolved);
   res.setHeader("Content-Type", "application/pdf");
