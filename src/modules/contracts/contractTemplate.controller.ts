@@ -7,6 +7,10 @@ import {
   createContractTemplateSchema,
   updateContractTemplateSchema,
 } from "@modules/contracts/contractTemplate.validation";
+import {
+  applyMinimalTags,
+  renderContractPdf,
+} from "@modules/contracts/contractDocument.service";
 
 export async function listTemplates(_req: AuthRequest, res: Response) {
   const data = await svc.listContractTemplates();
@@ -55,4 +59,25 @@ export async function deactivateTemplate(req: AuthRequest, res: Response) {
   );
 
   sendSuccess(res, template, "Template deactivated");
+}
+
+const PREVIEW_PLACEHOLDERS: Record<string, string> = {
+  "player.name": "اسم اللاعب",
+  "player.nationalId": "1234567890",
+  "player.nationality": "سعودي",
+  "player.phone": "05XXXXXXXX",
+  "contract.startDate": "2026/01/01",
+  "contract.endDate": "2028/01/01",
+  "commission.pct": "10",
+};
+
+export async function previewTemplatePdf(req: AuthRequest, res: Response) {
+  const template = await svc.getContractTemplate(req.params.id);
+  const body = template.bodyHtml ?? "<p>(empty template)</p>";
+  const resolved = applyMinimalTags(body, PREVIEW_PLACEHOLDERS);
+  const buffer = await renderContractPdf(resolved);
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Length", buffer.length);
+  res.setHeader("Content-Disposition", "inline; filename=template-preview.pdf");
+  res.end(buffer);
 }
