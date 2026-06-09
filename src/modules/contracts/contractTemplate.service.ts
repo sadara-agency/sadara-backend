@@ -1,4 +1,5 @@
 import { ContractTemplate } from "@modules/contracts/contractTemplate.model";
+import { sanitizeContractHtml } from "@modules/contracts/contractSanitize";
 import { AppError } from "@middleware/errorHandler";
 import type {
   CreateContractTemplateInput,
@@ -30,6 +31,9 @@ export async function createContractTemplate(
     contractType: input.contractType,
     category: input.category,
     defaultValues: input.defaultValues ?? {},
+    bodyHtml: input.bodyHtml ? sanitizeContractHtml(input.bodyHtml) : null,
+    bodyJson: (input.bodyJson as Record<string, unknown> | undefined) ?? null,
+    isDefault: input.isDefault ?? false,
     createdBy: userId ?? null,
   });
 }
@@ -48,6 +52,16 @@ export async function updateContractTemplate(
   if (input.category !== undefined) template.category = input.category;
   if (input.defaultValues !== undefined)
     template.defaultValues = input.defaultValues;
+  if (input.bodyHtml !== undefined) {
+    template.bodyHtml = input.bodyHtml
+      ? sanitizeContractHtml(input.bodyHtml)
+      : null;
+  }
+  if (input.bodyJson !== undefined) {
+    template.bodyJson =
+      (input.bodyJson as Record<string, unknown> | null) ?? null;
+  }
+  if (input.isDefault !== undefined) template.isDefault = input.isDefault;
   if (input.isActive !== undefined) template.isActive = input.isActive;
 
   await template.save();

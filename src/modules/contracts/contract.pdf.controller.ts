@@ -14,11 +14,12 @@ import {
   COVER_PDF_PATH,
   BACK_PDF_PATH,
 } from "@shared/utils/pdf";
+import { selectBodyHtml, renderContractPdf } from "./contractDocument.service";
 import {
-  selectBodyHtml,
-  applyMinimalTags,
-  renderContractPdf,
-} from "./contractDocument.service";
+  buildTagContext,
+  resolveMergeTags,
+  TagContextInput,
+} from "./contractMergeTags";
 
 // Map file extensions to MIME types for uploaded signed-contract downloads
 const UPLOAD_MIME_BY_EXT: Record<string, string> = {
@@ -305,23 +306,42 @@ export async function generateContractPdfBuffer(
     bodyHtmlSnapshot?: string | null;
     bodyHtml?: string | null;
   };
+  const snapshot = bodyFields.bodyHtmlSnapshot ?? null;
   const selectedBody = selectBodyHtml({
-    bodyHtmlSnapshot: bodyFields.bodyHtmlSnapshot ?? null,
+    bodyHtmlSnapshot: snapshot,
     bodyHtml: bodyFields.bodyHtml ?? null,
   });
   if (selectedBody) {
     const d = getData(contract);
-    // Minimal tag fill for preview; Session 3 swaps in the registry resolver.
-    const tagData: Record<string, string> = {
-      "player.name": d.pn,
-      "player.nationalId": d.pid,
-      "player.nationality": d.nat,
-      "player.phone": d.ph,
-      "contract.startDate": d.sd,
-      "contract.endDate": d.ed,
-      "commission.pct": String(d.cpct),
-    };
-    const resolved = applyMinimalTags(selectedBody, tagData);
+    const usingSnapshot = snapshot !== null && snapshot.trim().length > 0;
+    let resolved: string;
+    if (usingSnapshot) {
+      // Frozen snapshot already has resolved values — render as-is.
+      resolved = selectedBody;
+    } else {
+      const c = contract as {
+        player?: TagContextInput["player"];
+        startDate?: string | null;
+        endDate?: string | null;
+        commissionPct?: number | string | null;
+        displayId?: string | null;
+        agentName?: string | null;
+        agentLicense?: string | null;
+      };
+      const tagData = buildTagContext({
+        player: c.player ?? {},
+        contract: {
+          startDate: c.startDate ?? null,
+          endDate: c.endDate ?? null,
+          commissionPct: c.commissionPct ?? null,
+          displayId: c.displayId ?? null,
+          agentName: c.agentName ?? null,
+          agentLicense: c.agentLicense ?? null,
+        },
+        today: new Date().toISOString(),
+      });
+      resolved = resolveMergeTags(selectedBody, tagData);
+    }
     const buffer = await renderContractPdf(resolved);
     return { buffer, playerName: d.pn };
   }

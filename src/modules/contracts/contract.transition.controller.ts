@@ -15,6 +15,12 @@ import { logAudit, buildAuditContext } from "@shared/utils/audit";
 import { invalidateMultiple, CachePrefix } from "@shared/utils/cache";
 import { AppError } from "@middleware/errorHandler";
 import { Contract } from "@modules/contracts/contract.model";
+import { Player } from "@modules/players/player.model";
+import {
+  buildTagContext,
+  resolveMergeTags,
+  TagContextInput,
+} from "@modules/contracts/contractMergeTags";
 import { transaction } from "@config/database";
 import {
   createApprovalRequest,
@@ -84,7 +90,7 @@ export async function transitionContract(req: AuthRequest, res: Response) {
   }
 
   // Wrap in transaction with row-level lock to prevent race conditions
-  const { contract, currentStatus, nextStatus } = await transaction(
+  const { contract, currentStatus, nextStatus, frozeBody } = await transaction(
     async (t) => {
       // SELECT ... FOR UPDATE — blocks concurrent transitions on the same row
       const locked = await Contract.findByPk(id, {
@@ -166,12 +172,59 @@ export async function transitionContract(req: AuthRequest, res: Response) {
           : `[${timestamp}] ${action}: ${notes}`;
       }
 
+      // ── Freeze the editable body when the agent signs (atomic with signature) ──
+      // Resolve {{tags}} against the player + contract and snapshot the result so
+      // the signed copy can never diverge from a later edit. Irreversible.
+      if (
+        (action === "agent_sign_digital" || action === "agent_sign_upload") &&
+        locked.bodyHtml &&
+        locked.bodyHtml.trim().length > 0 &&
+        !locked.bodyFrozenAt
+      ) {
+        const player = await Player.findByPk(locked.playerId, {
+          attributes: [
+            "firstName",
+            "lastName",
+            "firstNameAr",
+            "lastNameAr",
+            "nationality",
+            "nationalId",
+            "phone",
+          ],
+          transaction: t,
+        });
+        if (!player) {
+          throw new AppError(
+            "Player not found — cannot freeze contract body for signing",
+            422,
+          );
+        }
+        const tagData = buildTagContext({
+          player: player as TagContextInput["player"],
+          contract: {
+            startDate: locked.startDate ?? null,
+            endDate: locked.endDate ?? null,
+            commissionPct: locked.commissionPct ?? null,
+            displayId: locked.displayId ?? null,
+            agentName: locked.agentName ?? null,
+            agentLicense: locked.agentLicense ?? null,
+          },
+          today: new Date().toISOString(),
+        });
+        updatePayload.bodyHtmlSnapshot = resolveMergeTags(
+          locked.bodyHtml,
+          tagData,
+        );
+        updatePayload.bodyFrozenAt = new Date();
+      }
+
       await locked.update(updatePayload, { transaction: t });
 
       return {
         contract: locked,
         currentStatus: curStatus,
         nextStatus: nxtStatus,
+        frozeBody: Boolean(updatePayload.bodyFrozenAt),
       };
     },
   );
@@ -194,7 +247,7 @@ export async function transitionContract(req: AuthRequest, res: Response) {
     "contracts",
     id,
     buildAuditContext(req.user!, req.ip),
-    `Contract transitioned: ${currentStatus} → ${nextStatus} (action: ${action})`,
+    `Contract transitioned: ${currentStatus} → ${nextStatus} (action: ${action})${frozeBody ? " [BODY_FROZEN]" : ""}`,
   );
 
   // ── Approval hooks (fire-and-forget, outside transaction) ──
