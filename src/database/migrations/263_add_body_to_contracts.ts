@@ -1,5 +1,5 @@
 // Adds editable body, freeze snapshot, and template FK columns to contracts for the editable-contracts feature.
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
 import { addColumnIfMissing, removeColumnIfPresent } from "../migrationHelpers";
 
 export async function up({
@@ -31,9 +31,28 @@ export async function up({
     type: DataTypes.UUID,
     allowNull: true,
     defaultValue: null,
-    references: { model: "contract_templates", key: "id" },
-    onDelete: "SET NULL",
   });
+  // Add FK constraint separately — inline references on ALTER TABLE ADD COLUMN
+  // generates invalid SQL in Sequelize; addConstraint issues a proper ALTER TABLE.
+  const constraintExists = await queryInterface.sequelize.query<{
+    exists: boolean;
+  }>(
+    `SELECT EXISTS (
+       SELECT 1 FROM information_schema.table_constraints
+       WHERE table_name = 'contracts' AND constraint_name = 'contracts_template_id_fkey'
+     ) AS exists`,
+    { type: QueryTypes.SELECT },
+  );
+  if (!constraintExists[0]?.exists) {
+    await queryInterface.addConstraint("contracts", {
+      fields: ["template_id"],
+      type: "foreign key",
+      name: "contracts_template_id_fkey",
+      references: { table: "contract_templates", field: "id" },
+      onDelete: "SET NULL",
+      onUpdate: "CASCADE",
+    });
+  }
 }
 
 export async function down({

@@ -456,8 +456,6 @@ Contract.init(
       allowNull: true,
       defaultValue: null,
       field: "template_id",
-      references: { model: "contract_templates", key: "id" },
-      onDelete: "SET NULL",
     },
     displayId: { type: DataTypes.STRING(20), unique: true },
     createdBy: {
