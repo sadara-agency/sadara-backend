@@ -118,21 +118,9 @@ jobs:
       github.event_name == 'push' ||
       needs.migration-changes.outputs.migrations_changed == 'true'
 
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: SadaraDB
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U admin"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
+    # NOTE: Postgres is started manually (not via `services:`) so the image pull
+    # can be retried. GitHub pulls `services:` images implicitly with no retry,
+    # which makes the job fail outright on a transient Docker Hub timeout/rate-limit.
     env:
       NODE_ENV: test
       POSTGRES_HOST: localhost
@@ -149,6 +137,21 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start Postgres (retry pull)
+        run: |
+          bash ./.github/scripts/docker-pull-retry.sh postgres:17
+          docker run -d --name postgres \
+            -e POSTGRES_USER=admin \
+            -e POSTGRES_PASSWORD=testpass \
+            -e POSTGRES_DB=SadaraDB \
+            -p 5432:5432 \
+            --health-cmd "pg_isready -U admin" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            postgres:17
+          bash ./.github/scripts/wait-for-healthy.sh postgres
 
       - uses: actions/setup-node@v4
         with:
@@ -169,31 +172,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: install
 
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: testpass
-          POSTGRES_DB: SadaraDB
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U admin"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-
+    # NOTE: Postgres + Redis are started manually (not via `services:`) so the
+    # image pulls can be retried. GitHub pulls `services:` images implicitly with
+    # no retry, which makes the job fail outright on a transient Docker Hub
+    # timeout/rate-limit.
     env:
       NODE_ENV: test
       POSTGRES_HOST: localhost
@@ -211,6 +193,30 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Start Postgres + Redis (retry pull)
+        run: |
+          bash ./.github/scripts/docker-pull-retry.sh postgres:17
+          bash ./.github/scripts/docker-pull-retry.sh redis:7-alpine
+          docker run -d --name postgres \
+            -e POSTGRES_USER=admin \
+            -e POSTGRES_PASSWORD=testpass \
+            -e POSTGRES_DB=SadaraDB \
+            -p 5432:5432 \
+            --health-cmd "pg_isready -U admin" \
+            --health-interval 5s \
+            --health-timeout 5s \
+            --health-retries 5 \
+            postgres:17
+          docker run -d --name redis \
+            -p 6379:6379 \
+            --health-cmd "redis-cli ping" \
+            --health-interval 5s \
+            --health-timeout 3s \
+            --health-retries 5 \
+            redis:7-alpine
+          bash ./.github/scripts/wait-for-healthy.sh postgres
+          bash ./.github/scripts/wait-for-healthy.sh redis
 
       - uses: actions/setup-node@v4
         with:
