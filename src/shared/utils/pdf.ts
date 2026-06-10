@@ -4,6 +4,12 @@ import puppeteer from "puppeteer";
 import { PDFDocument } from "pdf-lib";
 import { AppError } from "@middleware/errorHandler";
 import { env } from "@config/env";
+import { logger } from "@config/logger";
+
+/** Milliseconds elapsed since an hrtime mark, rounded to 0.1ms. */
+function msSince(mark: bigint): number {
+  return Math.round(Number(process.hrtime.bigint() - mark) / 1e5) / 10;
+}
 
 // ── Helpers ──
 
@@ -263,8 +269,15 @@ export async function renderFlowingHtmlToBuffer(
   } = options || {};
 
   const renderWork = async (): Promise<Uint8Array> => {
+    // Per-hop timing so prod logs pinpoint which step blows the budget on the
+    // cold path (browser launch vs setContent vs page.pdf). Remove once the
+    // intermittent 504 is confirmed resolved.
+    const t0 = process.hrtime.bigint();
+    const wasWarm = sharedBrowser !== null;
     const browser = await getSharedBrowser(extraArgs);
+    const tBrowser = msSince(t0);
     const page = await browser.newPage();
+    const tNewPage = msSince(t0);
     try {
       // domcontentloaded (not networkidle0): the body embeds its Arabic fonts as
       // inline base64 data URIs and references no external resources, so there
@@ -275,6 +288,7 @@ export async function renderFlowingHtmlToBuffer(
         waitUntil: "domcontentloaded",
         timeout: 15000,
       });
+      const tSetContent = msSince(t0);
       await page.evaluate(`new Promise(r => setTimeout(r, ${settleMs}))`);
       const pdf = await page.pdf({
         format: "A4",
@@ -283,6 +297,16 @@ export async function renderFlowingHtmlToBuffer(
         displayHeaderFooter: Boolean(headerHtml || footerHtml),
         headerTemplate: headerHtml ?? "<span></span>",
         footerTemplate: footerHtml ?? "<span></span>",
+      });
+      const tPdf = msSince(t0);
+      logger.info("[pdf] flow render timings", {
+        wasWarm,
+        launchMs: tBrowser,
+        newPageMs: Math.round((tNewPage - tBrowser) * 10) / 10,
+        setContentMs: Math.round((tSetContent - tNewPage) * 10) / 10,
+        pdfMs: Math.round((tPdf - tSetContent) * 10) / 10,
+        totalMs: tPdf,
+        htmlBytes: html.length,
       });
       return pdf;
     } finally {
