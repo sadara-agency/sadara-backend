@@ -41,6 +41,9 @@ h2, h3, h2.clause, h3.clause {
 }
 .clause-block { break-inside: avoid; }
 p { margin: 6px 0; }
+/* Embedded logo/images never overflow the printable width; preserve aspect
+   ratio when only one dimension is given. */
+img { max-width: 100%; height: auto; }
 ol, ul { margin: 6px 22px 6px 0; padding: 0; }
 li { margin: 3px 0; }
 table.party {
