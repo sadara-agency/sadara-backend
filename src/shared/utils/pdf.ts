@@ -251,7 +251,12 @@ export async function renderFlowingHtmlToBuffer(
   const {
     extraArgs = ["--font-render-hinting=none"],
     settleMs = 300,
-    timeoutMs = 30_000,
+    // 60s (not 30s): a cold Chromium launch on the shared-CPU/1GB Fly machine
+    // plus a font-embedded flow render can exceed 30s when the browser pool is
+    // cold (after Fly autostop or the 5-min idle close). Warm renders finish in
+    // ~1-2s; this margin only matters for the cold path. Matches the frontend's
+    // 60s axios timeout and the legacy PDF endpoints.
+    timeoutMs = 60_000,
     headerHtml,
     footerHtml,
     margin = { top: "22mm", bottom: "20mm", left: "18mm", right: "18mm" },
@@ -261,8 +266,13 @@ export async function renderFlowingHtmlToBuffer(
     const browser = await getSharedBrowser(extraArgs);
     const page = await browser.newPage();
     try {
+      // domcontentloaded (not networkidle0): the body embeds its Arabic fonts as
+      // inline base64 data URIs and references no external resources, so there
+      // is nothing to wait on the network for. networkidle0 only adds its 500ms
+      // quiet-window latency and can stall under shared-CPU load. The settleMs
+      // delay below gives the embedded fonts time to apply before page.pdf().
       await page.setContent(html, {
-        waitUntil: "networkidle0",
+        waitUntil: "domcontentloaded",
         timeout: 15000,
       });
       await page.evaluate(`new Promise(r => setTimeout(r, ${settleMs}))`);
