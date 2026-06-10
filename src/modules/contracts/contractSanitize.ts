@@ -68,9 +68,20 @@ export function sanitizeContractHtml(html: string): string {
     },
     // No remote/script schemes anywhere; images may only use base64 data URIs
     // (the editor embeds picked files as data: URIs, keeping the body
-    // self-contained). This blocks data: on any other tag.
+    // self-contained).
     allowedSchemes: [],
     allowedSchemesByTag: { img: ["data"] },
     disallowedTagsMode: "discard",
+    // sanitize-html only filters explicit schemes; a bare/relative src passes
+    // through. Strip any img src that is not a data: URI to close that gap.
+    transformTags: {
+      img: (tagName, attribs) => {
+        const safe = { ...attribs };
+        if (safe.src && !safe.src.startsWith("data:")) {
+          delete safe.src;
+        }
+        return { tagName, attribs: safe };
+      },
+    },
   });
 }
