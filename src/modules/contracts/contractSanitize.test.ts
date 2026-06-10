@@ -47,14 +47,23 @@ describe("sanitizeContractHtml", () => {
     expect(out).toContain("direction");
   });
 
-  it("strips anchor and image tags (no url vectors)", () => {
+  it("strips anchor tags and strips unsafe img src schemes (no url vectors)", () => {
     const out = sanitizeContractHtml(
       '<p>x</p><a href="javascript:alert(1)">link</a><img src="x" onerror="evil()">',
     );
     expect(out).not.toContain("<a");
-    expect(out).not.toContain("<img");
+    // img tag is allowed but src must be a data: URI; http/relative src is stripped
+    expect(out).not.toContain('src="x"');
     expect(out).not.toContain("javascript:");
     expect(out).not.toContain("onerror");
+  });
+
+  it("allows img with base64 data URI src (editor-embedded images)", () => {
+    const out = sanitizeContractHtml(
+      '<img src="data:image/png;base64,abc123" alt="logo" width="100">',
+    );
+    expect(out).toContain("<img");
+    expect(out).toContain('src="data:image/png;base64,abc123"');
   });
 
   it("drops unsafe inline style values (css injection)", () => {
