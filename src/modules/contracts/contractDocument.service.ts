@@ -3,6 +3,7 @@ import {
   mergeWithBrandPages,
   wrapHtml,
 } from "@shared/utils/pdf";
+import { logger } from "@config/logger";
 import {
   buildFormalSadaraCss,
   SADARA_RUNNING_HEADER,
@@ -51,5 +52,15 @@ export async function renderContractPdf(
     headerHtml: SADARA_RUNNING_HEADER,
     footerHtml: SADARA_PAGE_FOOTER,
   });
-  return mergeWithBrandPages([content]);
+  // Time the brand-merge hop separately — it loads two ~780KB brand PDFs from
+  // disk and runs a pdf-lib merge, which is a candidate slow step on the cold
+  // path. Remove alongside the flow-render timings once the 504 is resolved.
+  const mergeStart = process.hrtime.bigint();
+  const merged = await mergeWithBrandPages([content]);
+  logger.info("[pdf] brand merge timing", {
+    mergeMs:
+      Math.round(Number(process.hrtime.bigint() - mergeStart) / 1e5) / 10,
+    outBytes: merged.length,
+  });
+  return merged;
 }

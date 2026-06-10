@@ -4,6 +4,12 @@ import puppeteer from "puppeteer";
 import { PDFDocument } from "pdf-lib";
 import { AppError } from "@middleware/errorHandler";
 import { env } from "@config/env";
+import { logger } from "@config/logger";
+
+/** Milliseconds elapsed since an hrtime mark, rounded to 0.1ms. */
+function msSince(mark: bigint): number {
+  return Math.round(Number(process.hrtime.bigint() - mark) / 1e5) / 10;
+}
 
 // ── Helpers ──
 
@@ -251,20 +257,38 @@ export async function renderFlowingHtmlToBuffer(
   const {
     extraArgs = ["--font-render-hinting=none"],
     settleMs = 300,
-    timeoutMs = 30_000,
+    // 60s (not 30s): a cold Chromium launch on the shared-CPU/1GB Fly machine
+    // plus a font-embedded flow render can exceed 30s when the browser pool is
+    // cold (after Fly autostop or the 5-min idle close). Warm renders finish in
+    // ~1-2s; this margin only matters for the cold path. Matches the frontend's
+    // 60s axios timeout and the legacy PDF endpoints.
+    timeoutMs = 60_000,
     headerHtml,
     footerHtml,
     margin = { top: "22mm", bottom: "20mm", left: "18mm", right: "18mm" },
   } = options || {};
 
   const renderWork = async (): Promise<Uint8Array> => {
+    // Per-hop timing so prod logs pinpoint which step blows the budget on the
+    // cold path (browser launch vs setContent vs page.pdf). Remove once the
+    // intermittent 504 is confirmed resolved.
+    const t0 = process.hrtime.bigint();
+    const wasWarm = sharedBrowser !== null;
     const browser = await getSharedBrowser(extraArgs);
+    const tBrowser = msSince(t0);
     const page = await browser.newPage();
+    const tNewPage = msSince(t0);
     try {
+      // domcontentloaded (not networkidle0): the body embeds its Arabic fonts as
+      // inline base64 data URIs and references no external resources, so there
+      // is nothing to wait on the network for. networkidle0 only adds its 500ms
+      // quiet-window latency and can stall under shared-CPU load. The settleMs
+      // delay below gives the embedded fonts time to apply before page.pdf().
       await page.setContent(html, {
-        waitUntil: "networkidle0",
+        waitUntil: "domcontentloaded",
         timeout: 15000,
       });
+      const tSetContent = msSince(t0);
       await page.evaluate(`new Promise(r => setTimeout(r, ${settleMs}))`);
       const pdf = await page.pdf({
         format: "A4",
@@ -273,6 +297,16 @@ export async function renderFlowingHtmlToBuffer(
         displayHeaderFooter: Boolean(headerHtml || footerHtml),
         headerTemplate: headerHtml ?? "<span></span>",
         footerTemplate: footerHtml ?? "<span></span>",
+      });
+      const tPdf = msSince(t0);
+      logger.info("[pdf] flow render timings", {
+        wasWarm,
+        launchMs: tBrowser,
+        newPageMs: Math.round((tNewPage - tBrowser) * 10) / 10,
+        setContentMs: Math.round((tSetContent - tNewPage) * 10) / 10,
+        pdfMs: Math.round((tPdf - tSetContent) * 10) / 10,
+        totalMs: tPdf,
+        htmlBytes: html.length,
       });
       return pdf;
     } finally {
