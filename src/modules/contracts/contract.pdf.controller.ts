@@ -1,6 +1,7 @@
 import { Response } from "express";
 import fs from "fs";
 import path from "path";
+import * as Sentry from "@sentry/node";
 import { AuthRequest } from "@shared/types";
 import { AppError } from "@middleware/errorHandler";
 import { logger } from "@config/logger";
@@ -348,15 +349,42 @@ export async function generateContractPdfBuffer(
 
   const d = getData(contract);
 
+  // `stage` tells us in logs/Sentry which layer actually failed — Chromium
+  // rendering vs the pdf-lib merge. Previously a single catch collapsed both
+  // into a generic 500 logging only err.message, which discarded the real
+  // error name/stack and (because AppError is "operational") never reached
+  // Sentry. Keep the user-facing response identical; only widen what we record.
+  let stage: "render" | "merge" = "render";
   try {
     const contentBuffers = await renderPagesToBuffers([pg2(d), pg3(d)], {
       extraArgs: ["--font-render-hinting=none"],
       settleMs: 500,
     });
+
+    // An unhealthy/disconnected Chromium can return an empty buffer that then
+    // surfaces as a misleading pdf-lib "No PDF header found" during merge.
+    // Fail here with an accurate message so the failing layer is identifiable.
+    if (contentBuffers.some((b) => !b || b.length === 0)) {
+      throw new AppError("Chromium returned an empty PDF buffer", 502);
+    }
+
+    stage = "merge";
     const buffer = await mergeWithBrandPages(contentBuffers);
     return { buffer, playerName: d.pn };
-  } catch (err: any) {
-    logger.error("PDF generation error", { error: err.message });
+  } catch (err) {
+    const e = err as Error;
+    logger.error("PDF generation error", {
+      stage,
+      contractId: typeof contractOrId === "string" ? contractOrId : contract.id,
+      name: e?.name,
+      message: e?.message,
+      stack: e?.stack,
+    });
+    // AppError is operational, so the global errorHandler will NOT report it to
+    // Sentry — capture the ORIGINAL error here before wrapping it.
+    Sentry.captureException(e, {
+      tags: { module: "contracts", op: "generateContractPdf", stage },
+    });
     throw new AppError(
       "PDF generation failed. Please try again or contact support.",
       500,
