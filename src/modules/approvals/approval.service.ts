@@ -340,6 +340,117 @@ export async function isApprovalChainResolved(
   return { resolved: false, status: "Pending" };
 }
 
+// ── Entity summary (inline context for the detail modal) ──
+
+/**
+ * Resolve a compact, human-readable summary of the entity an approval is for,
+ * so reviewers see the key facts (who/what/value) without leaving the modal.
+ * Returns null for entity types we don't yet enrich. Best-effort: any lookup
+ * failure resolves to null rather than blocking the detail response.
+ */
+export interface ApprovalEntitySummary {
+  fields: { label: string; labelAr: string; value: string }[];
+}
+
+export async function getApprovalEntitySummary(
+  entityType: string,
+  entityId: string,
+): Promise<ApprovalEntitySummary | null> {
+  try {
+    if (entityType === "contract") {
+      // Lazy imports avoid pulling contract/player/club models into the
+      // approvals module graph at load time (keeps the dependency direction clean).
+      const [{ Contract }, { Player }, { Club }] = await Promise.all([
+        import("@modules/contracts/contract.model"),
+        import("@modules/players/player.model"),
+        import("@modules/clubs/club.model"),
+      ]);
+
+      const contract = await Contract.findByPk(entityId, {
+        attributes: [
+          "id",
+          "playerId",
+          "clubId",
+          "contractType",
+          "status",
+          "baseSalary",
+          "salaryCurrency",
+          "startDate",
+          "endDate",
+          "displayId",
+        ],
+      });
+      if (!contract) return null;
+
+      const [player, club] = await Promise.all([
+        contract.playerId
+          ? Player.findByPk(contract.playerId, {
+              attributes: [
+                "firstName",
+                "lastName",
+                "firstNameAr",
+                "lastNameAr",
+              ],
+            })
+          : null,
+        contract.clubId
+          ? Club.findByPk(contract.clubId, { attributes: ["name", "nameAr"] })
+          : null,
+      ]);
+
+      const playerName = player
+        ? [player.firstName, player.lastName].filter(Boolean).join(" ")
+        : "—";
+      const playerNameAr =
+        player && (player.firstNameAr || player.lastNameAr)
+          ? [player.firstNameAr, player.lastNameAr].filter(Boolean).join(" ")
+          : playerName;
+
+      const fields: ApprovalEntitySummary["fields"] = [
+        { label: "Player", labelAr: "اللاعب", value: playerName },
+        {
+          label: "Club",
+          labelAr: "النادي",
+          value:
+            (club && (club.nameAr || club.name)) || (club ? club.name : "—"),
+        },
+        {
+          label: "Type",
+          labelAr: "النوع",
+          value: contract.contractType || "—",
+        },
+        { label: "Status", labelAr: "الحالة", value: contract.status || "—" },
+      ];
+
+      if (contract.baseSalary != null) {
+        fields.push({
+          label: "Base salary",
+          labelAr: "الراتب الأساسي",
+          value: `${Number(contract.baseSalary).toLocaleString("en-US")} ${
+            contract.salaryCurrency || ""
+          }`.trim(),
+        });
+      }
+      if (contract.startDate || contract.endDate) {
+        fields.push({
+          label: "Term",
+          labelAr: "المدة",
+          value: `${contract.startDate || "—"} → ${contract.endDate || "—"}`,
+        });
+      }
+
+      return { fields };
+    }
+  } catch (err) {
+    logger.warn("Failed to build approval entity summary", {
+      entityType,
+      entityId,
+      error: (err as Error).message,
+    });
+  }
+  return null;
+}
+
 // ── Re-export detail query ──
 
 export { getApprovalWithSteps };

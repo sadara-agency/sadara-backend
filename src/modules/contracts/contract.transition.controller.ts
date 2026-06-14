@@ -254,11 +254,26 @@ export async function transitionContract(req: AuthRequest, res: Response) {
   if (action === "submit_review") {
     const due = new Date();
     due.setDate(due.getDate() + 3);
+    // Build a human-readable title: prefer player name, fall back to the
+    // contract's own title, then to a short id. The reviewer should see WHO
+    // and WHAT the approval is for without opening the detail page.
+    const player = await Player.findByPk(contract.playerId, {
+      attributes: ["firstName", "lastName", "firstNameAr", "lastNameAr"],
+    });
+    const playerName = player
+      ? [player.firstName, player.lastName].filter(Boolean).join(" ")
+      : "";
+    const playerNameAr = player
+      ? [player.firstNameAr, player.lastNameAr].filter(Boolean).join(" ")
+      : "";
+    const ref = contract.displayId || `#${id.slice(0, 8)}`;
+    const subject = playerName || contract.title || ref;
+    const subjectAr = playerNameAr || playerName || contract.title || ref;
     createApprovalRequest({
       entityType: "contract",
       entityId: id,
-      entityTitle: `Contract: ${contract.title || `#${id.slice(0, 8)}`}`,
-      entityTitleAr: `عقد: ${contract.title || `#${id.slice(0, 8)}`}`,
+      entityTitle: `Contract — ${subject} (${ref})`,
+      entityTitleAr: `عقد — ${subjectAr} (${ref})`,
       action: "review",
       requestedBy: req.user!.id,
       assignedRole: "Manager",
