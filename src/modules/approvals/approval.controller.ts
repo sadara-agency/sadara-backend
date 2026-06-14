@@ -27,8 +27,14 @@ export async function list(req: AuthRequest, res: Response) {
 // ── Detail ──
 
 export async function detail(req: AuthRequest, res: Response) {
-  const data = await svc.getApprovalWithSteps(req.params.id);
-  sendSuccess(res, data);
+  const approval = await svc.getApprovalWithSteps(req.params.id);
+  const entitySummary = await svc.getApprovalEntitySummary(
+    approval.entityType,
+    approval.entityId,
+  );
+  // Merge the summary onto the plain object so the modal can render inline
+  // context (player/club/value) without a second round-trip.
+  sendSuccess(res, { ...approval.toJSON(), entitySummary });
 }
 
 // ── Stats ──
