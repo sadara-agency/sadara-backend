@@ -326,18 +326,33 @@ export async function listPlayers(queryParams: PlayerQuery, user?: AuthUser) {
   );
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // ── Get Player by ID (With Aggregates) ──
 // Uses batchLoadPlayerStats (LATERAL joins) instead of 13+ correlated subqueries.
 export async function getPlayerById(id: string, user?: AuthUser) {
+  // Resolve displayId (e.g. "P-26-0036") → UUID before hitting UUID-typed columns.
+  // Non-UUID input that doesn't match a displayId results in a clean 404.
+  let resolvedId = id;
+  if (!UUID_RE.test(id)) {
+    const byDisplay = await Player.findOne({
+      where: { displayId: id },
+      attributes: ["id"],
+    });
+    if (!byDisplay) throw new AppError("Player not found", 404);
+    resolvedId = byDisplay.id;
+  }
+
   // Run lightweight base query + batch stats + sidebar counts + perf history in parallel
   const [player, statsMap, counts, performanceHistory, portalUser] =
     await Promise.all([
-      Player.findByPk(id, {
+      Player.findByPk(resolvedId, {
         attributes: { include: COMPUTED_ATTRIBUTES },
         include: ["club", "agent"],
       }),
-      batchLoadPlayerStats([id]),
-      getPlayerCounts(id),
+      batchLoadPlayerStats([resolvedId]),
+      getPlayerCounts(resolvedId),
       sequelize
         .query(
           `SELECT
@@ -348,11 +363,11 @@ export async function getPlayerById(id: string, user?: AuthUser) {
          GROUP BY TO_CHAR(perf.created_at, 'YYYY-MM')
          ORDER BY month DESC
          LIMIT 12`,
-          { replacements: { id }, type: QueryTypes.SELECT },
+          { replacements: { id: resolvedId }, type: QueryTypes.SELECT },
         )
         .catch(() => []),
       User.findOne({
-        where: { playerId: id },
+        where: { playerId: resolvedId },
         attributes: ["isActive", "inviteTokenExpiry"],
       }),
     ]);
@@ -364,7 +379,7 @@ export async function getPlayerById(id: string, user?: AuthUser) {
   if (!hasAccess) throw new AppError("Player not found", 404);
 
   const plain = player.get({ plain: true });
-  const rawStats = statsMap.get(id) || {};
+  const rawStats = statsMap.get(resolvedId) || {};
   const stats = camelCaseKeys<Record<string, any>>(rawStats);
 
   // Determine portal account status for this player

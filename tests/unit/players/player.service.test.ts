@@ -5,6 +5,7 @@ import type { PlayerQuery } from '../../../src/modules/players/utils/player.vali
 // ── Mock dependencies ──
 const mockFindAndCountAll = jest.fn();
 const mockFindByPk = jest.fn();
+const mockFindOne = jest.fn();
 const mockCreate = jest.fn();
 const mockDestroy = jest.fn();
 const mockProviderFindAll = jest.fn();
@@ -25,6 +26,7 @@ jest.mock('../../../src/modules/players/player.model', () => ({
   Player: {
     findAndCountAll: (...a: unknown[]) => mockFindAndCountAll(...a),
     findByPk: (...a: unknown[]) => mockFindByPk(...a),
+    findOne: (...a: unknown[]) => mockFindOne(...a),
     create: (...a: unknown[]) => mockCreate(...a),
     destroy: (...a: unknown[]) => mockDestroy(...a),
   },
@@ -195,6 +197,8 @@ describe('Player Service', () => {
   describe('getPlayerById', () => {
     it('should return player with counts', async () => {
       const player = mockModelInstance(mockPlayer());
+      const resolvedUuid = '00000000-0000-0000-0000-000000000001';
+      mockFindOne.mockResolvedValue({ id: resolvedUuid });
       mockFindByPk.mockResolvedValue(player);
       const { sequelize } = require('../../../src/config/database');
       sequelize.query.mockResolvedValue([{ activeContracts: 1, activeInjuries: 0, openTasks: 2 }]);
@@ -202,11 +206,12 @@ describe('Player Service', () => {
       const result = await playerService.getPlayerById('player-001');
 
       expect(result).toBeDefined();
-      expect(mockFindByPk).toHaveBeenCalledWith('player-001', expect.anything());
+      expect(mockFindOne).toHaveBeenCalledWith(expect.objectContaining({ where: { displayId: 'player-001' } }));
+      expect(mockFindByPk).toHaveBeenCalledWith(resolvedUuid, expect.anything());
     });
 
     it('should throw 404 if player not found', async () => {
-      mockFindByPk.mockResolvedValue(null);
+      mockFindOne.mockResolvedValue(null);
 
       await expect(playerService.getPlayerById('nonexistent')).rejects.toThrow('Player not found');
     });

@@ -104,6 +104,7 @@ import matchEvaluationRoutes from "@modules/matchEvaluations/matchEvaluation.rou
 import "@modules/matchEvaluations/matchEvaluation.swagger";
 import analystRouter from "@modules/analyst/analyst.routes";
 import { locale } from "@middleware/locale";
+import { readinessGate } from "@middleware/readiness";
 import { setupSwagger } from "@config/swagger";
 
 const app = express();
@@ -426,6 +427,14 @@ app.get("/api/health", async (_req, res) => {
 // Associations are set up lazily in initInfrastructure() (index.ts)
 // AFTER model.sync() so that circular FKs (User ↔ Player) don't block
 // table creation on a fresh database.
+
+// ── Readiness gate ──
+// The server starts listening before init completes (associations, migrations,
+// seed). This returns 503 for every /api/v1 route until `appReady`, so requests
+// landing in the warmup window retry instead of hitting half-initialized
+// handlers (e.g. "Player is not associated to PlayerCoachAssignment!"). Mounted
+// AFTER /api/health above so probes stay exempt during startup.
+app.use("/api/v1", readinessGate);
 
 // ── API Routes ──
 app.use("/api/v1/auth", authRoutes);
