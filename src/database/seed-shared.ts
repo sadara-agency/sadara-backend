@@ -1129,6 +1129,19 @@ const RAW_PERMISSIONS: Perm[] = [
     canUpdate: true,
     canDelete: true,
   }),
+
+  // ── Network Partners ──
+  // Admin, Manager, PipelineManager: full CRUD
+  ...forRoles("partners", ["Admin", "Manager", "PipelineManager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  // Partner role: read-only (row-scoping enforced at service layer)
+  ...forRoles("partners", ["Partner"], {
+    canRead: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
