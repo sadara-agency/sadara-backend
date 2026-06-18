@@ -1111,9 +1111,9 @@ async function checkPipelineSla() {
     const hoursStuck = Math.floor(
       (now - (s.phaseSince?.getTime() ?? now)) / (1000 * 60 * 60),
     );
-    const partner = (s as any).partner as
-      | { nameEn: string; referenceNo: string }
-      | undefined;
+    const partner = (
+      s as unknown as { partner?: { nameEn: string; referenceNo: string } }
+    ).partner;
     return `${s.submissionRef} — ${s.playerNameEn} (${s.phase}, ${hoursStuck}h) — Partner: ${partner?.nameEn ?? "Unknown"} [${partner?.referenceNo ?? ""}]`;
   });
 
