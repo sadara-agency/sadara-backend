@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────
 // src/modules/pipeline/pipeline.controller.ts
 // ─────────────────────────────────────────────────────────────
-import { Response, NextFunction } from "express";
+import { Response } from "express";
 import { createCrudController } from "@shared/utils/crudController";
 import { CachePrefix } from "@shared/utils/cache";
 import { sendSuccess } from "@shared/utils/apiResponse";
@@ -28,28 +28,12 @@ const crud = createCrudController({
 
 export const { list, getById, create, update, remove } = crud;
 
-export async function advancePhase(
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction,
-) {
-  try {
-    const updated = await pipelineService.advancePhase(req.params.id, req.body);
-    sendSuccess(res, updated, "Phase advanced");
-  } catch (err) {
-    next(err);
-  }
+export async function advancePhase(req: AuthRequest, res: Response) {
+  const updated = await pipelineService.advancePhase(req.params.id, req.body);
+  sendSuccess(res, updated, "Phase advanced");
 }
 
-export async function slaDigest(
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction,
-) {
-  try {
-    const breaches = await pipelineService.getSlaBreaches();
-    sendSuccess(res, breaches, `${breaches.length} SLA breaches found`);
-  } catch (err) {
-    next(err);
-  }
+export async function slaDigest(req: AuthRequest, res: Response) {
+  const breaches = await pipelineService.getSlaBreaches();
+  sendSuccess(res, breaches, `${breaches.length} SLA breaches found`);
 }

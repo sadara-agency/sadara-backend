@@ -34,9 +34,12 @@ export const advancePhaseSchema = z.object({
   notes: z.string().optional(),
 });
 
-export const updateSubmissionSchema = submitPlayerSchema.partial().extend({
-  conflictNote: z.string().optional(),
-});
+export const updateSubmissionSchema = submitPlayerSchema
+  .omit({ partnerId: true })
+  .partial()
+  .extend({
+    conflictNote: z.string().optional(),
+  });
 
 export const getPipelineSchema = z.object({ id: z.string().uuid() });
 
