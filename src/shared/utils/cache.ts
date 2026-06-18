@@ -69,6 +69,7 @@ export const CachePrefix = {
   POSTURE: "posture",
   REHAB: "rehab",
   PARTNERS: "partners",
+  PIPELINE: "pipeline",
 } as const;
 
 // ── Core Operations ──

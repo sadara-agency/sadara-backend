@@ -1142,6 +1142,20 @@ const RAW_PERMISSIONS: Perm[] = [
   ...forRoles("partners", ["Partner"], {
     canRead: true,
   }),
+
+  // ── Pipeline Submissions ──
+  // Admin, Manager, PipelineManager: full CRUD
+  ...forRoles("pipeline", ["Admin", "Manager", "PipelineManager"], {
+    canCreate: true,
+    canRead: true,
+    canUpdate: true,
+    canDelete: true,
+  }),
+  // Partner: submit own players + view own submissions (row-scope enforced in service)
+  ...forRoles("pipeline", ["Partner"], {
+    canCreate: true,
+    canRead: true,
+  }),
 ];
 
 function dedup(entries: Perm[]): Perm[] {
