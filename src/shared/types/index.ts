@@ -23,6 +23,8 @@ export const USER_ROLES = [
   "ContentManager",
   "Approver",
   "Publisher",
+  "Partner",
+  "PipelineManager",
 ] as const;
 
 export type UserRole = (typeof USER_ROLES)[number];
@@ -73,6 +75,8 @@ export const ROLES = {
   CONTENT_MANAGER: "ContentManager",
   APPROVER: "Approver",
   PUBLISHER: "Publisher",
+  PARTNER: "Partner",
+  PIPELINE_MANAGER: "PipelineManager",
 } as const satisfies Record<string, UserRole>;
 
 // ── Authenticated Request (Express-specific, stays in backend) ──

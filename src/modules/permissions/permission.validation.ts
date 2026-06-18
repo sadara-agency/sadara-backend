@@ -22,6 +22,8 @@ const ROLES = [
   "ContentManager",
   "Approver",
   "Publisher",
+  "Partner",
+  "PipelineManager",
 ] as const;
 
 const MODULES = [
@@ -75,6 +77,8 @@ const MODULES = [
   "heatmaps",
   "workout-plans",
   "player-inbox",
+  "partners",
+  "pipeline",
 ] as const;
 
 export const updatePermissionsSchema = z.object({
