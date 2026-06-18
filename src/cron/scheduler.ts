@@ -115,6 +115,7 @@ import {
   runLiveEventsTier,
 } from "./engines/saudiLeagues.engine";
 import { refreshExpiringManifests } from "@modules/saffplus/saffplus.service";
+import { getSlaBreaches } from "@modules/pipeline/pipeline.service";
 
 import { runCloseIdleSessions } from "@modules/staffMonitoring/staffMonitoring.cron";
 import { pollLiveMatches } from "@modules/spl/spl.liveMatch.poller";
@@ -1093,6 +1094,50 @@ async function checkKickoffProximity() {
 }
 
 // ══════════════════════════════════════════════════════════════
+// JOB: Network Partner Pipeline — Daily SLA Digest
+// Alerts HQ about pipeline submissions stuck in screening
+// phases (Compliance / Fit-or-Pass) for more than 48 hours.
+// ══════════════════════════════════════════════════════════════
+
+async function checkPipelineSla() {
+  const breaches = await getSlaBreaches();
+
+  if (breaches.length === 0) return { breaches: 0 };
+
+  const sample = breaches.slice(0, 10);
+  const now = Date.now();
+
+  const lines = sample.map((s) => {
+    const hoursStuck = Math.floor(
+      (now - (s.phaseSince?.getTime() ?? now)) / (1000 * 60 * 60),
+    );
+    const partner = (s as any).partner as
+      | { nameEn: string; referenceNo: string }
+      | undefined;
+    return `${s.submissionRef} — ${s.playerNameEn} (${s.phase}, ${hoursStuck}h) — Partner: ${partner?.nameEn ?? "Unknown"} [${partner?.referenceNo ?? ""}]`;
+  });
+
+  const moreSuffix =
+    breaches.length > 10 ? ` (+${breaches.length - 10} more)` : "";
+
+  const bodyEn = `The following pipeline submissions have exceeded the 48-hour SLA in a screening phase:\n\n${lines.join("\n")}${moreSuffix}\n\nPlease review and advance or escalate.`;
+  const bodyAr = `تجاوزت الطلبات التالية مدة 48 ساعة في مرحلة الفحص:\n\n${lines.join("\n")}${moreSuffix}\n\nيرجى المراجعة والمتابعة.`;
+
+  await notifyByRole(["Admin", "Manager", "PipelineManager"], {
+    type: "system",
+    title: `${breaches.length} pipeline submission(s) past 48h SLA`,
+    titleAr: `${breaches.length} طلب(ات) تجاوزت مهلة 48 ساعة في خط الأنابيب`,
+    body: bodyEn,
+    bodyAr: bodyAr,
+    link: "/dashboard/pipeline",
+    sourceType: "pipeline",
+    priority: "high",
+  });
+
+  return { breaches: breaches.length };
+}
+
+// ══════════════════════════════════════════════════════════════
 // REGISTER ALL JOBS
 // ══════════════════════════════════════════════════════════════
 
@@ -1441,5 +1486,9 @@ export async function startCronJobs() {
   registerJob("spl-live-match-poll", pollLiveMatches);
   // schedule("*/30 * * * * *", "spl-live-match-poll"); // Every 30 seconds — disabled
 
-  logger.info("[CRON] 75 jobs scheduled ✓");
+  // ── Network Partner Pipeline — SLA digest ──
+  registerJob("pipeline-sla-digest", checkPipelineSla);
+  schedule("45 5 * * *", "pipeline-sla-digest"); // 5:45 AM UTC (08:45 KSA) — free slot between 5:40 and 5:50
+
+  logger.info("[CRON] 76 jobs scheduled ✓");
 }
