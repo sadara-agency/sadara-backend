@@ -14,7 +14,7 @@ import * as pipelineService from "./pipeline.service";
 const crud = createCrudController({
   service: {
     list: (query, user) => pipelineService.listSubmissions(query, user),
-    getById: (id) => pipelineService.getSubmissionById(id),
+    getById: (id, user) => pipelineService.getSubmissionById(id, user),
     // create(body, userId) — we ignore userId because submitPlayer validates
     // partnerId from the body and checks Partner status itself.
     create: (body, _userId) => pipelineService.submitPlayer(body),
@@ -29,7 +29,11 @@ const crud = createCrudController({
 export const { list, getById, create, update, remove } = crud;
 
 export async function advancePhase(req: AuthRequest, res: Response) {
-  const updated = await pipelineService.advancePhase(req.params.id, req.body);
+  const updated = await pipelineService.advancePhase(
+    req.params.id,
+    req.body,
+    req.user,
+  );
   sendSuccess(res, updated, "Phase advanced");
 }
 

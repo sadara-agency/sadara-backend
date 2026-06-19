@@ -257,8 +257,26 @@ describe("submitPlayer", () => {
 // ─────────────────────────────────────────────────────────────
 
 describe("getSubmissionById", () => {
-  it("returns the submission when found", async () => {
-    const mockSub = { id: "s1", playerNameEn: "Test Player" };
+  const staffUser: AuthUser = {
+    id: "user-admin",
+    email: "admin@sadara.com",
+    fullName: "Admin",
+    role: "Admin",
+  };
+
+  const partnerUser: AuthUser = {
+    id: "user-partner-1",
+    email: "partner@example.com",
+    fullName: "Partner User",
+    role: "Partner",
+  };
+
+  it("returns the submission when found (no user — internal call)", async () => {
+    const mockSub = {
+      id: "s1",
+      playerNameEn: "Test Player",
+      partnerId: "partner-uuid-1",
+    };
     (Pipeline.findByPk as jest.Mock).mockResolvedValue(mockSub);
 
     const result = await service.getSubmissionById("s1");
@@ -271,6 +289,59 @@ describe("getSubmissionById", () => {
     (Pipeline.findByPk as jest.Mock).mockResolvedValue(null);
 
     await expect(service.getSubmissionById("missing")).rejects.toMatchObject({
+      statusCode: 404,
+      message: "Submission not found",
+    });
+  });
+
+  it("returns submission when staff user requests it (no row-scope applied)", async () => {
+    const mockSub = {
+      id: "s1",
+      playerNameEn: "Test Player",
+      partnerId: "partner-uuid-1",
+    };
+    (Pipeline.findByPk as jest.Mock).mockResolvedValue(mockSub);
+    // Staff resolves to undefined — no Partner row lookup
+    (Partner.findOne as jest.Mock).mockResolvedValue(null);
+
+    const result = await service.getSubmissionById("s1", staffUser);
+
+    expect(result).toEqual(mockSub);
+    // resolvePartnerIdForUser returns undefined for non-Partner roles — no Partner.findOne call
+    expect(Partner.findOne).not.toHaveBeenCalled();
+  });
+
+  it("returns submission when Partner user requests their OWN submission", async () => {
+    const mockSub = {
+      id: "s1",
+      playerNameEn: "Test Player",
+      partnerId: "partner-uuid-1",
+    };
+    (Pipeline.findByPk as jest.Mock).mockResolvedValue(mockSub);
+    (Partner.findOne as jest.Mock).mockResolvedValue({ id: "partner-uuid-1" });
+
+    const result = await service.getSubmissionById("s1", partnerUser);
+
+    expect(Partner.findOne).toHaveBeenCalledWith({
+      where: { userId: partnerUser.id },
+    });
+    expect(result).toEqual(mockSub);
+  });
+
+  it("throws 404 (not 403) when Partner user requests a submission belonging to a DIFFERENT partner", async () => {
+    // The submission belongs to partner-uuid-OTHER, not to this partner user's partner
+    const mockSub = {
+      id: "s-other",
+      playerNameEn: "Other Partner Player",
+      partnerId: "partner-uuid-OTHER",
+    };
+    (Pipeline.findByPk as jest.Mock).mockResolvedValue(mockSub);
+    // This partner user owns partner-uuid-1
+    (Partner.findOne as jest.Mock).mockResolvedValue({ id: "partner-uuid-1" });
+
+    await expect(
+      service.getSubmissionById("s-other", partnerUser),
+    ).rejects.toMatchObject({
       statusCode: 404,
       message: "Submission not found",
     });

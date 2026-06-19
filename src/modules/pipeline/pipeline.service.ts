@@ -67,11 +67,16 @@ export async function listSubmissions(query: PaginationQuery, user: AuthUser) {
   });
 }
 
-export async function getSubmissionById(id: string) {
+export async function getSubmissionById(id: string, user?: AuthUser) {
   const sub = await Pipeline.findByPk(id, {
     include: [{ model: Partner, as: "partner" }],
   });
   if (!sub) throw new AppError("Submission not found", 404);
+  // Ownership guard: Partner-role users may only read their own submissions.
+  // Return 404 (not 403) so submission existence is not confirmed to other partners.
+  const scoped = user ? await resolvePartnerIdForUser(user) : undefined;
+  if (scoped && sub.partnerId !== scoped)
+    throw new AppError("Submission not found", 404);
   return sub;
 }
 
@@ -110,8 +115,15 @@ export async function submitPlayer(data: SubmitPlayerDTO) {
   });
 }
 
-export async function advancePhase(id: string, data: AdvancePhaseDTO) {
-  const sub = await getSubmissionById(id);
+export async function advancePhase(
+  id: string,
+  data: AdvancePhaseDTO,
+  user?: AuthUser,
+) {
+  // Pass user so the ownership guard inside getSubmissionById is enforced.
+  // advancePhase is a staff-only operation in practice (Partner has no update perm)
+  // but thread it through for defence-in-depth.
+  const sub = await getSubmissionById(id, user);
   return sub.update({
     phase: data.phase,
     phaseSince: new Date(),
@@ -123,11 +135,17 @@ export async function advancePhase(id: string, data: AdvancePhaseDTO) {
 }
 
 export async function updateSubmission(id: string, data: UpdateSubmissionDTO) {
+  // NOTE: Partner role does not have update permission on pipeline (seed-enforced).
+  // The crudController factory calls service.update(id, body) without a user arg,
+  // so we cannot thread ownership here without a factory change. The seed is the
+  // primary guard; getSubmissionById without user performs no ownership check.
   const sub = await getSubmissionById(id);
   return sub.update(data);
 }
 
 export async function deleteSubmission(id: string) {
+  // NOTE: Partner role does not have delete permission on pipeline (seed-enforced).
+  // Same factory constraint as updateSubmission — seed is the primary guard.
   const sub = await getSubmissionById(id);
   await sub.destroy();
   return { id };
