@@ -115,6 +115,71 @@ export function getArabicFontFaceCss(): string {
   return cachedFontFaceCss;
 }
 
+// ── Brand image assets (base64 data URIs; file:// is unreliable in Chromium) ──
+
+function resolveImgDir(): string {
+  const distPath = path.resolve(__dirname, "..", "..", "assets", "img");
+  const srcPath = path.resolve(process.cwd(), "src", "assets", "img");
+  if (fs.existsSync(distPath)) return distPath;
+  return srcPath;
+}
+
+const cachedImgDataUris: Record<string, string> = {};
+
+/**
+ * Returns a `data:image/png;base64,...` URI for a file in assets/img.
+ * Cached after first read. Throws AppError if the asset is missing.
+ */
+export function getBrandImageDataUri(file: string): string {
+  if (cachedImgDataUris[file]) return cachedImgDataUris[file];
+  const full = path.join(resolveImgDir(), file);
+  try {
+    const buf = fs.readFileSync(full);
+    const uri = `data:image/png;base64,${buf.toString("base64")}`;
+    cachedImgDataUris[file] = uri;
+    return uri;
+  } catch {
+    throw new AppError(
+      `Brand image asset missing: ${file}. Place it in src/assets/img/`,
+      500,
+    );
+  }
+}
+
+// ── Letterhead header/footer (Puppeteer running header/footer templates) ──
+// These render as isolated mini-documents: page CSS does NOT apply, default
+// font-size is 0, and only inline styles + data-URI images work. Keep all
+// styling inline.
+
+/** Company contact line for report footers. */
+export const SADARA_ADDRESS_LINE =
+  "'Irqah Dist., Riyadh 12534, Saudi Arabia   M - info@sadarasport.sa   W - www.sadarasport.sa   P - +966533919155";
+
+/** Top-of-page letterhead: logo left, reference text right. */
+export function makeLetterheadHeaderTemplate(opts: {
+  logoDataUri: string;
+  rightText: string;
+}): string {
+  return `<div style="width:100%;font-size:8px;color:#1a1a1a;font-family:Arial,sans-serif;padding:6mm 16mm 0 16mm;box-sizing:border-box;-webkit-print-color-adjust:exact;">
+  <div style="display:flex;justify-content:space-between;align-items:center;">
+    <img src="${opts.logoDataUri}" style="height:34px;width:auto;" />
+    <span style="font-size:9px;font-weight:bold;color:#0f3460;">${escHtml(opts.rightText)}</span>
+  </div>
+</div>`;
+}
+
+/** Bottom-of-page letterhead: address line above the geometric pattern strip. */
+export function makeLetterheadFooterTemplate(opts: {
+  patternDataUri: string;
+  addressLine?: string;
+}): string {
+  const addr = opts.addressLine ?? SADARA_ADDRESS_LINE;
+  return `<div style="width:100%;font-size:8px;color:#1a1a1a;font-family:Arial,sans-serif;-webkit-print-color-adjust:exact;box-sizing:border-box;">
+  <div style="font-size:8px;font-weight:bold;text-align:center;padding:0 16mm 2mm 16mm;">${escHtml(addr)}</div>
+  <img src="${opts.patternDataUri}" style="display:block;width:100%;height:auto;" />
+</div>`;
+}
+
 // ── HTML utilities ──
 
 export function wrapHtml(body: string, css: string): string {
