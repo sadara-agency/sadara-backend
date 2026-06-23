@@ -4,7 +4,8 @@
       "Bash(npx jest:*)",
       "Bash(grep -E \"\\(app|routes|index\\)\\\\.ts$\")",
       "Bash(find /e/Sadara/Code/backend/src/modules -type f -name *.validation.ts)",
-      "Bash(find /e/Sadara/Code/backend/src/modules -type f \\\\\\(-name *.schema.ts -o -name *.validation.ts \\\\\\))"
+      "Bash(find /e/Sadara/Code/backend/src/modules -type f \\\\\\(-name *.schema.ts -o -name *.validation.ts \\\\\\))",
+      "mcp__7610d987-1604-407d-a924-3be14ed6a95b__execute_sql"
     ]
   }
 }

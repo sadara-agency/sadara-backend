@@ -7,6 +7,7 @@ import * as dashboardController from "@modules/dashboard/dashboard.controller";
 import * as configController from "@modules/dashboard/dashboardConfig.controller";
 import * as transferPortfolioController from "@modules/dashboard/transferPortfolio.controller";
 import * as portfolioAnalyticsController from "@modules/dashboard/portfolioAnalytics.controller";
+import * as salesDashboardController from "@modules/dashboard/salesDashboard.controller";
 
 const router = Router();
 router.use(authenticate);
@@ -337,6 +338,144 @@ router.get(
   authorizeModule("dashboard", "read"),
   cacheRoute("dash", CacheTTL.MEDIUM),
   asyncHandler(portfolioAnalyticsController.getRankings),
+);
+
+// ── Leadership Sales Dashboard (descriptive commercial analytics) ──
+// Funnel offers→contracts, open-pipeline value, commission revenue,
+// per-rep performance, and top counterparty clubs. Leadership-only,
+// matching the executive route gating. Descriptive only — no forecasting.
+
+/**
+ * @swagger
+ * /dashboard/sales/all:
+ *   get:
+ *     summary: Batched leadership sales dashboard (funnel + pipeline + revenue + reps + clubs)
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Combined sales analytics payload
+ */
+router.get(
+  "/sales/all",
+  authorize("Admin", "Executive", "Manager"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(salesDashboardController.getAll),
+);
+
+/**
+ * @swagger
+ * /dashboard/sales/funnel:
+ *   get:
+ *     summary: Offer→contract conversion funnel with win rate and deal velocity
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Funnel counters and rates
+ */
+router.get(
+  "/sales/funnel",
+  authorize("Admin", "Executive", "Manager"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(salesDashboardController.getFunnel),
+);
+
+/**
+ * @swagger
+ * /dashboard/sales/pipeline:
+ *   get:
+ *     summary: Open-offer pipeline value broken down by status and phase
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pipeline stage buckets and totals
+ */
+router.get(
+  "/sales/pipeline",
+  authorize("Admin", "Executive", "Manager"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(salesDashboardController.getPipeline),
+);
+
+/**
+ * @swagger
+ * /dashboard/sales/revenue:
+ *   get:
+ *     summary: Commission summary (expected/collected/outstanding) and monthly trend
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: months
+ *         schema:
+ *           type: integer
+ *           default: 12
+ *         description: Trend window in months
+ *     responses:
+ *       200:
+ *         description: Commission totals and monthly revenue trend
+ */
+router.get(
+  "/sales/revenue",
+  authorize("Admin", "Executive", "Manager"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(salesDashboardController.getRevenue),
+);
+
+/**
+ * @swagger
+ * /dashboard/sales/rep-performance:
+ *   get:
+ *     summary: Per-rep deal performance (offers created, won, won value)
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Ranked rep performance list
+ */
+router.get(
+  "/sales/rep-performance",
+  authorize("Admin", "Executive", "Manager"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(salesDashboardController.getRepPerformance),
+);
+
+/**
+ * @swagger
+ * /dashboard/sales/top-clubs:
+ *   get:
+ *     summary: Top counterparty clubs by deal volume and value
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 10
+ *     responses:
+ *       200:
+ *         description: Ranked club deal stats
+ */
+router.get(
+  "/sales/top-clubs",
+  authorize("Admin", "Executive", "Manager"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(salesDashboardController.getTopClubs),
 );
 
 export default router;
