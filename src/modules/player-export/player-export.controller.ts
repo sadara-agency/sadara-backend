@@ -3,6 +3,7 @@ import { AppError } from "@middleware/errorHandler";
 import { sendSuccess } from "@shared/utils/apiResponse";
 import { getSignedUrl, isStorageKey } from "@shared/utils/storage";
 import type { AuthRequest } from "@shared/types";
+import { Player } from "@modules/players/player.model";
 import { aggregatePlayerData } from "./player-export.service";
 import { ExportPlayerDTO, ExportFormat } from "./player-export.validation";
 import { renderPdfBuffer, renderHtmlBuffer } from "./player-export.pdf";
@@ -88,10 +89,16 @@ export async function exportPlayerData(req: AuthRequest, res: Response) {
 
   const data = await aggregatePlayerData(playerId, sections, user, locale);
 
-  // Resolve photoUrl to a full public URL so the frontend PDF renderer can fetch it
-  const rawPhotoUrl = data.player.photoUrl as string | null | undefined;
-  if (rawPhotoUrl && isStorageKey(rawPhotoUrl)) {
-    data.player.photoUrl = await getSignedUrl(rawPhotoUrl);
+  // photoUrl may be stripped by field-level permissions — fetch it directly
+  // so the frontend PDF renderer can always display the avatar.
+  const playerRaw = await Player.findByPk(playerId, {
+    attributes: ["photoUrl"],
+  });
+  const rawPhotoUrl = playerRaw?.get("photoUrl") as string | null | undefined;
+  if (rawPhotoUrl) {
+    data.player.photoUrl = isStorageKey(rawPhotoUrl)
+      ? await getSignedUrl(rawPhotoUrl)
+      : rawPhotoUrl;
   }
 
   sendSuccess(res, data);
