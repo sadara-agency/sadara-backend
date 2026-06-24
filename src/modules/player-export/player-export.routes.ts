@@ -3,7 +3,7 @@ import { asyncHandler } from "@middleware/errorHandler";
 import { authenticate, authorizeModule } from "@middleware/auth";
 import { validate } from "@middleware/validate";
 import { exportPlayerSchema } from "./player-export.validation";
-import { exportPlayer } from "./player-export.controller";
+import { exportPlayer, exportPlayerData } from "./player-export.controller";
 
 const router = Router({ mergeParams: true });
 
@@ -49,6 +49,36 @@ router.post(
   authorizeModule("players", "read"),
   validate(exportPlayerSchema),
   asyncHandler(exportPlayer),
+);
+
+/**
+ * @swagger
+ * /players/{id}/export-data:
+ *   get:
+ *     summary: Get aggregated player data for client-side PDF rendering
+ *     tags: [Players]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string, format: uuid }
+ *       - in: query
+ *         name: sections
+ *         schema: { type: string }
+ *         description: Comma-separated section keys
+ *       - in: query
+ *         name: locale
+ *         schema: { type: string, enum: [en, ar] }
+ *     responses:
+ *       200:
+ *         description: Aggregated player export data
+ */
+router.get(
+  "/:id/export-data",
+  authorizeModule("players", "read"),
+  asyncHandler(exportPlayerData),
 );
 
 export default router;
