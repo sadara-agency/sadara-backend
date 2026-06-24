@@ -190,14 +190,36 @@ function renderTableBlock(section: SectionRows, locale: "en" | "ar"): string {
   if (!section.rows.length) {
     return `<p class="empty">${locale === "ar" ? "لا توجد بيانات" : "No records."}</p>`;
   }
-  // Collect union of keys across rows; drop noisy internal fields
+  // Collect union of keys across rows; drop internal, binary, and blob fields
+  const BLOB_SUFFIXES = [
+    "Url",
+    "Id",
+    "Json",
+    "Html",
+    "Snapshot",
+    "Data",
+    "Token",
+    "Hash",
+    "Secret",
+  ];
+  const BLOB_KEYS = new Set([
+    "bodyJson",
+    "bodyHtml",
+    "bodyHtmlSnapshot",
+    "bodyFrozenAt",
+    "agentSignatureData",
+    "playerSignatureData",
+    "signatureData",
+    "notes",
+    "declarationText",
+  ]);
   const keys = Array.from(
     new Set(section.rows.flatMap((r) => Object.keys(r))),
   ).filter(
     (k) =>
       !["id", "createdAt", "updatedAt", "deletedAt"].includes(k) &&
-      !k.endsWith("Url") &&
-      !k.endsWith("Id"),
+      !BLOB_KEYS.has(k) &&
+      !BLOB_SUFFIXES.some((s) => k.endsWith(s)),
   );
   const header = keys.map((k) => `<th>${escHtml(labelize(k))}</th>`).join("");
   const rowsHtml = section.rows

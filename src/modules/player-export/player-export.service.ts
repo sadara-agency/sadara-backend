@@ -209,6 +209,35 @@ async function loadSection(
   }
 }
 
+const CONTRACT_EXPORT_ATTRS = [
+  "category",
+  "contractType",
+  "playerContractType",
+  "status",
+  "title",
+  "startDate",
+  "endDate",
+  "baseSalary",
+  "salaryCurrency",
+  "signingBonus",
+  "releaseClause",
+  "performanceBonus",
+  "commissionPct",
+  "totalCommission",
+  "exclusivity",
+  "representationScope",
+  "agentName",
+  "agentLicense",
+  "signedAt",
+  "signingMethod",
+  "expiryAlertSent",
+  "terminationReason",
+  "terminationDate",
+  "terminationType",
+  "outstandingAmount",
+  "outstandingCurrency",
+];
+
 async function loadContracts(
   playerId: string,
   role: string,
@@ -216,6 +245,7 @@ async function loadContracts(
 ): Promise<SectionRows> {
   const rows = await Contract.findAll({
     where: { playerId },
+    attributes: CONTRACT_EXPORT_ATTRS,
     order: [["startDate", "DESC"]],
   });
   return { rows: await stripAll(rows, role, "contracts", userId) };
@@ -245,6 +275,21 @@ async function loadOffers(
   return { rows: await stripAll(rows, role, "offers", userId) };
 }
 
+const SESSION_EXPORT_ATTRS = [
+  "sessionType",
+  "programOwner",
+  "sessionDate",
+  "title",
+  "titleAr",
+  "summary",
+  "summaryAr",
+  "completionStatus",
+  "rating",
+  "locationType",
+  "playerAttendance",
+  "outcomeTags",
+];
+
 async function loadSessions(
   playerId: string,
   role: string,
@@ -252,8 +297,9 @@ async function loadSessions(
 ): Promise<SectionRows> {
   const rows = await Session.findAll({
     where: { playerId },
+    attributes: SESSION_EXPORT_ATTRS,
     order: [["sessionDate", "DESC"]],
-    limit: 100,
+    limit: 50,
   });
   return { rows: await stripAll(rows, role, "session-feedback", userId) };
 }
