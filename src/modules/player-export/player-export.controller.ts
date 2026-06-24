@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { AppError } from "@middleware/errorHandler";
 import { sendSuccess } from "@shared/utils/apiResponse";
+import { getSignedUrl, isStorageKey } from "@shared/utils/storage";
 import type { AuthRequest } from "@shared/types";
 import { aggregatePlayerData } from "./player-export.service";
 import { ExportPlayerDTO, ExportFormat } from "./player-export.validation";
@@ -86,5 +87,12 @@ export async function exportPlayerData(req: AuthRequest, res: Response) {
   const locale = (req.query.locale as "en" | "ar") ?? "en";
 
   const data = await aggregatePlayerData(playerId, sections, user, locale);
+
+  // Resolve photoUrl to a full public URL so the frontend PDF renderer can fetch it
+  const rawPhotoUrl = data.player.photoUrl as string | null | undefined;
+  if (rawPhotoUrl && isStorageKey(rawPhotoUrl)) {
+    data.player.photoUrl = await getSignedUrl(rawPhotoUrl);
+  }
+
   sendSuccess(res, data);
 }
