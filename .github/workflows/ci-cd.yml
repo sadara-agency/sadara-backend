@@ -46,12 +46,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: ESLint
         run: npm run lint
@@ -73,12 +75,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: npm audit (high + critical)
         run: npm audit --audit-level=high --omit=dev || true
@@ -156,12 +160,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: Run migrations on fresh DB (no --sync-first)
         run: npm run migrate
@@ -221,12 +227,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: Sync models & run migrations
         run: npm run migrate -- --sync-first
@@ -254,12 +262,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: Build
         run: npm run build
@@ -328,12 +338,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
       - name: Restore node_modules
         uses: actions/cache/restore@v4
         with:
           path: node_modules
           key: node-modules-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - id: auth
         uses: google-github-actions/auth@v2
