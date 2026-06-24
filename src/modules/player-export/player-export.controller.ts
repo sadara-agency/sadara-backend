@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { AppError } from "@middleware/errorHandler";
+import { sendSuccess } from "@shared/utils/apiResponse";
 import type { AuthRequest } from "@shared/types";
 import { aggregatePlayerData } from "./player-export.service";
 import { ExportPlayerDTO, ExportFormat } from "./player-export.validation";
@@ -55,4 +56,35 @@ export async function exportPlayer(req: AuthRequest, res: Response) {
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
   res.setHeader("Content-Length", String(buffer.length));
   res.send(buffer);
+}
+
+/**
+ * GET /players/:id/export-data
+ * Returns aggregated player data as JSON for client-side PDF rendering.
+ */
+export async function exportPlayerData(req: AuthRequest, res: Response) {
+  const user = req.user;
+  if (!user) throw new AppError("Unauthorized", 401);
+
+  const playerId = req.params.id;
+  const sections = req.query.sections
+    ? (String(req.query.sections).split(",") as ExportPlayerDTO["sections"])
+    : ([
+        "personal",
+        "stats",
+        "contracts",
+        "injuries",
+        "training",
+        "sessions",
+        "wellness",
+        "reports",
+        "finance",
+        "documents",
+        "notes",
+        "offers",
+      ] as ExportPlayerDTO["sections"]);
+  const locale = (req.query.locale as "en" | "ar") ?? "en";
+
+  const data = await aggregatePlayerData(playerId, sections, user, locale);
+  sendSuccess(res, data);
 }

@@ -221,6 +221,24 @@ function renderTableBlock(section: SectionRows, locale: "en" | "ar"): string {
       !BLOB_KEYS.has(k) &&
       !BLOB_SUFFIXES.some((s) => k.endsWith(s)),
   );
+  // Wide sections (>8 columns) render as stacked key-value cards to avoid
+  // column-crush on A4 (~163mm usable width / 25 columns ≈ 6.5mm each).
+  if (keys.length > 8) {
+    const cards = section.rows
+      .map((r) => {
+        const pairs = keys
+          .filter((k) => r[k] !== null && r[k] !== undefined && r[k] !== "")
+          .map(
+            (k) =>
+              `<div class="row"><span class="k">${escHtml(labelize(k))}</span><span class="v">${fmt(r[k])}</span></div>`,
+          )
+          .join("");
+        return `<div class="kv" style="margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e0e3ea;">${pairs}</div>`;
+      })
+      .join("");
+    return cards;
+  }
+
   const header = keys.map((k) => `<th>${escHtml(labelize(k))}</th>`).join("");
   const rowsHtml = section.rows
     .map((r) => `<tr>${keys.map((k) => `<td>${fmt(r[k])}</td>`).join("")}</tr>`)
