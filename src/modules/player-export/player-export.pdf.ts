@@ -263,7 +263,7 @@ export async function renderPdfBuffer(
     headerHtml,
     footerHtml,
     // top clears the logo header, bottom clears address line + pattern strip.
-    margin: { top: "28mm", bottom: "26mm", left: "16mm", right: "16mm" },
+    margin: { top: "32mm", bottom: "26mm", left: "16mm", right: "16mm" },
   });
   return Buffer.from(buf);
 }

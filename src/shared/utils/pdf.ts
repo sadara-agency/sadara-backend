@@ -162,7 +162,7 @@ export function makeLetterheadHeaderTemplate(opts: {
 }): string {
   return `<div style="width:100%;font-size:8px;color:#1a1a1a;font-family:Arial,sans-serif;padding:6mm 16mm 0 16mm;box-sizing:border-box;-webkit-print-color-adjust:exact;">
   <div style="display:flex;justify-content:space-between;align-items:center;">
-    <img src="${opts.logoDataUri}" style="height:34px;width:auto;" />
+    <img src="${opts.logoDataUri}" style="height:50px;width:auto;" />
     <span style="font-size:9px;font-weight:bold;color:#0f3460;">${escHtml(opts.rightText)}</span>
   </div>
 </div>`;
