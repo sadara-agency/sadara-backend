@@ -1,3 +1,5 @@
+import https from "https";
+import http from "http";
 import {
   escHtml,
   fmtDate,
@@ -7,6 +9,7 @@ import {
   makeLetterheadHeaderTemplate,
   renderFlowingHtmlToBuffer,
 } from "@shared/utils/pdf";
+import { streamFileBuffer } from "@shared/utils/storage";
 import type {
   AggregatedPlayerExport,
   SectionRows,
@@ -67,19 +70,67 @@ tr:nth-child(even) td { background: #f8f9fb; }
 .tag { display: inline-block; padding: 2px 7px; border-radius: 3px; background: #e8ecf3; color: #0f3460; font-size: 9px; margin-inline-end: 4px; }
 `;
 
+// ── Avatar fetch ──
+
+/** Fetches an image URL or Supabase storage key and returns a data URI. */
+async function fetchAvatarDataUri(photoUrl: string): Promise<string | null> {
+  try {
+    if (photoUrl.startsWith("http://") || photoUrl.startsWith("https://")) {
+      const buf = await new Promise<Buffer>((resolve, reject) => {
+        const client = photoUrl.startsWith("https://") ? https : http;
+        client
+          .get(photoUrl, (res) => {
+            const chunks: Buffer[] = [];
+            res.on("data", (c: Buffer) => chunks.push(c));
+            res.on("end", () => resolve(Buffer.concat(chunks)));
+            res.on("error", reject);
+          })
+          .on("error", reject);
+      });
+      const mime = photoUrl.endsWith(".webp")
+        ? "image/webp"
+        : photoUrl.endsWith(".png")
+          ? "image/png"
+          : "image/jpeg";
+      return `data:${mime};base64,${buf.toString("base64")}`;
+    }
+    // Bare storage key (Supabase) or local path starting with /uploads/
+    const key = photoUrl.startsWith("/uploads/")
+      ? photoUrl.replace(/^\/uploads\//, "")
+      : photoUrl;
+    const buf = await streamFileBuffer(key);
+    const mime = key.endsWith(".webp")
+      ? "image/webp"
+      : key.endsWith(".png")
+        ? "image/png"
+        : "image/jpeg";
+    return `data:${mime};base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
 // ── Rendering ──
 
 function t(locale: "en" | "ar", key: SectionKey): string {
   return SECTION_TITLE[key][locale];
 }
 
+const MAX_CELL_LEN = 300;
+
 function fmt(v: unknown): string {
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? "✓" : "✗";
   if (v instanceof Date) return fmtDate(v);
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return fmtDate(v);
-  if (typeof v === "object") return escHtml(JSON.stringify(v));
-  return escHtml(String(v));
+  if (typeof v === "object") {
+    const s = JSON.stringify(v);
+    return escHtml(
+      s.length > MAX_CELL_LEN ? s.slice(0, MAX_CELL_LEN) + "…" : s,
+    );
+  }
+  const s = String(v);
+  return escHtml(s.length > MAX_CELL_LEN ? s.slice(0, MAX_CELL_LEN) + "…" : s);
 }
 
 const AVATAR_PLACEHOLDER = `<div class="avatar-placeholder"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg></div>`;
@@ -87,15 +138,15 @@ const AVATAR_PLACEHOLDER = `<div class="avatar-placeholder"><svg viewBox="0 0 24
 function renderPersonalBlock(
   player: Record<string, unknown>,
   locale: "en" | "ar",
+  avatarDataUri?: string | null,
 ): string {
   const L = locale === "ar";
   const displayName = L
     ? `${player.firstNameAr ?? player.firstName ?? ""} ${player.lastNameAr ?? player.lastName ?? ""}`.trim()
     : `${player.firstName ?? ""} ${player.lastName ?? ""}`.trim();
 
-  const photoUrl = player.photoUrl as string | null | undefined;
-  const avatarHtml = photoUrl
-    ? `<img class="avatar" src="${escHtml(photoUrl)}" alt="player" onerror="this.style.display='none';this.nextSibling.style.display='flex'" />${AVATAR_PLACEHOLDER.replace('style="', 'style="display:none;')}`
+  const avatarHtml = avatarDataUri
+    ? `<img class="avatar" src="${avatarDataUri}" alt="player" />`
     : AVATAR_PLACEHOLDER;
 
   const position = [player.position, player.secondaryPosition]
@@ -171,6 +222,7 @@ function labelize(key: string): string {
 export function renderHtml(
   data: AggregatedPlayerExport,
   forPdf = false,
+  avatarDataUri?: string | null,
 ): string {
   const locale: "en" | "ar" = data.locale;
   const L = locale === "ar";
@@ -191,7 +243,7 @@ export function renderHtml(
       const section = data.sections[key]!;
       const block =
         key === "personal"
-          ? renderPersonalBlock(data.player, locale)
+          ? renderPersonalBlock(data.player, locale, avatarDataUri)
           : renderTableBlock(section, locale);
       const noteHtml = section.note
         ? `<p class="omitted">${escHtml(section.note)}</p>`
@@ -244,7 +296,10 @@ export function renderHtmlBuffer(data: AggregatedPlayerExport): Buffer {
 export async function renderPdfBuffer(
   data: AggregatedPlayerExport,
 ): Promise<Buffer> {
-  const html = renderHtml(data, true);
+  const photoUrl = data.player.photoUrl as string | null | undefined;
+  const avatarDataUri = photoUrl ? await fetchAvatarDataUri(photoUrl) : null;
+
+  const html = renderHtml(data, true, avatarDataUri);
 
   const displayId =
     (data.player.displayId as string) ||
