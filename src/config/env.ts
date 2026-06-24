@@ -159,15 +159,6 @@ const envSchema = z.object({
   // Anthropic LLM (optional — required for AI summary generation)
   ANTHROPIC_API_KEY: z.string().default(""),
 
-  // AI chat assistant provider config. Default is the local OpenAI-compatible
-  // endpoint (Ollama) so player data can stay on-prem for KSA PDPL compliance.
-  // Switch to "anthropic" to route through the Anthropic Messages API instead.
-  AI_PROVIDER: z.enum(["openai", "anthropic"]).default("openai"),
-  AI_MODEL: z.string().default("llama3.1"),
-  AI_BASE_URL: z.string().default("http://localhost:11434/v1"),
-  AI_API_KEY: z.string().default(""),
-  AI_MAX_TOKENS: z.coerce.number().int().min(256).max(8192).default(2048),
-
   // InBody OCR (deterministic, tesseract.js). All optional.
   //   OCR_TIMEOUT_MS — per-image OCR ceiling so the extract request can't hang.
   //   OCR_LANG_PATH  — override the eng/ara traineddata dir (default: bundled).
@@ -335,15 +326,6 @@ export const env = {
 
   anthropic: {
     apiKey: validated.ANTHROPIC_API_KEY,
-  },
-
-  ai: {
-    provider: validated.AI_PROVIDER,
-    model: validated.AI_MODEL,
-    baseUrl: validated.AI_BASE_URL || undefined,
-    apiKey: validated.AI_API_KEY,
-    anthropicApiKey: validated.ANTHROPIC_API_KEY,
-    maxTokens: validated.AI_MAX_TOKENS,
   },
 
   ocr: {

@@ -84,10 +84,6 @@ const RAW_PERMISSIONS: Perm[] = [
 
   ...allRoles("dashboard", { canRead: true }),
 
-  // Assistant route gate only. Per-data RBAC is enforced inside each tool via
-  // the wrapped module's own (module, "read") permission.
-  ...allRoles("assistant", { canRead: true }),
-
   ...allRoles("players", { canRead: true }),
   ...forRoles("players", ["Admin", "SportingDirector"], {
     canCreate: true,
