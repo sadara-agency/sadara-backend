@@ -1747,24 +1747,35 @@ async function seedAllData(tx: Transaction): Promise<void> {
     for (let i = 0; i < 4; i++) {
       const pid =
         perfPlayerIds[Math.floor(Math.random() * perfPlayerIds.length)];
-      await sequelize.query(
-        `INSERT INTO performances (player_id, match_id, average_rating, goals, assists, key_passes, successful_dribbles, minutes)
-         VALUES (:pid, :mid, :rating, :goals, :assists, :kp, :sd, :mins) ON CONFLICT DO NOTHING`,
-        {
-          replacements: {
-            pid,
-            mid: matchId,
-            rating: (6 + Math.random() * 3).toFixed(1),
-            goals: Math.random() > 0.7 ? Math.floor(Math.random() * 2) + 1 : 0,
-            assists: Math.random() > 0.6 ? 1 : 0,
-            kp: Math.floor(Math.random() * 5),
-            sd: Math.floor(Math.random() * 4),
-            mins: 60 + Math.floor(Math.random() * 30),
+      try {
+        await sequelize.query(
+          `INSERT INTO performances (player_id, match_id, average_rating, goals, assists, key_passes, successful_dribbles, minutes)
+           VALUES (:pid, :mid, :rating, :goals, :assists, :kp, :sd, :mins)
+           ON CONFLICT (player_id, match_id) DO NOTHING`,
+          {
+            replacements: {
+              pid,
+              mid: matchId,
+              rating: (6 + Math.random() * 3).toFixed(1),
+              goals:
+                Math.random() > 0.7 ? Math.floor(Math.random() * 2) + 1 : 0,
+              assists: Math.random() > 0.6 ? 1 : 0,
+              kp: Math.floor(Math.random() * 5),
+              sd: Math.floor(Math.random() * 4),
+              mins: 60 + Math.floor(Math.random() * 30),
+            },
+            type: QueryTypes.INSERT,
+            transaction: tx,
+            retry: { max: 0 },
           },
-          type: QueryTypes.INSERT,
-          transaction: tx,
-        },
-      );
+        );
+      } catch (perfErr) {
+        console.error(
+          "  ❌ Performance insert failed:",
+          (perfErr as Error).message,
+        );
+        throw perfErr;
+      }
     }
   }
   console.log("  ✅ Performances seeded");
@@ -1962,6 +1973,9 @@ async function seedAllData(tx: Transaction): Promise<void> {
   );
 
   try {
+    await sequelize.query("SAVEPOINT before_injury_update", {
+      transaction: tx,
+    });
     await InjuryUpdate.bulkCreate(
       [
         {
@@ -1978,8 +1992,14 @@ async function seedAllData(tx: Transaction): Promise<void> {
         transaction: tx,
       },
     );
+    await sequelize.query("RELEASE SAVEPOINT before_injury_update", {
+      transaction: tx,
+    });
   } catch {
-    // InjuryUpdate table may not exist yet
+    // InjuryUpdate table may not exist yet — rollback to savepoint to keep tx alive
+    await sequelize
+      .query("ROLLBACK TO SAVEPOINT before_injury_update", { transaction: tx })
+      .catch(() => {});
   }
 
   // Auto-task training (2 courses + 2 enrollments)
