@@ -204,6 +204,25 @@ router.get(
   asyncHandler(dashboardController.getApprovalBottleneck),
 );
 
+/**
+ * @swagger
+ * /dashboard/executive/health:
+ *   get:
+ *     summary: Executive health snapshot — current + 30d-ago values for finance, ops and staff signals
+ *     tags: [Dashboard]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Health snapshot with current and prev sub-signal values
+ */
+router.get(
+  "/executive/health",
+  authorize("Admin", "Executive"),
+  cacheRoute("dash", CacheTTL.MEDIUM),
+  asyncHandler(dashboardController.getExecutiveHealth),
+);
+
 // ── Sports Manager Dashboard ──
 router.get(
   "/sports-manager",

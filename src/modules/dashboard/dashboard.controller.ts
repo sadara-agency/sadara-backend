@@ -194,6 +194,12 @@ export async function getApprovalBottleneck(_req: AuthRequest, res: Response) {
   sendSuccess(res, data);
 }
 
+// GET /dashboard/executive/health — current + 30d-ago snapshot for trend arrows
+export async function getExecutiveHealth(_req: AuthRequest, res: Response) {
+  const data = await dashboardService.getExecutiveHealth();
+  sendSuccess(res, data);
+}
+
 // GET /dashboard/all — batched fetch for all dashboard sections (15 → 1 request)
 export async function getAll(req: AuthRequest, res: Response) {
   const role = req.user!.role;

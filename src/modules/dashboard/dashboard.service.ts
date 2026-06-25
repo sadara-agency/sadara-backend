@@ -1172,3 +1172,201 @@ export async function getSportsManagerOverview() {
     CacheTTL.SHORT,
   );
 }
+
+// ═══════════════════════════════════════════════════════════════
+// EXECUTIVE HEALTH SNAPSHOT
+// Returns current sub-signal values alongside their values from
+// 30 days ago so the frontend can show real trend arrows.
+// Risk (player attention level) has no historical record in the DB
+// so its delta is omitted (null) and the client renders a plain value.
+// ═══════════════════════════════════════════════════════════════
+
+export interface ExecutiveHealthSnapshot {
+  finance: {
+    revenueYtdCurrent: number;
+    revenueYtdPrev: number;
+    outstandingCurrent: number;
+    outstandingPrev: number;
+    overdueCountCurrent: number;
+    overdueCountPrev: number;
+  };
+  ops: {
+    completionRateCurrent: number | null;
+    completionRatePrev: number | null;
+    overdueCurrent: number;
+    overduePrev: number;
+    pendingApprovalsCurrent: number;
+    pendingApprovalsPrev: number;
+  };
+  staff: {
+    active30dCurrent: number;
+    active30dPrev: number;
+    totalActive: number;
+  };
+}
+
+export async function getExecutiveHealth(): Promise<ExecutiveHealthSnapshot> {
+  const cacheKey = buildCacheKey(`${P}:exec:health`, {});
+
+  return cacheOrFetch(
+    cacheKey,
+    async () => {
+      // Run finance, ops, and staff queries in parallel for speed.
+      const [financeRow, opsRow, staffRow] = await Promise.all([
+        // ── Finance ──────────────────────────────────────────────
+        sequelize
+          .query<Record<string, unknown>>(
+            `SELECT
+               -- Current YTD revenue (paid this year)
+               COALESCE(SUM(amount) FILTER (
+                 WHERE status = 'Paid'
+                   AND paid_date >= DATE_TRUNC('year', NOW())
+               ), 0)::numeric AS revenue_ytd_current,
+
+               -- Revenue YTD as-of 30 days ago (paid this year up to 30d ago)
+               COALESCE(SUM(amount) FILTER (
+                 WHERE status = 'Paid'
+                   AND paid_date >= DATE_TRUNC('year', NOW())
+                   AND paid_date < NOW() - INTERVAL '30 days'
+               ), 0)::numeric AS revenue_ytd_prev,
+
+               -- Current outstanding (overdue as of today)
+               COALESCE(SUM(amount) FILTER (
+                 WHERE status != 'Paid'
+                   AND due_date < CURRENT_DATE
+               ), 0)::numeric AS outstanding_current,
+
+               -- Outstanding as-of 30 days ago
+               COALESCE(SUM(amount) FILTER (
+                 WHERE status != 'Paid'
+                   AND due_date < CURRENT_DATE - 30
+               ), 0)::numeric AS outstanding_prev,
+
+               -- Overdue count today
+               COUNT(*) FILTER (
+                 WHERE status != 'Paid'
+                   AND due_date < CURRENT_DATE
+               )::int AS overdue_count_current,
+
+               -- Overdue count 30 days ago
+               COUNT(*) FILTER (
+                 WHERE status != 'Paid'
+                   AND due_date < CURRENT_DATE - 30
+               )::int AS overdue_count_prev
+             FROM payments`,
+            { type: QueryTypes.SELECT },
+          )
+          .then((r) => camelCaseKeys(r)[0] as Record<string, number>),
+
+        // ── Operational ──────────────────────────────────────────
+        sequelize
+          .query<Record<string, unknown>>(
+            `SELECT
+               -- Completion rate: tasks created in last 30 days
+               ROUND(
+                 COUNT(*) FILTER (
+                   WHERE status = 'Completed'
+                     AND created_at >= NOW() - INTERVAL '30 days'
+                 )::numeric /
+                 NULLIF(COUNT(*) FILTER (
+                   WHERE created_at >= NOW() - INTERVAL '30 days'
+                 ), 0) * 100,
+               1) AS completion_rate_current,
+
+               -- Completion rate: tasks created in 30-60d window (prior period)
+               ROUND(
+                 COUNT(*) FILTER (
+                   WHERE status = 'Completed'
+                     AND created_at >= NOW() - INTERVAL '60 days'
+                     AND created_at < NOW() - INTERVAL '30 days'
+                 )::numeric /
+                 NULLIF(COUNT(*) FILTER (
+                   WHERE created_at >= NOW() - INTERVAL '60 days'
+                     AND created_at < NOW() - INTERVAL '30 days'
+                 ), 0) * 100,
+               1) AS completion_rate_prev,
+
+               -- Overdue tasks now
+               COUNT(*) FILTER (
+                 WHERE status NOT IN ('Completed', 'Canceled')
+                   AND due_date < CURRENT_DATE
+               )::int AS overdue_current,
+
+               -- Overdue tasks as-of 30 days ago (due date was before that date)
+               COUNT(*) FILTER (
+                 WHERE status NOT IN ('Completed', 'Canceled')
+                   AND due_date < CURRENT_DATE - 30
+               )::int AS overdue_prev,
+
+               -- Pending approvals now
+               (SELECT COUNT(*)::int FROM approval_requests WHERE status = 'Pending')
+                 AS pending_approvals_current,
+
+               -- Pending approvals 30d ago (submitted before then, still pending or resolved after)
+               -- Proxy: count that were created >30d ago and are still open today
+               (SELECT COUNT(*)::int FROM approval_requests
+                WHERE status = 'Pending'
+                  AND created_at < NOW() - INTERVAL '30 days')
+                 AS pending_approvals_prev
+             FROM tasks`,
+            { type: QueryTypes.SELECT },
+          )
+          .then((r) => camelCaseKeys(r)[0] as Record<string, number | null>),
+
+        // ── Staff ─────────────────────────────────────────────────
+        sequelize
+          .query<Record<string, unknown>>(
+            `SELECT
+               -- Active in last 30 days (has a session heartbeat)
+               COUNT(DISTINCT user_id) FILTER (
+                 WHERE last_heartbeat_at >= NOW() - INTERVAL '30 days'
+               )::int AS active_30d_current,
+
+               -- Active in 30-60d window
+               COUNT(DISTINCT user_id) FILTER (
+                 WHERE last_heartbeat_at >= NOW() - INTERVAL '60 days'
+                   AND last_heartbeat_at < NOW() - INTERVAL '30 days'
+               )::int AS active_30d_prev,
+
+               -- Total registered active users (denominator for % calc)
+               (SELECT COUNT(*)::int FROM users WHERE is_active = true)
+                 AS total_active
+             FROM user_sessions`,
+            { type: QueryTypes.SELECT },
+          )
+          .then((r) => camelCaseKeys(r)[0] as Record<string, number>),
+      ]);
+
+      return {
+        finance: {
+          revenueYtdCurrent: Number(financeRow.revenueYtdCurrent ?? 0),
+          revenueYtdPrev: Number(financeRow.revenueYtdPrev ?? 0),
+          outstandingCurrent: Number(financeRow.outstandingCurrent ?? 0),
+          outstandingPrev: Number(financeRow.outstandingPrev ?? 0),
+          overdueCountCurrent: Number(financeRow.overdueCountCurrent ?? 0),
+          overdueCountPrev: Number(financeRow.overdueCountPrev ?? 0),
+        },
+        ops: {
+          completionRateCurrent:
+            opsRow.completionRateCurrent != null
+              ? Number(opsRow.completionRateCurrent)
+              : null,
+          completionRatePrev:
+            opsRow.completionRatePrev != null
+              ? Number(opsRow.completionRatePrev)
+              : null,
+          overdueCurrent: Number(opsRow.overdueCurrent ?? 0),
+          overduePrev: Number(opsRow.overduePrev ?? 0),
+          pendingApprovalsCurrent: Number(opsRow.pendingApprovalsCurrent ?? 0),
+          pendingApprovalsPrev: Number(opsRow.pendingApprovalsPrev ?? 0),
+        },
+        staff: {
+          active30dCurrent: Number(staffRow.active30dCurrent ?? 0),
+          active30dPrev: Number(staffRow.active30dPrev ?? 0),
+          totalActive: Number(staffRow.totalActive ?? 0),
+        },
+      } satisfies ExecutiveHealthSnapshot;
+    },
+    CacheTTL.MEDIUM,
+  );
+}
