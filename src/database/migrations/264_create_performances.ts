@@ -1,4 +1,4 @@
-import { QueryInterface, DataTypes } from "sequelize";
+import { QueryInterface, DataTypes, QueryTypes } from "sequelize";
 
 export async function up({
   context: queryInterface,
@@ -14,14 +14,10 @@ export async function up({
     player_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "players", key: "id" },
-      onDelete: "CASCADE",
     },
     match_id: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: { model: "matches", key: "id" },
-      onDelete: "CASCADE",
     },
     average_rating: {
       type: DataTypes.DECIMAL(4, 1),
@@ -71,6 +67,36 @@ export async function up({
     name: "performances_player_match_unique",
     unique: true,
   });
+
+  // Add FK constraints only if parent tables exist (fresh-DB guard)
+  const sequelize = queryInterface.sequelize;
+  const [playersExists] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
+  );
+  if (playersExists) {
+    await queryInterface.addConstraint("performances", {
+      fields: ["player_id"],
+      type: "foreign key",
+      name: "performances_player_id_fkey",
+      references: { table: "players", field: "id" },
+      onDelete: "CASCADE",
+    });
+  }
+
+  const [matchesExists] = await sequelize.query(
+    `SELECT 1 FROM information_schema.tables WHERE table_name = 'matches' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
+  );
+  if (matchesExists) {
+    await queryInterface.addConstraint("performances", {
+      fields: ["match_id"],
+      type: "foreign key",
+      name: "performances_match_id_fkey",
+      references: { table: "matches", field: "id" },
+      onDelete: "CASCADE",
+    });
+  }
 }
 
 export async function down({
