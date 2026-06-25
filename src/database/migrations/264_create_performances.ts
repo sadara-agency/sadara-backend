@@ -82,6 +82,7 @@ export async function up({
       name: "performances_player_id_fkey",
       references: { table: "players", field: "id" },
       onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
   }
 
@@ -97,6 +98,7 @@ export async function up({
       name: "performances_match_id_fkey",
       references: { table: "matches", field: "id" },
       onDelete: "CASCADE",
+      onUpdate: "CASCADE",
     });
   }
 }
