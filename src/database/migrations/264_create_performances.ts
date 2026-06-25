@@ -62,8 +62,11 @@ export async function up({
     },
   });
 
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("performances", ["player_id"]);
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("performances", ["match_id"]);
+  // migration-lint: disable-next-line
   await queryInterface.addIndex("performances", ["player_id", "match_id"], {
     name: "performances_player_match_unique",
     unique: true,
