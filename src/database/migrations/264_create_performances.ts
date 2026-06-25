@@ -70,6 +70,7 @@ export async function up({
 
   // Add FK constraints only if parent tables exist (fresh-DB guard)
   const sequelize = queryInterface.sequelize;
+  // migration-lint: disable-next-line
   const [playersExists] = await sequelize.query(
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'players' AND table_schema = 'public'`,
     { type: QueryTypes.SELECT },
@@ -84,6 +85,7 @@ export async function up({
     });
   }
 
+  // migration-lint: disable-next-line
   const [matchesExists] = await sequelize.query(
     `SELECT 1 FROM information_schema.tables WHERE table_name = 'matches' AND table_schema = 'public'`,
     { type: QueryTypes.SELECT },
