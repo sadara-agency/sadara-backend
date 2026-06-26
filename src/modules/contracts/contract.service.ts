@@ -321,8 +321,15 @@ export async function createContract(
 // ────────────────────────────────────────────────────────────
 // Update Contract
 // ────────────────────────────────────────────────────────────
-export async function updateContract(id: string, input: UpdateContractInput) {
+export async function updateContract(
+  id: string,
+  input: UpdateContractInput,
+  user?: AuthUser,
+) {
   const contract = await findOrThrow(Contract, id, "Contract");
+
+  const hasAccess = await checkRowAccess("contracts", contract, user);
+  if (!hasAccess) throw new AppError("Contract not found", 404);
 
   // Body is immutable once frozen (agent has signed).
   if (
@@ -368,8 +375,11 @@ export async function updateContract(id: string, input: UpdateContractInput) {
 // ────────────────────────────────────────────────────────────
 // Delete Contract
 // ────────────────────────────────────────────────────────────
-export async function deleteContract(id: string) {
+export async function deleteContract(id: string, user?: AuthUser) {
   const contract = await findOrThrow(Contract, id, "Contract");
+
+  const hasAccess = await checkRowAccess("contracts", contract, user);
+  if (!hasAccess) throw new AppError("Contract not found", 404);
 
   // Prevent deletion of active/signed contracts
   if (["Active", "Expiring Soon"].includes(contract.status)) {

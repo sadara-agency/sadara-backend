@@ -10,11 +10,11 @@ import * as contractService from "@modules/contracts/contract.service";
 
 const crud = createCrudController({
   service: {
-    list: (query) => contractService.listContracts(query),
-    getById: (id) => contractService.getContractById(id),
+    list: (query, user) => contractService.listContracts(query, user),
+    getById: (id, user) => contractService.getContractById(id, user),
     create: (body, userId) => contractService.createContract(body, userId),
-    update: (id, body) => contractService.updateContract(id, body),
-    delete: (id) => contractService.deleteContract(id),
+    update: (id, body, user) => contractService.updateContract(id, body, user),
+    delete: (id, user) => contractService.deleteContract(id, user),
   },
   entity: "contracts",
   cachePrefixes: [CachePrefix.CONTRACTS, CachePrefix.DASHBOARD],
