@@ -191,8 +191,8 @@ export async function createContract(
   createdBy: string,
 ) {
   const totalCommission =
-    input.commissionPct && input.baseSalary
-      ? (input.baseSalary * input.commissionPct) / 100
+    input.commissionPct != null && input.baseSalary != null
+      ? (Number(input.baseSalary) * Number(input.commissionPct)) / 100
       : 0;
 
   // Agency contracts (Representation / CareerManagement) have no club counterparty —
@@ -367,7 +367,7 @@ export async function updateContract(
 
   if (input.commissionPct !== undefined || input.baseSalary !== undefined) {
     updateData.totalCommission =
-      newPct && newSalary
+      newPct != null && newSalary != null
         ? (Number(newSalary) * Number(newPct)) / 100
         : contract.totalCommission;
   }
@@ -426,60 +426,74 @@ export async function terminateContract(
   terminatedBy: string,
   user?: AuthUser,
 ) {
-  const contract = await findOrThrow(Contract, id, "Contract");
+  await sequelize.transaction(async (t) => {
+    const contract = await Contract.findByPk(id, {
+      lock: t.LOCK.UPDATE,
+      transaction: t,
+    });
+    if (!contract) throw new AppError("Contract not found", 404);
 
-  const hasAccess = await checkRowAccess("contracts", contract, user);
-  if (!hasAccess) throw new AppError("Contract not found", 404);
+    const hasAccess = await checkRowAccess("contracts", contract, user);
+    if (!hasAccess) throw new AppError("Contract not found", 404);
 
-  // Only active/expiring contracts can be terminated
-  const terminatable = ["Active", "Expiring Soon", "AwaitingPlayer", "Signing"];
-  if (!terminatable.includes(contract.status)) {
-    throw new AppError(
-      `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(", ")} contracts can be terminated.`,
-      422,
-    );
-  }
+    // Only active/expiring contracts can be terminated
+    const terminatable = [
+      "Active",
+      "Expiring Soon",
+      "AwaitingPlayer",
+      "Signing",
+    ];
+    if (!terminatable.includes(contract.status)) {
+      throw new AppError(
+        `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(", ")} contracts can be terminated.`,
+        422,
+      );
+    }
 
-  const termDate =
-    input.terminationDate || new Date().toISOString().split("T")[0];
+    const termDate =
+      input.terminationDate || new Date().toISOString().split("T")[0];
 
-  // Validate termination date falls within contract period
-  if (contract.startDate && new Date(termDate) < new Date(contract.startDate)) {
-    throw new AppError(
-      "Termination date cannot be before contract start date",
-      422,
-    );
-  }
-  if (contract.endDate && new Date(termDate) > new Date(contract.endDate)) {
-    throw new AppError(
-      "Termination date cannot be after contract end date",
-      422,
-    );
-  }
+    // Validate termination date falls within contract period
+    if (
+      contract.startDate &&
+      new Date(termDate) < new Date(contract.startDate)
+    ) {
+      throw new AppError(
+        "Termination date cannot be before contract start date",
+        422,
+      );
+    }
+    if (contract.endDate && new Date(termDate) > new Date(contract.endDate)) {
+      throw new AppError(
+        "Termination date cannot be after contract end date",
+        422,
+      );
+    }
 
-  // Set termination fields
-  const existing = contract.notes || "";
-  const timestamp = new Date().toISOString().split("T")[0];
-  const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
+    // Set termination fields
+    const existing = contract.notes || "";
+    const timestamp = new Date().toISOString().split("T")[0];
+    const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
 
-  const updatePayload: Record<string, unknown> = {
-    status: "Terminated",
-    terminationDate: termDate,
-    terminationReason: input.reason,
-    terminationType: input.terminationType ?? "mutual",
-    notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
-    endDate: termDate,
-    commissionLocked: true,
-  };
+    const updatePayload: Record<string, unknown> = {
+      status: "Terminated",
+      terminationDate: termDate,
+      terminationReason: input.reason,
+      terminationType: input.terminationType ?? "mutual",
+      notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
+      endDate: termDate,
+      commissionLocked: true,
+    };
 
-  if (input.hasOutstanding) {
-    updatePayload.hasOutstanding = true;
-    updatePayload.outstandingAmount = input.outstandingAmount ?? 0;
-    updatePayload.outstandingCurrency = input.outstandingCurrency ?? "SAR";
-    updatePayload.outstandingDetails = input.outstandingDetails ?? null;
-  }
+    if (input.hasOutstanding) {
+      updatePayload.hasOutstanding = true;
+      updatePayload.outstandingAmount = input.outstandingAmount ?? 0;
+      updatePayload.outstandingCurrency = input.outstandingCurrency ?? "SAR";
+      updatePayload.outstandingDetails = input.outstandingDetails ?? null;
+    }
 
-  await contract.update(updatePayload);
+    await contract.update(updatePayload, { transaction: t });
+  });
 
   return getContractById(id);
 }
