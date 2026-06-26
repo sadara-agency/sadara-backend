@@ -277,7 +277,12 @@ Player.init(
 );
 
 // ── Encryption at rest for PII fields ──
-const ENCRYPTED_PLAYER_FIELDS = ["phone", "email", "guardianPhone"];
+const ENCRYPTED_PLAYER_FIELDS = [
+  "phone",
+  "email",
+  "guardianPhone",
+  "nationalId",
+];
 Player.addHook("beforeSave", encryptFields(ENCRYPTED_PLAYER_FIELDS));
 Player.addHook("afterFind", decryptFields(ENCRYPTED_PLAYER_FIELDS));
 

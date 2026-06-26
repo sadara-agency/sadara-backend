@@ -152,3 +152,51 @@ export const playerQuerySchema = z.object({
 export type CreatePlayerInput = z.infer<typeof createPlayerSchema>;
 export type UpdatePlayerInput = z.infer<typeof updatePlayerSchema>;
 export type PlayerQuery = z.infer<typeof playerQuerySchema>;
+
+// ── Provider schemas ──
+const PROVIDER_NAMES = [
+  "Wyscout",
+  "InStat",
+  "StatsBomb",
+  "APIFootball",
+  "Sportmonks",
+  "SPL",
+  "PulseLive",
+  "ESPN",
+  "Other",
+] as const;
+
+export const upsertProviderSchema = z.object({
+  providerName: z.enum(PROVIDER_NAMES),
+  externalPlayerId: z.string().min(1).max(100),
+  externalTeamId: z.string().max(100).optional(),
+  apiBaseUrl: z.string().url().optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const validateProviderSchema = z.object({
+  providerName: z.enum(PROVIDER_NAMES),
+  externalPlayerId: z.string().min(1).max(100),
+});
+
+export const refreshStatsSchema = z.object({
+  provider: z.enum(PROVIDER_NAMES),
+  dateFrom: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+  dateTo: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .optional(),
+});
+
+export const timelineQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(200).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+  types: z.string().optional(),
+});
+
+export type UpsertProviderInput = z.infer<typeof upsertProviderSchema>;
+export type ValidateProviderInput = z.infer<typeof validateProviderSchema>;
+export type RefreshStatsInput = z.infer<typeof refreshStatsSchema>;

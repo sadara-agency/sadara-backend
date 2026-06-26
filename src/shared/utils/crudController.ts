@@ -112,12 +112,12 @@ export function createCrudController(config: CrudConfig) {
     // Get old item for audit diff — don't block update if this fails
     let oldItem: any = null;
     try {
-      oldItem = await service.getById(req.params.id);
+      oldItem = await service.getById(req.params.id, req.user);
     } catch {
       // old item fetch failed — proceed with update without audit diff
     }
 
-    const item = await service.update(req.params.id, req.body);
+    const item = await service.update(req.params.id, req.body, req.user);
     sendSuccess(res, item, `${entityLabel.slice(0, -1)} updated`);
 
     // Fire-and-forget: audit + cache invalidation (don't block response)
@@ -146,7 +146,7 @@ export function createCrudController(config: CrudConfig) {
   };
 
   const remove: Handler = async (req, res) => {
-    const result = await service.delete(req.params.id);
+    const result = await service.delete(req.params.id, req.user);
     sendSuccess(res, result, `${entityLabel.slice(0, -1)} deleted`);
     // Fire-and-forget: audit + cache invalidation (don't block response)
     Promise.all([

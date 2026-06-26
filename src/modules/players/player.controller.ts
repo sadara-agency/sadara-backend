@@ -7,6 +7,12 @@ import { createCrudController } from "@shared/utils/crudController";
 import { AppError } from "@middleware/errorHandler";
 import { uploadFile } from "@shared/utils/storage";
 import * as playerService from "@modules/players/player.service";
+import {
+  upsertProviderSchema,
+  validateProviderSchema,
+  refreshStatsSchema,
+  timelineQuerySchema,
+} from "@modules/players/utils/player.validation";
 
 const PLAYER_CACHE = [
   CachePrefix.PLAYERS,
@@ -17,10 +23,10 @@ const PLAYER_CACHE = [
 const crud = createCrudController({
   service: {
     list: (query, user) => playerService.listPlayers(query, user),
-    getById: (id) => playerService.getPlayerById(id),
+    getById: (id, user) => playerService.getPlayerById(id, user),
     create: (body, userId) => playerService.createPlayer(body, userId),
-    update: (id, body) => playerService.updatePlayer(id, body),
-    delete: (id) => playerService.deletePlayer(id),
+    update: (id, body, user) => playerService.updatePlayer(id, body, user),
+    delete: (id, user) => playerService.deletePlayer(id, user),
   },
   entity: "players",
   cachePrefixes: PLAYER_CACHE,
@@ -63,7 +69,9 @@ export async function uploadPhoto(req: AuthRequest, res: Response) {
 }
 
 export async function checkDuplicate(req: AuthRequest, res: Response) {
-  const duplicates = await playerService.checkDuplicate(req.query as any);
+  const duplicates = await playerService.checkDuplicate(
+    req.query as Record<string, string>,
+  );
   sendSuccess(res, { duplicates, hasDuplicates: duplicates.length > 0 });
 }
 
@@ -107,20 +115,17 @@ export async function validateProvider(req: AuthRequest, res: Response) {
 
 export async function getTimeline(req: AuthRequest, res: Response) {
   const { getPlayerTimeline } = await import("./player.timeline");
-  const { limit, offset, types } = req.query as any;
+  const query = timelineQuerySchema.parse(req.query);
   const result = await getPlayerTimeline(req.params.id, {
-    limit: limit ? Number(limit) : 50,
-    offset: offset ? Number(offset) : 0,
-    types: types ? String(types).split(",") : undefined,
+    limit: query.limit,
+    offset: query.offset,
+    types: query.types ? query.types.split(",") : undefined,
   });
   sendSuccess(res, result);
 }
 
 export async function refreshStats(req: AuthRequest, res: Response) {
-  const { provider, dateFrom, dateTo } = req.body;
-  if (!provider) {
-    throw new AppError("provider is required in request body", 400);
-  }
+  const { provider, dateFrom, dateTo } = refreshStatsSchema.parse(req.body);
   const { syncPlayerMatches } =
     await import("../integrations/matchAnalysis.service");
   const providers = await playerService.getPlayerProviders(req.params.id);

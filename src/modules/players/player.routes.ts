@@ -10,6 +10,10 @@ import {
   createPlayerSchema,
   updatePlayerSchema,
   playerQuerySchema,
+  upsertProviderSchema,
+  validateProviderSchema,
+  refreshStatsSchema,
+  timelineQuerySchema,
 } from "@modules/players/utils/player.validation";
 import * as playerController from "@modules/players/player.controller";
 import {
@@ -91,6 +95,7 @@ router.post(
 router.get(
   "/:id/overview",
   authorizeModule("players", "read"),
+  dynamicFieldAccess("players"),
   cacheRoute("player-overview", CacheTTL.SHORT),
   asyncHandler(playerController.getPlayerOverview),
 );
@@ -98,28 +103,34 @@ router.get(
 router.get(
   "/:id/performance-summary",
   authorizeModule("players", "read"),
+  dynamicFieldAccess("players"),
   asyncHandler(playerController.getPerformanceSummary),
 );
 
 router.get(
   "/:id/timeline",
   authorizeModule("players", "read"),
+  dynamicFieldAccess("players"),
+  validate(timelineQuerySchema, "query"),
   asyncHandler(playerController.getTimeline),
 );
 
 router.get(
   "/:id/club-history",
   authorizeModule("players", "read"),
+  dynamicFieldAccess("players"),
   asyncHandler(playerController.getClubHistory),
 );
 router.get(
   "/:id/providers",
   authorizeModule("players", "read"),
+  dynamicFieldAccess("players"),
   asyncHandler(playerController.getProviders),
 );
 router.put(
   "/:id/providers",
   authorizeModule("players", "update"),
+  validate(upsertProviderSchema),
   asyncHandler(playerController.upsertProvider),
 );
 router.delete(
@@ -130,11 +141,13 @@ router.delete(
 router.post(
   "/:id/providers/validate",
   authorizeModule("players", "read"),
+  validate(validateProviderSchema),
   asyncHandler(playerController.validateProvider),
 );
 router.post(
   "/:id/refresh-stats",
   authorizeModule("players", "create"),
+  validate(refreshStatsSchema),
   asyncHandler(playerController.refreshStats),
 );
 
