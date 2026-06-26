@@ -39,7 +39,7 @@ export async function terminate(req: AuthRequest, res: Response) {
     "contracts",
     req.params.id,
     buildAuditContext(req.user!, req.ip),
-    `Contract terminated: ${(result as any).title || "Untitled"} — Reason: ${req.body.reason}`,
+    `Contract terminated: ${(result as { title?: string }).title ?? "Untitled"} — Reason: ${req.body.reason}`,
   );
   sendSuccess(res, result, "Contract terminated");
 }

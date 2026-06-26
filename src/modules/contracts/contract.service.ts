@@ -158,9 +158,16 @@ export async function getContractById(id: string, user?: AuthUser) {
 
   const enriched = enrichContract(contract);
 
-  let milestones: any[] = [];
+  interface MilestoneRow {
+    id: string;
+    due_date: string;
+    commission_schedule_id: string;
+    [key: string]: unknown;
+  }
+
+  let milestones: MilestoneRow[] = [];
   try {
-    milestones = await sequelize.query(
+    milestones = await sequelize.query<MilestoneRow>(
       `SELECT ms.*
        FROM milestones ms
        JOIN commission_schedules cs ON ms.commission_schedule_id = cs.id
@@ -168,8 +175,12 @@ export async function getContractById(id: string, user?: AuthUser) {
        ORDER BY ms.due_date`,
       { bind: [id], type: QueryTypes.SELECT },
     );
-  } catch {
-    // milestones/commission_schedules tables may not exist yet
+  } catch (err) {
+    // milestones/commission_schedules tables may not exist in all environments
+    const msg = (err as Error).message ?? "";
+    if (!msg.includes("does not exist")) {
+      logger.warn("Milestone query failed", { contractId: id, error: msg });
+    }
   }
 
   // Include approval chain status for UI visibility decisions

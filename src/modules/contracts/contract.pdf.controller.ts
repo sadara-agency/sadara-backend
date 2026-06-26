@@ -61,6 +61,7 @@ function ensureDataUri(val: string): string {
   return `data:image/png;base64,${val}`;
 }
 
+// getData: c is the enriched contract plain object from enrichContract(); shape varies by CONTRACT_INCLUDES and is not formally typed
 function getData(c: any) {
   const p = c.player || {};
   const ar =
