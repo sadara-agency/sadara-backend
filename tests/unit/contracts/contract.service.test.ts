@@ -17,7 +17,7 @@ jest.mock('../../../src/config/database', () => ({
   sequelize: {
     query: jest.fn().mockResolvedValue([]),
     authenticate: jest.fn(),
-    transaction: jest.fn(async (cb: (t: object) => Promise<unknown>) => cb({})),
+    transaction: jest.fn(async (cb: (t: object) => Promise<unknown>) => cb({ LOCK: { UPDATE: 'UPDATE' } })),
   },
 }));
 
@@ -355,6 +355,7 @@ describe('Contract Service', () => {
           terminationReason: 'Mutual agreement',
           commissionLocked: true,
         }),
+        expect.objectContaining({ transaction: expect.anything() }),
       );
     });
 

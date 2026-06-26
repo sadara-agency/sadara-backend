@@ -6,7 +6,10 @@ import { AppError } from "@middleware/errorHandler";
 import { generateDisplayId } from "@shared/utils/displayId";
 import { parsePagination, buildMeta } from "@shared/utils/pagination";
 import { sequelize } from "@config/database";
-import { ExternalProviderMapping } from "@modules/players/externalProvider.model";
+import {
+  ExternalProviderMapping,
+  ProviderName,
+} from "@modules/players/externalProvider.model";
 import { PlayerClubHistory } from "@modules/players/playerClubHistory.model";
 import { Referral } from "@modules/referrals/referral.model";
 import { Session } from "@modules/sessions/session.model";
@@ -388,9 +391,11 @@ export async function getPlayerById(id: string, user?: AuthUser) {
     if (portalUser.isActive) {
       portalStatus = "active";
     } else {
+      const expiry = portalUser.inviteTokenExpiry
+        ? new Date(portalUser.inviteTokenExpiry)
+        : null;
       const tokenExpired =
-        !portalUser.inviteTokenExpiry ||
-        new Date(portalUser.inviteTokenExpiry).getTime() < Date.now();
+        !expiry || isNaN(expiry.getTime()) || expiry.getTime() < Date.now();
       portalStatus = tokenExpired ? "expired" : "pending";
     }
   }
@@ -441,9 +446,12 @@ export async function createPlayer(input: any, createdBy: string) {
   return await Player.create({ ...input, createdBy, displayId });
 }
 
-export async function updatePlayer(id: string, input: any) {
+export async function updatePlayer(id: string, input: any, user?: AuthUser) {
   const player = await Player.findByPk(id);
   if (!player) throw new AppError("Player not found", 404);
+
+  const hasAccess = await checkRowAccess("players", player, user);
+  if (!hasAccess) throw new AppError("Player not found", 404);
 
   // Sanitize email — empty string → null
   if ("email" in input) {
@@ -476,21 +484,29 @@ export async function updatePlayer(id: string, input: any) {
     player.currentClubId
   ) {
     try {
-      // Close the previous club entry
       const today = new Date().toISOString().split("T")[0];
-      await PlayerClubHistory.update(
-        { endDate: today },
-        {
-          where: { playerId: id, clubId: player.currentClubId, endDate: null },
-        },
-      );
-      // Open a new club entry
-      await PlayerClubHistory.create({
-        playerId: id,
-        clubId: input.currentClubId,
-        startDate: today,
-        position: input.position || player.position,
-        jerseyNumber: input.jerseyNumber || player.jerseyNumber,
+      await sequelize.transaction(async (t) => {
+        await PlayerClubHistory.update(
+          { endDate: today },
+          {
+            where: {
+              playerId: id,
+              clubId: player.currentClubId as string,
+              endDate: null,
+            },
+            transaction: t,
+          },
+        );
+        await PlayerClubHistory.create(
+          {
+            playerId: id,
+            clubId: input.currentClubId,
+            startDate: today,
+            position: input.position || player.position,
+            jerseyNumber: input.jerseyNumber || player.jerseyNumber,
+          },
+          { transaction: t },
+        );
       });
     } catch (err: any) {
       logger.error("Club history update failed", {
@@ -546,7 +562,13 @@ export async function updatePlayer(id: string, input: any) {
   }
 }
 
-export async function deletePlayer(id: string) {
+export async function deletePlayer(id: string, user?: AuthUser) {
+  const player = await Player.findByPk(id, { attributes: ["id"] });
+  if (!player) throw new AppError("Player not found", 404);
+
+  const hasAccess = await checkRowAccess("players", player, user);
+  if (!hasAccess) throw new AppError("Player not found", 404);
+
   const [deps] = await sequelize.query<{
     active_contracts: number;
     referrals: number;
@@ -608,7 +630,7 @@ export async function getPlayerProviders(playerId: string) {
 export async function upsertPlayerProvider(
   playerId: string,
   input: {
-    providerName: string;
+    providerName: ProviderName;
     externalPlayerId: string;
     externalTeamId?: string;
     apiBaseUrl?: string;
@@ -618,12 +640,12 @@ export async function upsertPlayerProvider(
   try {
     const [mapping] = await ExternalProviderMapping.upsert({
       playerId,
-      providerName: input.providerName as any,
+      providerName: input.providerName,
       externalPlayerId: input.externalPlayerId,
       externalTeamId: input.externalTeamId || null,
       apiBaseUrl: input.apiBaseUrl || null,
       notes: input.notes || null,
-    } as any);
+    });
     return mapping;
   } catch (err: any) {
     logger.error("upsertPlayerProvider failed", {
@@ -663,8 +685,8 @@ export async function checkDuplicate(params: {
     searchConditions.push(
       `(LOWER(first_name) = LOWER(:firstName) AND LOWER(last_name) = LOWER(:lastName))`,
     );
-    replacements.firstName = params.firstName;
-    replacements.lastName = params.lastName;
+    replacements.firstName = params.firstName.trim();
+    replacements.lastName = params.lastName.trim();
   }
   if (dobValue) {
     searchConditions.push(`date_of_birth = :dob`);

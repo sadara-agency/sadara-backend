@@ -317,7 +317,7 @@ describe('Player Service', () => {
       mockProviderUpsert.mockResolvedValue([{ id: 'map-001' }, true]);
 
       const result = await playerService.upsertPlayerProvider('player-001', {
-        providerName: 'wyscout',
+        providerName: 'Wyscout',
         externalPlayerId: '456',
       });
 

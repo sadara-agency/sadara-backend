@@ -35,6 +35,14 @@ import {
 import { generateDisplayId } from "@shared/utils/displayId";
 import { resolveFileUrl } from "@shared/utils/storage";
 
+// ── Module-scope interfaces ──
+interface MilestoneRow {
+  id: string;
+  due_date: string;
+  commission_schedule_id: string;
+  [key: string]: unknown;
+}
+
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
   {
@@ -158,9 +166,9 @@ export async function getContractById(id: string, user?: AuthUser) {
 
   const enriched = enrichContract(contract);
 
-  let milestones: any[] = [];
+  let milestones: MilestoneRow[] = [];
   try {
-    milestones = await sequelize.query(
+    milestones = await sequelize.query<MilestoneRow>(
       `SELECT ms.*
        FROM milestones ms
        JOIN commission_schedules cs ON ms.commission_schedule_id = cs.id
@@ -168,8 +176,12 @@ export async function getContractById(id: string, user?: AuthUser) {
        ORDER BY ms.due_date`,
       { bind: [id], type: QueryTypes.SELECT },
     );
-  } catch {
-    // milestones/commission_schedules tables may not exist yet
+  } catch (err) {
+    // milestones/commission_schedules tables may not exist in all environments
+    const msg = (err as Error).message;
+    if (!msg.includes("does not exist")) {
+      logger.warn("Milestone query failed", { contractId: id, error: msg });
+    }
   }
 
   // Include approval chain status for UI visibility decisions
@@ -191,8 +203,8 @@ export async function createContract(
   createdBy: string,
 ) {
   const totalCommission =
-    input.commissionPct && input.baseSalary
-      ? (input.baseSalary * input.commissionPct) / 100
+    input.commissionPct != null && input.baseSalary != null
+      ? (Number(input.baseSalary) * Number(input.commissionPct)) / 100
       : 0;
 
   // Agency contracts (Representation / CareerManagement) have no club counterparty —
@@ -219,16 +231,27 @@ export async function createContract(
   if (!playerRow) throw new AppError("Player not found", 404);
 
   // Auto-fill playerContractType from player profile if not provided
-  let playerContractType = (input as any).playerContractType || null;
+  let playerContractType: "Professional" | "Amateur" | "Youth" | null =
+    input.playerContractType ?? null;
   if (!playerContractType) {
-    playerContractType = (playerRow as any).contractType || null;
+    const rawContractType = (playerRow as unknown as { contractType?: string })
+      .contractType;
+    const VALID_PLAYER_CONTRACT_TYPES = [
+      "Professional",
+      "Amateur",
+      "Youth",
+    ] as const;
+    playerContractType = VALID_PLAYER_CONTRACT_TYPES.includes(
+      rawContractType as (typeof VALID_PLAYER_CONTRACT_TYPES)[number],
+    )
+      ? (rawContractType as "Professional" | "Amateur" | "Youth")
+      : null;
   }
 
   const displayId = await generateDisplayId("contracts");
 
   // Auto-resolve squadId to the senior squad of the club when not explicitly provided.
-  // squadId is not yet in the Zod schema; accepted as a passthrough from trusted callers.
-  let squadId: string | null = (input as any).squadId ?? null;
+  let squadId: string | null = input.squadId ?? null;
   if (!squadId && input.clubId) {
     const seniorSquad = await Squad.findOne({
       where: { clubId: input.clubId, ageCategory: "senior" },
@@ -280,7 +303,7 @@ export async function createContract(
         playerId: input.playerId,
         clubId: input.clubId as string, // always defined — agency contracts auto-resolved above; others validated by Zod
         category: input.category,
-        contractType: (input as any).contractType,
+        contractType: input.contractType,
         playerContractType,
         title: input.title,
         startDate: input.startDate,
@@ -321,8 +344,15 @@ export async function createContract(
 // ────────────────────────────────────────────────────────────
 // Update Contract
 // ────────────────────────────────────────────────────────────
-export async function updateContract(id: string, input: UpdateContractInput) {
+export async function updateContract(
+  id: string,
+  input: UpdateContractInput,
+  user?: AuthUser,
+) {
   const contract = await findOrThrow(Contract, id, "Contract");
+
+  const hasAccess = await checkRowAccess("contracts", contract, user);
+  if (!hasAccess) throw new AppError("Contract not found", 404);
 
   // Body is immutable once frozen (agent has signed).
   if (
@@ -342,7 +372,7 @@ export async function updateContract(id: string, input: UpdateContractInput) {
   ) {
     throw new AppError(
       "Commission fields cannot be modified after the contract has been signed",
-      400,
+      422,
     );
   }
 
@@ -356,7 +386,7 @@ export async function updateContract(id: string, input: UpdateContractInput) {
 
   if (input.commissionPct !== undefined || input.baseSalary !== undefined) {
     updateData.totalCommission =
-      newPct && newSalary
+      newPct != null && newSalary != null
         ? (Number(newSalary) * Number(newPct)) / 100
         : contract.totalCommission;
   }
@@ -368,14 +398,17 @@ export async function updateContract(id: string, input: UpdateContractInput) {
 // ────────────────────────────────────────────────────────────
 // Delete Contract
 // ────────────────────────────────────────────────────────────
-export async function deleteContract(id: string) {
+export async function deleteContract(id: string, user?: AuthUser) {
   const contract = await findOrThrow(Contract, id, "Contract");
+
+  const hasAccess = await checkRowAccess("contracts", contract, user);
+  if (!hasAccess) throw new AppError("Contract not found", 404);
 
   // Prevent deletion of active/signed contracts
   if (["Active", "Expiring Soon"].includes(contract.status)) {
     throw new AppError(
       "Cannot delete an active contract. Use termination instead.",
-      400,
+      422,
     );
   }
 
@@ -410,58 +443,76 @@ export async function terminateContract(
   id: string,
   input: TerminateContractInput,
   terminatedBy: string,
+  user?: AuthUser,
 ) {
-  const contract = await findOrThrow(Contract, id, "Contract");
+  await sequelize.transaction(async (t) => {
+    const contract = await Contract.findByPk(id, {
+      lock: t.LOCK.UPDATE,
+      transaction: t,
+    });
+    if (!contract) throw new AppError("Contract not found", 404);
 
-  // Only active/expiring contracts can be terminated
-  const terminatable = ["Active", "Expiring Soon", "AwaitingPlayer", "Signing"];
-  if (!terminatable.includes(contract.status)) {
-    throw new AppError(
-      `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(", ")} contracts can be terminated.`,
-      400,
-    );
-  }
+    const hasAccess = await checkRowAccess("contracts", contract, user);
+    if (!hasAccess) throw new AppError("Contract not found", 404);
 
-  const termDate =
-    input.terminationDate || new Date().toISOString().split("T")[0];
+    // Only active/expiring contracts can be terminated
+    const terminatable = [
+      "Active",
+      "Expiring Soon",
+      "AwaitingPlayer",
+      "Signing",
+    ];
+    if (!terminatable.includes(contract.status)) {
+      throw new AppError(
+        `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(", ")} contracts can be terminated.`,
+        422,
+      );
+    }
 
-  // Validate termination date falls within contract period
-  if (contract.startDate && new Date(termDate) < new Date(contract.startDate)) {
-    throw new AppError(
-      "Termination date cannot be before contract start date",
-      400,
-    );
-  }
-  if (contract.endDate && new Date(termDate) > new Date(contract.endDate)) {
-    throw new AppError(
-      "Termination date cannot be after contract end date",
-      400,
-    );
-  }
+    const termDate =
+      input.terminationDate || new Date().toISOString().split("T")[0];
 
-  // Set termination fields
-  const existing = contract.notes || "";
-  const timestamp = new Date().toISOString().split("T")[0];
-  const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
+    // Validate termination date falls within contract period
+    if (
+      contract.startDate &&
+      new Date(termDate) < new Date(contract.startDate)
+    ) {
+      throw new AppError(
+        "Termination date cannot be before contract start date",
+        422,
+      );
+    }
+    if (contract.endDate && new Date(termDate) > new Date(contract.endDate)) {
+      throw new AppError(
+        "Termination date cannot be after contract end date",
+        422,
+      );
+    }
 
-  const updatePayload: Record<string, unknown> = {
-    status: "Terminated",
-    terminationDate: termDate,
-    terminationReason: input.reason,
-    terminationType: input.terminationType ?? "mutual",
-    notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
-    endDate: termDate,
-    commissionLocked: true,
-  };
+    // Set termination fields
+    const existing = contract.notes || "";
+    const timestamp = new Date().toISOString().split("T")[0];
+    const terminationNote = `[${timestamp}] TERMINATED: ${input.reason}`;
 
-  if (input.hasOutstanding) {
-    updatePayload.hasOutstanding = true;
-    updatePayload.outstandingAmount = input.outstandingAmount ?? 0;
-    updatePayload.outstandingCurrency = input.outstandingCurrency ?? "SAR";
-    updatePayload.outstandingDetails = input.outstandingDetails ?? null;
-  }
+    const updatePayload: Record<string, unknown> = {
+      status: "Terminated",
+      terminationDate: termDate,
+      terminationReason: input.reason,
+      terminationType: input.terminationType ?? "mutual",
+      notes: existing ? `${existing}\n${terminationNote}` : terminationNote,
+      endDate: termDate,
+      commissionLocked: true,
+    };
 
-  await contract.update(updatePayload);
+    if (input.hasOutstanding) {
+      updatePayload.hasOutstanding = true;
+      updatePayload.outstandingAmount = input.outstandingAmount ?? 0;
+      updatePayload.outstandingCurrency = input.outstandingCurrency ?? "SAR";
+      updatePayload.outstandingDetails = input.outstandingDetails ?? null;
+    }
+
+    await contract.update(updatePayload, { transaction: t });
+  });
 
   return getContractById(id);
 }
