@@ -29,6 +29,7 @@ import {
 } from "@modules/approvals/approval.service";
 import { enqueueContractPdfRegen } from "@shared/utils/pdf";
 import { generateContractTransitionTask } from "@modules/contracts/contractAutoTasks";
+import { checkRowAccess } from "@shared/utils/rowScope";
 
 // ── Allowed transitions map (5-step dual-signing flow) ──
 const TRANSITION_MAP: Record<string, Record<string, string>> = {
@@ -99,6 +100,9 @@ export async function transitionContract(req: AuthRequest, res: Response) {
       });
 
       if (!locked) throw new AppError("Contract not found", 404);
+
+      const hasAccess = await checkRowAccess("contracts", locked, req.user);
+      if (!hasAccess) throw new AppError("Contract not found", 404);
 
       const curStatus = locked.status;
       const allowedActions = TRANSITION_MAP[curStatus];

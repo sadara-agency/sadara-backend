@@ -29,6 +29,7 @@ export async function terminate(req: AuthRequest, res: Response) {
     req.params.id,
     req.body,
     req.user!.id,
+    req.user,
   );
 
   await invalidateMultiple([CachePrefix.CONTRACTS, CachePrefix.DASHBOARD]);

@@ -420,8 +420,12 @@ export async function terminateContract(
   id: string,
   input: TerminateContractInput,
   terminatedBy: string,
+  user?: AuthUser,
 ) {
   const contract = await findOrThrow(Contract, id, "Contract");
+
+  const hasAccess = await checkRowAccess("contracts", contract, user);
+  if (!hasAccess) throw new AppError("Contract not found", 404);
 
   // Only active/expiring contracts can be terminated
   const terminatable = ["Active", "Expiring Soon", "AwaitingPlayer", "Signing"];
