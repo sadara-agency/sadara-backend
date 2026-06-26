@@ -353,7 +353,7 @@ export async function updateContract(
   ) {
     throw new AppError(
       "Commission fields cannot be modified after the contract has been signed",
-      400,
+      422,
     );
   }
 
@@ -389,7 +389,7 @@ export async function deleteContract(id: string, user?: AuthUser) {
   if (["Active", "Expiring Soon"].includes(contract.status)) {
     throw new AppError(
       "Cannot delete an active contract. Use termination instead.",
-      400,
+      422,
     );
   }
 
@@ -436,7 +436,7 @@ export async function terminateContract(
   if (!terminatable.includes(contract.status)) {
     throw new AppError(
       `Cannot terminate a contract in '${contract.status}' status. Only ${terminatable.join(", ")} contracts can be terminated.`,
-      400,
+      422,
     );
   }
 
@@ -447,13 +447,13 @@ export async function terminateContract(
   if (contract.startDate && new Date(termDate) < new Date(contract.startDate)) {
     throw new AppError(
       "Termination date cannot be before contract start date",
-      400,
+      422,
     );
   }
   if (contract.endDate && new Date(termDate) > new Date(contract.endDate)) {
     throw new AppError(
       "Termination date cannot be after contract end date",
-      400,
+      422,
     );
   }
 
