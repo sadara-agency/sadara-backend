@@ -219,16 +219,20 @@ export async function createContract(
   if (!playerRow) throw new AppError("Player not found", 404);
 
   // Auto-fill playerContractType from player profile if not provided
-  let playerContractType = (input as any).playerContractType || null;
+  let playerContractType: "Professional" | "Amateur" | "Youth" | null =
+    input.playerContractType ?? null;
   if (!playerContractType) {
-    playerContractType = (playerRow as any).contractType || null;
+    const rawContractType = (playerRow as unknown as { contractType?: string })
+      .contractType;
+    playerContractType =
+      (rawContractType as "Professional" | "Amateur" | "Youth" | undefined) ??
+      null;
   }
 
   const displayId = await generateDisplayId("contracts");
 
   // Auto-resolve squadId to the senior squad of the club when not explicitly provided.
-  // squadId is not yet in the Zod schema; accepted as a passthrough from trusted callers.
-  let squadId: string | null = (input as any).squadId ?? null;
+  let squadId: string | null = input.squadId ?? null;
   if (!squadId && input.clubId) {
     const seniorSquad = await Squad.findOne({
       where: { clubId: input.clubId, ageCategory: "senior" },
@@ -280,7 +284,7 @@ export async function createContract(
         playerId: input.playerId,
         clubId: input.clubId as string, // always defined — agency contracts auto-resolved above; others validated by Zod
         category: input.category,
-        contractType: (input as any).contractType,
+        contractType: input.contractType,
         playerContractType,
         title: input.title,
         startDate: input.startDate,
