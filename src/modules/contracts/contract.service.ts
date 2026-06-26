@@ -35,6 +35,14 @@ import {
 import { generateDisplayId } from "@shared/utils/displayId";
 import { resolveFileUrl } from "@shared/utils/storage";
 
+// ── Module-scope interfaces ──
+interface MilestoneRow {
+  id: string;
+  due_date: string;
+  commission_schedule_id: string;
+  [key: string]: unknown;
+}
+
 // ── Shared includes for player + club ──
 const CONTRACT_INCLUDES = [
   {
@@ -158,13 +166,6 @@ export async function getContractById(id: string, user?: AuthUser) {
 
   const enriched = enrichContract(contract);
 
-  interface MilestoneRow {
-    id: string;
-    due_date: string;
-    commission_schedule_id: string;
-    [key: string]: unknown;
-  }
-
   let milestones: MilestoneRow[] = [];
   try {
     milestones = await sequelize.query<MilestoneRow>(
@@ -177,7 +178,7 @@ export async function getContractById(id: string, user?: AuthUser) {
     );
   } catch (err) {
     // milestones/commission_schedules tables may not exist in all environments
-    const msg = (err as Error).message ?? "";
+    const msg = (err as Error).message;
     if (!msg.includes("does not exist")) {
       logger.warn("Milestone query failed", { contractId: id, error: msg });
     }
@@ -235,9 +236,16 @@ export async function createContract(
   if (!playerContractType) {
     const rawContractType = (playerRow as unknown as { contractType?: string })
       .contractType;
-    playerContractType =
-      (rawContractType as "Professional" | "Amateur" | "Youth" | undefined) ??
-      null;
+    const VALID_PLAYER_CONTRACT_TYPES = [
+      "Professional",
+      "Amateur",
+      "Youth",
+    ] as const;
+    playerContractType = VALID_PLAYER_CONTRACT_TYPES.includes(
+      rawContractType as (typeof VALID_PLAYER_CONTRACT_TYPES)[number],
+    )
+      ? (rawContractType as "Professional" | "Amateur" | "Youth")
+      : null;
   }
 
   const displayId = await generateDisplayId("contracts");
