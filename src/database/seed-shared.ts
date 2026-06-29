@@ -202,6 +202,12 @@ const RAW_PERMISSIONS: Perm[] = [
     canRead: true,
   }),
 
+  // Executive Player Report — leadership decision brief (view + generate).
+  ...forRoles("executive-reports", ["Executive", "Manager", "Admin"], {
+    canRead: true,
+    canCreate: true,
+  }),
+
   ...forRoles("offers", ["Admin", "SportingDirector"], {
     canCreate: true,
     canRead: true,
