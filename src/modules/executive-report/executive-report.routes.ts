@@ -35,7 +35,7 @@ router.use(authenticate);
  *       403:
  *         description: Caller lacks executive-reports read permission
  *       404:
- *         description: Player not found
+ *         description: Player not Here
  */
 router.get(
   "/:playerId",
