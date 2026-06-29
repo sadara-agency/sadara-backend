@@ -6,6 +6,7 @@ import helmet from "helmet";
 import compression from "compression";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
+// just for development, not used in production
 import fs from "fs";
 import { QueryTypes } from "sequelize";
 import { env } from "@config/env";
