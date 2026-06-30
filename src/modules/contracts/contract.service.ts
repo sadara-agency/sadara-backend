@@ -231,16 +231,16 @@ export async function createContract(
   if (!playerRow) throw new AppError("Player not found", 404);
 
   // Auto-fill playerContractType from player profile if not provided
-  let playerContractType: "Professional" | "Youth" | null =
+  let playerContractType: "Professional" | "Amateur" | null =
     input.playerContractType ?? null;
   if (!playerContractType) {
     const rawContractType = (playerRow as unknown as { contractType?: string })
       .contractType;
-    const VALID_PLAYER_CONTRACT_TYPES = ["Professional", "Youth"] as const;
+    const VALID_PLAYER_CONTRACT_TYPES = ["Professional", "Amateur"] as const;
     playerContractType = VALID_PLAYER_CONTRACT_TYPES.includes(
       rawContractType as (typeof VALID_PLAYER_CONTRACT_TYPES)[number],
     )
-      ? (rawContractType as "Professional" | "Youth")
+      ? (rawContractType as "Professional" | "Amateur")
       : null;
   }
 
@@ -562,7 +562,7 @@ export function __resetHomeAgencyCache() {
 export async function createAgencyRepresentationDraft(
   args: {
     playerId: string;
-    playerContractType: "Professional" | "Youth";
+    playerContractType: "Professional" | "Amateur";
     createdBy: string;
   },
   transaction?: import("sequelize").Transaction,

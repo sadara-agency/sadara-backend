@@ -2,7 +2,7 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 import { encryptFields, decryptFields } from "@shared/utils/encryption";
 
-export type PlayerContractType = "Professional" | "Youth";
+export type PlayerContractType = "Professional" | "Amateur";
 
 interface ContractAttributes {
   id: string;

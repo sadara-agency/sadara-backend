@@ -612,7 +612,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "الجويعر",
       dob: "2006-03-15",
       pos: "RW",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alNassr,
       value: 500000,
     },
@@ -623,7 +623,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "الحسن",
       dob: "2007-07-20",
       pos: "CB",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alAhli,
       value: 350000,
     },
@@ -634,7 +634,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "الغامدي",
       dob: "2006-11-02",
       pos: "GK",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alIttihad,
       value: 250000,
     },
@@ -645,7 +645,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "المطيري",
       dob: "2005-08-09",
       pos: "ST",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alShabab,
       value: 600000,
     },
@@ -656,7 +656,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "القحطاني",
       dob: "2007-01-25",
       pos: "LB",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alFateh,
       value: 200000,
     },
@@ -702,7 +702,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "العبسي",
       dob: "2005-06-30",
       pos: "CB",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alHilal,
       value: 400000,
       agent: "agent2" as const,
@@ -714,7 +714,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
       lastNameAr: "الصحفي",
       dob: "2006-09-14",
       pos: "AM",
-      type: "Youth" as const,
+      type: "Amateur" as const,
       clubId: IDS.clubs.alRaed,
       value: 300000,
     },
@@ -752,7 +752,7 @@ async function seedAllData(tx: Transaction): Promise<void> {
     })),
     opts,
   );
-  console.log("  ✅ Players seeded (12 Pro + 8 Youth)");
+  console.log("  ✅ Players seeded (12 Pro + 8 Amateur)");
 
   // ── 4. Contracts (12) ──
   const contractDefs = [

@@ -13,7 +13,7 @@ export interface ListPlayersQuery {
   order?: "asc" | "desc";
   search?: string;
   status?: "active" | "injured" | "inactive";
-  playerType?: "Pro" | "Youth";
+  playerType?: "Pro" | "Amateur";
   clubId?: string;
   position?: string;
   nationality?: string;
@@ -64,7 +64,7 @@ export interface EnrichedPlayerListItem {
   fullNameAr: string | null;
   dateOfBirth: string;
   nationality: string | null;
-  playerType: "Pro" | "Youth";
+  playerType: "Pro" | "Amateur";
   position: string | null;
   status: "active" | "injured" | "inactive";
   email: string | null;

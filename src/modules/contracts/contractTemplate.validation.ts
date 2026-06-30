@@ -16,7 +16,7 @@ const CATEGORIES = ["Club", "Sponsorship", "Agency"] as const;
 
 const defaultValuesSchema = z
   .object({
-    playerContractType: z.enum(["Professional", "Youth"]).optional(),
+    playerContractType: z.enum(["Professional", "Amateur"]).optional(),
     exclusivity: z.enum(["Exclusive", "NonExclusive"]).optional(),
     representationScope: z.enum(["Local", "International", "Both"]).optional(),
     baseSalary: z.number().positive().optional(),

@@ -2,7 +2,7 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
 export interface ContractTemplateDefaultValues {
-  playerContractType?: "Professional" | "Youth";
+  playerContractType?: "Professional" | "Amateur";
   exclusivity?: "Exclusive" | "NonExclusive";
   representationScope?: "Local" | "International" | "Both";
   baseSalary?: number;

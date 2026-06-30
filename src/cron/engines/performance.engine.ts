@@ -3,7 +3,7 @@
 //
 // Detects multi-match performance patterns that single-match
 // auto-tasks miss: declining trends, fatigue risk, breakout
-// youth players, minutes drought, and assist streaks.
+// amateur players, minutes drought, and assist streaks.
 // ═══════════════════════════════════════════════════════════════
 
 import { sequelize } from "@config/database";
@@ -481,7 +481,7 @@ export async function checkFatigueRisk(): Promise<{
 // ══════════════════════════════════════════════════════════════
 // JOB 3: Breakout Player Alert (weekly — Monday 10:30 AM)
 //
-// Youth players with avg rating ≥ 7.5 over last 5
+// Amateur players with avg rating ≥ 7.5 over last 5
 // matches → notify scouts + manager for promotion review.
 // ══════════════════════════════════════════════════════════════
 
@@ -524,7 +524,7 @@ export async function checkBreakoutPlayers(): Promise<{
     JOIN players p ON p.id = rs.player_id
     WHERE rs.rn <= :window
       AND p.status = 'active'
-      AND p.player_type = 'Youth'
+      AND p.player_type = 'Amateur'
     GROUP BY rs.player_id, p.first_name, p.last_name,
              p.first_name_ar, p.last_name_ar, p.player_type, p.position,
              p.agent_id, p.coach_id
@@ -583,7 +583,7 @@ export async function checkBreakoutPlayers(): Promise<{
 
   // Count total youth for stats
   const [countRow] = (await sequelize.query(
-    `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active' AND player_type = 'Youth'`,
+    `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active' AND player_type = 'Amateur'`,
     { type: QueryTypes.SELECT },
   )) as CountRow[];
 

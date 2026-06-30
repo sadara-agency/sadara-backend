@@ -215,7 +215,7 @@ export async function getContractStatusDistribution() {
   );
 }
 
-/** Active player count grouped by contract type: Professional / Youth. */
+/** Active player count grouped by contract type: Professional / Amateur. */
 export async function getPlayerDistribution() {
   return cacheOrFetch(
     `${P}:player-dist`,
