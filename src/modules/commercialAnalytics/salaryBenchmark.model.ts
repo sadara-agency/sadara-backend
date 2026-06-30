@@ -2,7 +2,7 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 
 export type SalaryTier = "low" | "mid" | "high";
-export type PlayerType = "Pro" | "Youth";
+export type PlayerType = "Pro" | "Amateur";
 
 export interface SalaryBenchmarkAttributes {
   id: string;

@@ -462,7 +462,7 @@ describe('Contract Service', () => {
       await expect(
         contractService.createAgencyRepresentationDraft({
           playerId: 'player-001',
-          playerContractType: 'Youth',
+          playerContractType: 'Amateur',
           createdBy: 'user-001',
         }),
       ).rejects.toThrow('Home agency not configured');
@@ -474,7 +474,7 @@ describe('Contract Service', () => {
       const fakeTx = { __fake: true } as any;
 
       await contractService.createAgencyRepresentationDraft(
-        { playerId: 'player-001', playerContractType: 'Youth', createdBy: 'user-001' },
+        { playerId: 'player-001', playerContractType: 'Amateur', createdBy: 'user-001' },
         fakeTx,
       );
 

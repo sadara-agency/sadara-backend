@@ -85,7 +85,7 @@
  *               representationScope: { type: string, enum: [Local, International, Both], default: Both }
  *               agentName: { type: string }
  *               agentLicense: { type: string }
- *               playerContractType: { type: string, enum: [Professional, Youth] }
+ *               playerContractType: { type: string, enum: [Professional, Amateur] }
  *               notes: { type: string }
  *     responses:
  *       201: { description: Contract created }

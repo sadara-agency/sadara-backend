@@ -18,9 +18,9 @@ interface PlayerAttributes {
   dateOfBirth: string | null;
   nationality?: string | null;
   secondaryNationality?: string | null;
-  playerType: "Pro" | "Youth";
+  playerType: "Pro" | "Amateur";
   playerPackage: string;
-  contractType: "Professional" | "Youth";
+  contractType: "Professional" | "Amateur";
   position?: string | null;
   secondaryPosition?: string | null;
   preferredFoot?: "Left" | "Right" | "Both" | null;
@@ -91,9 +91,9 @@ export class Player
   declare dateOfBirth: string | null;
   declare nationality: string | null;
   declare secondaryNationality: string | null;
-  declare playerType: "Pro" | "Youth";
+  declare playerType: "Pro" | "Amateur";
   declare playerPackage: string;
-  declare contractType: "Professional" | "Youth";
+  declare contractType: "Professional" | "Amateur";
   declare position: string | null;
   declare secondaryPosition: string | null;
   declare preferredFoot: "Left" | "Right" | "Both" | null;

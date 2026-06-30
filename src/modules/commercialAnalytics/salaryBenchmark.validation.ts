@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const TIERS = ["low", "mid", "high"] as const;
-const PLAYER_TYPES = ["Pro", "Youth"] as const;
+const PLAYER_TYPES = ["Pro", "Amateur"] as const;
 
 export const createSalaryBenchmarkSchema = z.object({
   position: z.string().min(1).max(20),
