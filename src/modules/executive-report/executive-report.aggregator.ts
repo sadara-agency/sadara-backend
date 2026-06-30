@@ -91,7 +91,7 @@ export async function aggregateExecutiveReportData(
     include: [
       {
         model: Club,
-        as: "currentClub",
+        as: "club",
         attributes: ["id", "name", "nameAr"],
         required: false,
       },
@@ -99,8 +99,7 @@ export async function aggregateExecutiveReportData(
   });
   if (!player) throw new AppError("Player not found", 404);
 
-  // currentClub association is optional; read defensively.
-  const club = (player as unknown as { currentClub?: Club | null }).currentClub;
+  const club = (player as unknown as { club?: Club | null }).club;
 
   // ── Season stats: latest row + prior row (DESC by season) ──
   const seasonRows = await getAllPlayerSeasonStats(playerId);
