@@ -462,7 +462,7 @@ describe('Contract Service', () => {
       await expect(
         contractService.createAgencyRepresentationDraft({
           playerId: 'player-001',
-          playerContractType: 'Amateur',
+          playerContractType: 'Youth',
           createdBy: 'user-001',
         }),
       ).rejects.toThrow('Home agency not configured');

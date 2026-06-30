@@ -2,7 +2,7 @@ import { DataTypes, Model, Optional } from "sequelize";
 import { sequelize } from "@config/database";
 import { encryptFields, decryptFields } from "@shared/utils/encryption";
 
-export type PlayerContractType = "Professional" | "Amateur" | "Youth";
+export type PlayerContractType = "Professional" | "Youth";
 
 interface ContractAttributes {
   id: string;
@@ -251,7 +251,7 @@ Contract.init(
       field: "contract_type",
     },
     playerContractType: {
-      type: DataTypes.ENUM("Professional", "Amateur", "Youth"),
+      type: DataTypes.STRING(50),
       allowNull: true,
       defaultValue: null,
       field: "player_contract_type",

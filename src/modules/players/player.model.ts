@@ -18,9 +18,9 @@ interface PlayerAttributes {
   dateOfBirth: string | null;
   nationality?: string | null;
   secondaryNationality?: string | null;
-  playerType: "Pro" | "Youth" | "Amateur";
+  playerType: "Pro" | "Youth";
   playerPackage: string;
-  contractType: "Professional" | "Amateur" | "Youth";
+  contractType: "Professional" | "Youth";
   position?: string | null;
   secondaryPosition?: string | null;
   preferredFoot?: "Left" | "Right" | "Both" | null;
@@ -91,9 +91,9 @@ export class Player
   declare dateOfBirth: string | null;
   declare nationality: string | null;
   declare secondaryNationality: string | null;
-  declare playerType: "Pro" | "Youth" | "Amateur";
+  declare playerType: "Pro" | "Youth";
   declare playerPackage: string;
-  declare contractType: "Professional" | "Amateur" | "Youth";
+  declare contractType: "Professional" | "Youth";
   declare position: string | null;
   declare secondaryPosition: string | null;
   declare preferredFoot: "Left" | "Right" | "Both" | null;
@@ -165,7 +165,7 @@ Player.init(
     nationality: { type: DataTypes.STRING },
     secondaryNationality: { type: DataTypes.STRING },
     playerType: {
-      type: DataTypes.ENUM("Pro", "Youth", "Amateur"),
+      type: DataTypes.STRING(50),
       defaultValue: "Pro",
     },
     playerPackage: {

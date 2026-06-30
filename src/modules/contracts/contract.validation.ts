@@ -12,7 +12,7 @@ const CONTRACT_TYPES = [
   "MedicalAuth",
   "Termination",
 ] as const;
-const PLAYER_CONTRACT_TYPES = ["Professional", "Amateur", "Youth"] as const;
+const PLAYER_CONTRACT_TYPES = ["Professional", "Youth"] as const;
 const CONTRACT_STATUSES = [
   "Active",
   "Expiring Soon",

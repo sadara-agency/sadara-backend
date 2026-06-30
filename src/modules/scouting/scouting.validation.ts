@@ -139,7 +139,7 @@ export const signProspectSchema = z.object({
   lastName: z.string().min(1).max(100),
   firstNameAr: z.string().max(100).optional(),
   lastNameAr: z.string().max(100).optional(),
-  playerType: z.enum(["Pro", "Youth", "Amateur"]),
+  playerType: z.enum(["Pro", "Youth"]),
   playerPackage: z.enum(["A+", "A", "B+", "B"]),
   nationalId: z.string().max(50).optional(),
   email: z.string().email().max(255).optional(),

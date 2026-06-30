@@ -481,7 +481,7 @@ export async function checkFatigueRisk(): Promise<{
 // ══════════════════════════════════════════════════════════════
 // JOB 3: Breakout Player Alert (weekly — Monday 10:30 AM)
 //
-// Youth/Amateur players with avg rating ≥ 7.5 over last 5
+// Youth players with avg rating ≥ 7.5 over last 5
 // matches → notify scouts + manager for promotion review.
 // ══════════════════════════════════════════════════════════════
 
@@ -524,7 +524,7 @@ export async function checkBreakoutPlayers(): Promise<{
     JOIN players p ON p.id = rs.player_id
     WHERE rs.rn <= :window
       AND p.status = 'active'
-      AND p.player_type IN ('Youth', 'Amateur')
+      AND p.player_type = 'Youth'
     GROUP BY rs.player_id, p.first_name, p.last_name,
              p.first_name_ar, p.last_name_ar, p.player_type, p.position,
              p.agent_id, p.coach_id
@@ -581,9 +581,9 @@ export async function checkBreakoutPlayers(): Promise<{
     }
   }
 
-  // Count total youth/amateur for stats
+  // Count total youth for stats
   const [countRow] = (await sequelize.query(
-    `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active' AND player_type IN ('Youth', 'Amateur')`,
+    `SELECT COUNT(*) AS cnt FROM players WHERE status = 'active' AND player_type = 'Youth'`,
     { type: QueryTypes.SELECT },
   )) as CountRow[];
 
