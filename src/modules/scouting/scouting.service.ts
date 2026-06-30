@@ -1039,7 +1039,7 @@ export async function signProspect(
     lastName: string;
     firstNameAr?: string;
     lastNameAr?: string;
-    playerType: "Pro" | "Youth" | "Amateur";
+    playerType: "Pro" | "Youth";
     playerPackage: "A+" | "A" | "B+" | "B";
     nationalId?: string;
     email?: string;
@@ -1074,12 +1074,7 @@ export async function signProspect(
   const wl = (sc as any).watchlist as Watchlist | undefined;
   if (!wl) throw new AppError("Prospect watchlist entry missing", 500);
 
-  const contractType =
-    input.playerType === "Pro"
-      ? "Professional"
-      : input.playerType === "Youth"
-        ? "Youth"
-        : "Amateur";
+  const contractType = input.playerType === "Pro" ? "Professional" : "Youth";
 
   const result = await sequelize.transaction(async (t) => {
     const player = await Player.create(

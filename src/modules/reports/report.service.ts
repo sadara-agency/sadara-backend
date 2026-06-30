@@ -461,7 +461,6 @@ export async function getPlayerPortfolioReport(filters: ReportFilters) {
       `SELECT
          COUNT(*)::INT AS total_players,
          COUNT(*) FILTER (WHERE contract_type = 'Professional')::INT AS professional,
-         COUNT(*) FILTER (WHERE contract_type = 'Amateur')::INT AS amateur,
          COUNT(*) FILTER (WHERE contract_type = 'Youth')::INT AS youth,
          COALESCE(SUM(market_value), 0)::NUMERIC AS total_market_value
        FROM players WHERE status = 'active'`,

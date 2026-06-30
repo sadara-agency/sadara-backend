@@ -186,7 +186,7 @@ export const expenseQuerySchema = z.object({
 // ── Dashboard Query ──
 
 export const dashboardQuerySchema = z.object({
-  playerContractType: z.enum(["Professional", "Amateur", "Youth"]).optional(),
+  playerContractType: z.enum(["Professional", "Youth"]).optional(),
   comparisonPeriod: z.enum(["MoM", "QoQ", "YoY"]).default("MoM"),
 });
 
