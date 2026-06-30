@@ -29,6 +29,20 @@ export async function up({
   );
   if (tableExists.length === 0) return; // baseline not yet applied — nothing to do
 
+  // Older prod baselines built `performances` without match_id. The unique
+  // index below references it, so add the column first if it's missing.
+  // migration-lint: disable-next-line
+  const matchIdExists = await sequelize.query(
+    `SELECT 1 FROM information_schema.columns WHERE table_name = 'performances' AND column_name = 'match_id' AND table_schema = 'public'`,
+    { type: QueryTypes.SELECT },
+  );
+  if (matchIdExists.length === 0) {
+    // migration-lint: disable-next-line
+    await sequelize.query(
+      `ALTER TABLE performances ADD COLUMN match_id UUID REFERENCES matches(id)`,
+    );
+  }
+
   // migration-lint: disable-next-line
   const uniqueIdxExists = await sequelize.query(
     `SELECT 1 FROM pg_indexes WHERE tablename = 'performances' AND indexname = 'performances_player_match_unique'`,
