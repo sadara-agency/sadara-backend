@@ -18,13 +18,12 @@ RUN npm run build
 FROM node:20-slim
 
 # Install Chromium + system libs for Puppeteer PDF generation
+# Fonts: Latin (liberation + noto-core) only. Arabic (IBM Plex) copied below.
+# CJK / color-emoji / noto-meta dropped — app is AR+EN only (~300MB saved).
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-liberation \
-    fonts-noto-color-emoji \
-    fonts-noto-cjk \
     fonts-noto-core \
-    fonts-noto \
     fontconfig \
     libatk-bridge2.0-0 \
     libatk1.0-0 \
