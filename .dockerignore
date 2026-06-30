@@ -18,6 +18,16 @@ docker-compose*
 .docker/
 .dockerignore
 
+# --- Build output & deps (rebuilt inside image) ---
+node_modules/
+dist/
+coverage/
+src/**/*.test.ts
+
+# --- Runtime dirs (created in image) ---
+uploads/
+logs/
+
 # --- Logs & Temp Files ---
 *.log
 npm-debug.log*
